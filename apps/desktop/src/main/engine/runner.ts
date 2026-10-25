@@ -144,23 +144,34 @@ export class TaskRunner {
     this.deciding.add(taskId);
     try {
       const kept: KeptCopy[] = [];
+      const trashed: string[] = [];
+      // Files in the Trash are gone from the task too, whatever the engine reports next, and even after a Stop.
+      const record = (t: Task) => {
+        let next = t;
+        for (const path of trashed)
+          next = applyEvent(next, { type: "file", change: { path, kind: "delete", role: "made" } }, this.now());
+        return { ...next, kept: [...(next.kept ?? []), ...kept] };
+      };
       if (allow) {
-        for (const path of approval.paths) {
-          if (approval.action === "delete") await this.guard.trash(task, path);
-          else kept.push(await this.guard.keep(task, path, "overwrite"));
+        try {
+          for (const path of approval.paths) {
+            if (approval.action === "delete") {
+              await this.guard.trash(task, path);
+              trashed.push(path);
+            } else kept.push(await this.guard.keep(task, path, "overwrite"));
+          }
+        } catch (err) {
+          // What was done before the failure stays recorded: a file already in the Trash, a copy already kept.
+          if (trashed.length || kept.length) this.save({ ...record(this.mustGet(taskId)), updatedAt: this.now() });
+          throw err;
         }
       }
-      let current = this.mustGet(taskId);
-      // Files in the Trash are gone from the task too, whatever the engine reports next, and even after a Stop.
-      if (allow && approval.action === "delete")
-        for (const path of approval.paths)
-          current = applyEvent(current, { type: "file", change: { path, kind: "delete", role: "made" } }, this.now());
-      const allKept = [...(current.kept ?? []), ...kept];
+      const current = record(this.mustGet(taskId));
       // Stop can land while the copies or the Trash are being done. Then the task stays as it is, with the copies
       // recorded, rather than going back to running with nothing running it.
       if (current.status !== "needs-you" || current.approval?.id !== approval.id)
-        return allow ? this.save({ ...current, kept: allKept, updatedAt: this.now() }) : current;
-      const next = this.save({ ...resume(current, this.now()), kept: allKept });
+        return allow ? this.save({ ...current, updatedAt: this.now() }) : current;
+      const next = this.save(resume(current, this.now()));
       this.engine.decide(taskId, approval.id, allow);
       return next;
     } finally {

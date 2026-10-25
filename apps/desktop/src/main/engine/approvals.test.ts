@@ -156,6 +156,25 @@ describe("approvals and Stop", () => {
     });
   });
 
+  it("keeps the record of a deletion done before a later one failed", async () => {
+    const { store, runner, task, work } = await setup();
+    const [a, b] = [join(work, "a.txt"), join(work, "b.txt")];
+    store.saveTask({ ...task, status: "needs-you", approval: { id: "ap", action: "delete", paths: [a, b] } });
+    (runner as unknown as { guard: unknown }).guard = {
+      keep: async () => {
+        throw new Error("no copies here");
+      },
+      trash: async (_t: Task, path: string) => {
+        if (path === b) throw new Error("b is locked");
+      },
+      restore: async () => {},
+    };
+    await expect(runner.decide(task.id, true)).rejects.toThrow(/locked/);
+    const files = store.getTask(task.id)?.files ?? [];
+    expect(files).toContainEqual({ path: a, kind: "delete", role: "made" });
+    expect(files.some((f) => f.path === b)).toBe(false);
+  });
+
   it("refuses a second restore while one is under way", async () => {
     const { runner, task, work, status } = await setup();
     const path = join(work, "Proposta.docx");
