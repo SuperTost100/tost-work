@@ -2315,3 +2315,23 @@ fieldset.fld > legend {
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--t3);
 }
+
+/* An action that failed, at the bottom of the window until dismissed */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  width: min(520px, calc(100% - 48px));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 16px;
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 12px 32px rgba(27, 23, 18, 0.14);
+  font-size: 14px;
+  z-index: 50;
+}

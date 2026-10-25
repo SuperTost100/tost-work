@@ -26,6 +26,40 @@ describe("starting and finishing a task", () => {
   });
 });
 
+describe("failures and double clicks", () => {
+  it("starts one task when Enter is pressed twice", async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    const box = screen.getByRole("textbox");
+    fireEvent.change(box, { target: { value: "Write a proposal" } });
+    await act(async () => {
+      fireEvent.keyDown(box, { key: "Enter" });
+      fireEvent.keyDown(box, { key: "Enter" });
+    });
+    expect(await api.tasks.list()).toHaveLength(1);
+  });
+
+  it("shows an answer that fails instead of dropping it", async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    const option = await screen.findByRole("button", { name: /We do/ });
+    // As when the task was stopped elsewhere and the answer arrives after the question is gone.
+    api.tasks.answer = async () => {
+      throw new Error("This task isn't waiting for an answer");
+    };
+    await act(async () => {
+      fireEvent.click(option);
+    });
+    expect(screen.getByRole("alert").textContent).toMatch(/isn't waiting for an answer/);
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
 describe("projects", () => {
   it("creates a project from a folder and names it after the folder", async () => {
     const api = createMemoryApi();

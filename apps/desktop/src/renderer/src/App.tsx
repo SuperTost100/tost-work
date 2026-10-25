@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
+import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
 import { Home } from "@/screens/Home";
 import { Project } from "@/screens/Project";
@@ -26,6 +27,9 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
   const [projectBrief, setProjectBrief] = useState("");
   const [projectId, setProjectId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const starting = useRef(false);
+  const report = (err: unknown) => setError(err instanceof Error ? err.message : String(err));
   const isMac = api?.platform === "darwin";
 
   const section: Section | null = useMemo(() => {
@@ -49,10 +53,19 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
   };
 
   const start = async (text: string, inProject: string | null, clear: () => void) => {
-    if (!api || !text.trim()) return;
-    const task = await api.tasks.start({ projectId: inProject, brief: text.trim() });
-    clear();
-    setRoute({ name: "task", id: task.id });
+    // Enter and the send button can both fire before the first start returns.
+    if (!api || !text.trim() || starting.current) return;
+    starting.current = true;
+    setError(null);
+    try {
+      const task = await api.tasks.start({ projectId: inProject, brief: text.trim() });
+      clear();
+      setRoute({ name: "task", id: task.id });
+    } catch (err) {
+      report(err);
+    } finally {
+      starting.current = false;
+    }
   };
 
   const sectionTitle: Record<"skills" | "jobs" | "board" | "settings", string> = {
@@ -105,10 +118,11 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
     const project = task?.projectId ? (projects.find((p) => p.id === task.projectId) ?? null) : null;
     screen = task ? (
       <Task
+        key={task.id}
         task={task}
         project={project}
-        onAnswer={(answer) => void api?.tasks.answer(task.id, answer)}
-        onStop={() => void api?.tasks.stop(task.id)}
+        onAnswer={(answer) => void api?.tasks.answer(task.id, answer).catch(report)}
+        onStop={() => void api?.tasks.stop(task.id).catch(report)}
         onOpenProject={() => project && setRoute({ name: "project", id: project.id })}
       />
     ) : null;
@@ -128,6 +142,14 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
         onOpenTask={(id) => setRoute({ name: "task", id })}
       />
       {screen ?? <div className="main" />}
+      {error && (
+        <div className="toast" role="alert">
+          <span className="grow">{error}</span>
+          <button type="button" className="iconbtn" aria-label={t("common.dismiss")} onClick={() => setError(null)}>
+            <Icon name="close" />
+          </button>
+        </div>
+      )}
       {api && (
         <NewProjectDialog
           api={api}

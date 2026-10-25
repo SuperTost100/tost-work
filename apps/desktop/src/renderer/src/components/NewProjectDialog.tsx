@@ -1,5 +1,5 @@
 import { Dialog } from "@base-ui/react/dialog";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { Project } from "../../../shared/model";
@@ -22,6 +22,9 @@ export function NewProjectDialog({
   const [description, setDescription] = useState("");
   const [folder, setFolder] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The ref stops a double click in the same tick; the state greys the button out.
+  const creating = useRef(false);
+  const [busy, setBusy] = useState(false);
 
   const choose = async () => {
     const picked = await api.projects.pickFolder();
@@ -32,7 +35,9 @@ export function NewProjectDialog({
   };
 
   const create = async () => {
-    if (!folder || !name.trim()) return;
+    if (creating.current || !folder || !name.trim()) return;
+    creating.current = true;
+    setBusy(true);
     try {
       const project = await api.projects.create({ name: name.trim(), description: description.trim(), folder });
       onCreated(project);
@@ -43,6 +48,9 @@ export function NewProjectDialog({
       onOpenChange(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      creating.current = false;
+      setBusy(false);
     }
   };
 
@@ -72,7 +80,7 @@ export function NewProjectDialog({
           {error && <p className="fld-error">{error}</p>}
           <div className="row" style={{ justifyContent: "flex-end", marginTop: 6 }}>
             <Dialog.Close className="btn">{t("dialog.cancel")}</Dialog.Close>
-            <button type="button" className="btn dark" disabled={!folder || !name.trim()} onClick={create}>
+            <button type="button" className="btn dark" disabled={busy || !folder || !name.trim()} onClick={create}>
               {t("dialog.create")}
             </button>
           </div>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Composer } from "@/components/Composer";
 import { TaskTag } from "@/components/TaskTag";
 import { Icon } from "@/lib/Icon";
+import { keyed } from "@/lib/keys";
 import { useT } from "@/lib/useT";
 import type { FileChange, Project, ReviewItem, Task as TaskT } from "../../../shared/model";
 
@@ -45,8 +46,8 @@ function Checks({ title, items, icon }: { title: string; items: ReviewItem[]; ic
   return (
     <>
       <div className="grp-k">{title}</div>
-      {items.map((item) => (
-        <div className="chk" key={item.text}>
+      {keyed(items, (item) => item.text).map(([key, item]) => (
+        <div className="chk" key={key}>
           <Icon name={icon} className={icon === "check" ? "ok" : undefined} />
           <span>
             {item.text}
@@ -115,21 +116,21 @@ export function Task({
                       {t("task.step", { n: String(current + 1), total: String(task.steps.length) })}
                     </p>
                   )}
-                  {task.steps.map((s) => (
-                    <div key={s.text} className={s.status === "in_progress" ? "now" : undefined}>
+                  {keyed(task.steps, (s) => s.text).map(([key, s]) => (
+                    <div key={key} className={s.status === "in_progress" ? "now" : undefined}>
                       <Icon name={s.status === "done" ? "check" : s.status === "in_progress" ? "pencil" : "time"} />
                       {s.text}
                     </div>
                   ))}
                 </div>
               )}
-              {agentNotes.map((m) =>
+              {keyed(agentNotes, (m) => `${m.from}:${m.at}`).map(([key, m]) =>
                 m.from === "user" ? (
-                  <div className="you" style={{ marginTop: 18 }} key={m.at}>
+                  <div className="you" style={{ marginTop: 18 }} key={key}>
                     {m.text}
                   </div>
                 ) : (
-                  <p className="agent" key={m.at}>
+                  <p className="agent" key={key}>
                     {m.text}
                   </p>
                 ),

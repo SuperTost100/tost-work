@@ -62,6 +62,7 @@ const en = {
   "tag.toReview": "to review",
   "tag.stopped": "stopped",
   "tag.failed": "failed",
+  "common.dismiss": "Dismiss",
   "soon.title": "{section} arrives in a later version.",
   "soon.body": "It's part of the plan for 0.1.0. For now, start tasks from New task or from a project.",
 } as const;
@@ -131,6 +132,7 @@ const it: Record<MessageKey, string> = {
   "tag.toReview": "da rivedere",
   "tag.stopped": "interrotta",
   "tag.failed": "non riuscita",
+  "common.dismiss": "Chiudi",
   "soon.title": "{section} arriva in una versione successiva.",
   "soon.body": "Fa parte del piano per la 0.1.0. Per ora avvia le attività da Nuova attività o da un progetto.",
 };
