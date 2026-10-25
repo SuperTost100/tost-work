@@ -1,6 +1,7 @@
 import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
 import { useT } from "@/lib/useT";
+import type { Task } from "../../../shared/model";
 
 export type Section = "home" | "projects" | "skills" | "jobs" | "board" | "settings";
 
@@ -21,11 +22,17 @@ export function Sidebar({
   onNavigate,
   userName,
   isMac,
+  tasks,
+  openTaskId,
+  onOpenTask,
 }: {
-  current: Section;
+  current: Section | null;
   onNavigate: (s: Section) => void;
   userName: string;
   isMac: boolean;
+  tasks: Task[];
+  openTaskId: string | null;
+  onOpenTask: (id: string) => void;
 }) {
   const t = useT();
   return (
@@ -61,9 +68,23 @@ export function Sidebar({
         ))}
       </nav>
       <h4>{t("nav.recent")}</h4>
-      <p className="t3" style={{ fontSize: 13, padding: "0 8px" }}>
-        {t("recent.empty")}
-      </p>
+      {tasks.length === 0 && (
+        <p className="t3" style={{ fontSize: 13, padding: "0 8px" }}>
+          {t("recent.empty")}
+        </p>
+      )}
+      {tasks.slice(0, 8).map((task) => (
+        <button
+          type="button"
+          key={task.id}
+          className={`rec split${openTaskId === task.id ? " on" : ""}`}
+          aria-current={openTaskId === task.id ? "page" : undefined}
+          onClick={() => onOpenTask(task.id)}
+        >
+          <span className="truncate">{task.title}</span>
+          {task.status === "needs-you" && <span className="tag mine">{t("tag.needsYou")}</span>}
+        </button>
+      ))}
       <span className="spacer" />
       <div className="me">
         <span className="avatar">{userName.slice(0, 1).toUpperCase()}</span>

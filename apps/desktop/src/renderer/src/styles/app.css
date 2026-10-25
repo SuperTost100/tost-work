@@ -2143,3 +2143,175 @@ textarea:focus-visible {
   opacity: 0.35;
   cursor: default;
 }
+
+/* ===== App controls that the mockup only drew ===== */
+button.item,
+button.notice,
+button.pcard,
+button.rec {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+button.notice {
+  border: 0;
+}
+button.item {
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+}
+.link {
+  color: var(--t2);
+}
+.link:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.iconbtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.composer textarea:disabled {
+  cursor: default;
+}
+
+/* Menus (Base UI) */
+.menu {
+  min-width: 220px;
+  padding: 5px;
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 12px 32px rgba(27, 23, 18, 0.14);
+  outline: none;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: default;
+  outline: none;
+}
+.menu-item[data-highlighted] {
+  background: var(--hover);
+}
+.menu-check {
+  margin-left: auto;
+  width: 15px;
+  height: 15px;
+}
+.menu-sep {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--line-2);
+}
+
+/* Dialogs (Base UI) */
+.dlg-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(250, 248, 244, 0.7);
+  backdrop-filter: blur(2px);
+}
+:root[data-theme="dark"] .dlg-backdrop {
+  background: rgba(20, 18, 16, 0.7);
+}
+.dlg {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(520px, calc(100vw - 48px));
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  border-radius: 16px;
+  background: var(--canvas);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 24px 70px rgba(0, 0, 0, 0.18);
+}
+.dlg-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.fld {
+  display: grid;
+  gap: 6px;
+}
+.fld > span:first-child {
+  font-size: 12.5px;
+  color: var(--t3);
+}
+.fld-path {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fld-error {
+  color: var(--need);
+  font-size: 13px;
+}
+.input {
+  height: 36px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font:
+    400 14.5px "Schibsted Grotesk",
+    sans-serif;
+}
+.input:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+fieldset.fld {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+fieldset.fld > legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  color: var(--t3);
+}
+
+/* Thin scrollbars in the palette, on every platform. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--t3);
+}
