@@ -78,3 +78,21 @@ The sidebar in A wasn't loved, and none of the directions had good jobs.
 - New screen "Quick edit, new file": the side panel shows the new file with a preview and what the agent decided, like a small done task.
 - Jobs are one list grouped by next run (tomorrow, later this week, next week, off). Each row carries its next run and its last run with the file.
 - "New job" opens a large window over the jobs page, with the four steps on the left and the job written out as a sentence as you fill it in.
+
+## Round 4, 2026-10-25
+
+| Area | Verdict |
+| --- | --- |
+| Chat above the box | Good. History shows above it. |
+| Agent questions | Should offer ready answers to click, plus a free answer, as some note-taking apps do. |
+| Jobs | Simple and understandable. |
+| New job | The flow works. The window sat too high, which is a UI point. |
+| Quick edit | It must handle anything the AI can do: edit the original, make one new file, or make ten. |
+
+## What round 5 changed
+
+- Agent questions show as a card above the box, with clickable answers and a line inviting your own. The agent keeps working on other parts while it waits.
+- All quick edits share one "What changed" panel, grouped into edited and new files, followed by what the agent decided.
+- Editing the original keeps a copy of it as it was, with a Restore button.
+- New screen "Quick edit, many files": one original edited and four new files, with a preview of the selected one.
+- The New job window is centred on the page.
