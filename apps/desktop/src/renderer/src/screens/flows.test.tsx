@@ -116,12 +116,16 @@ describe("the answer draft", () => {
     // The send succeeds later, and the question stays open, so the box stays on screen.
     const [waiting] = await api.tasks.list();
     let finish = () => {};
-    api.tasks.answer = () =>
-      new Promise((resolve) => {
+    let sent = "";
+    api.tasks.answer = (_id, answer) => {
+      sent = answer;
+      return new Promise((resolve) => {
         finish = () => waiting && resolve(waiting);
       });
+    };
     fireEvent.change(box, { target: { value: "Half and half" } });
     fireEvent.keyDown(box, { key: "Enter" });
+    expect(sent).toBe("Half and half");
     fireEvent.change(box, { target: { value: "Also add a note" } });
     await act(async () => finish());
     expect(box.value).toBe("Also add a note");
