@@ -72,3 +72,17 @@ describe("titleFrom", () => {
     );
   });
 });
+
+describe("TaskRunner notifications", () => {
+  it("finishes the task even when the change callback throws", async () => {
+    const store = new Store(":memory:");
+    const engine = new FakeEngine({ ...PROPOSAL_SCRIPT, question: undefined }, 0);
+    const runner = new TaskRunner(store, engine, () => {
+      throw new Error("Object has been destroyed");
+    });
+    const task = runner.create({ projectId: null, brief: "Write a proposal", attachments: ["/notes.docx"] });
+    const final = await runner.start(task.id, "/tmp/p");
+    expect(final.status).toBe("done");
+    expect(store.getTask(task.id)?.attachments).toEqual(["/notes.docx"]);
+  });
+});

@@ -57,4 +57,13 @@ describe("Store", () => {
     expect(s.getTask("q")?.question).toBeNull();
     expect(s.getTask("d")?.status).toBe("done");
   });
+
+  it("stops interrupted tasks however old they are", () => {
+    const s = new Store(":memory:");
+    s.saveTask(task("old-running", "running", "2026-01-01T00:00:00Z"));
+    for (let i = 0; i < 1100; i++)
+      s.saveTask(task(`d${i}`, "done", `2026-10-01T00:00:${String(i % 60).padStart(2, "0")}Z`));
+    expect(s.stopInterrupted("2026-10-02T00:00:00Z")).toBe(1);
+    expect(s.getTask("old-running")?.status).toBe("stopped");
+  });
 });

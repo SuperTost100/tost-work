@@ -7,12 +7,7 @@ import { IPC, type NewProjectInput, type NewTaskInput } from "../shared/api";
 import type { Project } from "../shared/model";
 import type { TaskRunner } from "./engine/runner";
 import type { Store } from "./store/store";
-
-const text = (v: unknown, field: string, max = 20_000): string => {
-  if (typeof v !== "string") throw new Error(`${field} must be text`);
-  if (v.length > max) throw new Error(`${field} is too long`);
-  return v;
-};
+import { absolutePath, paths, text } from "./validate";
 
 /** Validates everything that comes from the interface, because IPC is a trust boundary. */
 export function registerIpc(store: Store, runner: TaskRunner, window: () => BrowserWindow | null): void {
@@ -20,7 +15,7 @@ export function registerIpc(store: Store, runner: TaskRunner, window: () => Brow
 
   ipcMain.handle(IPC.projectsCreate, (_e, input: NewProjectInput) => {
     const name = text(input?.name, "name", 200).trim();
-    const folder = text(input?.folder, "folder", 4096);
+    const folder = absolutePath(input?.folder, "folder");
     if (!name) throw new Error("A project needs a name");
     const project: Project = {
       id: randomUUID(),
@@ -50,7 +45,7 @@ export function registerIpc(store: Store, runner: TaskRunner, window: () => Brow
     const projectId = input?.projectId == null ? null : text(input.projectId, "projectId", 100);
     const project = projectId ? store.getProject(projectId) : undefined;
     if (projectId && !project) throw new Error("That project doesn't exist");
-    const task = runner.create({ projectId, brief });
+    const task = runner.create({ projectId, brief, attachments: paths(input?.attachments, "attachments") });
     // A task without a project works in a temporary folder of its own, as a quick edit does.
     const workdir = project?.folder ?? join(tmpdir(), "tost-work", "quick", task.id);
     if (!project) await mkdir(workdir, { recursive: true });

@@ -105,7 +105,11 @@ export class TaskRunner {
 
   private save(task: Task): Task {
     this.store.saveTask(task);
-    this.onChange(task);
+    try {
+      this.onChange(task);
+    } catch {
+      // A failed notification must not fail the task: the task is saved, and the window reloads it from the store.
+    }
     return task;
   }
 }

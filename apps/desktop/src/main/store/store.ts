@@ -67,14 +67,14 @@ export class Store {
 
   /** Tasks that were running when the app quit can't continue, so they are marked stopped on the next start. */
   stopInterrupted(at: string): number {
-    let count = 0;
-    for (const task of this.listTasks(1000)) {
-      if (task.status === "running" || task.status === "needs-you") {
-        this.saveTask({ ...task, status: "stopped", question: null, approval: null, updatedAt: at });
-        count++;
-      }
+    const rows = this.db.prepare("select data from tasks where status in ('running', 'needs-you')").all() as {
+      data: string;
+    }[];
+    for (const row of rows) {
+      const task = JSON.parse(row.data) as Task;
+      this.saveTask({ ...task, status: "stopped", question: null, approval: null, updatedAt: at });
     }
-    return count;
+    return rows.length;
   }
 
   close(): void {
