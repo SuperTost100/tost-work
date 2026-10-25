@@ -1,11 +1,19 @@
-import { useState } from "react";
 import { Icon } from "@/lib/Icon";
 import { greetingKey } from "@/lib/i18n";
 import { useT } from "@/lib/useT";
 
-export function Home({ userName, now = new Date() }: { userName: string; now?: Date }) {
+export function Home({
+  userName,
+  brief,
+  onBriefChange,
+  now = new Date(),
+}: {
+  userName: string;
+  brief: string;
+  onBriefChange: (text: string) => void;
+  now?: Date;
+}) {
   const t = useT();
-  const [brief, setBrief] = useState("");
   return (
     <div className="main">
       <div className="top" />
@@ -23,7 +31,7 @@ export function Home({ userName, now = new Date() }: { userName: string; now?: D
               aria-label={t("composer.placeholder")}
               placeholder={t("composer.placeholder")}
               value={brief}
-              onChange={(e) => setBrief(e.target.value)}
+              onChange={(e) => onBriefChange(e.target.value)}
             />
             <div className="in">
               <button type="button" className="iconbtn" title={t("composer.attach")} aria-label={t("composer.attach")}>

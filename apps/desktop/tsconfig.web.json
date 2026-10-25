@@ -6,5 +6,5 @@
     "types": ["vite/client"],
     "paths": { "@/*": ["./src/renderer/src/*"] }
   },
-  "include": ["src/renderer/src/**/*", "src/preload/*.d.ts", "src/shared/**/*", "vitest.config.ts"]
+  "include": ["src/renderer/src/**/*", "src/preload/*.d.ts", "src/shared/**/*", "src/test-setup.ts", "vitest.config.ts"]
 }

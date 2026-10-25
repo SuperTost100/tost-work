@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { App } from "./App";
 
@@ -15,5 +15,13 @@ describe("App", () => {
     render(<App userName="Giulia" />);
     const start = screen.getAllByRole("button", { name: "Start task" })[0] as HTMLButtonElement;
     expect(start.disabled).toBe(true);
+  });
+
+  it("keeps the brief when the user visits another section and comes back", () => {
+    render(<App userName="Giulia" />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Summarise the contract" } });
+    fireEvent.click(screen.getByRole("button", { name: "Projects" }));
+    fireEvent.click(screen.getByRole("button", { name: "New task" }));
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Summarise the contract");
   });
 });
