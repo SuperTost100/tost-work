@@ -1,0 +1,6 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+reviews:
+  auto_review:
+    enabled: true
+    # Stacked pull requests target the branch below them, not main, and still need a review.
+    base_branches: [".*"]
