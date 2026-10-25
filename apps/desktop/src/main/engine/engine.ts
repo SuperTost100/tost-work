@@ -5,6 +5,8 @@ export interface RunContext {
   project: Project | null;
   /** Folder the agent works in: the project folder, or the quick edit's temporary folder. */
   workdir: string;
+  /** The user's new message when this run continues a finished task, null on the first run. */
+  followUp: string | null;
   signal: AbortSignal;
 }
 

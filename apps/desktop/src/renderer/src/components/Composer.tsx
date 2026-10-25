@@ -2,6 +2,13 @@ import type { ReactNode } from "react";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
 
+/** Files attached to a brief, kept by whoever owns the brief so they survive a trip to another section. */
+export interface Attachments {
+  files: string[];
+  onAdd: () => void;
+  onRemove: (path: string) => void;
+}
+
 /** The quiet box from the mockups: text, attach, send. Settings go underneath, never inside. */
 export function Composer({
   value,
@@ -13,6 +20,7 @@ export function Composer({
   minHeight,
   children,
   className,
+  attach,
 }: {
   value: string;
   onChange: (text: string) => void;
@@ -24,6 +32,8 @@ export function Composer({
   /** Shown above the text field, for example the answer choices of a question. */
   children?: ReactNode;
   className?: string;
+  /** Without it the attach button stays off. */
+  attach?: Attachments;
 }) {
   const t = useT();
   const canSend = !disabled && value.trim().length > 0;
@@ -51,11 +61,30 @@ export function Composer({
           className="iconbtn"
           title={t("composer.attach")}
           aria-label={t("composer.attach")}
-          disabled
+          disabled={disabled || !attach}
+          onClick={attach?.onAdd}
         >
           <Icon name="add" />
         </button>
-        <span className="grow" />
+        <span className="atts">
+          {attach?.files.map((path) => {
+            const name = path.split(/[\\/]/).pop() ?? path;
+            return (
+              <span className="attached" key={path} title={path}>
+                <Icon name="file" />
+                <span className="truncate">{name}</span>
+                <button
+                  type="button"
+                  className="x"
+                  aria-label={t("composer.remove", { name })}
+                  onClick={() => attach.onRemove(path)}
+                >
+                  <Icon name="close" />
+                </button>
+              </span>
+            );
+          })}
+        </span>
         <button
           type="button"
           className="send"
