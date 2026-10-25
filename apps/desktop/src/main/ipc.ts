@@ -74,6 +74,10 @@ export function registerIpc(store: Store, runner: TaskRunner, window: () => Brow
     runner.answer(text(id, "id", 100), text(answer, "answer", 5000)),
   );
   ipcMain.handle(IPC.tasksStop, (_e, id: unknown) => runner.stop(text(id, "id", 100)));
+  ipcMain.handle(IPC.tasksDecide, (_e, id: unknown, allow: unknown) => {
+    if (typeof allow !== "boolean") throw new Error("allow must be true or false");
+    return runner.decide(text(id, "id", 100), allow);
+  });
   ipcMain.handle(IPC.tasksFollowUp, (_e, id: unknown, message: unknown) => {
     const taskId = text(id, "id", 100);
     const body = text(message, "message").trim();
@@ -133,5 +137,8 @@ export function registerIpc(store: Store, runner: TaskRunner, window: () => Brow
   });
   ipcMain.handle(IPC.filesReveal, async (_e, taskId: unknown, path: unknown) =>
     shell.showItemInFolder(await fileOf(taskId, path)),
+  );
+  ipcMain.handle(IPC.filesRestore, (_e, taskId: unknown, path: unknown) =>
+    runner.restore(text(taskId, "taskId", 100), absolutePath(path, "path")),
   );
 }

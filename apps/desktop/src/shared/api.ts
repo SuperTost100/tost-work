@@ -46,6 +46,8 @@ export interface TostWorkApi {
     /** Creates the task and starts it right away. */
     start(input: NewTaskInput): Promise<Task>;
     answer(id: string, answer: string): Promise<Task>;
+    /** Allows or refuses the overwrite or delete the task asked for. */
+    decide(id: string, allow: boolean): Promise<Task>;
     /** Sends another instruction to a task that finished or stopped, and runs it again. */
     followUp(id: string, text: string): Promise<Task>;
     /** Asks for a folder, every time, and copies the files the task made into it. Null when the user cancels. */
@@ -63,6 +65,8 @@ export interface TostWorkApi {
     open(taskId: string, path: string): Promise<void>;
     /** Shows the file in Finder or Explorer. */
     reveal(taskId: string, path: string): Promise<void>;
+    /** Puts back the copy kept before the file was replaced. Restoring again undoes it. */
+    restore(taskId: string, path: string): Promise<Task>;
   };
 }
 
@@ -78,6 +82,7 @@ export const IPC = {
   tasksStart: "tasks:start",
   tasksAnswer: "tasks:answer",
   tasksStop: "tasks:stop",
+  tasksDecide: "tasks:decide",
   tasksFollowUp: "tasks:follow-up",
   tasksSaveCopy: "tasks:save-copy",
   taskChanged: "tasks:changed",
@@ -85,4 +90,5 @@ export const IPC = {
   filesRead: "files:read",
   filesOpen: "files:open",
   filesReveal: "files:reveal",
+  filesRestore: "files:restore",
 } as const;

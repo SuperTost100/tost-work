@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { Project, Task } from "../../shared/model";
+import type { KeptCopy, Project, Task } from "../../shared/model";
 import { applyEvent, resume } from "../../shared/reduce";
+import type { Guard } from "../guard";
 import type { Store } from "../store/store";
 import type { Engine } from "./engine";
 
@@ -22,15 +23,24 @@ export function titleFrom(brief: string, max = 60): string {
   return `${space > 20 ? cut.slice(0, space) : cut}…`;
 }
 
+const REFUSE: Guard = {
+  keep: () => Promise.reject(new Error("No guard is set up to keep copies")),
+  trash: () => Promise.reject(new Error("No guard is set up to move files to the Trash")),
+  restore: () => Promise.reject(new Error("No guard is set up to restore copies")),
+};
+
 /** Starts tasks on an engine, keeps each task's state in the store and reports every change. */
 export class TaskRunner {
   private running = new Map<string, AbortController>();
+  /** Tasks whose decision is being carried out, so a double click can't trash or copy twice. */
+  private deciding = new Set<string>();
 
   constructor(
     private store: Store,
     private engine: Engine,
     private onChange: (task: Task) => void,
     private now: () => string = () => new Date().toISOString(),
+    private guard: Guard = REFUSE,
   ) {}
 
   create(input: NewTask): Task {
@@ -116,6 +126,45 @@ export class TaskRunner {
       messages: [...task.messages, { from: "user", text, at, followUp: true }],
       updatedAt: at,
     });
+  }
+
+  /**
+   * Carries out the user's decision on an overwrite or delete, then tells the engine. Allowed overwrites keep a copy
+   * first and allowed deletions go to the Trash, both done here so they don't depend on the agent.
+   */
+  async decide(taskId: string, allow: boolean): Promise<Task> {
+    const task = this.mustGet(taskId);
+    const approval = task.approval;
+    if (!approval) throw new Error("This task isn't waiting for a decision");
+    if (this.deciding.has(taskId)) throw new Error("This decision is already being carried out");
+    this.deciding.add(taskId);
+    try {
+      const kept: KeptCopy[] = [];
+      if (allow) {
+        for (const path of approval.paths) {
+          if (approval.action === "delete") await this.guard.trash(task, path);
+          else kept.push(await this.guard.keep(task, path, "overwrite"));
+        }
+      }
+      const current = this.mustGet(taskId);
+      const next = this.save({ ...resume(current, this.now()), kept: [...(current.kept ?? []), ...kept] });
+      this.engine.decide(taskId, approval.id, allow);
+      return next;
+    } finally {
+      this.deciding.delete(taskId);
+    }
+  }
+
+  /** Puts back the newest kept copy of a file. The version it replaces is kept too, so restoring can be undone. */
+  async restore(taskId: string, path: string): Promise<Task> {
+    const task = this.mustGet(taskId);
+    if (this.running.has(taskId)) throw new Error("Wait for the task to finish before restoring");
+    const latest = (task.kept ?? []).filter((k) => k.path === path).at(-1);
+    if (!latest) throw new Error("There's no kept copy of that file");
+    const current = await this.guard.keep(task, path, "restore");
+    await this.guard.restore(task, latest);
+    const at = this.now();
+    return this.save({ ...task, kept: [...(task.kept ?? []), current], updatedAt: at });
   }
 
   stop(taskId: string): void {

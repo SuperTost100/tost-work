@@ -43,6 +43,13 @@ export async function savablePaths(task: Task): Promise<string[]> {
   return real;
 }
 
+/** A file inside the task's folder, resolved through symlinks. Throws for anything outside, so a link can't point out. */
+export async function taskFile(task: Task, path: string): Promise<string> {
+  const real = await realpath(path);
+  if (!inside(await realpath(task.workdir), real)) throw new Error("That file is outside the task's folder");
+  return real;
+}
+
 export const describe = (path: string) => ({ name: basename(path), ext: extname(path).slice(1).toLowerCase() });
 
 const exists = (path: string) =>

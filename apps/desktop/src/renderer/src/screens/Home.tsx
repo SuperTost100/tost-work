@@ -1,3 +1,4 @@
+import { approvalTitle } from "@/components/Approval";
 import { type Attachments, Composer } from "@/components/Composer";
 import { ProjectPicker } from "@/components/ProjectPicker";
 import { TaskTag } from "@/components/TaskTag";
@@ -76,7 +77,7 @@ export function Home({
               </span>
               <div>
                 <b>{task.title}</b>
-                <p>{task.question?.text}</p>
+                <p>{task.question?.text ?? (task.approval && approvalTitle(t, task.approval))}</p>
               </div>
             </button>
           ))}

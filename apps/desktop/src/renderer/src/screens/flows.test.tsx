@@ -208,6 +208,40 @@ describe("quick edit", () => {
   });
 });
 
+describe("approvals", () => {
+  it("asks before an overwrite, then lets the user restore the old version", async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Update the proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: /We do/ }));
+    });
+    await screen.findByText("Check it against your brief");
+
+    act(() =>
+      api.emit("t1", {
+        type: "approval",
+        approval: { id: "a1", action: "overwrite", paths: ["/tmp/Proposta.docx"] },
+      }),
+    );
+    expect(screen.getByText("The task wants to replace Proposta.docx")).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Allow overwrite" }));
+    });
+    expect(screen.queryByRole("button", { name: "Allow overwrite" })).toBeNull();
+    expect(screen.getByText("The version before the edit is kept")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    });
+    expect(screen.getByText("You restored the earlier version")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Undo" })).toBeTruthy();
+  });
+});
+
 describe("projects", () => {
   it("creates a project from a folder and names it after the folder", async () => {
     const api = createMemoryApi();
