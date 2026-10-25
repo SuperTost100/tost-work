@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Tost Work · Mockup C · Board</title>
+<link rel="stylesheet" href="../shared/wire.css">
+<style>
+  .screen { flex-direction: column; }
+  .topbar { display: flex; align-items: center; gap: 4px; padding: 0 14px; height: 50px; border-bottom: 1px solid var(--line); flex: none; }
+  .topbar .ptab { padding: 6px 10px; border-radius: var(--radius); color: var(--ink-2); white-space: nowrap; }
+  .topbar .ptab:hover { background: var(--bg-2); }
+  .topbar .ptab.on { background: var(--bg-3); color: var(--ink); font-weight: 500; }
+  .topbar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 6px; }
+  .area { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+  .area-head { display: flex; align-items: center; gap: 10px; padding: 16px 20px 12px; }
+  .lanes { flex: 1; min-height: 0; display: grid; grid-template-columns: 220px repeat(4, 1fr); gap: 10px; padding: 0 20px 20px; }
+  .col { background: var(--bg-2); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; overflow: auto; }
+  .col.sched { background: transparent; border: 1px dashed var(--line); }
+  .col h3 { font-size: 13px; display: flex; justify-content: space-between; padding: 2px 4px 2px; }
+  .card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; display: grid; gap: 6px; }
+  a.card:hover { border-color: #c2c2c2; }
+  .card.sel { outline: 2px solid var(--accent); }
+  .card .foot { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .card.ghost { border-style: dashed; background: transparent; color: var(--muted); }
+  .newcard textarea { border: 0; width: 100%; resize: none; font: inherit; min-height: 96px; padding: 0; }
+  .newcard textarea:focus { outline: none; }
+  .scrim { position: absolute; inset: 0; background: rgba(250,250,250,.7); }
+  .sheet { position: absolute; top: 0; right: 0; bottom: 0; width: min(880px, 66%); background: var(--bg); border-left: 1px solid var(--line); box-shadow: -10px 0 30px rgba(0,0,0,.06); display: grid; grid-template-columns: 1fr 290px; }
+  .sheet .left { overflow: auto; padding: 22px 26px; }
+  .sheet .rightcol { border-left: 1px solid var(--line); overflow: auto; padding: 14px; background: var(--bg-2); }
+  .sheet .rightcol .panel-convo { display: none; }
+  .sheet .rightcol.open .panel-convo { display: block; }
+  .sheet .rightcol.open .panel-files { display: none; }
+  .t-files, .open .t-convo { color: var(--ink) !important; border-color: var(--ink) !important; }
+  .open .t-files { color: var(--muted) !important; border-color: transparent !important; }
+  .pgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 0 20px 20px; }
+  .mini { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .mini span { background: var(--bg-2); border-radius: 4px; padding: 6px; font-size: 11.5px; color: var(--muted); text-align: center; }
+  .sgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .week { display: grid; grid-template-columns: 56px repeat(7, 1fr); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .week > div { border-left: 1px solid var(--line-2); border-top: 1px solid var(--line-2); min-height: 44px; padding: 4px; font-size: 12px; }
+  .week .h { background: var(--bg-2); font-weight: 500; text-align: center; border-top: 0; min-height: 0; padding: 6px; }
+  .week .t { color: var(--muted); border-left: 0; text-align: right; padding-right: 8px; }
+  .ev { display: block; background: var(--accent-bg); color: var(--accent); border-radius: 4px; padding: 3px 6px; font-size: 11.5px; }
+  .ev.warn { background: var(--warn-bg); color: var(--warn); }
+  .ev.off { background: var(--bg-3); color: var(--muted); }
+  .swim { display: grid; grid-template-columns: 170px repeat(4, 1fr); gap: 8px; padding: 0 20px; }
+  .swim .lab { padding: 10px 4px; font-weight: 500; }
+  .swim .cell { background: var(--bg-2); border-radius: 8px; padding: 8px; display: grid; gap: 6px; align-content: start; min-height: 70px; }
+  .swim .hd { font-size: 12.5px; color: var(--muted); padding: 0 4px; }
+  .modal { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 560px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,.12); }
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="titlebar"><span class="dots"><i></i><i></i><i></i></span>Tost Work · <span class="where"></span></div>
+
+  <!-- ============ 1. WORK HOME = THE PROJECT BOARD ============ -->
+  <section class="screen" id="s-home" data-title="Work home">
+    <div data-top="proposals"></div>
+    <div class="area">
+      <div class="area-head">
+        <h1>Client proposals</h1><span class="muted small">~/Documents/Proposals</span>
+        <span class="grow"></span>
+        <span class="note">Home is the board of the project you're in. New work is a new card.</span>
+        <button class="btn">Project settings</button>
+      </div>
+      <div class="lanes">
+        <div class="col sched"><h3>Scheduled <span class="muted">0</span></h3>
+          <p class="small muted" style="padding:0 4px">Jobs in this project appear here before they run.</p>
+          <a class="card ghost" href="#jobs">+ New job</a>
+        </div>
+        <div class="col"><h3>To do <span class="muted">1</span></h3>
+          <div class="card newcard">
+            <textarea placeholder="Describe the work…">Write a proposal for Alpi Logistica from yesterday's call notes. Template, 8–10k, in Italian.</textarea>
+            <div class="foot"><span class="chip file">notes-call-alpi.docx</span></div>
+            <div class="foot"><span class="select">GPT-5.5</span><span class="select">Reasoning effort: medium</span></div>
+            <div class="foot"><button class="btn sm">Save for later</button><a class="btn sm primary" href="#task">Start now</a></div>
+          </div>
+          <div class="card"><b>Proposal for Brera Design</b><span class="small muted">Waiting for the call notes</span><div class="foot"><span class="chip skill">Proposal writer</span></div></div>
+        </div>
+        <div class="col"><h3>Running <span class="muted">1</span></h3>
+          <a class="card" href="#task"><b>Proposal for Alpi Logistica</b><span class="status running">Step 3 of 6 · scope and timeline</span><div class="foot"><span class="chip file">2 new files</span></div></a>
+        </div>
+        <div class="col"><h3>Needs you <span class="muted">0</span></h3>
+          <p class="small muted" style="padding:0 4px">Cards move here when the agent has a question or wants to overwrite a file.</p>
+        </div>
+        <div class="col"><h3>Done <span class="muted">12</span></h3>
+          <a class="card" href="#task"><b>Proposal for Cantina Ferraris</b><div class="foot"><span class="chip file">Proposta_Ferraris.docx</span><span class="chip file">.pdf</span></div><span class="small muted">yesterday</span></a>
+          <a class="card" href="#task"><b>Update prices in the template</b><span class="small muted">12 Oct</span></a>
+          <a class="card" href="#task"><b>Translate Brera to English</b><span class="small muted">8 Oct</span></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. RUNNING TASK = CARD OPEN ============ -->
+  <section class="screen" id="s-task" data-title="Running task">
+    <div data-top="proposals"></div>
+    <div class="area">
+      <div class="area-head"><h1>Client proposals</h1></div>
+      <div class="lanes">
+        <div class="col sched"><h3>Scheduled</h3></div>
+        <div class="col"><h3>To do</h3><div class="card"><b>Proposal for Brera Design</b></div></div>
+        <div class="col"><h3>Running</h3><div class="card sel"><b>Proposal for Alpi Logistica</b></div></div>
+        <div class="col"><h3>Needs you</h3></div>
+        <div class="col"><h3>Done</h3></div>
+      </div>
+      <a class="scrim" href="#home" aria-label="Close card"></a>
+      <div class="sheet">
+        <div class="left stack-lg">
+          <div class="row between"><span class="muted small">Client proposals › Running</span><a class="btn sm ghost" href="#home">Close ✕</a></div>
+          <div class="stack">
+            <h1>Proposal for Alpi Logistica</h1>
+            <div class="row wrap"><span class="status running">Step 3 of 6</span><span class="chip">GPT-5.5</span><span class="chip">Reasoning effort: medium</span><span class="chip skill">Proposal writer v3</span><button class="btn sm">Stop</button></div>
+          </div>
+          <div class="box soft pad stack">
+            <h3>Brief</h3>
+            <p>Write a proposal for Alpi Logistica from yesterday's call notes. Use our proposal template, price between 8 and 10k, in Italian.</p>
+            <div class="row"><span class="chip file">notes-call-alpi.docx</span></div>
+          </div>
+          <div class="stack">
+            <h3>Checklist</h3>
+            <ol class="steps">
+              <li class="done">Read the call notes</li>
+              <li class="done">Open the proposal template</li>
+              <li class="now"><span>Draft scope and timeline<span class="detail">Writing section 3 of 6</span></span></li>
+              <li class="wait">Build the price table, €8,000–10,000</li>
+              <li class="wait">Check against the proposal checklist</li>
+              <li class="wait">Save the .docx and a PDF copy</li>
+            </ol>
+          </div>
+          <p class="note">The card keeps the board behind it, so you never lose your place among the other work.</p>
+        </div>
+        <div class="rightcol" id="sheetR">
+          <div class="tabs" style="margin-bottom:12px"><a href="#" class="t-files" data-close="#sheetR">Files</a><a href="#" class="t-convo" data-open="#sheetR">Conversation</a></div>
+          <div class="panel-files stack">
+            <div class="file writing"><div class="ic">docx</div><div class="grow"><div class="truncate">Proposta_AlpiLogistica.docx</div><div class="tag">Writing now</div></div></div>
+            <div class="file new"><div class="ic">xlsx</div><div class="grow"><div class="truncate">prezzi-alpi.xlsx</div><div class="tag">New</div></div></div>
+            <div class="file"><div class="ic">docx</div><div class="grow"><div class="truncate">notes-call-alpi.docx</div><div class="tag">Read</div></div></div>
+            <button class="btn sm" style="width:100%">Show in folder</button>
+          </div>
+          <div class="panel-convo">
+            <div class="msg"><span class="who">Agent</span>Are travel costs included? I assumed not.</div>
+            <div class="msg me"><span class="who">You</span>Not included. Add the 30-day payment term.</div>
+            <div class="msg"><span class="who">Agent</span>Added to section 5.</div>
+            <textarea class="field small" style="margin-top:10px; min-height:56px" placeholder="Write to the agent"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2b. QUICK EDIT ============ -->
+  <section class="screen" id="s-quick" data-title="Quick edit">
+    <div data-top="proposals"></div>
+    <div class="area">
+      <div class="area-head"><h1>Client proposals</h1></div>
+      <div class="lanes"><div class="col sched"></div><div class="col"></div><div class="col"></div><div class="col"></div><div class="col"></div></div>
+      <div class="scrim"></div>
+      <div class="modal">
+        <div class="row between" style="padding:12px 14px; border-bottom:1px solid var(--line)"><b>Quick edit · letter-bank.docx</b><a class="btn sm ghost" href="#home">✕</a></div>
+        <div style="padding:14px">
+          <div class="msg me"><span class="who">You</span>Fix the typos and make it more formal.</div>
+          <div class="msg"><span class="who">Agent</span>Done: 7 typos fixed and the greeting and closing made formal.</div>
+          <div class="file new" style="margin-top:10px"><div class="ic">docx</div><div class="grow">letter-bank (edited).docx<div class="tag">New · next to the original</div></div><button class="btn sm">Open</button></div>
+          <textarea class="field" style="margin-top:12px; min-height:50px" placeholder="Ask for another change"></textarea>
+          <div class="row" style="margin-top:10px"><button class="btn sm">Turn into a card in…</button><span class="grow"></span><button class="btn sm primary">Send</button></div>
+          <p class="note" style="margin-top:12px">Quick edit floats over whatever you're doing, opened from the top bar or by dropping a file anywhere.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3. PROJECTS ============ -->
+  <section class="screen" id="s-projects" data-title="Projects">
+    <div data-top="projects"></div>
+    <div class="area">
+      <div class="area-head"><h1>Projects</h1><span class="grow"></span><button class="btn primary">New project</button></div>
+      <div class="pgrid">
+        <a class="box pad stack" href="#home"><div class="row between"><h3>Client proposals</h3><span class="status running">1 running</span></div><p class="muted small">~/Documents/Proposals</p><div class="mini"><span>To do 1</span><span>Run 1</span><span>You 0</span><span>Done 12</span></div></a>
+        <a class="box pad stack" href="#home"><div class="row between"><h3>October newsletter</h3><span class="muted small">job Mon 08:00</span></div><p class="muted small">~/Documents/Newsletter</p><div class="mini"><span>To do 0</span><span>Run 0</span><span>You 0</span><span>Done 6</span></div></a>
+        <a class="box pad stack" href="#home"><div class="row between"><h3>Q3 expense reports</h3><span class="status needs">1 needs you</span></div><p class="muted small">~/Documents/Accounting/Q3</p><div class="mini"><span>To do 2</span><span>Run 0</span><span style="color:var(--warn)">You 1</span><span>Done 6</span></div></a>
+        <a class="box pad stack" href="#home"><h3>Website</h3><p class="muted small">~/Documents/Website copy</p><div class="mini"><span>To do 1</span><span>Run 0</span><span>You 0</span><span>Done 3</span></div></a>
+      </div>
+      <div style="padding:0 20px"><div class="box pad stack" style="max-width:640px">
+        <h3>Project settings · Client proposals</h3>
+        <label class="label">Instructions every card reads first</label>
+        <textarea class="field">Proposals are in Italian unless the client is foreign. Prices are without VAT. Sign as Giulia Rossi, Studio Rossi.</textarea>
+        <label class="label">Skills on in this project</label>
+        <div class="row wrap"><span class="chip skill">Proposal writer</span><span class="chip skill">Brand tone of voice</span><span class="chip skill">Price table</span><button class="btn sm ghost">+ Add</button></div>
+        <p class="note">Each project is a board. Its settings open from the board header.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ============ 4. SKILLS ============ -->
+  <section class="screen" id="s-skills" data-title="Skills">
+    <div data-top="skills"></div>
+    <div class="area" style="flex-direction:row">
+      <div style="flex:1; overflow:auto; padding:16px 20px" class="stack-lg">
+        <div class="row between"><h1>Skills</h1><div class="row"><button class="btn">Import SKILL.md</button><button class="btn primary">New skill</button></div></div>
+        <div class="sgrid">
+          <div class="box pad stack" style="outline:2px solid var(--accent)"><h3>Proposal writer</h3><p class="small muted">When the user asks for a commercial proposal or quote.</p><div class="row"><span class="chip">v3</span><span class="small muted">Client proposals · used 11 times</span></div></div>
+          <div class="box pad stack"><h3>Brand tone of voice</h3><p class="small muted">Any text that goes out under the Studio Rossi name.</p><div class="row"><span class="chip">v1</span><span class="small muted">3 projects</span></div></div>
+          <div class="box pad stack"><h3>Meeting notes to actions</h3><p class="small muted">Turns notes into a list of owners and deadlines.</p><div class="row"><span class="chip">v2</span><span class="small muted">2 projects</span></div></div>
+          <div class="box pad stack"><h3>Price table</h3><p class="small muted">Builds a price table from a range.</p><div class="row"><span class="chip">v1</span></div></div>
+          <div class="box pad stack"><h3>Newsletter from links</h3><p class="small muted">Picks and summarises links for the newsletter.</p><div class="row"><span class="chip">v4</span><span class="small muted">used by 1 job</span></div></div>
+          <div class="box pad stack placeholder"><h3>From a Done card</h3><p class="small">Drag a Done card here and the app drafts a skill from what worked.</p></div>
+        </div>
+        <p class="note">Skills are a library you attach to cards and projects. A Done card can become a skill.</p>
+      </div>
+      <aside style="width:420px; border-left:1px solid var(--line); overflow:auto; padding:16px 18px" class="stack">
+        <div class="row between"><h2>Proposal writer</h2><div class="row"><button class="btn sm">Try on a file</button><button class="btn sm primary">Save</button></div></div>
+        <div class="tabs"><a class="on">Form</a><a>SKILL.md</a><a>Versions</a></div>
+        <label class="label">When should the AI use it?</label>
+        <input class="field" value="When the user asks for a commercial proposal or quote.">
+        <label class="label">Instructions</label>
+        <textarea class="field" style="min-height:160px">1. Read the call notes and list the client's requirements.
+2. Fill the proposal template section by section. Never invent requirements.
+3. Prices without VAT, rounded to €50.
+4. End with the payment terms from the project instructions.</textarea>
+        <label class="label">Files it brings</label>
+        <div class="row"><span class="chip file">template-proposal.docx</span><span class="chip file">checklist.md</span></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============ 5. JOBS ============ -->
+  <section class="screen" id="s-jobs" data-title="Jobs">
+    <div data-top="jobs"></div>
+    <div class="area" style="overflow:auto">
+      <div class="area-head"><h1>Jobs</h1><span class="muted small">This week · 26 Oct – 1 Nov</span><span class="grow"></span><button class="btn primary">New job</button></div>
+      <div style="padding:0 20px 20px" class="stack-lg">
+        <div class="week">
+          <div class="h"></div><div class="h">Mon 26</div><div class="h">Tue 27</div><div class="h">Wed 28</div><div class="h">Thu 29</div><div class="h">Fri 30</div><div class="h">Sat 31</div><div class="h">Sun 1</div>
+          <div class="t">08:00</div><div><span class="ev">Press review ✓</span></div><div></div><div></div><div></div><div></div><div></div><div></div>
+          <div class="t">09:00</div><div></div><div></div><div></div><div></div><div></div><div></div><div><span class="ev warn">Expense check</span></div>
+          <div class="t">18:00</div><div><span class="ev off">Inbox digest</span></div><div><span class="ev off">Inbox digest</span></div><div><span class="ev off">Inbox digest</span></div><div><span class="ev off">Inbox digest</span></div><div><span class="ev off">Inbox digest</span></div><div></div><div></div>
+        </div>
+        <div class="box pad stack" style="max-width:720px">
+          <div class="row between"><h2>Monday press review</h2><span class="status done">Last run today 08:00</span></div>
+          <div class="row wrap"><span>Every</span><span class="select">Monday</span><span>at</span><span class="select">08:00</span><span>in</span><span class="select">October newsletter</span><span>with</span><span class="chip skill">Newsletter from links</span><span class="mono muted">0 8 * * 1</span></div>
+          <label class="label">Brief</label>
+          <textarea class="field">Read the links in links.md, pick the 5 most relevant for our clients and write the "This week" section.</textarea>
+          <div class="row"><span class="small muted">Each run becomes a card in the project's Done column.</span><span class="grow"></span><button class="btn sm">Run now</button><button class="btn sm primary">Save</button></div>
+        </div>
+        <div class="placeholder small" style="max-width:720px">Inbox digest is grey because it needs the Gmail integration, which comes in 0.2.</div>
+        <p class="note">A week view answers "what will the AI do while I'm away?" at a glance.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6. BOARD, ALL PROJECTS ============ -->
+  <section class="screen" id="s-board" data-title="Board, all projects">
+    <div data-top="all"></div>
+    <div class="area" style="overflow:auto">
+      <div class="area-head"><h1>All projects</h1><span class="grow"></span><span class="note">One row per project, Paperclip-style. Agents as assignees arrive in Advanced.</span></div>
+      <div class="swim">
+        <div></div><div class="hd">To do</div><div class="hd">Running</div><div class="hd">Needs you</div><div class="hd">Done this week</div>
+        <div class="lab">Client proposals</div>
+        <div class="cell"><div class="card"><b class="small">Proposal for Brera Design</b></div></div>
+        <div class="cell"><a class="card" href="#task"><b class="small">Proposal for Alpi Logistica</b><span class="status running">3 of 6</span></a></div>
+        <div class="cell"></div>
+        <div class="cell"><div class="card"><b class="small">Proposal for Cantina Ferraris</b></div></div>
+        <div class="lab">October newsletter</div>
+        <div class="cell"></div><div class="cell"></div><div class="cell"></div>
+        <div class="cell"><div class="card"><b class="small">Press review · 26 Oct</b><span class="small muted">from a job</span></div></div>
+        <div class="lab">Q3 expense reports</div>
+        <div class="cell"><div class="card"><b class="small">September receipts</b></div><div class="card"><b class="small">Reconcile card statement</b></div></div>
+        <div class="cell"></div>
+        <div class="cell"><div class="card"><b class="small">Supplier contracts summary</b><span class="small">Wants to overwrite contracts-summary.xlsx</span><div class="foot"><button class="btn sm">New file</button><button class="btn sm primary">Allow</button></div></div></div>
+        <div class="cell"></div>
+        <div class="lab">Website</div>
+        <div class="cell"><div class="card"><b class="small">Write three case studies</b></div></div>
+        <div class="cell"></div><div class="cell"></div>
+        <div class="cell"><div class="card"><b class="small">Rewrite the About page</b></div></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<nav class="mocknav"><b>C · Board</b></nav>
+
+<template id="top">
+  <div class="topbar">
+    <a class="ptab" data-k="all" href="#board">All</a>
+    <a class="ptab" data-k="proposals" href="#home">Client proposals</a>
+    <a class="ptab" href="#home">October newsletter</a>
+    <a class="ptab" href="#home">Q3 expense reports <span style="color:var(--warn)">•</span></a>
+    <a class="ptab" href="#home">Website</a>
+    <a class="ptab muted" data-k="projects" href="#projects">+ Projects</a>
+    <span class="grow"></span>
+    <a class="btn sm" href="#quick">Quick edit</a>
+    <span class="sep"></span>
+    <a class="ptab" data-k="skills" href="#skills">Skills</a>
+    <a class="ptab" data-k="jobs" href="#jobs">Jobs</a>
+    <a class="ptab">About</a>
+    <a class="ptab">Settings</a>
+  </div>
+</template>
+<script>
+  for (const s of document.querySelectorAll("[data-top]")) {
+    s.append(document.getElementById("top").content.cloneNode(true));
+    s.querySelector(`[data-k="${s.dataset.top}"]`)?.classList.add("on");
+  }
+</script>
+<script src="../shared/wire.js"></script>
+</body>
+</html>
