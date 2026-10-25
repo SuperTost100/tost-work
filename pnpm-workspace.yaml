@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+# pnpm 12 runs install scripts only for packages listed here.
+allowBuilds:
+  electron: true
+  esbuild: true
+  electron-winstaller: false
