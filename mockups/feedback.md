@@ -58,3 +58,23 @@ The sidebar in A wasn't loved, and none of the directions had good jobs.
 - The skill editor uses the full width, with "Try it", availability and versions in a side column.
 - Jobs show the cards and the agenda side by side, and the builder opens in place of the agenda.
 - The board is a list grouped by Needs you, Running, To do and Done, with quick filters, a Display menu, a side panel for details and a Columns option. It follows Linear and Paperclip.
+
+## Round 3, 2026-10-25
+
+| Area | Verdict |
+| --- | --- |
+| Work home, running task, projects, one project, skills | Fine as they are. Refine during the alpha. |
+| Chat | Above the input box (variant 1). The chat stays, because these are language models. |
+| Done task | Better. The check against the brief and the file below it work. |
+| Skill from a task | Liked, especially the similar existing skill, which stops people making many copies of one skill. |
+| Quick edit | Right for small text edits, but not enough when a quick edit makes a new file or works on numbers. |
+| New skill | Should also be creatable with AI. Not part of the mockups. |
+| Jobs | The agenda showed the same job twice, which looks like a duplicate job. The builder is right, and it should open as a large window over the page. |
+| Board | Good, both as a list and as columns. Only small refinements left. |
+
+## What round 4 changed
+
+- The side-panel chat variant is gone, and the chat stays above the input box.
+- New screen "Quick edit, new file": the side panel shows the new file with a preview and what the agent decided, like a small done task.
+- Jobs are one list grouped by next run (tomorrow, later this week, next week, off). Each row carries its next run and its last run with the file.
+- "New job" opens a large window over the jobs page, with the four steps on the left and the job written out as a sentence as you fill it in.
