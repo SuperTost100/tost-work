@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Tost Work · UI round 1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Source+Sans+3:wght@400;500;600&family=Instrument+Serif&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/light/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
+<style>
+/* ===== Look A · Precise (Linear, Things) ===== */
+body[data-look="a"] {
+  --font-ui: "Geist", system-ui, sans-serif; --font-title: "Geist", system-ui, sans-serif; --font-mono: "Geist Mono", ui-monospace, monospace;
+  --title-size: 22px; --title-weight: 600; --title-track: -0.015em; --base: 14px;
+  --radius: 6px; --radius-lg: 10px; --shadow: 0 1px 2px rgba(0,0,0,.05); --shadow-lg: 0 8px 28px rgba(0,0,0,.08);
+}
+body[data-look="a"][data-theme="light"] {
+  --desk: #EDEDEB; --bg: #FFFFFF; --side: #F7F7F6; --surface: #FFFFFF; --surface-2: #F4F4F3; --hover: #F0F0EE;
+  --ink: #17181C; --ink-2: #3E4048; --muted: #6B6E76; --line: #E4E4E2; --line-2: #EFEFED;
+  --accent: #2E4FD6; --accent-ink: #FFFFFF; --accent-soft: #EDF1FE;
+  --run: #2E4FD6; --run-soft: #EDF1FE; --need: #A35F00; --need-soft: #FFF4E0; --need-line: #F0D3A0; --done: #23794A; --done-soft: #E7F4EC;
+}
+body[data-look="a"][data-theme="dark"] {
+  --desk: #0B0C0E; --bg: #141518; --side: #101113; --surface: #1A1B1F; --surface-2: #212227; --hover: #232429;
+  --ink: #EDEEF0; --ink-2: #C3C5CB; --muted: #8D9099; --line: #2A2C31; --line-2: #222328;
+  --accent: #7B95FF; --accent-ink: #0D1020; --accent-soft: #1D2442;
+  --run: #7B95FF; --run-soft: #1D2442; --need: #E5A54B; --need-soft: #33261A; --need-line: #5A4122; --done: #5CC48A; --done-soft: #18301F;
+}
+
+/* ===== Look B · Paper (Craft, tost.one) ===== */
+body[data-look="b"] {
+  --font-ui: "Source Sans 3", system-ui, sans-serif; --font-title: "Instrument Serif", Georgia, serif; --font-mono: "Geist Mono", ui-monospace, monospace;
+  --title-size: 34px; --title-weight: 400; --title-track: -0.01em; --base: 15px;
+  --radius: 4px; --radius-lg: 8px; --shadow: none; --shadow-lg: 0 10px 30px rgba(40,30,15,.10);
+}
+body[data-look="b"][data-theme="light"] {
+  --desk: #E9E2D5; --bg: #FAF7F1; --side: #F2ECE2; --surface: #FFFDF9; --surface-2: #F3EEE5; --hover: #EDE6DA;
+  --ink: #1B1712; --ink-2: #3E362C; --muted: #6E6253; --line: #E3DACB; --line-2: #ECE5D9;
+  --accent: #1B1712; --accent-ink: #FAF7F1; --accent-soft: #EAE2D4;
+  --run: #3D5A80; --run-soft: #E5EAF1; --need: #9A6212; --need-soft: #F7EBD6; --need-line: #E6CFA6; --done: #4F7232; --done-soft: #E8EFDF;
+}
+body[data-look="b"][data-theme="dark"] {
+  --desk: #0F0D0B; --bg: #1A1714; --side: #15120F; --surface: #211D19; --surface-2: #2A2520; --hover: #2D2822;
+  --ink: #EFE8DC; --ink-2: #CFC5B5; --muted: #A39684; --line: #3A332B; --line-2: #2C2721;
+  --accent: #EFE8DC; --accent-ink: #1A1714; --accent-soft: #2F2923;
+  --run: #8FA9CC; --run-soft: #222A35; --need: #D9A55A; --need-soft: #362A1A; --need-line: #5C4526; --done: #9DBB7C; --done-soft: #25301C;
+}
+
+/* ===== Look C · Friendly (Spark) ===== */
+body[data-look="c"] {
+  --font-ui: "Figtree", system-ui, sans-serif; --font-title: "Figtree", system-ui, sans-serif; --font-mono: "Geist Mono", ui-monospace, monospace;
+  --title-size: 25px; --title-weight: 700; --title-track: -0.02em; --base: 14.5px;
+  --radius: 10px; --radius-lg: 14px; --shadow: 0 1px 3px rgba(20,24,40,.06), 0 4px 14px rgba(20,24,40,.05); --shadow-lg: 0 16px 40px rgba(20,24,40,.12);
+}
+body[data-look="c"][data-theme="light"] {
+  --desk: #E4E6EB; --bg: #F4F5F7; --side: #F4F5F7; --surface: #FFFFFF; --surface-2: #F6F7F9; --hover: #ECEEF2;
+  --ink: #1C1E24; --ink-2: #444853; --muted: #6A6F7B; --line: #E3E5EA; --line-2: #EDEEF2;
+  --accent: #0E7C74; --accent-ink: #FFFFFF; --accent-soft: #E3F3F1;
+  --run: #2F6BD8; --run-soft: #E7EFFC; --need: #B45F06; --need-soft: #FFF1DF; --need-line: #F3D2A6; --done: #1F8A55; --done-soft: #E4F5EC;
+}
+body[data-look="c"][data-theme="dark"] {
+  --desk: #0A0B0D; --bg: #121317; --side: #121317; --surface: #1B1D22; --surface-2: #23252B; --hover: #262930;
+  --ink: #ECEDF0; --ink-2: #C4C7CF; --muted: #8E929C; --line: #2C2F36; --line-2: #24262C;
+  --accent: #3BBFB2; --accent-ink: #07201D; --accent-soft: #15302D;
+  --run: #7BA4F2; --run-soft: #1B2740; --need: #EDA850; --need-soft: #35281A; --need-line: #5E4524; --done: #5BCB8F; --done-soft: #173023;
+}
+
+/* ===== Shared structure ===== */
+* { box-sizing: border-box; }
+html { background: var(--desk); }
+body { margin: 0; min-width: 1180px; font-family: var(--font-ui); font-size: var(--base); line-height: 1.45; color: var(--ink); background: var(--desk); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; cursor: pointer; }
+p { margin: 0; }
+h1, h2, h3 { margin: 0; }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.mono { font-family: var(--font-mono); font-size: 12px; }
+.row { display: flex; align-items: center; gap: 8px; }
+.grow { flex: 1; min-width: 0; }
+.truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+i[data-i] { font-size: 17px; line-height: 1; flex: none; }
+
+.window { margin: 46px auto 86px; width: min(1400px, calc(100vw - 36px)); height: calc(100vh - 132px); min-height: 700px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,.12); }
+.titlebar { height: 38px; flex: none; display: flex; align-items: center; padding: 0 14px; gap: 8px; background: var(--side); border-bottom: 1px solid var(--line-2); font-size: 12.5px; color: var(--muted); }
+.lights { display: flex; gap: 8px; width: 210px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.lights i:nth-child(1) { background: #FF5F57; } .lights i:nth-child(2) { background: #FEBC2E; } .lights i:nth-child(3) { background: #28C840; }
+.titlebar .ttl { flex: 1; text-align: center; padding-right: 210px; }
+
+.screen { display: none; flex: 1; min-height: 0; }
+.screen.on { display: flex; }
+.shell { display: grid; grid-template-columns: 228px 1fr; flex: 1; min-height: 0; }
+.content { min-height: 0; overflow: hidden; display: flex; background: var(--bg); }
+body[data-look="c"] .shell { background: var(--side); }
+body[data-look="c"] .content { margin: 0 8px 8px 0; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); }
+body[data-look="c"] .titlebar { border-bottom: 0; }
+
+/* Sidebar */
+.side { background: var(--side); display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line-2); padding: 10px 8px; gap: 2px; }
+body[data-look="c"] .side { border-right: 0; }
+.brand { display: flex; align-items: center; gap: 8px; padding: 4px 8px 12px; }
+.brand .mark { width: 22px; height: 22px; border-radius: 6px; background: var(--ink); color: var(--bg); display: grid; place-items: center; font: 600 12px/1 var(--font-ui); }
+body[data-look="b"] .brand .mark { border-radius: 50%; font: 400 15px/1 var(--font-title); }
+body[data-look="c"] .brand .mark { background: var(--accent); color: var(--accent-ink); border-radius: 7px; }
+.brand b { font-weight: 600; font-size: 14px; }
+body[data-look="b"] .brand b { font: 400 19px/1 var(--font-title); }
+.nav { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: var(--radius); color: var(--ink-2); font-weight: 450; }
+.nav:hover { background: var(--hover); }
+.nav.on { background: var(--hover); color: var(--ink); font-weight: 550; }
+body[data-look="c"] .nav.on { background: var(--surface); box-shadow: var(--shadow); }
+.nav i { color: var(--muted); }
+.nav.on i { color: var(--ink); }
+body[data-look="c"] .nav.on i { color: var(--accent); }
+.side h4 { margin: 14px 9px 4px; font-size: 11.5px; font-weight: 500; color: var(--muted); }
+body[data-look="a"] .side h4 { text-transform: none; }
+.pin { display: flex; align-items: center; gap: 10px; padding: 6px 9px; border-radius: var(--radius); color: var(--ink-2); font-size: 13.5px; }
+.pin:hover { background: var(--hover); }
+.dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--line); }
+.dot.run { background: var(--run); } .dot.need { background: var(--need); } .dot.done { background: var(--done); }
+.spacer { flex: 1; }
+.drop-mini { margin: 6px 2px; padding: 10px; border: 1.5px dashed var(--line); border-radius: var(--radius-lg); font-size: 12.5px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+
+/* Controls */
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-weight: 500; white-space: nowrap; }
+.btn:hover { background: var(--hover); }
+.btn.sm { height: 28px; padding: 0 10px; font-size: 12.5px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
+.btn.ghost:hover { background: var(--hover); }
+body[data-look="c"] .btn { box-shadow: var(--shadow); }
+body[data-look="c"] .btn.ghost { box-shadow: none; }
+.pill { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border-radius: var(--radius); background: var(--surface-2); color: var(--ink-2); font-size: 12.5px; white-space: nowrap; border: 1px solid transparent; }
+.pill.sel { border-color: var(--line); background: var(--surface); }
+.pill i { font-size: 14px; color: var(--muted); }
+body[data-look="c"] .pill { border-radius: 13px; }
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+.status.run { color: var(--run); } .status.need { color: var(--need); } .status.done { color: var(--done); }
+.status .dot.run { animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .status .dot.run { animation: none; } }
+.tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 11px; font-size: 12px; font-weight: 500; }
+.tag.run { background: var(--run-soft); color: var(--run); } .tag.need { background: var(--need-soft); color: var(--need); } .tag.done { background: var(--done-soft); color: var(--done); }
+
+/* Page */
+.page { flex: 1; overflow: auto; }
+.page-in { max-width: 960px; margin: 0 auto; padding: 40px 36px 60px; display: grid; gap: 28px; }
+.title { font-family: var(--font-title); font-size: var(--title-size); font-weight: var(--title-weight); letter-spacing: var(--title-track); line-height: 1.15; }
+.section-h { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.section-h h2 { font-size: 13.5px; font-weight: 600; }
+body[data-look="b"] .section-h h2 { font: 400 21px/1.2 var(--font-title); }
+.section-h .n { color: var(--muted); font-weight: 400; margin-left: 6px; }
+
+.composer { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
+.composer:focus-within { border-color: var(--ink-2); }
+.composer textarea { width: 100%; border: 0; resize: none; background: transparent; color: var(--ink); font: inherit; font-size: 15px; line-height: 1.55; padding: 14px 16px 6px; min-height: 76px; }
+.composer textarea:focus { outline: none; }
+.composer textarea::placeholder { color: var(--muted); }
+.composer .bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px 10px; flex-wrap: wrap; }
+
+.drop { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1.5px dashed var(--line); border-radius: var(--radius-lg); }
+.drop .ic { width: 38px; height: 38px; border-radius: var(--radius); background: var(--surface-2); display: grid; place-items: center; color: var(--muted); }
+.drop b { font-weight: 600; }
+
+.list { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); overflow: hidden; }
+body[data-look="c"] .list { box-shadow: var(--shadow); }
+.li { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--line-2); }
+.li:first-child { border-top: 0; }
+.li:hover { background: var(--hover); }
+.li .meta { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.need-box { border: 1px solid var(--need-line); background: var(--need-soft); border-radius: var(--radius-lg); padding: 12px 14px; display: flex; align-items: center; gap: 12px; }
+
+/* Running task */
+.task { display: grid; grid-template-columns: 1fr 320px; flex: 1; min-height: 0; }
+.task .center { overflow: auto; padding: 26px 40px 0; display: flex; flex-direction: column; min-width: 0; }
+.crumb { color: var(--muted); font-size: 12.5px; display: flex; gap: 6px; align-items: center; }
+.progress { display: flex; gap: 4px; margin: 18px 0 8px; }
+.progress span { flex: 1; height: 5px; border-radius: 3px; background: var(--line-2); }
+.progress span.d { background: var(--done); } .progress span.n { background: var(--run); }
+.paper { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); padding: 28px 36px; box-shadow: var(--shadow); }
+body[data-look="b"] .paper { background: #FFFEFB; color: #1B1712; }
+body[data-look="b"][data-theme="dark"] .paper { background: var(--surface); color: var(--ink); }
+.paper h3 { font-size: 15px; margin: 18px 0 6px; font-weight: 600; }
+.paper h3:first-child { margin-top: 0; }
+.paper p { font-size: 14.5px; line-height: 1.7; margin-bottom: 10px; }
+.writing { border-left: 2px solid var(--run); padding-left: 12px; color: var(--ink-2); }
+.caret { display: inline-block; width: 2px; height: 16px; background: var(--run); vertical-align: -3px; animation: pulse 1s steps(1) infinite; }
+.dock { position: sticky; bottom: 0; background: linear-gradient(to bottom, transparent, var(--bg) 24px); padding: 24px 0 18px; margin-top: auto; }
+body[data-look="c"] .dock { background: linear-gradient(to bottom, transparent, var(--surface) 24px); }
+.thread { border: 1px solid var(--line); border-bottom: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--surface-2); padding: 12px 14px; display: grid; gap: 10px; }
+.thread + .composer { border-top-left-radius: 0; border-top-right-radius: 0; box-shadow: none; }
+.q { border: 1px solid var(--need-line); background: var(--need-soft); border-radius: var(--radius-lg); padding: 12px 14px; display: grid; gap: 10px; }
+.q .who { font-size: 12px; color: var(--need); font-weight: 600; display: flex; gap: 6px; align-items: center; }
+.q p { font-size: 14.5px; }
+.opts { display: grid; gap: 6px; }
+.opt { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); padding: 9px 12px; display: flex; gap: 10px; align-items: center; }
+.opt:hover { border-color: var(--ink-2); }
+.opt kbd { font: 500 11px/1 var(--font-mono); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 3px 5px; }
+.right { border-left: 1px solid var(--line-2); background: var(--side); overflow: auto; padding: 18px 16px; display: grid; align-content: start; gap: 20px; }
+body[data-look="c"] .right { background: var(--surface-2); border-radius: 0 var(--radius-lg) var(--radius-lg) 0; }
+.right h3 { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+.file { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.file + .file { margin-top: 6px; }
+.file .fi { width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center; font-size: 18px; flex: none; }
+.fi.doc { background: #E7EEFB; color: #2B5BB8; } .fi.xls { background: #E3F2E8; color: #217346; } .fi.pdf { background: #FBE7E5; color: #B83A2B; }
+body[data-theme="dark"] .fi.doc { background: #1D2A42; color: #8DB0F0; } body[data-theme="dark"] .fi.xls { background: #183024; color: #79C99A; } body[data-theme="dark"] .fi.pdf { background: #3A1E1B; color: #F0998D; }
+.file .sub { font-size: 12px; color: var(--muted); }
+.file .sub.run { color: var(--run); } .file .sub.new { color: var(--done); }
+
+/* Board */
+.board { display: grid; grid-template-columns: 1fr 380px; flex: 1; min-height: 0; }
+.board .lst { overflow: auto; }
+.bhead { padding: 22px 28px 14px; display: grid; gap: 14px; border-bottom: 1px solid var(--line-2); position: sticky; top: 0; background: var(--bg); z-index: 1; }
+body[data-look="c"] .bhead { background: var(--surface); }
+.qf { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border: 1px solid var(--line); border-radius: 14px; font-size: 12.5px; background: var(--surface); color: var(--ink-2); }
+.qf .n { color: var(--muted); }
+.qf.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.seg { display: inline-flex; padding: 2px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--line-2); }
+.seg a { padding: 4px 10px; border-radius: calc(var(--radius) - 2px); font-size: 12.5px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.seg a.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.grp { display: flex; align-items: center; gap: 8px; padding: 18px 28px 6px; font-size: 13px; font-weight: 600; }
+.grp .n { color: var(--muted); font-weight: 400; }
+body[data-look="b"] .grp { font: 400 19px/1.2 var(--font-title); }
+.trow { display: grid; grid-template-columns: 16px 1fr 150px 200px 80px; gap: 12px; align-items: center; padding: 10px 28px; border-top: 1px solid var(--line-2); font-size: 13.5px; }
+.trow:hover { background: var(--hover); }
+.trow.sel { background: var(--accent-soft); }
+.trow .proj, .trow .when { color: var(--muted); font-size: 12.5px; }
+.trow .when { text-align: right; }
+.trow .outs { display: flex; gap: 4px; overflow: hidden; }
+.trow .outs .pill { height: 22px; font-size: 12px; flex: none; }
+.trow .outs .pill:first-child { flex: 0 1 auto; min-width: 0; display: block; line-height: 22px; overflow: hidden; text-overflow: ellipsis; }
+.decision { margin: 0 28px 10px 56px; }
+.peek { border-left: 1px solid var(--line-2); background: var(--side); overflow: auto; padding: 22px 20px; display: grid; gap: 20px; align-content: start; }
+body[data-look="c"] .peek { background: var(--surface-2); }
+.peek h2 { font-family: var(--font-title); font-size: 20px; font-weight: var(--title-weight); letter-spacing: var(--title-track); }
+body[data-look="b"] .peek h2 { font-size: 26px; }
+.msg { padding: 9px 12px; border-radius: var(--radius-lg); background: var(--surface-2); font-size: 13.5px; }
+.msg .who { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 2px; }
+
+/* Mockup bar */
+.mocknav { position: fixed; left: 0; right: 0; bottom: 14px; margin: 0 auto; width: max-content; max-width: calc(100vw - 24px); display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 3px; padding: 5px 6px; background: #FFFEF8; border: 1.5px dashed #B9B29A; border-radius: 10px; font: 12.5px/1.2 system-ui, sans-serif; color: #3A372E; z-index: 50; }
+.mocknav b { padding: 0 8px; }
+.mocknav a { padding: 5px 9px; border-radius: 6px; cursor: pointer; }
+.mocknav a:hover { background: #F2EFE2; }
+.mocknav a.on { background: #E6E0CA; color: #111; font-weight: 600; }
+.mocknav .sep { width: 1px; height: 18px; background: #D8D2BD; margin: 0 4px; }
+.lookcap { position: fixed; top: 10px; left: 0; right: 0; margin: 0 auto; width: max-content; max-width: calc(100vw - 40px); font: 12.5px/1.3 system-ui, sans-serif; color: #6B6550; background: #FFFEF8; border: 1.5px dashed #B9B29A; border-radius: 8px; padding: 5px 12px; z-index: 50; }
+</style>
+</head>
+<body data-look="a" data-theme="light">
+<div class="lookcap" id="lookcap"></div>
+<div class="window">
+  <div class="titlebar"><span class="lights"><i></i><i></i><i></i></span><span class="ttl" id="ttl">Tost Work</span></div>
+
+  <!-- ===== Work home ===== -->
+  <section class="screen" id="s-home" data-title="Work home">
+    <div class="shell">
+      <aside class="side" data-side data-on="work"></aside>
+      <div class="content"><div class="page"><div class="page-in">
+        <h1 class="title">Good morning, Giulia</h1>
+        <div class="composer">
+          <textarea>Write a proposal for Alpi Logistica from yesterday's call notes. Use our proposal template, price between 8 and 10k, in Italian.</textarea>
+          <div class="bar">
+            <span class="pill sel"><i data-i="folder-simple"></i>Client proposals<i data-i="caret-down"></i></span>
+            <span class="pill"><i data-i="file-doc"></i>notes-call-alpi.docx</span>
+            <button class="btn ghost sm" title="Attach files"><i data-i="paperclip"></i></button>
+            <span class="grow"></span>
+            <span class="pill sel">GPT-5.5<i data-i="caret-down"></i></span>
+            <span class="pill sel">Reasoning effort: medium<i data-i="caret-down"></i></span>
+            <a class="btn primary" href="#task">Start task<i data-i="arrow-up"></i></a>
+          </div>
+        </div>
+        <a class="drop" href="#">
+          <span class="ic"><i data-i="file-arrow-up"></i></span>
+          <span class="grow"><b>Quick edit, no project</b><br><span class="muted small">Drop one file and say what to change. You get the file back.</span></span>
+          <span class="btn">Choose file</span>
+        </a>
+        <div>
+          <div class="section-h"><h2>Needs you<span class="n">1</span></h2></div>
+          <div class="need-box">
+            <span class="tag need">Needs you</span>
+            <span class="grow"><b style="font-weight:600">Supplier contracts summary</b><br><span class="muted small">Wants to overwrite contracts-summary.xlsx · Q3 expense reports</span></span>
+            <button class="btn sm">Save as new file</button><button class="btn sm primary">Allow overwrite</button>
+          </div>
+        </div>
+        <div>
+          <div class="section-h"><h2>Recent tasks</h2><a class="muted small" href="#board">Open board</a></div>
+          <div class="list">
+            <a class="li" href="#task"><span class="status run"><span class="dot run"></span>Running</span><span class="grow">Proposal for Alpi Logistica</span><span class="meta">Client proposals · step 3 of 6</span></a>
+            <a class="li"><span class="status done"><span class="dot done"></span>Done</span><span class="grow">Proposal for Cantina Ferraris</span><span class="meta">Client proposals · to review</span></a>
+            <a class="li"><span class="status done"><span class="dot done"></span>Done</span><span class="grow">Monday press review</span><span class="meta">October newsletter · job · 08:00</span></a>
+            <a class="li"><span class="status done"><span class="dot done"></span>Done</span><span class="grow">Rewrite the About page</span><span class="meta">Website · reviewed</span></a>
+          </div>
+        </div>
+      </div></div></div>
+    </div>
+  </section>
+
+  <!-- ===== Running task ===== -->
+  <section class="screen" id="s-task" data-title="Running task">
+    <div class="shell">
+      <aside class="side" data-side data-on="work"></aside>
+      <div class="content"><div class="task">
+        <div class="center">
+          <div class="row"><span class="crumb"><i data-i="folder-simple"></i>Client proposals</span><span class="grow"></span><button class="btn sm"><i data-i="stop"></i>Stop</button></div>
+          <h1 class="title" style="margin-top:8px">Proposal for Alpi Logistica</h1>
+          <div class="row" style="margin-top:10px; flex-wrap:wrap">
+            <span class="pill">GPT-5.5</span><span class="pill">Reasoning effort: medium</span><span class="pill"><i data-i="puzzle-piece"></i>Proposal writer v3</span><span class="pill">Brief<i data-i="caret-down"></i></span>
+          </div>
+          <div class="progress"><span class="d"></span><span class="d"></span><span class="n"></span><span></span><span></span><span></span></div>
+          <div class="row small"><span class="status run"><span class="dot run"></span>Step 3 of 6</span><b style="font-weight:600">Draft scope and timeline</b><span class="muted">· all steps</span></div>
+          <div class="paper">
+            <h3>1. Premessa</h3>
+            <p>Alpi Logistica ci ha chiesto di ridurre i tempi di preparazione delle offerte di trasporto, che oggi richiedono in media due giorni lavorativi.</p>
+            <h3>2. Obiettivi</h3>
+            <p>Portare la preparazione di un'offerta standard sotto le quattro ore entro il 15 novembre, senza cambiare i gestionali in uso.</p>
+            <h3>3. Ambito e tempi</h3>
+            <p class="writing">Il progetto si svolge in tre fasi: analisi delle offerte degli ultimi sei mesi, costruzione delle skill<span class="caret"></span></p>
+          </div>
+          <div class="dock">
+            <div class="thread">
+              <a class="muted small" href="#">3 earlier messages</a>
+              <div class="q">
+                <span class="who"><i data-i="question"></i>Question · it keeps writing the other sections while you decide</span>
+                <p>The notes don't say who pays the transport insurance. What should the proposal say?</p>
+                <div class="opts">
+                  <button class="opt"><kbd>1</kbd>Alpi Logistica pays it</button>
+                  <button class="opt"><kbd>2</kbd>Include it in our price</button>
+                  <button class="opt"><kbd>3</kbd>Leave it out and mark it as open</button>
+                </div>
+              </div>
+            </div>
+            <div class="composer">
+              <textarea style="min-height:48px" placeholder="Answer, or write anything else to the agent"></textarea>
+              <div class="bar"><span class="muted small">Or type your own answer</span><span class="grow"></span><button class="btn sm primary">Send<i data-i="arrow-up"></i></button></div>
+            </div>
+          </div>
+        </div>
+        <aside class="right">
+          <div>
+            <h3>Made by this task</h3>
+            <div class="file"><span class="fi doc"><i data-i="file-doc"></i></span><span class="grow"><span class="truncate" style="display:block">Proposta_AlpiLogistica.docx</span><span class="sub run">Writing now · previewed</span></span></div>
+            <div class="file"><span class="fi xls"><i data-i="file-xls"></i></span><span class="grow"><span class="truncate" style="display:block">prezzi-alpi.xlsx</span><span class="sub new">New · 2 min ago</span></span><button class="btn ghost sm"><i data-i="arrow-square-out"></i></button></div>
+          </div>
+          <div>
+            <h3>Read</h3>
+            <div class="file"><span class="fi doc"><i data-i="file-doc"></i></span><span class="grow"><span class="truncate" style="display:block">notes-call-alpi.docx</span><span class="sub">Attached</span></span></div>
+            <div class="file"><span class="fi doc"><i data-i="file-doc"></i></span><span class="grow"><span class="truncate" style="display:block">template-proposal.docx</span><span class="sub">From project folder</span></span></div>
+          </div>
+          <button class="btn" style="justify-content:center"><i data-i="folder-open"></i>Show in folder</button>
+        </aside>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ===== Board ===== -->
+  <section class="screen" id="s-board" data-title="Board">
+    <div class="shell">
+      <aside class="side" data-side data-on="board"></aside>
+      <div class="content"><div class="board">
+        <div class="lst">
+          <div class="bhead">
+            <div class="row">
+              <h1 class="title">Board</h1>
+              <span class="pill sel" style="margin-left:6px">Everything<i data-i="caret-down"></i></span>
+              <span class="grow"></span>
+              <span class="seg"><a class="on"><i data-i="list-bullets"></i>List</a><a><i data-i="columns"></i>Columns</a></span>
+              <button class="btn sm"><i data-i="faders-horizontal"></i>Display</button>
+              <button class="btn sm primary"><i data-i="plus"></i>New task</button>
+            </div>
+            <div class="row" style="flex-wrap:wrap">
+              <span class="qf">Needs me <span class="n">1</span></span><span class="qf">Running <span class="n">1</span></span><span class="qf">To review <span class="n">1</span></span><span class="qf">From jobs <span class="n">1</span></span><span class="qf">Has files</span>
+            </div>
+          </div>
+          <div class="grp"><span class="dot need"></span>Needs you<span class="n">1</span></div>
+          <a class="trow"><span class="dot need"></span><span>Supplier contracts summary</span><span class="proj">Q3 expense reports</span><span class="outs"><span class="pill">contracts-summary.xlsx</span></span><span class="when">12 min</span></a>
+          <div class="need-box decision"><span class="grow small">Wants to overwrite <b>contracts-summary.xlsx</b>, which you edited on Friday.</span><button class="btn sm">Save as new file</button><button class="btn sm primary">Allow</button></div>
+          <div class="grp"><span class="dot run"></span>Running<span class="n">1</span></div>
+          <a class="trow sel" href="#task"><span class="dot run"></span><span>Proposal for Alpi Logistica <span class="muted small">· step 3 of 6</span></span><span class="proj">Client proposals</span><span class="outs"><span class="pill">Proposta_AlpiLogistica.docx</span><span class="pill">+1</span></span><span class="when">9:12</span></a>
+          <div class="grp"><span class="dot"></span>To do<span class="n">3</span></div>
+          <a class="trow"><span class="dot"></span><span>Proposal for Brera Design <span class="muted small">· waiting for the call notes</span></span><span class="proj">Client proposals</span><span class="outs"></span><span class="when">Thu</span></a>
+          <a class="trow"><span class="dot"></span><span>Write three case studies</span><span class="proj">Website</span><span class="outs"></span><span class="when">Wed</span></a>
+          <a class="trow"><span class="dot"></span><span>September receipts</span><span class="proj">Q3 expense reports</span><span class="outs"></span><span class="when">Tue</span></a>
+          <div class="grp"><span class="dot done"></span>Done this week<span class="n">3</span></div>
+          <a class="trow"><span class="dot done"></span><span>Proposal for Cantina Ferraris <span class="small" style="color:var(--need)">· to review</span></span><span class="proj">Client proposals</span><span class="outs"><span class="pill">Proposta_Ferraris.docx</span><span class="pill">+2</span></span><span class="when">yesterday</span></a>
+          <a class="trow"><span class="dot done"></span><span>Monday press review <span class="pill" style="height:20px;font-size:11px">job</span></span><span class="proj">October newsletter</span><span class="outs"><span class="pill">this-week.md</span></span><span class="when">08:00</span></a>
+          <a class="trow" style="margin-bottom:24px"><span class="dot done"></span><span>Rewrite the About page</span><span class="proj">Website</span><span class="outs"><span class="pill">about.md</span></span><span class="when">Fri</span></a>
+        </div>
+        <aside class="peek">
+          <div class="row"><span class="crumb"><i data-i="folder-simple"></i>Client proposals</span><span class="grow"></span><a class="btn sm" href="#task">Open task</a><button class="btn ghost sm"><i data-i="x"></i></button></div>
+          <div style="display:grid; gap:8px"><h2>Proposal for Alpi Logistica</h2><span class="status run"><span class="dot run"></span>Step 3 of 6 · Draft scope and timeline</span></div>
+          <div><h3 class="small muted" style="font-weight:600; margin-bottom:8px">Files so far</h3>
+            <div class="file"><span class="fi doc"><i data-i="file-doc"></i></span><span class="grow"><span class="truncate" style="display:block">Proposta_AlpiLogistica.docx</span><span class="sub run">Writing now</span></span></div>
+            <div class="file"><span class="fi xls"><i data-i="file-xls"></i></span><span class="grow"><span class="truncate" style="display:block">prezzi-alpi.xlsx</span><span class="sub new">New</span></span></div>
+          </div>
+          <div><h3 class="small muted" style="font-weight:600; margin-bottom:6px">Brief</h3><p class="small" style="line-height:1.55">Write a proposal for Alpi Logistica from yesterday's call notes. Use our proposal template, price between 8 and 10k, in Italian.</p></div>
+          <div><h3 class="small muted" style="font-weight:600; margin-bottom:6px">Last message</h3><div class="msg"><span class="who">Agent</span>Added the payment term to section 5.</div></div>
+        </aside>
+      </div></div>
+    </div>
+  </section>
+</div>
+
+<nav class="mocknav" id="mocknav"></nav>
+
+<template id="side">
+  <div class="brand"><span class="mark">T</span><b>Tost Work</b><span class="grow"></span><button class="btn ghost sm" title="Collapse sidebar"><i data-i="sidebar-simple"></i></button></div>
+  <a class="nav" data-k="work" href="#home"><i data-i="house"></i>Work</a>
+  <a class="nav" data-k="projects"><i data-i="folder-simple"></i>Projects</a>
+  <a class="nav" data-k="skills"><i data-i="puzzle-piece"></i>Skills</a>
+  <a class="nav" data-k="jobs"><i data-i="clock-clockwise"></i>Jobs</a>
+  <a class="nav" data-k="board" href="#board"><i data-i="kanban"></i>Board</a>
+  <h4>Pinned projects</h4>
+  <a class="pin"><span class="dot run"></span>Client proposals</a>
+  <a class="pin"><span class="dot need"></span>Q3 expense reports</a>
+  <a class="pin"><span class="dot"></span>October newsletter</a>
+  <span class="spacer"></span>
+  <div class="drop-mini"><i data-i="file-arrow-up"></i>Drop a file to quick-edit it</div>
+  <a class="nav" data-k="about"><i data-i="info"></i>About</a>
+  <a class="nav" data-k="settings"><i data-i="gear-six"></i>Settings</a>
+</template>
+
+<script>
+  const LOOKS = {
+    a: { name: "A · Precise", icons: "ph", cap: "A · Precise: Geist, neutral greys, one cobalt accent, small radii. From Linear's precision and Things' calm." },
+    b: { name: "B · Paper", icons: "ph-light", cap: "B · Paper: tost.one's paper and ink, Instrument Serif titles, Source Sans 3 text, no shadows, ink buttons. From Craft and tost.one." },
+    c: { name: "C · Friendly", icons: "ph-bold", cap: "C · Friendly: Figtree, the page as a floating card, rounder corners, soft shadows, a teal accent. From Spark." },
+  };
+  for (const s of document.querySelectorAll("[data-side]")) {
+    s.append(document.getElementById("side").content.cloneNode(true));
+    s.querySelector(`[data-k="${s.dataset.on}"]`)?.classList.add("on");
+  }
+  const screens = [...document.querySelectorAll(".screen")];
+  const nav = document.getElementById("mocknav");
+  function link(label, on) { const a = document.createElement("a"); a.textContent = label; a.onclick = on; nav.appendChild(a); return a; }
+  function sep() { const s = document.createElement("span"); s.className = "sep"; nav.appendChild(s); }
+  nav.innerHTML = "<b>UI round 1</b>";
+  const lookLinks = Object.entries(LOOKS).map(([k, v]) => [k, link(v.name, () => setLook(k))]);
+  sep();
+  const themeLinks = ["light", "dark"].map((t) => [t, link(t === "light" ? "Light" : "Dark", () => setTheme(t))]);
+  sep();
+  const screenLinks = screens.map((s) => [s.id.slice(2), link(s.dataset.title, () => (location.hash = s.id.slice(2)))]);
+  sep();
+  const back = document.createElement("a"); back.href = "../index.html"; back.textContent = "All rounds"; nav.appendChild(back);
+
+  function paintIcons() {
+    const w = LOOKS[document.body.dataset.look].icons;
+    for (const i of document.querySelectorAll("i[data-i]")) i.className = `${w} ph-${i.dataset.i}`;
+  }
+  function setLook(k) {
+    document.body.dataset.look = k;
+    for (const [key, a] of lookLinks) a.classList.toggle("on", key === k);
+    document.getElementById("lookcap").textContent = LOOKS[k].cap;
+    paintIcons();
+    sessionStorage.setItem("look", k);
+  }
+  function setTheme(t) {
+    document.body.dataset.theme = t;
+    for (const [key, a] of themeLinks) a.classList.toggle("on", key === t);
+    sessionStorage.setItem("theme", t);
+  }
+  function show() {
+    const name = location.hash.slice(1) || "home";
+    const target = document.getElementById("s-" + name) || screens[0];
+    for (const s of screens) s.classList.toggle("on", s === target);
+    for (const [key, a] of screenLinks) a.classList.toggle("on", "s-" + key === target.id);
+    document.getElementById("ttl").textContent = "Tost Work · " + target.dataset.title;
+  }
+  const params = new URLSearchParams(location.search);
+  setLook(params.get("look") || sessionStorage.getItem("look") || "a");
+  setTheme(params.get("theme") || sessionStorage.getItem("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+  addEventListener("hashchange", show);
+  show();
+</script>
+</body>
+</html>
