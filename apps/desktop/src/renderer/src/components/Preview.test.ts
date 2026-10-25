@@ -32,6 +32,16 @@ describe("preview loading", () => {
     expect(loaded.more).toBe(800);
   });
 
+  it("says a long CSV has more rows, without a count it can't know", async () => {
+    const csv = Array.from({ length: 500 }, (_, i) => `Row ${i + 1},${i}`).join("\n");
+    const loaded = await load({ name: "long.csv", ext: "csv", bytes: new TextEncoder().encode(csv) });
+    if (loaded.kind !== "table") throw new Error(`expected a table, got ${loaded.kind}`);
+    expect(loaded.rows).toHaveLength(200);
+    expect(loaded.more).toBeNull();
+    const short = await load({ name: "s.csv", ext: "csv", bytes: new TextEncoder().encode("a,1\nb,2") });
+    expect(short.kind === "table" && short.more).toBe(0);
+  });
+
   it("sanitises Markdown written by an agent", async () => {
     const bytes = new TextEncoder().encode('# Title\n\n<img src=x onerror="alert(1)"><script>alert(2)</script>');
     const loaded = await load({ name: "x.md", ext: "md", bytes });

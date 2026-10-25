@@ -5,7 +5,13 @@ import type { FileContent, TostWorkApi } from "../../../shared/api";
 type Loaded =
   | { kind: "html"; html: string }
   | { kind: "docx"; bytes: Uint8Array }
-  | { kind: "table"; rows: { id: string; cells: { id: string; text: string }[] }[]; sheet: string; more: number }
+  | {
+      kind: "table";
+      rows: { id: string; cells: { id: string; text: string }[] }[];
+      sheet: string;
+      /** Rows left out of the preview; null when there are more but the format doesn't say how many (CSV). */
+      more: number | null;
+    }
   | { kind: "pdf"; bytes: Uint8Array }
   | { kind: "image"; url: string }
   | { kind: "text"; text: string }
@@ -27,9 +33,12 @@ export async function load(file: FileContent): Promise<Loaded> {
     const sheet = book.SheetNames[0];
     const ws = sheet ? book.Sheets[sheet] : undefined;
     if (!sheet || !ws) return { kind: "none" };
-    const fullRef = ws["!fullref"] ?? ws["!ref"];
+    // XLSX and XLS record their full size; CSV doesn't, so a parse that filled the limit may have stopped early.
+    const fullRef = ws["!fullref"];
+    const parsed = ws["!ref"] ? utils.decode_range(ws["!ref"]) : null;
     const full = fullRef ? utils.decode_range(fullRef) : null;
     const total = full ? full.e.r - full.s.r + 1 : 0;
+    const filled = parsed ? parsed.e.r - parsed.s.r + 1 >= MAX_ROWS : false;
     const rows = utils.sheet_to_json<(string | number | boolean | null)[]>(ws, {
       header: 1,
       raw: false,
@@ -40,7 +49,8 @@ export async function load(file: FileContent): Promise<Loaded> {
       id: `r${r}`,
       cells: Array.from(row, (cell, c) => ({ id: `r${r}c${c}`, text: cell == null ? "" : String(cell) })),
     }));
-    return { kind: "table", rows: shown, sheet, more: Math.max(0, total - MAX_ROWS) };
+    const more = full ? Math.max(0, total - MAX_ROWS) : filled ? null : 0;
+    return { kind: "table", rows: shown, sheet, more };
   }
   if (ext === "md" || ext === "markdown") {
     const [{ marked }, { default: DOMPurify }] = await Promise.all([import("marked"), import("dompurify")]);
@@ -62,15 +72,17 @@ function Docx({ bytes, onError }: { bytes: Uint8Array; onError: OnError }) {
     if (!el) return;
     let alive = true;
     import("docx-preview")
-      .then(({ renderAsync }) => {
-        if (!alive) return;
-        el.replaceChildren();
-        return renderAsync(bytes, el, undefined, {
+      .then(async ({ renderAsync }) => {
+        // docx-preview can't be cancelled, so it draws into a detached container that's attached only if this
+        // render is still the current one.
+        const staging = document.createElement("div");
+        await renderAsync(bytes, staging, undefined, {
           className: "docx",
           inWrapper: false,
           breakPages: true,
           ignoreLastRenderedPageBreak: true,
         });
+        if (alive) el.replaceChildren(...staging.childNodes);
       })
       .catch((err: unknown) => alive && onError(err));
     return () => {
@@ -206,7 +218,11 @@ export function Preview({
               ))}
             </tbody>
           </table>
-          {loaded.more > 0 && <p className="pv-note">{t("preview.moreRows", { n: String(loaded.more) })}</p>}
+          {loaded.more === null ? (
+            <p className="pv-note">{t("preview.moreRowsUnknown")}</p>
+          ) : (
+            loaded.more > 0 && <p className="pv-note">{t("preview.moreRows", { n: String(loaded.more) })}</p>
+          )}
         </div>
       );
     default:
