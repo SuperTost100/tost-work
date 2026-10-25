@@ -60,6 +60,34 @@ describe("failures and double clicks", () => {
   });
 });
 
+describe("a typed answer", () => {
+  it("stays in the box when sending it fails, and goes once it's sent", async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    const box = await screen.findByRole("textbox", { name: "Or answer in your own words" });
+    const realAnswer = api.tasks.answer;
+    api.tasks.answer = async () => {
+      throw new Error("The app didn't respond");
+    };
+    fireEvent.change(box, { target: { value: "Split it half and half" } });
+    await act(async () => {
+      fireEvent.keyDown(box, { key: "Enter" });
+    });
+    expect(screen.getByRole("alert").textContent).toMatch(/didn't respond/);
+    expect((box as HTMLTextAreaElement).value).toBe("Split it half and half");
+
+    api.tasks.answer = realAnswer;
+    await act(async () => {
+      fireEvent.keyDown(box, { key: "Enter" });
+    });
+    expect(await screen.findByText("Split it half and half")).toBeTruthy();
+  });
+});
+
 describe("projects", () => {
   it("creates a project from a folder and names it after the folder", async () => {
     const api = createMemoryApi();

@@ -38,5 +38,13 @@ export function useData(api: TostWorkApi | undefined) {
     (p: Project) => setProjects((list) => (list.some((x) => x.id === p.id) ? list : [...list, p])),
     [],
   );
-  return { projects, tasks, addProject };
+  // The recent list stops at 50 tasks, so a project page loads its whole history when it opens.
+  const loadProject = useCallback(
+    (projectId: string) => {
+      if (!api) return;
+      void api.tasks.listForProject(projectId).then((t) => setTasks((list) => mergeTasks(list, t)));
+    },
+    [api],
+  );
+  return { projects, tasks, addProject, loadProject };
 }

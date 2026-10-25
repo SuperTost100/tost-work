@@ -40,10 +40,16 @@ export function createMemoryApi(): TostWorkApi & { emit(id: string, e: EngineEve
         projects.push(p);
         return p;
       },
+      taskCounts: async () => {
+        const counts: Record<string, number> = {};
+        for (const t of tasks.values()) if (t.projectId) counts[t.projectId] = (counts[t.projectId] ?? 0) + 1;
+        return counts;
+      },
       pickFolder: async () => "/Users/giulia/Documents/Proposals",
     },
     tasks: {
       list: async () => [...tasks.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+      listForProject: async (projectId) => [...tasks.values()].filter((t) => t.projectId === projectId),
       get: async (id) => tasks.get(id) ?? null,
       start: async (input: NewTaskInput) => {
         const at = now();

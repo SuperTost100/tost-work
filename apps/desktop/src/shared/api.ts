@@ -19,11 +19,16 @@ export interface TostWorkApi {
   projects: {
     list(): Promise<Project[]>;
     create(input: NewProjectInput): Promise<Project>;
+    /** How many tasks each project has, by project id. */
+    taskCounts(): Promise<Record<string, number>>;
     /** Opens the system folder picker. Resolves to null when the user cancels. */
     pickFolder(): Promise<string | null>;
   };
   tasks: {
+    /** The 50 most recently updated tasks. */
     list(): Promise<Task[]>;
+    /** Every task of one project. */
+    listForProject(projectId: string): Promise<Task[]>;
     get(id: string): Promise<Task | null>;
     /** Creates the task and starts it right away. */
     start(input: NewTaskInput): Promise<Task>;
@@ -38,8 +43,10 @@ export interface TostWorkApi {
 export const IPC = {
   projectsList: "projects:list",
   projectsCreate: "projects:create",
+  projectsTaskCounts: "projects:task-counts",
   projectsPickFolder: "projects:pick-folder",
   tasksList: "tasks:list",
+  tasksListForProject: "tasks:list-for-project",
   tasksGet: "tasks:get",
   tasksStart: "tasks:start",
   tasksAnswer: "tasks:answer",

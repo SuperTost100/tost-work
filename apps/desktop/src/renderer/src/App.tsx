@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
@@ -20,7 +20,7 @@ type Route =
 
 export function App({ userName = "Giulia", api = window.tostWork }: { userName?: string; api?: TostWorkApi }) {
   const t = useT();
-  const { projects, tasks, addProject } = useData(api);
+  const { projects, tasks, addProject, loadProject } = useData(api);
   const [route, setRoute] = useState<Route>({ name: "home" });
   // The briefs live here so they survive a trip to another section.
   const [brief, setBrief] = useState("");
@@ -29,8 +29,18 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const starting = useRef(false);
-  const report = (err: unknown) => setError(err instanceof Error ? err.message : String(err));
+  const report = useCallback((err: unknown) => setError(err instanceof Error ? err.message : String(err)), []);
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const isMac = api?.platform === "darwin";
+
+  const openProjectId = route.name === "project" ? route.id : null;
+  useEffect(() => {
+    if (openProjectId) loadProject(openProjectId);
+  }, [openProjectId, loadProject]);
+  // Counted in the store, because the task list here holds only the recent ones.
+  useEffect(() => {
+    if (route.name === "projects") void api?.projects.taskCounts().then(setCounts, report);
+  }, [route.name, api, report]);
 
   const section: Section | null = useMemo(() => {
     switch (route.name) {
@@ -95,7 +105,7 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
     screen = (
       <Projects
         projects={projects}
-        tasks={tasks}
+        counts={counts}
         onOpen={(id) => setRoute({ name: "project", id })}
         onNew={() => setDialogOpen(true)}
       />
@@ -121,7 +131,15 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
         key={task.id}
         task={task}
         project={project}
-        onAnswer={(answer) => void api?.tasks.answer(task.id, answer).catch(report)}
+        onAnswer={(answer) =>
+          (api?.tasks.answer(task.id, answer) ?? Promise.reject(new Error("No connection to the app"))).then(
+            () => true,
+            (err: unknown) => {
+              report(err);
+              return false;
+            },
+          )
+        }
         onStop={() => void api?.tasks.stop(task.id).catch(report)}
         onOpenProject={() => project && setRoute({ name: "project", id: project.id })}
       />

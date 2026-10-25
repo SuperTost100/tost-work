@@ -1,15 +1,16 @@
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
-import type { Project, Task } from "../../../shared/model";
+import type { Project } from "../../../shared/model";
 
 export function Projects({
   projects,
-  tasks,
+  counts,
   onOpen,
   onNew,
 }: {
   projects: Project[];
-  tasks: Task[];
+  /** Tasks per project id. */
+  counts: Record<string, number>;
   onOpen: (id: string) => void;
   onNew: () => void;
 }) {
@@ -29,7 +30,7 @@ export function Projects({
           {projects.length === 0 && <p className="t2">{t("projects.empty")}</p>}
           <div className="pgrid" style={{ marginTop: 16 }}>
             {projects.map((p) => {
-              const count = tasks.filter((x) => x.projectId === p.id).length;
+              const count = counts[p.id] ?? 0;
               return (
                 <button type="button" key={p.id} className="pcard" onClick={() => onOpen(p.id)}>
                   <h3>{p.name}</h3>

@@ -69,7 +69,8 @@ export function Task({
 }: {
   task: TaskT;
   project: Project | null;
-  onAnswer: (answer: string) => void;
+  /** Resolves true once the answer is sent, false when it failed and the draft should stay. */
+  onAnswer: (answer: string) => Promise<boolean>;
   onStop: () => void;
   onOpenProject: () => void;
 }) {
@@ -157,8 +158,7 @@ export function Task({
                   value={answer}
                   onChange={setAnswer}
                   onSubmit={() => {
-                    onAnswer(answer.trim());
-                    setAnswer("");
+                    void onAnswer(answer.trim()).then((sent) => sent && setAnswer(""));
                   }}
                   placeholder={t("composer.answer")}
                   sendLabel={t("composer.start")}
@@ -166,7 +166,7 @@ export function Task({
                 >
                   <div className="q">{task.question.text}</div>
                   {task.question.options.map((option, i) => (
-                    <button type="button" key={option} className="o" onClick={() => onAnswer(option)}>
+                    <button type="button" key={option} className="o" onClick={() => void onAnswer(option)}>
                       <span className="n">{i + 1}</span>
                       {option}
                     </button>
