@@ -1,0 +1,182 @@
+import { useEffect, useRef, useState } from "react";
+import { useT } from "@/lib/useT";
+import type { FileContent, TostWorkApi } from "../../../shared/api";
+
+type Loaded =
+  | { kind: "html"; html: string }
+  | { kind: "docx"; bytes: Uint8Array }
+  | { kind: "table"; rows: { id: string; cells: { id: string; text: string }[] }[]; sheet: string; more: number }
+  | { kind: "pdf"; bytes: Uint8Array }
+  | { kind: "image"; url: string }
+  | { kind: "text"; text: string }
+  | { kind: "none" };
+
+const MAX_ROWS = 200;
+const IMAGE = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
+const TEXT = new Set(["txt", "json", "log", "xml", "html", "csv-raw"]);
+
+/** Turns a file into something the preview can draw. Each library loads only when a file of its kind opens. */
+export async function load(file: FileContent): Promise<Loaded> {
+  const { ext, bytes } = file;
+  if (ext === "docx") return { kind: "docx", bytes };
+  if (ext === "pdf") return { kind: "pdf", bytes };
+  if (ext === "xlsx" || ext === "xls" || ext === "csv" || ext === "ods") {
+    const { read, utils } = await import("xlsx");
+    const book = read(bytes, { type: "array" });
+    const sheet = book.SheetNames[0];
+    const ws = sheet ? book.Sheets[sheet] : undefined;
+    if (!sheet || !ws) return { kind: "none" };
+    const rows = utils.sheet_to_json<(string | number | boolean | null)[]>(ws, {
+      header: 1,
+      raw: false,
+      blankrows: false,
+    });
+    // Rows and cells get ids from their position here, once, so the table can key them.
+    const shown = rows.slice(0, MAX_ROWS).map((row, r) => ({
+      id: `r${r}`,
+      cells: Array.from(row, (cell, c) => ({ id: `r${r}c${c}`, text: cell == null ? "" : String(cell) })),
+    }));
+    return { kind: "table", rows: shown, sheet, more: Math.max(0, rows.length - MAX_ROWS) };
+  }
+  if (ext === "md" || ext === "markdown") {
+    const [{ marked }, { default: DOMPurify }] = await Promise.all([import("marked"), import("dompurify")]);
+    // Agents write this Markdown, so its HTML is sanitised before it reaches the page.
+    return { kind: "html", html: DOMPurify.sanitize(await marked.parse(new TextDecoder().decode(bytes))) };
+  }
+  if (IMAGE.has(ext)) return { kind: "image", url: URL.createObjectURL(new Blob([bytes as BlobPart])) };
+  if (TEXT.has(ext)) return { kind: "text", text: new TextDecoder().decode(bytes).slice(0, 200_000) };
+  return { kind: "none" };
+}
+
+function Docx({ bytes }: { bytes: Uint8Array }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let alive = true;
+    void import("docx-preview").then(({ renderAsync }) => {
+      if (!alive) return;
+      el.replaceChildren();
+      return renderAsync(bytes, el, undefined, {
+        className: "docx",
+        inWrapper: false,
+        breakPages: true,
+        ignoreLastRenderedPageBreak: true,
+      });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [bytes]);
+  return <div className="pv-docx" ref={ref} />;
+}
+
+function Pdf({ bytes }: { bytes: Uint8Array }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let alive = true;
+    void (async () => {
+      const pdfjs = await import("pdfjs-dist");
+      const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+      pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+      // pdf.js takes ownership of the buffer it gets, so it gets a copy.
+      const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+      el.replaceChildren();
+      for (let n = 1; n <= Math.min(doc.numPages, 20) && alive; n++) {
+        const page = await doc.getPage(n);
+        const viewport = page.getViewport({ scale: 1.4 });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        el.appendChild(canvas);
+        await page.render({ canvas, viewport }).promise;
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [bytes]);
+  return <div className="pv-pdf" ref={ref} />;
+}
+
+function Html({ html }: { html: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.innerHTML = html;
+  }, [html]);
+  return <div className="pv-md" ref={ref} />;
+}
+
+export function Preview({
+  api,
+  taskId,
+  path,
+  version,
+}: {
+  api: TostWorkApi;
+  taskId: string;
+  path: string;
+  version: string;
+}) {
+  const t = useT();
+  const [state, setState] = useState<{ loaded?: Loaded; error?: string }>({});
+  const latest = useRef("");
+
+  // `version` changes whenever the task does, so a file being written is read again. The previous preview stays on
+  // screen until the new one is ready, and a read that comes back after a newer one started is dropped.
+  useEffect(() => {
+    const request = `${taskId}|${path}|${version}`;
+    latest.current = request;
+    let url: string | undefined;
+    api.files
+      .read(taskId, path)
+      .then(load)
+      .then((loaded) => {
+        if (loaded.kind === "image") url = loaded.url;
+        if (latest.current === request) setState({ loaded });
+      })
+      .catch(
+        (e: unknown) => latest.current === request && setState({ error: e instanceof Error ? e.message : String(e) }),
+      );
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [api, taskId, path, version]);
+
+  const { loaded, error } = state;
+  if (error) return <p className="pv-note">{error}</p>;
+  if (!loaded) return <p className="pv-note">{t("preview.loading")}</p>;
+  switch (loaded.kind) {
+    case "docx":
+      return <Docx bytes={loaded.bytes} />;
+    case "pdf":
+      return <Pdf bytes={loaded.bytes} />;
+    case "html":
+      return <Html html={loaded.html} />;
+    case "image":
+      return <img className="pv-img" src={loaded.url} alt="" />;
+    case "text":
+      return <pre className="pv-text">{loaded.text}</pre>;
+    case "table":
+      return (
+        <div className="pv-table">
+          <table className="tbl">
+            <tbody>
+              {loaded.rows.map((row) => (
+                <tr key={row.id}>
+                  {row.cells.map((cell) => (
+                    <td key={cell.id}>{cell.text}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {loaded.more > 0 && <p className="pv-note">{t("preview.moreRows", { n: String(loaded.more) })}</p>}
+        </div>
+      );
+    default:
+      return <p className="pv-note">{t("preview.none")}</p>;
+  }
+}

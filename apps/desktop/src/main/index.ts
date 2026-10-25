@@ -51,7 +51,8 @@ app.whenReady().then(() => {
   const store = new Store(join(app.getPath("userData"), "tost-work.db"));
   store.stopInterrupted(new Date().toISOString());
   // shortcut: every task runs on the fake engine until the cli-funnel engine lands (cli-funnel #126 to #128).
-  const runner = new TaskRunner(store, new FakeEngine(), (task) => {
+  const samples = join(app.getAppPath(), "resources", "fake");
+  const runner = new TaskRunner(store, new FakeEngine(undefined, undefined, samples), (task) => {
     // On Mac the app outlives its window, so a task can change after the window is gone.
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.taskChanged, task);
   });

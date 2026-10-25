@@ -21,7 +21,9 @@ describe("starting and finishing a task", () => {
     });
     await screen.findByText("Check it against your brief");
     expect(screen.getByText("Travel not included")).toBeTruthy();
-    expect(screen.getByText("Proposta.docx")).toBeTruthy();
+    // The file shows in the side panel and as the preview's title, and its content is drawn.
+    expect(screen.getAllByText("Proposta.docx")).toHaveLength(2);
+    expect(await screen.findByText(/ci ha chiesto di ridurre i tempi/)).toBeTruthy();
     expect(screen.queryByText("Who pays the insurance?")).toBeNull();
   });
 });

@@ -1,3 +1,5 @@
+import { copyFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import type { EngineEvent, Review } from "../../shared/model";
 import type { Engine, RunContext } from "./engine";
 
@@ -57,6 +59,8 @@ export class FakeEngine implements Engine {
   constructor(
     private script: FakeScript = PROPOSAL_SCRIPT,
     private stepMs = 900,
+    /** Folder with sample files to copy into the task's folder, so previews have something real to show. */
+    private samples?: string,
   ) {}
 
   async *run({ task, workdir, signal }: RunContext): AsyncIterable<EngineEvent> {
@@ -82,7 +86,12 @@ export class FakeEngine implements Engine {
       };
       await sleep(this.stepMs, signal);
       for (const f of s.files.filter((f) => f.afterStep === i)) {
-        yield { type: "file", change: { path: `${workdir}/${f.path}`, kind: f.kind, role: "made" } };
+        const path = join(workdir, f.path);
+        if (this.samples) {
+          await mkdir(workdir, { recursive: true });
+          await copyFile(join(this.samples, f.path), path);
+        }
+        yield { type: "file", change: { path, kind: f.kind, role: "made" } };
       }
     }
     if (signal.aborted) return yield { type: "stopped" };

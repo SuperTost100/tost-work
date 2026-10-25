@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type BrowserWindow, dialog, ipcMain } from "electron";
+import { type BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { IPC, type NewProjectInput, type NewTaskInput } from "../shared/api";
 import type { Project } from "../shared/model";
 import type { TaskRunner } from "./engine/runner";
+import { describe, readablePath } from "./files";
 import type { Store } from "./store/store";
 import { absolutePath, paths, text } from "./validate";
 
@@ -49,11 +50,11 @@ export function registerIpc(store: Store, runner: TaskRunner, window: () => Brow
     const projectId = input?.projectId == null ? null : text(input.projectId, "projectId", 100);
     const project = projectId ? store.getProject(projectId) : undefined;
     if (projectId && !project) throw new Error("That project doesn't exist");
-    const task = runner.create({ projectId, brief, attachments: paths(input?.attachments, "attachments") });
     // A task without a project works in a temporary folder of its own, as a quick edit does.
-    const workdir = project?.folder ?? join(tmpdir(), "tost-work", "quick", task.id);
+    const workdir = project?.folder ?? join(tmpdir(), "tost-work", "quick", randomUUID());
     if (!project) await mkdir(workdir, { recursive: true });
-    runner.launch(task.id, workdir);
+    const task = runner.create({ projectId, brief, workdir, attachments: paths(input?.attachments, "attachments") });
+    runner.launch(task.id);
     return task;
   });
 
@@ -61,4 +62,21 @@ export function registerIpc(store: Store, runner: TaskRunner, window: () => Brow
     runner.answer(text(id, "id", 100), text(answer, "answer", 5000)),
   );
   ipcMain.handle(IPC.tasksStop, (_e, id: unknown) => runner.stop(text(id, "id", 100)));
+
+  const fileOf = async (taskId: unknown, path: unknown) => {
+    const task = store.getTask(text(taskId, "taskId", 100));
+    if (!task) throw new Error("That task doesn't exist");
+    return readablePath(task, absolutePath(path, "path"));
+  };
+  ipcMain.handle(IPC.filesRead, async (_e, taskId: unknown, path: unknown) => {
+    const real = await fileOf(taskId, path);
+    return { ...describe(real), bytes: new Uint8Array(await readFile(real)) };
+  });
+  ipcMain.handle(IPC.filesOpen, async (_e, taskId: unknown, path: unknown) => {
+    const error = await shell.openPath(await fileOf(taskId, path));
+    if (error) throw new Error(error);
+  });
+  ipcMain.handle(IPC.filesReveal, async (_e, taskId: unknown, path: unknown) =>
+    shell.showItemInFolder(await fileOf(taskId, path)),
+  );
 }

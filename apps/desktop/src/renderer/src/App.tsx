@@ -126,24 +126,26 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
   } else if (route.name === "task") {
     const task = tasks.find((x) => x.id === route.id);
     const project = task?.projectId ? (projects.find((p) => p.id === task.projectId) ?? null) : null;
-    screen = task ? (
-      <Task
-        key={task.id}
-        task={task}
-        project={project}
-        onAnswer={(answer) =>
-          (api?.tasks.answer(task.id, answer) ?? Promise.reject(new Error("No connection to the app"))).then(
-            () => true,
-            (err: unknown) => {
-              report(err);
-              return false;
-            },
-          )
-        }
-        onStop={() => void api?.tasks.stop(task.id).catch(report)}
-        onOpenProject={() => project && setRoute({ name: "project", id: project.id })}
-      />
-    ) : null;
+    screen =
+      task && api ? (
+        <Task
+          key={task.id}
+          api={api}
+          task={task}
+          project={project}
+          onAnswer={(answer) =>
+            api.tasks.answer(task.id, answer).then(
+              () => true,
+              (err: unknown) => {
+                report(err);
+                return false;
+              },
+            )
+          }
+          onStop={() => void api.tasks.stop(task.id).catch(report)}
+          onOpenProject={() => project && setRoute({ name: "project", id: project.id })}
+        />
+      ) : null;
   } else {
     screen = <Soon section={sectionTitle[route.section]} />;
   }

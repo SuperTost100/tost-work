@@ -5,7 +5,7 @@ import type { Plugin } from "vite";
 
 // The production page may load nothing from the network. The dev server injects an inline React preamble, which this
 // policy would block, so it is added only to the built page.
-const CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'";
+const CSP = "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'";
 const cspInBuild = (): Plugin => ({
   name: "tost-work-csp",
   apply: "build",

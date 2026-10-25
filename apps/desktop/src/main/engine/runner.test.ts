@@ -27,8 +27,12 @@ const waitFor = async (check: () => boolean) => {
 describe("TaskRunner with the fake engine", () => {
   it("pauses on the question, resumes with the answer and finishes with files and a review", async () => {
     const { store, runner } = setup();
-    const task = runner.create({ projectId: null, brief: "Write a proposal for Alpi Logistica" });
-    const done = runner.start(task.id, "/tmp/project");
+    const task = runner.create({
+      projectId: null,
+      brief: "Write a proposal for Alpi Logistica",
+      workdir: "/tmp/project",
+    });
+    const done = runner.start(task.id);
 
     await waitFor(() => store.getTask(task.id)?.status === "needs-you");
     const waiting = store.getTask(task.id);
@@ -48,8 +52,8 @@ describe("TaskRunner with the fake engine", () => {
 
   it("stops a task that is waiting for an answer", async () => {
     const { store, runner } = setup();
-    const task = runner.create({ projectId: null, brief: "Write a proposal" });
-    const done = runner.start(task.id, "/tmp/p");
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
+    const done = runner.start(task.id);
     await waitFor(() => store.getTask(task.id)?.status === "needs-you");
     runner.stop(task.id);
     expect((await done).status).toBe("stopped");
@@ -58,7 +62,7 @@ describe("TaskRunner with the fake engine", () => {
 
   it("refuses an answer when no question is open", () => {
     const { runner } = setup();
-    const task = runner.create({ projectId: null, brief: "Hello" });
+    const task = runner.create({ projectId: null, brief: "Hello", workdir: "/tmp/p" });
     expect(() => runner.answer(task.id, "yes")).toThrow(/isn't waiting/);
   });
 });
@@ -80,8 +84,13 @@ describe("TaskRunner notifications", () => {
     const runner = new TaskRunner(store, engine, () => {
       throw new Error("Object has been destroyed");
     });
-    const task = runner.create({ projectId: null, brief: "Write a proposal", attachments: ["/notes.docx"] });
-    const final = await runner.start(task.id, "/tmp/p");
+    const task = runner.create({
+      projectId: null,
+      brief: "Write a proposal",
+      workdir: "/tmp/p",
+      attachments: ["/notes.docx"],
+    });
+    const final = await runner.start(task.id);
     expect(final.status).toBe("done");
     expect(store.getTask(task.id)?.attachments).toEqual(["/notes.docx"]);
   });
@@ -91,7 +100,7 @@ describe("TaskRunner when saving fails", () => {
   const brokenSetup = () => {
     const store = new Store(":memory:");
     const runner = new TaskRunner(store, new FakeEngine(PROPOSAL_SCRIPT, 0), () => {});
-    const task = runner.create({ projectId: null, brief: "Write a proposal" });
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
     const save = store.saveTask.bind(store);
     return { store, runner, task, save };
   };
@@ -102,7 +111,7 @@ describe("TaskRunner when saving fails", () => {
       if (t.status === "running") throw new Error("disk full");
       save(t);
     };
-    const final = await runner.start(task.id, "/tmp/p");
+    const final = await runner.start(task.id);
     expect(final.status).toBe("failed");
     expect(final.error).toBe("disk full");
     expect(runner.isRunning(task.id)).toBe(false);
@@ -114,7 +123,7 @@ describe("TaskRunner when saving fails", () => {
       throw new Error("disk gone");
     };
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    runner.launch(task.id, "/tmp/p");
+    runner.launch(task.id);
     await vi.waitFor(() => expect(log).toHaveBeenCalledOnce());
     expect(String(log.mock.calls[0]?.[1])).toMatch(/disk gone/);
     expect(runner.isRunning(task.id)).toBe(false);

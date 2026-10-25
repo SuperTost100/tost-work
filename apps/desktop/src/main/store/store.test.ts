@@ -9,6 +9,7 @@ const task = (id: string, status: Task["status"], updatedAt: string): Task => ({
   title: id,
   brief: id,
   attachments: [],
+  workdir: "/tmp",
   model: "m",
   effort: "medium",
   status,
