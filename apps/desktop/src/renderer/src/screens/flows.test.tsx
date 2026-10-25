@@ -177,11 +177,98 @@ describe("file actions", () => {
     await act(async () => {
       fireEvent.click(option);
     });
-    const open = await screen.findByRole("button", { name: "Open" });
+    // A task without a project is a quick edit, so Open is on the preview and in the What changed panel.
+    const [open] = await screen.findAllByRole("button", { name: "Open" });
+    if (!open) throw new Error("no Open button");
     await act(async () => {
       fireEvent.click(open);
     });
     expect(screen.getByRole("alert").textContent).toMatch(/moved or deleted/);
+  });
+});
+
+describe("quick edit", () => {
+  it("attaches a file, saves a copy and takes another instruction", async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Attach files" }));
+    });
+    // The chip can be removed and added again.
+    fireEvent.click(screen.getByRole("button", { name: "Remove letter-bank.docx" }));
+    expect(screen.queryByText("letter-bank.docx")).toBeNull();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Attach files" }));
+    });
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Fix the typos" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+
+    expect(await screen.findByText(/letter-bank.docx, not in a project/)).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /We do/ }));
+    });
+    await screen.findByText("Check it against your brief");
+
+    expect(screen.getByRole("status").textContent).toBe("Your original isn't touched");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save a copy" }));
+    });
+    expect(screen.getByRole("status").textContent).toBe("Saved in /Users/giulia/Documents");
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Ask for another change" }), {
+      target: { value: "Make it shorter" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    });
+    expect(await screen.findByText("Done, I made the change.")).toBeTruthy();
+    // The new run's steps sit under the instruction that started it.
+    const instruction = screen.getByText("Make it shorter");
+    const step = screen.getByText("Make the change");
+    expect(instruction.compareDocumentPosition(step) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The old review checked the old brief, so it's gone.
+    expect(screen.queryByText("Check it against your brief")).toBeNull();
+  });
+});
+
+describe("approvals", () => {
+  it("asks before an overwrite, then lets the user restore the old version", async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Update the proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: /We do/ }));
+    });
+    await screen.findByText("Check it against your brief");
+
+    act(() =>
+      api.emit("t1", {
+        type: "approval",
+        approval: { id: "a1", action: "overwrite", paths: ["/tmp/Proposta.docx"] },
+      }),
+    );
+    expect(screen.getByText("The task wants to replace Proposta.docx")).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Allow overwrite" }));
+    });
+    expect(screen.queryByRole("button", { name: "Allow overwrite" })).toBeNull();
+    expect(screen.getByText("The version before the edit is kept")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    });
+    expect(screen.getByText("You restored the earlier version")).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    });
+    // Undo puts the edited version back, so the row is back to offering Restore.
+    expect(screen.getByText("The version before the edit is kept")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Restore" })).toBeTruthy();
   });
 });
 

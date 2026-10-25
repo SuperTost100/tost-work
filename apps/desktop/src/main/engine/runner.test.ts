@@ -60,6 +60,48 @@ describe("TaskRunner with the fake engine", () => {
     expect(runner.isRunning(task.id)).toBe(false);
   });
 
+  it("continues a finished task with a follow-up, changing the last file it made", async () => {
+    const { store, runner } = setup();
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
+    const first = runner.start(task.id);
+    await waitFor(() => store.getTask(task.id)?.status === "needs-you");
+    runner.answer(task.id, "The client pays it");
+    await first;
+
+    const asked = runner.followUp(task.id, "Make the prices round numbers");
+    expect(asked.review).toBeNull();
+    const final = await runner.start(task.id, "Make the prices round numbers");
+
+    expect(final.status).toBe("done");
+    expect(final.messages.at(-1)?.text).toBe("Done, I made the change.");
+    expect(final.files.at(-1)).toEqual({ path: "/tmp/p/prezzi.xlsx", kind: "update", role: "made" });
+  });
+
+  it("refuses a follow-up while the task works or waits", async () => {
+    const { store, runner } = setup();
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
+    const done = runner.start(task.id);
+    expect(() => runner.followUp(task.id, "faster")).toThrow(/still working/);
+    await waitFor(() => store.getTask(task.id)?.status === "needs-you");
+    runner.stop(task.id);
+    await done;
+    expect(() => runner.followUp(task.id, "go on")).not.toThrow();
+  });
+
+  it("edits the copies a quick edit was given and leaves a review", async () => {
+    const { runner } = setup();
+    const task = runner.create({
+      projectId: null,
+      brief: "Fix the typos",
+      workdir: "/tmp/q",
+      attachments: ["/tmp/q/letter.docx"],
+    });
+    const final = await runner.start(task.id);
+    expect(final.status).toBe("done");
+    expect(final.files).toEqual([{ path: "/tmp/q/letter.docx", kind: "update", role: "made" }]);
+    expect(final.review?.decided).toHaveLength(1);
+  });
+
   it("refuses an answer when no question is open", () => {
     const { runner } = setup();
     const task = runner.create({ projectId: null, brief: "Hello", workdir: "/tmp/p" });

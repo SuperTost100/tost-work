@@ -20,18 +20,23 @@ async function folders() {
   return { samples, work };
 }
 
+/** Runs the fake to the end, refusing every approval it asks for. */
 const run = async (engine: FakeEngine, work: string, controller = new AbortController()) => {
   const events: EngineEvent[] = [];
   const task = { id: "t", files: [], attachments: [] } as unknown as Task;
-  for await (const e of engine.run({ task, project: null, workdir: work, signal: controller.signal })) events.push(e);
+  for await (const e of engine.run({ task, project: null, workdir: work, followUp: null, signal: controller.signal })) {
+    events.push(e);
+    if (e.type === "approval") engine.decide(task.id, e.approval.id, false);
+  }
   return events;
 };
 
 describe("FakeEngine samples", () => {
-  it("never replaces a file already in the folder", async () => {
+  it("asks before replacing a file already in the folder, and keeps it when refused", async () => {
     const { samples, work } = await folders();
     await writeFile(join(work, "Proposta.docx"), "the user's own");
     const events = await run(new FakeEngine(script, 0, samples), work);
+    expect(events.some((e) => e.type === "approval")).toBe(true);
     expect(await readFile(join(work, "Proposta.docx"), "utf8")).toBe("the user's own");
     expect(await readFile(join(work, "Proposta (2).docx"), "utf8")).toBe("sample");
     expect(events).toContainEqual({
@@ -46,11 +51,38 @@ describe("FakeEngine samples", () => {
     const engine = new FakeEngine(script, 50, samples);
     const events: EngineEvent[] = [];
     const task = { id: "t", files: [], attachments: [] } as unknown as Task;
-    for await (const e of engine.run({ task, project: null, workdir: work, signal: controller.signal })) {
+    for await (const e of engine.run({
+      task,
+      project: null,
+      workdir: work,
+      followUp: null,
+      signal: controller.signal,
+    })) {
       events.push(e);
       if (e.type === "plan") controller.abort();
     }
     expect(events.at(-1)).toEqual({ type: "stopped" });
     expect(await readdir(work)).toEqual([]);
+  });
+
+  it("doesn't hang when Stop lands just before it asks for an approval", async () => {
+    const { samples, work } = await folders();
+    await writeFile(join(work, "old.txt"), "x");
+    const remove: FakeScript = { steps: ["Tidy"], files: [], remove: { path: "old.txt", afterStep: 0 }, summary: "" };
+    const controller = new AbortController();
+    const engine = new FakeEngine(remove, 50, samples);
+    const events: EngineEvent[] = [];
+    const task = { id: "t", files: [], attachments: [] } as unknown as Task;
+    for await (const e of engine.run({
+      task,
+      project: null,
+      workdir: work,
+      followUp: null,
+      signal: controller.signal,
+    })) {
+      events.push(e);
+      if (e.type === "plan") controller.abort();
+    }
+    expect(events.at(-1)).toEqual({ type: "stopped" });
   });
 });

@@ -1,5 +1,6 @@
-import { lstat, realpath, stat } from "node:fs/promises";
-import { basename, extname, isAbsolute, join, relative } from "node:path";
+import { constants } from "node:fs";
+import { copyFile, lstat, realpath, stat } from "node:fs/promises";
+import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
 import type { Task } from "../shared/model";
 
 /** The biggest file the interface may load for a preview. */
@@ -31,6 +32,53 @@ export async function readablePath(task: Task, requested: string, limitSize = tr
   return real;
 }
 
+/** The files a task made that still exist, resolved through symlinks, each checked to sit inside the task's folder. */
+export async function savablePaths(task: Task): Promise<string[]> {
+  const folder = await realpath(task.workdir);
+  const made = [...new Set(task.files.filter((f) => f.role === "made" && f.kind !== "delete").map((f) => f.path))];
+  const real: string[] = [];
+  for (const path of made) {
+    // A file removed outside the app has nothing to save; the rest still are.
+    const resolved = await realpath(path).catch((err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") return null;
+      throw err;
+    });
+    if (resolved === null) continue;
+    if (!inside(folder, resolved)) throw new Error("That file is outside the task's folder");
+    real.push(resolved);
+  }
+  return real;
+}
+
+/** A file inside the task's folder, resolved through symlinks. Throws for anything outside, so a link can't point out. */
+export async function taskFile(task: Task, path: string): Promise<string> {
+  const real = await realpath(path);
+  if (!inside(await realpath(task.workdir), real)) throw new Error("That file is outside the task's folder");
+  return real;
+}
+
+/**
+ * Where to write a file of the task that may no longer exist, such as one the user removed before restoring it. An
+ * existing file goes through taskFile; a missing one must sit in a folder inside the task's folder, and a broken link
+ * left at its name is refused, since writing through it would land wherever it points.
+ */
+export async function writablePath(task: Task, path: string): Promise<string> {
+  try {
+    return await taskFile(task, path);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+  }
+  const link = await lstat(path).catch((err: NodeJS.ErrnoException) => {
+    if (err.code === "ENOENT") return null;
+    throw err;
+  });
+  if (link) throw new Error("That file is a broken link");
+  const folder = await realpath(task.workdir);
+  const parent = await realpath(dirname(path));
+  if (parent !== folder && !inside(folder, parent)) throw new Error("That file is outside the task's folder");
+  return join(parent, basename(path));
+}
+
 export const describe = (path: string) => ({ name: basename(path), ext: extname(path).slice(1).toLowerCase() });
 
 // lstat, not access: a dangling link still takes the name, and an exclusive copy onto it would fail.
@@ -52,4 +100,52 @@ export async function freeName(folder: string, name: string): Promise<string> {
     if (!(await exists(candidate))) return candidate;
   }
   throw new Error(`Too many files called ${name} in that folder`);
+}
+
+/** Copies the user's files into a quick edit's folder, so the agent edits copies and the originals stay untouched. */
+export async function copyInto(paths: string[], folder: string): Promise<string[]> {
+  const copies: string[] = [];
+  for (const path of paths) {
+    const info = await stat(path);
+    if (!info.isFile()) throw new Error(`${basename(path)} isn't a file`);
+    const target = await freeName(folder, basename(path));
+    await copyFile(path, target, constants.COPYFILE_EXCL);
+    copies.push(target);
+  }
+  return copies;
+}
+
+/** What to do when a file with the same name is already in the folder the user picked. */
+export type Conflict = "replace" | "keep-both" | "cancel";
+
+/**
+ * Copies a task's files into a folder the user picked. A file already there is never overwritten without asking:
+ * "replace" moves the old one to the Trash first, "keep-both" saves under a free name, and "cancel" stops.
+ * Returns the paths written, including those written before a cancel.
+ */
+export async function saveCopies(
+  sources: string[],
+  folder: string,
+  ask: (name: string) => Promise<Conflict>,
+  trash: (path: string) => Promise<void>,
+): Promise<{ saved: string[]; cancelled: boolean }> {
+  const saved: string[] = [];
+  const destination = await realpath(folder);
+  for (const source of sources) {
+    let target = join(destination, basename(source));
+    // The user picked the folder the file is already in: it's saved, and Replace would trash the only copy.
+    if (target === source) {
+      saved.push(target);
+      continue;
+    }
+    if (await exists(target)) {
+      const choice = await ask(basename(source));
+      if (choice === "cancel") return { saved, cancelled: true };
+      if (choice === "replace") await trash(target);
+      else target = await freeName(destination, basename(source));
+    }
+    await copyFile(source, target, constants.COPYFILE_EXCL);
+    saved.push(target);
+  }
+  return { saved, cancelled: false };
 }

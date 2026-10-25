@@ -1,4 +1,4 @@
-import { Composer } from "@/components/Composer";
+import { type Attachments, Composer } from "@/components/Composer";
 import { TaskTag } from "@/components/TaskTag";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
@@ -10,6 +10,7 @@ export function Project({
   brief,
   onBriefChange,
   onStart,
+  attach,
   onOpenTask,
   onBack,
 }: {
@@ -18,6 +19,7 @@ export function Project({
   brief: string;
   onBriefChange: (text: string) => void;
   onStart: () => void;
+  attach?: Attachments;
   onOpenTask: (id: string) => void;
   onBack: () => void;
 }) {
@@ -44,6 +46,7 @@ export function Project({
               onChange={onBriefChange}
               onSubmit={onStart}
               placeholder={t("composer.newIn", { name: project.name })}
+              attach={attach}
               sendLabel={t("composer.start")}
               minHeight={56}
             />

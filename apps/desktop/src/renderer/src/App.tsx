@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Attachments } from "@/components/Composer";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
@@ -10,6 +11,9 @@ import { Task } from "@/screens/Task";
 import { type Section, Sidebar } from "@/shell/Sidebar";
 import { useData } from "@/state/useData";
 import type { TostWorkApi } from "../../shared/api";
+
+/** The main process accepts up to 20 attachments per task. */
+const MAX_FILES = 20;
 
 type Route =
   | { name: "home" }
@@ -25,6 +29,8 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
   // The briefs live here so they survive a trip to another section.
   const [brief, setBrief] = useState("");
   const [projectBrief, setProjectBrief] = useState("");
+  const [files, setFiles] = useState<string[]>([]);
+  const [projectFiles, setProjectFiles] = useState<string[]>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,13 +68,13 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
     else setRoute({ name: "soon", section: s });
   };
 
-  const start = async (text: string, inProject: string | null, clear: () => void) => {
+  const start = async (text: string, inProject: string | null, attachments: string[], clear: () => void) => {
     // Enter and the send button can both fire before the first start returns.
     if (!api || !text.trim() || starting.current) return;
     starting.current = true;
     setError(null);
     try {
-      const task = await api.tasks.start({ projectId: inProject, brief: text.trim() });
+      const task = await api.tasks.start({ projectId: inProject, brief: text.trim(), attachments });
       clear();
       setRoute({ name: "task", id: task.id });
     } catch (err) {
@@ -77,6 +83,17 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
       starting.current = false;
     }
   };
+
+  const attach = (list: string[], set: (update: (prev: string[]) => string[]) => void): Attachments | undefined =>
+    api && {
+      files: list,
+      onAdd: () =>
+        void api.files
+          .pick()
+          .then((picked) => set((prev) => [...new Set([...prev, ...picked])].slice(0, MAX_FILES)))
+          .catch(report),
+      onRemove: (path) => set((prev) => prev.filter((p) => p !== path)),
+    };
 
   const sectionTitle: Record<"skills" | "jobs" | "board" | "settings", string> = {
     skills: t("nav.skills"),
@@ -96,7 +113,13 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
         onProjectChange={setProjectId}
         projects={projects}
         tasks={tasks}
-        onStart={() => void start(brief, projectId, () => setBrief(""))}
+        onStart={() =>
+          void start(brief, projectId, files, () => {
+            setBrief("");
+            setFiles([]);
+          })
+        }
+        attach={attach(files, setFiles)}
         onOpenTask={(id) => setRoute({ name: "task", id })}
         onNewProject={() => setDialogOpen(true)}
       />
@@ -118,7 +141,13 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
         tasks={tasks}
         brief={projectBrief}
         onBriefChange={setProjectBrief}
-        onStart={() => void start(projectBrief, project.id, () => setProjectBrief(""))}
+        onStart={() =>
+          void start(projectBrief, project.id, projectFiles, () => {
+            setProjectBrief("");
+            setProjectFiles([]);
+          })
+        }
+        attach={attach(projectFiles, setProjectFiles)}
         onOpenTask={(id) => setRoute({ name: "task", id })}
         onBack={() => setRoute({ name: "projects" })}
       />
@@ -142,6 +171,10 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
               },
             )
           }
+          onFollowUp={(text) => void api.tasks.followUp(task.id, text).catch(report)}
+          onSaveCopy={() => api.tasks.saveCopy(task.id)}
+          onDecide={(allow) => api.tasks.decide(task.id, allow)}
+          onRestore={(path) => api.files.restore(task.id, path)}
           onStop={() => void api.tasks.stop(task.id).catch(report)}
           onOpenProject={() => project && setRoute({ name: "project", id: project.id })}
           onError={report}

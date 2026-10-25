@@ -94,6 +94,35 @@ export function createMemoryApi(): TostWorkApi & { emit(id: string, e: EngineEve
         emit(id, { type: "done" });
         return tasks.get(id) ?? t;
       },
+      decide: async (id, allow) => {
+        const t = tasks.get(id);
+        if (!t?.approval) throw new Error("This task isn't waiting for a decision");
+        const path = t.approval.paths[0] ?? "";
+        const kept = allow ? [{ path, copy: `/kept/${id}`, at: now(), reason: "overwrite" as const }] : [];
+        save({ ...resume(t, now()), kept: [...(t.kept ?? []), ...kept] });
+        emit(id, { type: "file", change: { path, kind: "update", role: "made" } });
+        emit(id, { type: "done" });
+        return tasks.get(id) ?? t;
+      },
+      followUp: async (id, text) => {
+        const t = tasks.get(id);
+        if (!t || t.status === "running" || t.question) throw new Error("This task can't take a follow-up now");
+        save({
+          ...t,
+          status: "running",
+          review: null,
+          messages: [...t.messages, { from: "user", text, at: now(), followUp: true }],
+        });
+        emit(id, { type: "plan", steps: [{ text: "Make the change", status: "in_progress" }] });
+        emit(id, { type: "message", text: "Done, I made the change." });
+        emit(id, { type: "done" });
+        return tasks.get(id) ?? t;
+      },
+      saveCopy: async (id) => {
+        const made = tasks.get(id)?.files.filter((f) => f.role === "made") ?? [];
+        const folder = "/Users/giulia/Documents";
+        return { folder, saved: made.map((f) => `${folder}/${f.path.split("/").pop()}`) };
+      },
       stop: async (id) => emit(id, { type: "stopped" }),
       onChange: (l) => {
         listeners.add(l);
@@ -101,6 +130,7 @@ export function createMemoryApi(): TostWorkApi & { emit(id: string, e: EngineEve
       },
     },
     files: {
+      pick: async () => ["/Users/giulia/Documents/letter-bank.docx"],
       read: async (_taskId, path) => ({
         name: path.split("/").pop() ?? path,
         ext: "md",
@@ -108,6 +138,14 @@ export function createMemoryApi(): TostWorkApi & { emit(id: string, e: EngineEve
       }),
       open: async () => {},
       reveal: async () => {},
+      restore: async (taskId, path) => {
+        const t = tasks.get(taskId);
+        if (!t) throw new Error("That task doesn't exist");
+        return save({
+          ...t,
+          kept: [...(t.kept ?? []), { path, copy: `/kept/${taskId}-2`, at: now(), reason: "restore" }],
+        });
+      },
     },
   };
 }

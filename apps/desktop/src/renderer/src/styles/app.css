@@ -358,7 +358,7 @@ h3 {
   min-height: 0;
 }
 .col {
-  width: 720px;
+  width: min(720px, 100% - 64px);
   margin: 0 auto;
   padding: 40px 0 64px;
 }
@@ -537,7 +537,15 @@ h3 {
   gap: 6px;
   padding: 6px 10px 10px;
 }
+.composer .atts {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 .attached {
+  max-width: 240px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -547,6 +555,31 @@ h3 {
   background: var(--panel);
   font-size: 13px;
   color: var(--t2);
+}
+.attached .ic {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--t3);
+}
+.attached .x {
+  width: 18px;
+  height: 18px;
+  margin-right: -4px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  color: var(--t3);
+  flex: none;
+}
+.attached .x:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.attached .x .ic {
+  width: 12px;
+  height: 12px;
+  color: inherit;
 }
 .send {
   width: 32px;
@@ -710,7 +743,8 @@ h3 {
   min-height: 0;
   min-width: 0;
 }
-.task .col {
+.task .col,
+.qe .col {
   padding-top: 24px;
   padding-bottom: 24px;
 }
@@ -804,9 +838,10 @@ h3 {
   background: linear-gradient(transparent, var(--canvas));
   pointer-events: none;
 }
+/* The footer's own padding is the gutter, so its column can take the full width up to 720px. */
 .foot .col {
   padding: 0;
-  width: 720px;
+  width: min(720px, 100%);
 }
 .asking {
   overflow: hidden;
@@ -838,6 +873,31 @@ h3 {
   width: 18px;
   color: var(--t3);
   font-size: 13px;
+}
+.asking .q .d {
+  margin: 4px 0 0;
+}
+.asking .q .err {
+  color: var(--need);
+}
+.approve .acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 16px 14px;
+}
+.kept {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0 6px 42px;
+  font-size: 13px;
+  color: var(--t3);
+}
+.kept .ic {
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
 .asking .o.own {
   color: var(--t3);
@@ -1303,10 +1363,10 @@ h3 {
   box-shadow: 0 0 0 1px var(--line);
 }
 
-/* Quick edit: one panel lists what changed */
+/* Quick edit: one panel lists what changed. 360px while it lists files; the change cards will need the mockup's 440px. */
 .qe {
   display: grid;
-  grid-template-columns: 1fr 440px;
+  grid-template-columns: 1fr 360px;
   flex: 1;
   min-height: 0;
 }
