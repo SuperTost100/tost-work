@@ -36,6 +36,19 @@ export interface Approval {
   /** What the agent wants to do, for example overwrite or delete a file. */
   action: "overwrite" | "delete";
   paths: string[];
+  /** Paths already handled when an earlier try failed part way, so a retry does only the rest. */
+  done?: string[];
+}
+
+/** A copy Tost Work kept before a file was replaced, so the user can put it back. */
+export interface KeptCopy {
+  /** The file in the task's folder. */
+  path: string;
+  /** Where the copy is kept, in the app's own data folder. */
+  copy: string;
+  at: string;
+  /** "overwrite" when the agent replaced the file, "restore" when the user put an older copy back. */
+  reason: "overwrite" | "restore";
 }
 
 export interface ReviewItem {
@@ -53,6 +66,8 @@ export interface Message {
   from: "user" | "agent";
   text: string;
   at: string;
+  /** True for an instruction sent after the task finished, which starts a new run with its own steps. */
+  followUp?: boolean;
 }
 
 export interface Task {
@@ -73,6 +88,8 @@ export interface Task {
   question: Question | null;
   approval: Approval | null;
   review: Review | null;
+  /** Missing on tasks saved before copies were kept. */
+  kept?: KeptCopy[];
   error: string | null;
   createdAt: string;
   updatedAt: string;

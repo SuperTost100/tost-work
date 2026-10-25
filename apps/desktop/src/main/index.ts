@@ -3,6 +3,7 @@ import { app, BrowserWindow, nativeTheme, shell } from "electron";
 import { IPC } from "../shared/api";
 import { FakeEngine } from "./engine/fake";
 import { TaskRunner } from "./engine/runner";
+import { fileGuard } from "./guard";
 import { registerIpc } from "./ipc";
 import { Store } from "./store/store";
 
@@ -52,10 +53,18 @@ app.whenReady().then(() => {
   store.stopInterrupted(new Date().toISOString());
   // shortcut: every task runs on the fake engine until the cli-funnel engine lands (cli-funnel #126 to #128).
   const samples = join(app.getAppPath(), "resources", "fake");
-  const runner = new TaskRunner(store, new FakeEngine(undefined, undefined, samples), (task) => {
-    // On Mac the app outlives its window, so a task can change after the window is gone.
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.taskChanged, task);
-  });
+  // shortcut: kept copies are never cleaned up; add a size limit or an age limit before the public beta.
+  const guard = fileGuard(join(app.getPath("userData"), "kept"), (path) => shell.trashItem(path));
+  const runner = new TaskRunner(
+    store,
+    new FakeEngine(undefined, undefined, samples),
+    (task) => {
+      // On Mac the app outlives its window, so a task can change after the window is gone.
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.taskChanged, task);
+    },
+    undefined,
+    guard,
+  );
   registerIpc(store, runner, () => mainWindow);
   app.on("before-quit", () => store.close());
   mainWindow = createWindow();

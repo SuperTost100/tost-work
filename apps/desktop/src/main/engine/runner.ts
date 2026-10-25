@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
-import type { Project, Task } from "../../shared/model";
+import type { KeptCopy, Project, Task } from "../../shared/model";
 import { applyEvent, resume } from "../../shared/reduce";
+import type { Guard } from "../guard";
 import type { Store } from "../store/store";
 import type { Engine } from "./engine";
 
@@ -22,15 +23,26 @@ export function titleFrom(brief: string, max = 60): string {
   return `${space > 20 ? cut.slice(0, space) : cut}…`;
 }
 
+const REFUSE: Guard = {
+  keep: () => Promise.reject(new Error("No guard is set up to keep copies")),
+  trash: () => Promise.reject(new Error("No guard is set up to move files to the Trash")),
+  restore: () => Promise.reject(new Error("No guard is set up to restore copies")),
+};
+
 /** Starts tasks on an engine, keeps each task's state in the store and reports every change. */
 export class TaskRunner {
   private running = new Map<string, AbortController>();
+  /** Tasks whose decision is being carried out, so a double click can't trash or copy twice. */
+  private deciding = new Set<string>();
+  /** Tasks with a restore under way, so a double click can't record two copies from one snapshot. */
+  private restoring = new Set<string>();
 
   constructor(
     private store: Store,
     private engine: Engine,
     private onChange: (task: Task) => void,
     private now: () => string = () => new Date().toISOString(),
+    private guard: Guard = REFUSE,
   ) {}
 
   create(input: NewTask): Task {
@@ -59,8 +71,11 @@ export class TaskRunner {
     return task;
   }
 
-  /** Runs the task to the end. Resolves with the final task; questions pause it until `answer` is called. */
-  async start(taskId: string): Promise<Task> {
+  /**
+   * Runs the task to the end. Resolves with the final task; questions pause it until `answer` is called.
+   * Pass the user's message as `followUp` to continue a task that already finished.
+   */
+  async start(taskId: string, followUp: string | null = null): Promise<Task> {
     let task = this.mustGet(taskId);
     const workdir = task.workdir;
     if (this.running.has(taskId)) throw new Error("This task is already running");
@@ -69,7 +84,7 @@ export class TaskRunner {
     this.running.set(taskId, controller);
     try {
       task = this.save({ ...task, status: "running", error: null, updatedAt: this.now() });
-      for await (const event of this.engine.run({ task, project, workdir, signal: controller.signal })) {
+      for await (const event of this.engine.run({ task, project, workdir, followUp, signal: controller.signal })) {
         // Read the stored task each time, so an answer saved meanwhile isn't overwritten.
         task = this.save(applyEvent(this.mustGet(taskId), event, this.now()));
       }
@@ -84,8 +99,8 @@ export class TaskRunner {
   }
 
   /** Starts the task without waiting for it. A failure the task couldn't record itself is logged, so it can't crash the app. */
-  launch(taskId: string): void {
-    this.start(taskId).catch((err: unknown) => {
+  launch(taskId: string, followUp: string | null = null): void {
+    this.start(taskId, followUp).catch((err: unknown) => {
       console.error(`Task ${taskId} failed and its state couldn't be saved`, err);
     });
   }
@@ -97,6 +112,105 @@ export class TaskRunner {
     const next = this.save({ ...resume(task, at), messages: [...task.messages, { from: "user", text: answer, at }] });
     this.engine.answer(taskId, task.question.id, answer);
     return next;
+  }
+
+  /** Adds the user's next instruction to a task that isn't working. Call `launch` with the same text to run it. */
+  followUp(taskId: string, text: string): Task {
+    const task = this.mustGet(taskId);
+    if (this.running.has(taskId)) throw new Error("This task is still working");
+    // A run started now could write to a file the restore is about to put back.
+    if (this.restoring.has(taskId)) throw new Error("Wait for the restore to finish");
+    if (task.question || task.approval) throw new Error("This task is waiting for an answer");
+    const at = this.now();
+    // The old review checked the old brief, so it goes until the agent writes a new one.
+    return this.save({
+      ...task,
+      review: null,
+      error: null,
+      messages: [...task.messages, { from: "user", text, at, followUp: true }],
+      updatedAt: at,
+    });
+  }
+
+  /**
+   * Carries out the user's decision on an overwrite or delete, then tells the engine. Allowed overwrites keep a copy
+   * first and allowed deletions go to the Trash, both done here so they don't depend on the agent.
+   */
+  async decide(taskId: string, allow: boolean): Promise<Task> {
+    const task = this.mustGet(taskId);
+    const approval = task.approval;
+    if (!approval) throw new Error("This task isn't waiting for a decision");
+    if (this.deciding.has(taskId)) throw new Error("This decision is already being carried out");
+    if (this.restoring.has(taskId)) throw new Error("Wait for the restore to finish");
+    this.deciding.add(taskId);
+    try {
+      const kept: KeptCopy[] = [];
+      const trashed: string[] = [];
+      // Files in the Trash are gone from the task too, whatever the engine reports next, and even after a Stop.
+      const record = (t: Task) => {
+        let next = t;
+        for (const path of trashed)
+          next = applyEvent(next, { type: "file", change: { path, kind: "delete", role: "made" } }, this.now());
+        return { ...next, kept: [...(next.kept ?? []), ...kept] };
+      };
+      if (allow) {
+        try {
+          for (const path of approval.paths) {
+            if (approval.done?.includes(path)) continue;
+            if (approval.action === "delete") {
+              await this.guard.trash(task, path);
+              trashed.push(path);
+            } else kept.push(await this.guard.keep(task, path, "overwrite"));
+          }
+        } catch (err) {
+          // What was done before the failure stays recorded: a file already in the Trash, a copy already kept.
+          if (trashed.length || kept.length) {
+            const latest = record(this.mustGet(taskId));
+            const handled = [...(approval.done ?? []), ...trashed, ...kept.map((k) => k.path)];
+            // A retry of the same approval skips what's done; a file already in the Trash can't be trashed again.
+            const pending = latest.approval?.id === approval.id ? { ...approval, done: handled } : latest.approval;
+            this.save({ ...latest, approval: pending, updatedAt: this.now() });
+          }
+          throw err;
+        }
+      }
+      const current = record(this.mustGet(taskId));
+      // Stop can land while the copies or the Trash are being done. Then the task stays as it is, with the copies
+      // recorded, rather than going back to running with nothing running it.
+      if (current.status !== "needs-you" || current.approval?.id !== approval.id)
+        return allow ? this.save({ ...current, updatedAt: this.now() }) : current;
+      const next = this.save(resume(current, this.now()));
+      this.engine.decide(taskId, approval.id, allow);
+      return next;
+    } finally {
+      this.deciding.delete(taskId);
+    }
+  }
+
+  /** Puts back the newest kept copy of a file. The version it replaces is kept too, so restoring can be undone. */
+  async restore(taskId: string, path: string): Promise<Task> {
+    const task = this.mustGet(taskId);
+    if (this.running.has(taskId)) throw new Error("Wait for the task to finish before restoring");
+    if (this.restoring.has(taskId)) throw new Error("A restore is already in progress");
+    // Stop can end the run while a decision still copies or trashes files; the restore waits for it.
+    if (this.deciding.has(taskId)) throw new Error("Wait for the decision to finish");
+    const latest = (task.kept ?? []).filter((k) => k.path === path).at(-1);
+    if (!latest) throw new Error("There's no kept copy of that file");
+    this.restoring.add(taskId);
+    try {
+      // The version being replaced is kept so Undo can bring it back. A file removed since has nothing to keep.
+      const current = await this.guard.keep(task, path, "restore").catch((err: NodeJS.ErrnoException) => {
+        if (err.code === "ENOENT") return null;
+        throw err;
+      });
+      await this.guard.restore(task, latest);
+      // Read the task again: it may have changed while the files were copied.
+      const fresh = this.mustGet(taskId);
+      const kept = current ? [...(fresh.kept ?? []), current] : (fresh.kept ?? []);
+      return this.save({ ...fresh, kept, updatedAt: this.now() });
+    } finally {
+      this.restoring.delete(taskId);
+    }
   }
 
   stop(taskId: string): void {
