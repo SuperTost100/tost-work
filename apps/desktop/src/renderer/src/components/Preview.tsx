@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useT } from "@/lib/useT";
 import type { FileContent, TostWorkApi } from "../../../shared/api";
 
@@ -22,10 +22,14 @@ export async function load(file: FileContent): Promise<Loaded> {
   if (ext === "pdf") return { kind: "pdf", bytes };
   if (ext === "xlsx" || ext === "xls" || ext === "csv" || ext === "ods") {
     const { read, utils } = await import("xlsx");
-    const book = read(bytes, { type: "array" });
+    // sheetRows stops parsing after the rows the preview shows; the sheet's full size stays in !fullref.
+    const book = read(bytes, { type: "array", sheetRows: MAX_ROWS });
     const sheet = book.SheetNames[0];
     const ws = sheet ? book.Sheets[sheet] : undefined;
     if (!sheet || !ws) return { kind: "none" };
+    const fullRef = ws["!fullref"] ?? ws["!ref"];
+    const full = fullRef ? utils.decode_range(fullRef) : null;
+    const total = full ? full.e.r - full.s.r + 1 : 0;
     const rows = utils.sheet_to_json<(string | number | boolean | null)[]>(ws, {
       header: 1,
       raw: false,
@@ -36,7 +40,7 @@ export async function load(file: FileContent): Promise<Loaded> {
       id: `r${r}`,
       cells: Array.from(row, (cell, c) => ({ id: `r${r}c${c}`, text: cell == null ? "" : String(cell) })),
     }));
-    return { kind: "table", rows: shown, sheet, more: Math.max(0, rows.length - MAX_ROWS) };
+    return { kind: "table", rows: shown, sheet, more: Math.max(0, total - MAX_ROWS) };
   }
   if (ext === "md" || ext === "markdown") {
     const [{ marked }, { default: DOMPurify }] = await Promise.all([import("marked"), import("dompurify")]);
@@ -48,33 +52,38 @@ export async function load(file: FileContent): Promise<Loaded> {
   return { kind: "none" };
 }
 
-function Docx({ bytes }: { bytes: Uint8Array }) {
+/** Called when a file can't be drawn, such as a damaged Word file or a PDF with a password. */
+type OnError = (error: unknown) => void;
+
+function Docx({ bytes, onError }: { bytes: Uint8Array; onError: OnError }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     let alive = true;
-    void import("docx-preview").then(({ renderAsync }) => {
-      if (!alive) return;
-      el.replaceChildren();
-      return renderAsync(bytes, el, undefined, {
-        className: "docx",
-        inWrapper: false,
-        breakPages: true,
-        ignoreLastRenderedPageBreak: true,
-      });
-    });
+    import("docx-preview")
+      .then(({ renderAsync }) => {
+        if (!alive) return;
+        el.replaceChildren();
+        return renderAsync(bytes, el, undefined, {
+          className: "docx",
+          inWrapper: false,
+          breakPages: true,
+          ignoreLastRenderedPageBreak: true,
+        });
+      })
+      .catch((err: unknown) => alive && onError(err));
     return () => {
       alive = false;
     };
-  }, [bytes]);
+  }, [bytes, onError]);
   return <div className="pv-docx" ref={ref} />;
 }
 
 /** PDF pages beyond this many are left out of the preview, with a note to open the file. */
 const MAX_PAGES = 20;
 
-function Pdf({ bytes }: { bytes: Uint8Array }) {
+function Pdf({ bytes, onError }: { bytes: Uint8Array; onError: OnError }) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [more, setMore] = useState(0);
@@ -102,11 +111,11 @@ function Pdf({ bytes }: { bytes: Uint8Array }) {
         el.appendChild(canvas);
         await page.render({ canvas, viewport }).promise;
       }
-    })();
+    })().catch((err: unknown) => alive && onError(err));
     return () => {
       alive = false;
     };
-  }, [bytes]);
+  }, [bytes, onError]);
   return (
     <>
       <div className="pv-pdf" ref={ref} />
@@ -163,14 +172,20 @@ export function Preview({
     return () => URL.revokeObjectURL(shown);
   }, [shown]);
 
+  // A file that loaded but can't be drawn shows the same message as one that couldn't be read.
+  const failed = useCallback(
+    (err: unknown) => setState({ error: err instanceof Error ? err.message : String(err) }),
+    [],
+  );
+
   const { loaded, error } = state;
   if (error) return <p className="pv-note">{error}</p>;
   if (!loaded) return <p className="pv-note">{t("preview.loading")}</p>;
   switch (loaded.kind) {
     case "docx":
-      return <Docx bytes={loaded.bytes} />;
+      return <Docx bytes={loaded.bytes} onError={failed} />;
     case "pdf":
-      return <Pdf bytes={loaded.bytes} />;
+      return <Pdf bytes={loaded.bytes} onError={failed} />;
     case "html":
       return <Html html={loaded.html} />;
     case "image":

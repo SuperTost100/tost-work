@@ -1,4 +1,4 @@
-import { access, realpath, stat } from "node:fs/promises";
+import { lstat, realpath, stat } from "node:fs/promises";
 import { basename, extname, isAbsolute, join, relative } from "node:path";
 import type { Task } from "../shared/model";
 
@@ -33,10 +33,14 @@ export async function readablePath(task: Task, requested: string, limitSize = tr
 
 export const describe = (path: string) => ({ name: basename(path), ext: extname(path).slice(1).toLowerCase() });
 
+// lstat, not access: a dangling link still takes the name, and an exclusive copy onto it would fail.
 const exists = (path: string) =>
-  access(path).then(
+  lstat(path).then(
     () => true,
-    () => false,
+    (err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") return false;
+      throw err;
+    },
   );
 
 /** A name that isn't taken in the folder yet: "letter.docx", then "letter (2).docx", "letter (3).docx" and so on. */

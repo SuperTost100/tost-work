@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Task } from "../shared/model";
-import { MAX_PREVIEW_BYTES, readablePath } from "./files";
+import { freeName, MAX_PREVIEW_BYTES, readablePath } from "./files";
 
 let root = "";
 let work = "";
@@ -78,5 +78,10 @@ describe("readablePath", () => {
     const task = base([{ path, kind: "add", role: "made" }]);
     await expect(readablePath(task, path)).rejects.toThrow(/too big/);
     await expect(readablePath(task, path, false)).resolves.toMatch(/big\.pdf$/);
+  });
+
+  it("counts a dangling link as a taken name", async () => {
+    await symlink(join(root, "gone.docx"), join(work, "Dangling.docx"));
+    expect(await freeName(work, "Dangling.docx")).toBe(join(work, "Dangling (2).docx"));
   });
 });
