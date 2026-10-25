@@ -19,6 +19,12 @@ export interface FileContent {
   bytes: Uint8Array;
 }
 
+export interface SaveResult {
+  folder: string;
+  /** Paths written. Fewer than the task's files when the user cancelled at a name clash. */
+  saved: string[];
+}
+
 /** What the preload exposes to the interface as `window.tostWork`. */
 export interface TostWorkApi {
   platform: "darwin" | "win32" | "linux";
@@ -40,11 +46,17 @@ export interface TostWorkApi {
     /** Creates the task and starts it right away. */
     start(input: NewTaskInput): Promise<Task>;
     answer(id: string, answer: string): Promise<Task>;
+    /** Sends another instruction to a task that finished or stopped, and runs it again. */
+    followUp(id: string, text: string): Promise<Task>;
+    /** Asks for a folder, every time, and copies the files the task made into it. Null when the user cancels. */
+    saveCopy(id: string): Promise<SaveResult | null>;
     stop(id: string): Promise<void>;
     /** Called with the full task every time it changes. Returns a function that stops listening. */
     onChange(listener: (task: Task) => void): () => void;
   };
   files: {
+    /** Opens the system file picker. Resolves to the chosen paths, empty when the user cancels. */
+    pick(): Promise<string[]>;
     /** Reads a file the task made, used or was given, for a preview. */
     read(taskId: string, path: string): Promise<FileContent>;
     /** Opens the file in its usual app, for example Word. */
@@ -66,7 +78,10 @@ export const IPC = {
   tasksStart: "tasks:start",
   tasksAnswer: "tasks:answer",
   tasksStop: "tasks:stop",
+  tasksFollowUp: "tasks:follow-up",
+  tasksSaveCopy: "tasks:save-copy",
   taskChanged: "tasks:changed",
+  filesPick: "files:pick",
   filesRead: "files:read",
   filesOpen: "files:open",
   filesReveal: "files:reveal",

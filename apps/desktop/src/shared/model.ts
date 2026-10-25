@@ -53,6 +53,8 @@ export interface Message {
   from: "user" | "agent";
   text: string;
   at: string;
+  /** True for an instruction sent after the task finished, which starts a new run with its own steps. */
+  followUp?: boolean;
 }
 
 export interface Task {

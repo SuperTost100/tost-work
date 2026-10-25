@@ -23,7 +23,7 @@ async function folders() {
 const run = async (engine: FakeEngine, work: string, controller = new AbortController()) => {
   const events: EngineEvent[] = [];
   const task = { id: "t", files: [], attachments: [] } as unknown as Task;
-  for await (const e of engine.run({ task, project: null, workdir: work, signal: controller.signal })) events.push(e);
+  for await (const e of engine.run({ task, project: null, workdir: work, followUp: null, signal: controller.signal })) events.push(e);
   return events;
 };
 
@@ -46,7 +46,7 @@ describe("FakeEngine samples", () => {
     const engine = new FakeEngine(script, 50, samples);
     const events: EngineEvent[] = [];
     const task = { id: "t", files: [], attachments: [] } as unknown as Task;
-    for await (const e of engine.run({ task, project: null, workdir: work, signal: controller.signal })) {
+    for await (const e of engine.run({ task, project: null, workdir: work, followUp: null, signal: controller.signal })) {
       events.push(e);
       if (e.type === "plan") controller.abort();
     }

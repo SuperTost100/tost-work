@@ -94,6 +94,25 @@ export function createMemoryApi(): TostWorkApi & { emit(id: string, e: EngineEve
         emit(id, { type: "done" });
         return tasks.get(id) ?? t;
       },
+      followUp: async (id, text) => {
+        const t = tasks.get(id);
+        if (!t || t.status === "running" || t.question) throw new Error("This task can't take a follow-up now");
+        save({
+          ...t,
+          status: "running",
+          review: null,
+          messages: [...t.messages, { from: "user", text, at: now(), followUp: true }],
+        });
+        emit(id, { type: "plan", steps: [{ text: "Make the change", status: "in_progress" }] });
+        emit(id, { type: "message", text: "Done, I made the change." });
+        emit(id, { type: "done" });
+        return tasks.get(id) ?? t;
+      },
+      saveCopy: async (id) => {
+        const made = tasks.get(id)?.files.filter((f) => f.role === "made") ?? [];
+        const folder = "/Users/giulia/Documents";
+        return { folder, saved: made.map((f) => `${folder}/${f.path.split("/").pop()}`) };
+      },
       stop: async (id) => emit(id, { type: "stopped" }),
       onChange: (l) => {
         listeners.add(l);
@@ -101,6 +120,7 @@ export function createMemoryApi(): TostWorkApi & { emit(id: string, e: EngineEve
       },
     },
     files: {
+      pick: async () => ["/Users/giulia/Documents/letter-bank.docx"],
       read: async (_taskId, path) => ({
         name: path.split("/").pop() ?? path,
         ext: "md",

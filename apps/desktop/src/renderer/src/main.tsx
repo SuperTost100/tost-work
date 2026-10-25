@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { languageFrom } from "../../shared/i18n";
 import { App } from "./App";
-import { languageFrom } from "./lib/i18n";
 import { LanguageContext } from "./lib/useT";
 import "./styles/app.css";
 

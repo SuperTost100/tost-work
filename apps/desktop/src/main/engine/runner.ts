@@ -59,8 +59,11 @@ export class TaskRunner {
     return task;
   }
 
-  /** Runs the task to the end. Resolves with the final task; questions pause it until `answer` is called. */
-  async start(taskId: string): Promise<Task> {
+  /**
+   * Runs the task to the end. Resolves with the final task; questions pause it until `answer` is called.
+   * Pass the user's message as `followUp` to continue a task that already finished.
+   */
+  async start(taskId: string, followUp: string | null = null): Promise<Task> {
     let task = this.mustGet(taskId);
     const workdir = task.workdir;
     if (this.running.has(taskId)) throw new Error("This task is already running");
@@ -69,7 +72,7 @@ export class TaskRunner {
     this.running.set(taskId, controller);
     try {
       task = this.save({ ...task, status: "running", error: null, updatedAt: this.now() });
-      for await (const event of this.engine.run({ task, project, workdir, signal: controller.signal })) {
+      for await (const event of this.engine.run({ task, project, workdir, followUp, signal: controller.signal })) {
         // Read the stored task each time, so an answer saved meanwhile isn't overwritten.
         task = this.save(applyEvent(this.mustGet(taskId), event, this.now()));
       }
@@ -84,8 +87,8 @@ export class TaskRunner {
   }
 
   /** Starts the task without waiting for it. A failure the task couldn't record itself is logged, so it can't crash the app. */
-  launch(taskId: string): void {
-    this.start(taskId).catch((err: unknown) => {
+  launch(taskId: string, followUp: string | null = null): void {
+    this.start(taskId, followUp).catch((err: unknown) => {
       console.error(`Task ${taskId} failed and its state couldn't be saved`, err);
     });
   }
@@ -97,6 +100,22 @@ export class TaskRunner {
     const next = this.save({ ...resume(task, at), messages: [...task.messages, { from: "user", text: answer, at }] });
     this.engine.answer(taskId, task.question.id, answer);
     return next;
+  }
+
+  /** Adds the user's next instruction to a task that isn't working. Call `launch` with the same text to run it. */
+  followUp(taskId: string, text: string): Task {
+    const task = this.mustGet(taskId);
+    if (this.running.has(taskId)) throw new Error("This task is still working");
+    if (task.question || task.approval) throw new Error("This task is waiting for an answer");
+    const at = this.now();
+    // The old review checked the old brief, so it goes until the agent writes a new one.
+    return this.save({
+      ...task,
+      review: null,
+      error: null,
+      messages: [...task.messages, { from: "user", text, at, followUp: true }],
+      updatedAt: at,
+    });
   }
 
   stop(taskId: string): void {

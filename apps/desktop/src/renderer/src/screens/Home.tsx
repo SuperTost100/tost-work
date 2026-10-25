@@ -1,8 +1,8 @@
-import { Composer } from "@/components/Composer";
+import { type Attachments, Composer } from "@/components/Composer";
 import { ProjectPicker } from "@/components/ProjectPicker";
 import { TaskTag } from "@/components/TaskTag";
-import { greetingKey } from "@/lib/i18n";
 import { useT } from "@/lib/useT";
+import { greetingKey } from "../../../shared/i18n";
 import type { Project, Task } from "../../../shared/model";
 
 export function Home({
@@ -14,6 +14,7 @@ export function Home({
   projects,
   tasks,
   onStart,
+  attach,
   onOpenTask,
   onNewProject,
   now = new Date(),
@@ -26,6 +27,7 @@ export function Home({
   projects: Project[];
   tasks: Task[];
   onStart: () => void;
+  attach?: Attachments;
   onOpenTask: (id: string) => void;
   onNewProject: () => void;
   now?: Date;
@@ -55,6 +57,7 @@ export function Home({
             onChange={onBriefChange}
             onSubmit={onStart}
             placeholder={t("composer.placeholder")}
+            attach={attach}
             sendLabel={t("composer.start")}
           />
           <div className="under">

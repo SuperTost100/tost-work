@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import { type Language, type MessageKey, translate } from "./i18n";
+import { type Language, type MessageKey, translate } from "../../../shared/i18n";
 
 export const LanguageContext = createContext<Language>("en");
 

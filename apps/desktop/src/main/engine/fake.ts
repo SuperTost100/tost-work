@@ -11,7 +11,9 @@ export interface FakeScript {
   /** Asked before this step index starts. */
   question?: { beforeStep: number; text: string; options: string[] };
   files: { path: string; kind: "add" | "update"; afterStep: number }[];
-  review: Review;
+  /** Reports files that already exist as changed: the copies a quick edit was given, or the last file made. */
+  touches?: { which: "attachments" | "last-made"; afterStep: number };
+  review?: Review;
   summary: string;
 }
 
@@ -40,6 +42,27 @@ export const PROPOSAL_SCRIPT: FakeScript = {
   summary: "Done. The proposal and the price table are in the project folder.",
 };
 
+/** A quick edit on files the user attached: the engine reports their copies as changed. */
+export const EDIT_SCRIPT: FakeScript = {
+  steps: ["Read your file", "Make the changes", "Check the result"],
+  files: [],
+  touches: { which: "attachments", afterStep: 1 },
+  review: {
+    asked: [{ text: "The changes in your message" }],
+    decided: [{ text: "Kept your layout and fonts" }],
+    checkYourself: [],
+  },
+  summary: "Done. Your original file stays as it is until you save a copy.",
+};
+
+/** One more instruction on a finished task. */
+export const FOLLOW_UP_SCRIPT: FakeScript = {
+  steps: ["Make the change"],
+  files: [],
+  touches: { which: "last-made", afterStep: 0 },
+  summary: "Done, I made the change.",
+};
+
 const sleep = (ms: number, signal: AbortSignal) =>
   new Promise<void>((resolve) => {
     if (ms <= 0 || signal.aborted) return resolve();
@@ -65,8 +88,9 @@ export class FakeEngine implements Engine {
     private samples?: string,
   ) {}
 
-  async *run({ task, workdir, signal }: RunContext): AsyncIterable<EngineEvent> {
-    const s = this.script;
+  async *run({ task, workdir, followUp, signal }: RunContext): AsyncIterable<EngineEvent> {
+    const quickEdit = task.projectId === null && task.attachments.length > 0;
+    const s = followUp ? FOLLOW_UP_SCRIPT : quickEdit ? EDIT_SCRIPT : this.script;
     const steps = s.steps.map((text) => ({ text, status: "pending" as const }));
     for (let i = 0; i < steps.length; i++) {
       if (signal.aborted) return yield { type: "stopped" };
@@ -100,9 +124,14 @@ export class FakeEngine implements Engine {
         }
         yield { type: "file", change: { path, kind: f.kind, role: "made" } };
       }
+      if (s.touches?.afterStep === i) {
+        const lastMade = task.files.filter((f) => f.role === "made" && f.kind !== "delete").at(-1)?.path;
+        const paths = s.touches.which === "attachments" ? task.attachments : lastMade ? [lastMade] : [];
+        for (const path of paths) yield { type: "file", change: { path, kind: "update", role: "made" } };
+      }
     }
     if (signal.aborted) return yield { type: "stopped" };
-    yield { type: "review", review: s.review };
+    if (s.review) yield { type: "review", review: s.review };
     yield { type: "message", text: s.summary };
     yield { type: "done" };
   }
