@@ -22,6 +22,7 @@ export class Store {
         updated_at text not null
       );
       create index if not exists tasks_updated on tasks (updated_at desc);
+      create index if not exists tasks_project on tasks (project_id, updated_at desc);
     `);
   }
 
@@ -63,6 +64,22 @@ export class Store {
       data: string;
     }[];
     return rows.map((r) => JSON.parse(r.data) as Task);
+  }
+
+  /** Every task of one project, newest first. The recent list stops at 50, a project's history doesn't. */
+  listProjectTasks(projectId: string): Task[] {
+    const rows = this.db
+      .prepare("select data from tasks where project_id = ? order by updated_at desc")
+      .all(projectId) as { data: string }[];
+    return rows.map((r) => JSON.parse(r.data) as Task);
+  }
+
+  /** How many tasks each project has, for the project cards. */
+  taskCounts(): Record<string, number> {
+    const rows = this.db
+      .prepare("select project_id as id, count(*) as n from tasks where project_id is not null group by project_id")
+      .all() as { id: string; n: number }[];
+    return Object.fromEntries(rows.map((r) => [r.id, Number(r.n)]));
   }
 
   /** Tasks that were running when the app quit can't continue, so they are marked stopped on the next start. */

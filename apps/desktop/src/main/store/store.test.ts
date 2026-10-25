@@ -66,4 +66,16 @@ describe("Store", () => {
     expect(s.stopInterrupted("2026-10-02T00:00:00Z")).toBe(1);
     expect(s.getTask("old-running")?.status).toBe("stopped");
   });
+
+  it("lists a project's whole history, past the 50 recent tasks, and counts tasks per project", () => {
+    const s = new Store(":memory:");
+    s.saveTask({ ...task("first", "done", "2026-01-01T00:00:00Z"), projectId: "p1" });
+    for (let i = 0; i < 60; i++) {
+      const at = new Date(Date.UTC(2026, 5, 1, 0, i)).toISOString();
+      s.saveTask({ ...task(`n${i}`, "done", at), projectId: i % 2 ? "p2" : null });
+    }
+    expect(s.listTasks().some((t) => t.id === "first")).toBe(false);
+    expect(s.listProjectTasks("p1").map((t) => t.id)).toEqual(["first"]);
+    expect(s.taskCounts()).toEqual({ p1: 1, p2: 30 });
+  });
 });
