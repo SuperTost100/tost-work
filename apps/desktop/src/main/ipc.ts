@@ -37,6 +37,10 @@ export function registerIpc(store: Store, runner: TaskRunner, window: () => Brow
   });
 
   ipcMain.handle(IPC.tasksList, () => store.listTasks());
+  ipcMain.handle(IPC.tasksListForProject, (_e, projectId: unknown) =>
+    store.listProjectTasks(text(projectId, "projectId", 100)),
+  );
+  ipcMain.handle(IPC.projectsTaskCounts, () => store.taskCounts());
   ipcMain.handle(IPC.tasksGet, (_e, id: unknown) => store.getTask(text(id, "id", 100)) ?? null);
 
   ipcMain.handle(IPC.tasksStart, async (_e, input: NewTaskInput) => {

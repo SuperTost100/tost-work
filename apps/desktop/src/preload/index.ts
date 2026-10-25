@@ -8,10 +8,12 @@ const api: TostWorkApi = {
   projects: {
     list: () => ipcRenderer.invoke(IPC.projectsList),
     create: (input) => ipcRenderer.invoke(IPC.projectsCreate, input),
+    taskCounts: () => ipcRenderer.invoke(IPC.projectsTaskCounts),
     pickFolder: () => ipcRenderer.invoke(IPC.projectsPickFolder),
   },
   tasks: {
     list: () => ipcRenderer.invoke(IPC.tasksList),
+    listForProject: (projectId) => ipcRenderer.invoke(IPC.tasksListForProject, projectId),
     get: (id) => ipcRenderer.invoke(IPC.tasksGet, id),
     start: (input) => ipcRenderer.invoke(IPC.tasksStart, input),
     answer: (id, answer) => ipcRenderer.invoke(IPC.tasksAnswer, id, answer),
