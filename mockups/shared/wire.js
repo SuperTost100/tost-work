@@ -9,6 +9,7 @@
       if (s.dataset.hidden !== undefined) continue;
       const a = document.createElement("a");
       a.href = "#" + s.id.slice(2);
+      a.dataset.screen = s.id.slice(2);
       a.textContent = s.dataset.title;
       nav.appendChild(a);
     }
@@ -26,7 +27,7 @@
     const target = document.getElementById("s-" + name) || screens[0];
     for (const s of screens) s.classList.toggle("on", s === target);
     if (nav) {
-      for (const a of nav.querySelectorAll("a")) a.classList.toggle("on", a.getAttribute("href") === "#" + target.id.slice(2));
+      for (const a of nav.querySelectorAll("a[data-screen]")) a.classList.toggle("on", a.dataset.screen === target.id.slice(2));
     }
     const title = document.querySelector(".titlebar .where");
     if (title) title.textContent = target.dataset.title;
