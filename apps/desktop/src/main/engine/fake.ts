@@ -91,6 +91,10 @@ export class FakeEngine implements Engine {
     private samples?: string,
   ) {}
 
+  async defaults() {
+    return { model: "gpt-5.5", effort: "medium" };
+  }
+
   /** Resolves with the user's reply, or null when the task is stopped first. */
   private reply(id: string, signal: AbortSignal): Promise<string | boolean | null> {
     // An abort that already happened never fires its event, so it's checked here.

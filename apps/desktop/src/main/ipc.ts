@@ -87,7 +87,8 @@ export function registerIpc(
       // The agent edits copies, so the user's originals stay as they are until they save a copy.
       attachments = await copyInto(given, workdir);
     }
-    const task = runner.create({ projectId, brief, workdir, attachments });
+    const { model, effort } = await runner.defaults();
+    const task = runner.create({ projectId, brief, workdir, attachments, model, effort });
     runner.launch(task.id);
     return task;
   });

@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
-    "cli-funnel": "0.5.1",
+    "cli-funnel": "0.6.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

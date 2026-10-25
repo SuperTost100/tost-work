@@ -90,6 +90,8 @@ export interface Task {
   review: Review | null;
   /** Missing on tasks saved before copies were kept. */
   kept?: KeptCopy[];
+  /** The agent's conversation, so a follow-up continues it. Set by the real engine. */
+  sessionId?: string;
   error: string | null;
   createdAt: string;
   updatedAt: string;
@@ -97,6 +99,7 @@ export interface Task {
 
 /** What an engine reports while it works. The task screen is built from these. */
 export type EngineEvent =
+  | { type: "session"; sessionId: string }
   | { type: "plan"; steps: Step[] }
   | { type: "message"; text: string }
   | { type: "file"; change: FileChange }

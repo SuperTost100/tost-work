@@ -11,6 +11,7 @@ describe("instructionsFor", () => {
     const text = instructionsFor(task, project, "it");
     expect(text).toContain("/Users/giulia/Proposte");
     expect(text).toContain("plain Italian");
+    expect(text).toContain("don't use Markdown");
     expect(text).toContain("request_approval with action overwrite");
     expect(text).toContain("The project's instructions:\nUse our template.");
   });

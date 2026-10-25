@@ -4,6 +4,8 @@ import type { EngineEvent, Task } from "./model";
 export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
   const next: Task = { ...task, updatedAt: at };
   switch (event.type) {
+    case "session":
+      return { ...next, sessionId: event.sessionId };
     case "plan":
       return { ...next, steps: event.steps };
     case "message":

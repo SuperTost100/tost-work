@@ -12,6 +12,8 @@ export interface RunContext {
 
 /** Something that does the work of a task: the real one wraps cli-funnel, the fake one replays a script. */
 export interface Engine {
+  /** The model and effort a new task starts with. */
+  defaults(): Promise<{ model: string; effort: string }>;
   run(ctx: RunContext): AsyncIterable<EngineEvent>;
   /** The user picked an answer, or wrote one, for the question the engine asked. */
   answer(taskId: string, questionId: string, answer: string): void;
