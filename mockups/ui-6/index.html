@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Tost Work · UI round 6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap">
+
+<style>
+/* Tost Work, round 4. Calm like the Claude app, branded like tost.one: paper, ink, taupe, Schibsted Grotesk. */
+body[data-theme="light"] {
+  --desk: #DDD8CF; --canvas: #FAF8F4; --side: #F3F0EA; --panel: #EFEBE3; --paper: #FFFFFF;
+  --line: #E6E1D8; --line-2: #EEEAE3; --hover: rgba(27,23,18,.045); --sel: rgba(27,23,18,.07);
+  --ink: #1B1712; --t2: #57504A; --t3: #807769; --taupe: #9C8B73;
+  --btn: #1B1712; --on-btn: #FAF8F4; --need: #9A5B0B;
+  --page-shadow: 0 1px 2px rgba(27,23,18,.06), 0 6px 18px rgba(27,23,18,.07);
+}
+body[data-theme="dark"] {
+  --desk: #0D0C0B; --canvas: #22201D; --side: #1B1917; --panel: #2C2925; --paper: #2A2723;
+  --line: #36322D; --line-2: #2F2B27; --hover: rgba(255,250,240,.045); --sel: rgba(255,250,240,.08);
+  --ink: #EEEAE3; --t2: #B7AFA4; --t3: #8E8679; --taupe: #B9A88F;
+  --btn: #EEEAE3; --on-btn: #1B1712; --need: #E3A452;
+  --page-shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 22px rgba(0,0,0,.35);
+}
+* { box-sizing: border-box; }
+html { background: var(--desk); }
+body { margin: 0; min-width: 1180px; font: 400 14px/1.5 "Schibsted Grotesk", system-ui, sans-serif; color: var(--ink); background: var(--desk); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; cursor: pointer; background: none; border: 0; padding: 0; }
+p, h1, h2, h3 { margin: 0; }
+.ic { display: inline-block; width: 17px; height: 17px; flex: none; background-color: currentColor; -webkit-mask: no-repeat center / contain; mask: no-repeat center / contain; }
+.row { display: flex; align-items: center; gap: 8px; }
+.grow { flex: 1; min-width: 0; }
+.t2 { color: var(--t2); } .t3 { color: var(--t3); }
+.truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.window { margin: 46px auto 86px; width: min(1400px, calc(100vw - 36px)); height: calc(100vh - 132px); min-height: 720px; border-radius: 12px; overflow: hidden; display: flex; background: var(--canvas); box-shadow: 0 0 0 1px rgba(0,0,0,.08), 0 24px 60px rgba(0,0,0,.18); }
+.screen { display: none; flex: 1; min-height: 0; }
+.screen.on { display: flex; }
+
+/* ===== Sidebar ===== */
+.side { width: 248px; flex: none; background: var(--side); display: flex; flex-direction: column; padding: 0 10px 10px; border-right: 1px solid var(--line-2); }
+.side .chrome { height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 4px; }
+.lights { display: flex; gap: 8px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.lights i:nth-child(1) { background: #FF5F57; } .lights i:nth-child(2) { background: #FEBC2E; } .lights i:nth-child(3) { background: #28C840; }
+.iconbtn { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; color: var(--t2); }
+.iconbtn:hover { background: var(--hover); color: var(--ink); }
+.brand { display: flex; align-items: center; gap: 9px; padding: 6px 6px 14px; }
+.brand svg { width: 24px; height: 24px; flex: none; }
+.brand b { font-weight: 800; font-size: 16px; letter-spacing: -0.02em; }
+.search { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border-radius: 8px; background: var(--canvas); border: 1px solid var(--line); color: var(--t3); font-size: 13.5px; margin-bottom: 8px; }
+body[data-theme="dark"] .search { background: var(--panel); border-color: transparent; }
+.search kbd { margin-left: auto; font: 500 11px/1 "Schibsted Grotesk"; color: var(--t3); }
+.nav { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border-radius: 8px; color: var(--ink); font-size: 14px; }
+.nav .ic { color: var(--t2); }
+.nav:hover { background: var(--hover); }
+.nav.on { background: var(--sel); font-weight: 500; }
+.side h4 { margin: 18px 8px 4px; font-size: 12.5px; font-weight: 500; color: var(--t3); }
+.rec { display: block; height: 30px; line-height: 30px; padding: 0 8px; border-radius: 8px; font-size: 13.5px; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rec:hover { background: var(--hover); color: var(--ink); }
+.rec.on { background: var(--sel); color: var(--ink); }
+.rec .wait { color: var(--need); font-size: 12px; flex: none; }
+.rec.split { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.spacer { flex: 1; }
+.me { display: flex; align-items: center; gap: 10px; padding: 8px 6px 2px; border-top: 1px solid var(--line-2); margin-top: 8px; }
+.avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--taupe); color: #FFF; display: grid; place-items: center; font-weight: 600; font-size: 12px; }
+.me .who { font-size: 13.5px; line-height: 1.2; }
+.me .who span { display: block; font-size: 12px; color: var(--t3); }
+
+/* ===== Main ===== */
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.top { height: 44px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 14px 0 22px; }
+.crumb { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--t2); }
+.crumb b { font-weight: 500; color: var(--ink); }
+.scroll { flex: 1; overflow: auto; min-height: 0; }
+.col { width: 720px; margin: 0 auto; padding: 40px 0 64px; }
+.tbtn { height: 30px; padding: 0 10px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--t2); }
+.tbtn:hover { background: var(--hover); color: var(--ink); }
+.btn { height: 32px; padding: 0 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 500; border: 1px solid var(--line); background: var(--paper); white-space: nowrap; }
+.btn:hover { border-color: var(--t3); }
+.btn.dark { background: var(--btn); color: var(--on-btn); border-color: var(--btn); }
+.btn.dark:hover { opacity: .88; }
+
+/* Headline in the tost.one manner: ink, then taupe */
+.home-col { position: relative; padding-top: 120px; }
+.hello { margin-bottom: 18px; }
+.hello h1 { font-size: 30px; line-height: 1.1; font-weight: 700; letter-spacing: -0.025em; }
+.hello h1 span { color: var(--taupe); }
+/* The home image: a tilted draft card, as on tost.one */
+.draft.float { position: absolute; top: 4px; right: -178px; width: 220px; z-index: 1; }
+.draft { display: block; color: #1B1712; transform: rotate(2deg); background: #FFFDF9; border-radius: 10px; box-shadow: var(--page-shadow); padding: 14px 14px 12px; font-size: 12px; }
+.draft .h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; white-space: nowrap; padding-bottom: 7px; border-bottom: 2px solid #1B1712; font-weight: 700; font-size: 12.5px; }
+.draft .h span { font: 500 10.5px/1 "IBM Plex Mono", monospace; color: #807769; }
+.draft .l { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #EEEAE3; color: #57504A; }
+.draft .l:last-child { border-bottom: 0; }
+.draft .l em { font: 500 10.5px/1 "IBM Plex Mono", monospace; font-style: normal; padding: 3px 6px; border-radius: 4px; background: #EFEBE3; color: #57504A; }
+.draft .l em.you { background: #1B1712; color: #FAF8F4; }
+.draft:hover { transform: rotate(1deg); }
+
+/* Sprigs from tost.one's illustrations, only on home */
+.sprig { position: absolute; bottom: 0; pointer-events: none; opacity: .9; }
+.sprig.left { left: 56px; width: 78px; }
+.sprig.right { right: 64px; width: 110px; }
+body[data-theme="dark"] .sprig { opacity: .5; }
+/* Composer, Claude style: quiet box, settings below as text */
+.composer { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 1px 2px rgba(27,23,18,.04), 0 4px 16px rgba(27,23,18,.04); }
+body[data-theme="dark"] .composer { box-shadow: none; }
+.composer textarea { width: 100%; border: 0; resize: none; background: transparent; color: var(--ink); font: 400 15px/1.55 "Schibsted Grotesk", sans-serif; padding: 14px 16px 6px; min-height: 76px; }
+.composer textarea:focus { outline: none; }
+.composer textarea::placeholder { color: var(--t3); }
+.composer .in { display: flex; align-items: center; gap: 6px; padding: 6px 10px 10px; }
+.attached { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; border-radius: 7px; background: var(--panel); font-size: 13px; color: var(--t2); }
+.send { width: 32px; height: 32px; border-radius: 50%; background: var(--btn); color: var(--on-btn); display: grid; place-items: center; }
+.send .ic { width: 16px; height: 16px; }
+.under { display: flex; align-items: center; gap: 4px; padding: 8px 6px 0; font-size: 13px; color: var(--t2); }
+.pick { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 6px; border-radius: 6px; }
+.pick:hover { background: var(--hover); color: var(--ink); }
+.pick b { font-weight: 500; color: var(--ink); }
+.pick .ic { width: 13px; height: 13px; }
+
+/* Needs you: a quiet panel, like Claude's notices */
+.notice { background: var(--panel); border-radius: 12px; padding: 16px 18px; display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center; margin-top: 30px; }
+.notice .k { font-size: 12.5px; font-weight: 500; color: var(--need); grid-column: 1 / -1; }
+.notice b { font-weight: 600; font-size: 15px; }
+.notice p { color: var(--t2); font-size: 13.5px; }
+
+/* Status tag, from tost.one: small mono label, ink when it's on you */
+.tag { display: inline-flex; align-items: center; height: 19px; padding: 0 6px; border-radius: 4px; background: var(--panel); color: var(--t2); font: 500 11px/1 "IBM Plex Mono", ui-monospace, monospace; white-space: nowrap; }
+.tag.mine { background: var(--ink); color: var(--canvas); }
+/* Plain rows separated by hairlines */
+.sec { display: flex; justify-content: space-between; align-items: baseline; margin: 40px 0 6px; font-size: 13.5px; color: var(--t3); }
+.sec a:hover { color: var(--ink); }
+.item { display: block; padding: 13px 2px; border-bottom: 1px solid var(--line-2); }
+.item:hover .ttl { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.item .r1 { display: flex; align-items: center; gap: 10px; }
+.item .ttl { flex: 1; font-size: 15px; }
+.item .when { font-size: 13px; color: var(--t3); white-space: nowrap; }
+.item .when.now { color: var(--ink); }
+.outs { display: flex; gap: 6px; margin-top: 8px; }
+.out { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; font-size: 12.5px; color: var(--t2); background: var(--paper); }
+.out .ic { width: 14px; height: 14px; color: var(--t3); }
+
+/* ===== Task ===== */
+.task { display: grid; grid-template-columns: 1fr 292px; flex: 1; min-height: 0; }
+.task .mid { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.task .col { padding-top: 24px; padding-bottom: 24px; }
+.you { margin-left: auto; max-width: 78%; background: var(--panel); border-radius: 14px; padding: 11px 15px; font-size: 15px; }
+.you .outs { margin-top: 10px; }
+.steps { margin: 26px 0 0; display: grid; gap: 9px; font-size: 14.5px; color: var(--t2); }
+.steps div { display: flex; gap: 10px; align-items: center; }
+.steps .ic { color: var(--t3); }
+.steps .now { color: var(--ink); }
+.steps .now .tm { color: var(--t3); font-size: 13px; }
+.artifact { margin-top: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
+.artifact .head { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 14px; }
+.artifact .head b { font-weight: 500; }
+.artifact .head .t3 { font-size: 13px; }
+.page { margin: 0 14px; background: var(--paper); border-radius: 6px 6px 0 0; box-shadow: var(--page-shadow); padding: 26px 40px 6px; height: 170px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+.page h3 { font-size: 15px; font-weight: 700; margin: 14px 0 5px; }
+.page h3:first-child { margin-top: 0; }
+.page p { font-size: 14px; line-height: 1.65; color: var(--ink); }
+.foot { padding: 0 32px 16px; position: relative; }
+.foot::before { content: ""; position: absolute; left: 0; right: 0; top: -24px; height: 24px; background: linear-gradient(transparent, var(--canvas)); pointer-events: none; }
+.foot .col { padding: 0; width: 720px; }
+.asking { overflow: hidden; }
+.asking .q { padding: 14px 16px 10px; font-size: 15px; }
+.asking .q span { display: block; font-size: 12.5px; color: var(--t3); margin-bottom: 3px; }
+.asking .o { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 8px 16px; border-top: 1px solid var(--line-2); font-size: 14.5px; }
+.asking .o:hover { background: var(--hover); }
+.asking .o .n { width: 18px; color: var(--t3); font-size: 13px; }
+.asking .o.own { color: var(--t3); }
+.rp { border-left: 1px solid var(--line-2); display: flex; flex-direction: column; min-height: 0; }
+.rp .body { padding: 6px 16px 16px; overflow: auto; }
+.rp h3 { font-size: 12.5px; font-weight: 500; color: var(--t3); margin: 14px 0 8px; }
+.fileline { display: flex; align-items: center; gap: 12px; padding: 7px 6px; border-radius: 8px; margin: 0 -6px; }
+.fileline:hover { background: var(--hover); }
+.thumb { width: 30px; height: 38px; flex: none; background: var(--paper); border-radius: 3px; box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0,0,0,.05); padding: 6px 5px; display: grid; gap: 3px; align-content: start; }
+.thumb i { display: block; height: 2px; background: var(--line); border-radius: 1px; }
+.thumb i:first-child { background: var(--t3); width: 70%; }
+.thumb.brief { position: relative; background: var(--canvas); box-shadow: 0 0 0 1px var(--line); }
+.thumb.brief i { background: var(--line); }
+.thumb.brief i:first-child { background: var(--t3); opacity: .5; }
+.thumb.brief::after { content: ""; position: absolute; right: 0; bottom: 0; width: 9px; height: 9px; background: linear-gradient(135deg, var(--line) 50%, var(--canvas) 50%); border-top-left-radius: 2px; }
+.thumb.sheet { padding: 4px; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.thumb.sheet i { height: 4px; width: auto !important; background: var(--line); }
+.fileline .nm { font-size: 13.5px; }
+.fileline .sb { font-size: 12px; color: var(--t3); }
+
+.setrow { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line-2); }
+.setrow:last-child { border-bottom: 0; }
+.setrow .k { display: block; font-size: 13.5px; }
+.setrow .v { display: block; font-size: 12px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.setrow > .ic { color: var(--t2); }
+.setrow .act { font-size: 13px; color: var(--t2); padding: 4px 6px; border-radius: 6px; }
+.setrow .act:hover { background: var(--hover); color: var(--ink); }
+/* ===== Board, Craft style list ===== */
+.bhead { padding: 22px 32px 18px; display: flex; align-items: center; gap: 16px; }
+.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--panel); margin-left: auto; }
+.seg a { height: 26px; padding: 0 10px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--t2); }
+.seg a span { color: var(--t3); }
+.seg a.on { background: var(--paper); color: var(--ink); font-weight: 500; box-shadow: 0 0 0 1px var(--line); }
+.bhead h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; }
+.tabs { display: flex; gap: 2px; margin-top: 14px; border-bottom: 1px solid var(--line-2); }
+.tabs a { padding: 8px 10px 10px; font-size: 13.5px; color: var(--t3); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs a.on { color: var(--ink); border-color: var(--ink); font-weight: 500; }
+.tabs a span { margin-left: 4px; color: var(--t3); }
+.board-wrap { max-width: 1060px; }
+.thead, .brow { display: grid; grid-template-columns: 46px 1fr 170px 90px; gap: 14px; align-items: center; padding: 0 32px; }
+.thead { height: 36px; font-size: 13px; color: var(--t3); margin: 0 20px; padding: 0 12px; border-bottom: 1px solid var(--line-2); }
+.gh { padding: 18px 32px 6px; font-size: 13.5px; color: var(--t3); }
+.board-wrap { padding-bottom: 24px; }
+.brow { min-height: 62px; padding-top: 9px; padding-bottom: 9px; margin: 0 20px; padding-left: 12px; padding-right: 12px; border-radius: 10px; }
+.brow:hover { background: var(--hover); }
+.brow.sel { background: var(--sel); }
+.brow .thumb { width: 34px; height: 42px; }
+.brow .nm { font-size: 15px; }
+.brow .sn { font-size: 13px; color: var(--t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brow .c { font-size: 13.5px; color: var(--t2); }
+.brow .actions { display: flex; gap: 6px; margin-top: 8px; }
+.empty-thumb { width: 34px; height: 42px; border-radius: 3px; box-shadow: inset 0 0 0 1px var(--line); }
+
+.irow { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line-2); }
+.irow b { font-weight: 600; }
+.irow .set { display: flex; gap: 18px; flex-wrap: wrap; color: var(--ink); }
+.irow .set .ic { width: 22px; height: 22px; }
+/* Mockup bar */
+.mocknav { position: fixed; left: 0; right: 0; bottom: 14px; margin: 0 auto; width: max-content; display: flex; align-items: center; gap: 3px; padding: 5px 6px; background: #FFFEF8; border: 1.5px dashed #B9B29A; border-radius: 10px; font: 12.5px/1.2 system-ui, sans-serif; color: #3A372E; z-index: 50; }
+.mocknav b { padding: 0 8px; }
+.mocknav a { padding: 5px 9px; border-radius: 6px; cursor: pointer; }
+.mocknav a:hover { background: #F2EFE2; }
+.mocknav a.on { background: #E6E0CA; color: #111; font-weight: 600; }
+.mocknav .sep { width: 1px; height: 18px; background: #D8D2BD; margin: 0 4px; }
+</style>
+</head>
+<body data-theme="light">
+<div class="window">
+
+  <!-- ===== Work home ===== -->
+  <section class="screen" id="s-home" data-title="Work home">
+    <aside class="side" data-side data-on="work"></aside>
+    <div class="main">
+      <div class="top"></div>
+      <div class="scroll" style="position:relative"><div class="col home-col">
+        <div class="hello">
+          <h1>Good morning, Giulia.</h1>
+        </div>
+          <a class="draft float" href="#" title="Review Proposta_Ferraris.docx">
+            <div class="h">Proposta_Ferraris <span>to review</span></div>
+            <div class="l">Requirements <em>assembled</em></div>
+            <div class="l">Price table <em>assembled</em></div>
+            <div class="l">Client VAT number <em class="you">check it</em></div>
+          </a>
+
+        <div class="composer">
+          <textarea placeholder="What should get done?"></textarea>
+          <div class="in">
+            <button class="iconbtn" title="Attach files"><i data-i="plus"></i></button>
+            <span class="attached"><i data-i="file"></i>notes-call-alpi.docx</span>
+            <span class="grow"></span>
+            
+            <a class="send" href="#task" title="Start task"><i data-i="arrow-up"></i></a>
+          </div>
+        </div>
+        <div class="under">
+          <span class="pick"><b>Client proposals</b><i data-i="caret-down"></i></span>
+          <span class="grow"></span>
+          <span class="pick"><b>GPT-5.5</b>&nbsp;Medium<i data-i="caret-down"></i></span>
+        </div>
+
+        <div class="notice">
+          <span class="k">Needs you · Q3 expense reports</span>
+          <div><b>Supplier contracts summary wants to overwrite a file</b><p>You edited contracts-summary.xlsx on Friday. Keep your version, or let the task replace it.</p></div>
+          <div class="row"><button class="btn">Allow overwrite</button><button class="btn dark">Save as new file</button></div>
+        </div>
+
+        <div class="sec"><span>Recent tasks</span><a href="#board">Board</a></div>
+        <a class="item" href="#task"><div class="r1"><span class="ttl">Proposal for Alpi Logistica</span><span class="tag">writing · 3 of 6</span></div></a>
+        <a class="item"><div class="r1"><span class="ttl">Proposal for Cantina Ferraris</span><span class="tag mine">to review</span><span class="when">25 Oct</span></div><div class="outs"><span class="out"><i data-i="file"></i>Proposta_Ferraris.docx</span><span class="out"><i data-i="file"></i>prezzi-ferraris.xlsx</span></div></a>
+        <a class="item"><div class="r1"><span class="ttl">Monday press review</span><span class="tag">job</span><span class="when">08:00</span></div><div class="outs"><span class="out"><i data-i="file"></i>this-week.md</span></div></a>
+        <a class="item"><div class="r1"><span class="ttl">Rewrite the About page</span><span class="when">23 Oct</span></div><div class="outs"><span class="out"><i data-i="file"></i>about.md</span></div></a>
+      </div>
+      <svg class="sprig left" viewBox="0 0 120 200" aria-hidden="true"><path d="M60 200 C58 140 62 90 60 20" stroke="var(--ink)" stroke-width="4" fill="none"/><path d="M60 60 C40 50 28 34 30 12 C52 16 62 36 60 60Z" fill="#B3A28B"/><path d="M60 110 C80 100 92 82 90 60 C68 66 58 86 60 110Z" fill="#CFC3AD"/><path d="M60 150 C42 142 32 128 33 110 C52 114 61 130 60 150Z" fill="#B3A28B"/></svg>
+      <svg class="sprig right" viewBox="0 0 160 200" aria-hidden="true"><path d="M20 200 C40 150 70 110 140 80" stroke="var(--ink)" stroke-width="4" fill="none"/><path d="M62 132 C48 112 46 88 58 66 C74 86 74 112 62 132Z" fill="#CFC3AD"/><path d="M96 104 C88 82 92 60 108 44 C118 66 112 88 96 104Z" fill="#B3A28B"/><path d="M84 116 C104 108 126 112 142 126 C120 136 100 132 84 116Z" fill="#B3A28B"/></svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Running task ===== -->
+  <section class="screen" id="s-task" data-title="Running task">
+    <aside class="side" data-side data-on="task"></aside>
+    <div class="main">
+      <div class="top"><span class="crumb">Client proposals<span class="t3">/</span><b>Proposal for Alpi Logistica</b><i data-i="caret-down" class="t3" style="font-size:12px"></i></span><span class="grow"></span><button class="tbtn"><i data-i="stop"></i>Stop</button><button class="iconbtn" title="Files panel"><i data-i="sidebar-simple"></i></button></div>
+      <div class="task">
+        <div class="mid">
+          <div class="scroll"><div class="col">
+            <div class="you">Write a proposal for Alpi Logistica from yesterday's call notes. Use our proposal template, price between 8 and 10k, in Italian.
+              <div class="outs" style="justify-content:flex-end"><span class="out"><i data-i="file"></i>notes-call-alpi.docx</span></div>
+            </div>
+            <div class="steps">
+              <div><i data-i="check"></i>Read the call notes: 4 requirements, deadline 15 November</div>
+              <div><i data-i="check"></i>Opened the 2026 proposal template</div>
+              <div class="now"><i data-i="pencil-simple" style="color:var(--ink)"></i>Writing section 3 of 6, scope and timeline <span class="tm">· 2 min</span></div>
+            </div>
+            <div class="artifact">
+              <div class="head"><i data-i="file"></i><b>Proposta_AlpiLogistica.docx</b><span class="tag">being written</span><span class="grow"></span><button class="tbtn">Open</button></div>
+              <div class="page">
+                <h3>1. Premessa</h3>
+                <p>Alpi Logistica ci ha chiesto di ridurre i tempi di preparazione delle offerte di trasporto, che oggi richiedono in media due giorni lavorativi.</p>
+                <h3>2. Obiettivi</h3>
+                <p>Portare la preparazione di un'offerta standard sotto le quattro ore entro il 15 novembre, senza cambiare i gestionali in uso.</p>
+                <h3>3. Ambito e tempi</h3>
+                <p>Il progetto si svolge in tre fasi: analisi delle offerte degli ultimi sei mesi, costruzione delle skill</p>
+              </div>
+            </div>
+          </div></div>
+          <div class="foot"><div class="col">
+            <div class="composer asking">
+              <div class="q">The notes don't say who pays the transport insurance. What should the proposal say?</div>
+              <button class="o"><span class="n">1</span>Alpi Logistica pays it</button>
+              <button class="o"><span class="n">2</span>Include it in our price</button>
+              <button class="o"><span class="n">3</span>Leave it out and mark it as open</button>
+              <textarea style="min-height:44px; border-top:1px solid var(--line-2)" placeholder="Or answer in your own words"></textarea>
+              <div class="in"><button class="iconbtn" title="Attach files"><i data-i="plus"></i></button><span class="grow"></span><button class="send" title="Send"><i data-i="arrow-up"></i></button></div>
+            </div>
+          </div></div>
+        </div>
+        <aside class="rp">
+          <div class="body">
+            <h3>Made by this task</h3>
+            <div class="fileline"><span class="thumb"><i></i><i></i><i></i><i></i><i></i></span><span class="grow"><span class="nm truncate" style="display:block">Proposta_AlpiLogistica.docx</span><span class="sb"><span class="tag">being written</span></span></span></div>
+            <div class="fileline"><span class="thumb sheet"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="grow"><span class="nm truncate" style="display:block">prezzi-alpi.xlsx</span><span class="sb">2 min ago</span></span></div>
+            <h3>Used</h3>
+            <div class="fileline"><span class="thumb"><i></i><i></i><i></i><i></i></span><span class="grow"><span class="nm truncate" style="display:block">notes-call-alpi.docx</span><span class="sb">Attached</span></span></div>
+            <div class="fileline"><span class="thumb"><i></i><i></i><i></i><i></i><i></i></span><span class="grow"><span class="nm truncate" style="display:block">template-proposal.docx</span><span class="sb">Project folder</span></span></div>
+            <h3>Task settings</h3>
+            <div class="setrow"><i data-i="cpu"></i><span class="grow"><span class="k">Model</span><span class="v">GPT-5.5 · Medium</span></span><a class="act">Change</a></div>
+            <div class="setrow"><i data-i="puzzle-piece"></i><span class="grow"><span class="k">Skill</span><span class="v">Proposal writer v3</span></span><a class="act">Change</a></div>
+            <div class="setrow"><i data-i="folder-simple"></i><span class="grow"><span class="k">Saves to</span><span class="v">~/Documents/Proposals</span></span><a class="act">Open</a></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Board ===== -->
+  <section class="screen" id="s-board" data-title="Board">
+    <aside class="side" data-side data-on="board"></aside>
+    <div class="main">
+      <div class="top"><span class="grow"></span><button class="iconbtn" title="List"><i data-i="list-bullets"></i></button><button class="iconbtn" title="Columns"><i data-i="columns"></i></button><button class="iconbtn" title="Display options"><i data-i="sliders-horizontal"></i></button></div>
+      <div class="scroll">
+        <div class="board-wrap"><div class="bhead">
+          <h1>Board</h1>
+          <div class="seg"><a class="on">Everything</a><a>Needs you <span>1</span></a><a>Running <span>1</span></a><a>To review <span>1</span></a><a>From jobs</a></div>
+        </div>
+        <div class="thead"><span style="grid-column: 1 / 3">Task</span><span>Project</span><span>Updated</span></div>
+        <div class="gh">Needs you</div>
+        <div class="brow"><span class="thumb sheet"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span style="min-width:0"><span class="nm">Supplier contracts summary</span><span class="sn" style="display:block">Wants to overwrite contracts-summary.xlsx, which you edited on Friday</span><span class="actions"><button class="btn" style="height:28px">Allow overwrite</button><button class="btn dark" style="height:28px">Save as new file</button></span></span><span class="c">Q3 expense reports</span><span class="c t3">9:40</span></div>
+        <div class="gh">Running</div>
+        <a class="brow sel" href="#task"><span class="thumb"><i></i><i></i><i></i><i></i><i></i></span><span style="min-width:0"><span class="nm">Proposal for Alpi Logistica</span><span class="sn" style="display:block">Writing section 3 of 6 · Proposta_AlpiLogistica.docx</span></span><span class="c">Client proposals</span><span class="c t3">9:12</span></a>
+        <div class="gh">To do</div>
+        <div class="brow"><span class="thumb brief"><i></i><i></i><i></i></span><span style="min-width:0"><span class="nm">Proposal for Brera Design</span><span class="sn" style="display:block">Waiting for the call notes</span></span><span class="c">Client proposals</span><span class="c t3">22 Oct</span></div>
+        <div class="brow"><span class="thumb brief"><i></i><i></i><i></i></span><span style="min-width:0"><span class="nm">Write three case studies</span><span class="sn" style="display:block">Brief written, not started</span></span><span class="c">Website</span><span class="c t3">21 Oct</span></div>
+        <div class="gh">Done this week</div>
+        <div class="brow"><span class="thumb"><i></i><i></i><i></i><i></i><i></i></span><span style="min-width:0"><span class="nm">Proposal for Cantina Ferraris</span><span class="sn" style="display:block"><span class="tag mine">to review</span>&nbsp; Proposta_Ferraris.docx, .pdf, prezzi-ferraris.xlsx</span></span><span class="c">Client proposals</span><span class="c t3">25 Oct</span></div>
+        <div class="brow"><span class="thumb"><i></i><i></i><i></i><i></i></span><span style="min-width:0"><span class="nm">Monday press review</span><span class="sn" style="display:block"><span class="tag">job</span>&nbsp; this-week.md</span></span><span class="c">October newsletter</span><span class="c t3">08:00</span></div>
+        <div class="brow last" style="margin-bottom:30px"><span class="thumb"><i></i><i></i><i></i><i></i><i></i></span><span style="min-width:0"><span class="nm">Rewrite the About page</span><span class="sn" style="display:block">about.md</span></span><span class="c">Website</span><span class="c t3">23 Oct</span></div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ===== Icon sets side by side ===== -->
+  <section class="screen" id="s-icons" data-title="Icon sets">
+    <div class="main"><div class="scroll"><div class="col" style="width:980px">
+      <h1 style="font-size:26px; font-weight:800; letter-spacing:-0.03em">Icon sets side by side</h1>
+      <p class="t2" style="margin:6px 0 22px">The app's icons in each set, at the size used in the sidebar. Pick a row, or a mix of two.</p>
+      <div id="iconTable"></div>
+    </div></div></div>
+  </section>
+</div>
+
+<nav class="mocknav" id="mocknav"></nav>
+
+<template id="side">
+  <div class="chrome"><span class="lights"><i></i><i></i><i></i></span><span class="grow"></span><button class="iconbtn" title="Collapse sidebar"><i data-i="sidebar-simple"></i></button></div>
+  <div class="brand">
+    <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--ink)"/><path d="M14 17h36v6H35v26h-6V23H14z" fill="var(--canvas)"/></svg>
+    <b>Tost Work</b>
+  </div>
+  <div class="search"><i data-i="magnifying-glass"></i>Search<kbd>⌘K</kbd></div>
+  <a class="nav" data-k="new" href="#home"><i data-i="note-pencil"></i>New task</a>
+  <a class="nav" data-k="projects"><i data-i="folder-simple"></i>Projects</a>
+  <a class="nav" data-k="skills"><i data-i="puzzle-piece"></i>Skills</a>
+  <a class="nav" data-k="jobs"><i data-i="calendar-blank"></i>Jobs</a>
+  <a class="nav" data-k="board" href="#board"><i data-i="list-checks"></i>Board</a>
+  <h4>Recent</h4>
+  <a class="rec" data-k="task" href="#task">Proposal for Alpi Logistica</a>
+  <a class="rec split"><span class="truncate">Supplier contracts summary</span><span class="tag mine">needs you</span></a>
+  <a class="rec">Proposal for Cantina Ferraris</a>
+  <a class="rec">Monday press review</a>
+  <a class="rec">Rewrite the About page</a>
+  <a class="rec">Translate Brera to English</a>
+  <span class="spacer"></span>
+  <div class="me"><span class="avatar">G</span><span class="who grow">Giulia Rossi<span>Studio Rossi</span></span><button class="iconbtn" title="Settings"><i data-i="gear-six"></i></button></div>
+</template>
+
+<script>
+  for (const s of document.querySelectorAll("[data-side]")) {
+    s.append(document.getElementById("side").content.cloneNode(true));
+    s.querySelector(`[data-k="${s.dataset.on}"]`)?.classList.add("on");
+    if (s.dataset.on === "work") s.querySelector('[data-k="new"]').classList.add("on");
+  }
+  // Icons are SVGs taken from each set (via @iconify-json) and drawn as masks, so they take the text colour.
+  const SETS = ["Iconoir", "Hugeicons", "Remix", "Solar", "MingCute", "Tabler", "Phosphor"];
+  const PREFIX = ["iconoir", "hugeicons", "ri", "solar", "mingcute", "tabler", "ph"];
+  const ICONS = {
+    "sidebar-simple": ["sidebar-collapse", "sidebar-left", "layout-left-line", "sidebar-minimalistic-linear", "layout-leftbar-close-line", "layout-sidebar", "sidebar-simple"],
+    "magnifying-glass": ["search", "search-01", "search-line", "magnifer-linear", "search-line", "search", "magnifying-glass"],
+    "note-pencil": ["edit-pencil", "pencil-edit-02", "edit-box-line", "pen-new-square-linear", "edit-line", "edit", "note-pencil"],
+    "folder-simple": ["folder", "folder-01", "folder-line", "folder-linear", "folder-line", "folder", "folder-simple"],
+    "puzzle-piece": ["puzzle", "puzzle", "puzzle-line", "widget-4-linear", "puzzled-line", "puzzle", "puzzle-piece"],
+    "calendar-blank": ["calendar", "calendar-03", "calendar-line", "calendar-linear", "calendar-line", "calendar", "calendar-blank"],
+    "list-checks": ["task-list", "task-done-01", "list-check-2", "checklist-minimalistic-linear", "task-line", "list-check", "list-checks"],
+    "gear-six": ["settings", "settings-02", "settings-3-line", "settings-linear", "settings-3-line", "settings", "gear-six"],
+    "plus": ["plus", "plus-sign", "add-line", "add-square-linear", "add-line", "plus", "plus"],
+    "arrow-up": ["arrow-up", "arrow-up-02", "arrow-up-line", "arrow-up-linear", "arrow-up-line", "arrow-up", "arrow-up"],
+    "file": ["page", "file-01", "file-line", "file-linear", "file-line", "file", "file"],
+    "caret-down": ["nav-arrow-down", "arrow-down-01", "arrow-down-s-line", "alt-arrow-down-linear", "down-line", "chevron-down", "caret-down"],
+    "check": ["check", "tick-02", "check-line", "check-read-linear", "check-line", "check", "check"],
+    "pencil-simple": ["edit-pencil", "pencil-edit-01", "pencil-line", "pen-linear", "pencil-line", "pencil", "pencil-simple"],
+    "stop": ["square", "stop", "stop-line", "stop-linear", "stop-line", "player-stop", "stop"],
+    "list-bullets": ["list", "list-view", "list-unordered", "list-linear", "list-check-line", "list", "list-bullets"],
+    "columns": ["view-columns-2", "layout-2-column", "layout-column-line", "widget-2-linear", "layout-line", "layout-columns", "columns"],
+    "sliders-horizontal": ["filter-list", "sliders-horizontal", "equalizer-line", "tuning-2-linear", "settings-6-line", "adjustments-horizontal", "sliders-horizontal"],
+    "cpu": ["cpu", "cpu", "cpu-line", "cpu-linear", "chip-line", "cpu", "cpu"],
+  };
+  for (const i of document.querySelectorAll("i[data-i]")) {
+    const span = document.createElement("span");
+    span.className = "ic " + i.className;
+    span.dataset.i = i.dataset.i;
+    if (i.getAttribute("style")) span.setAttribute("style", i.getAttribute("style"));
+    i.replaceWith(span);
+  }
+  const table = document.getElementById("iconTable");
+  SETS.forEach((name, k) => {
+    const row = document.createElement("div");
+    row.className = "irow";
+    row.innerHTML = `<b>${name}</b><span class="set"></span>`;
+    for (const key of Object.keys(ICONS)) {
+      const ic = document.createElement("span");
+      ic.className = "ic";
+      ic.title = key;
+      const url = `url("icons/${PREFIX[k]}/${ICONS[key][k]}.svg")`;
+      ic.style.maskImage = url; ic.style.webkitMaskImage = url;
+      row.querySelector(".set").appendChild(ic);
+    }
+    table.appendChild(row);
+  });
+  function paintIcons(set) {
+    const k = Math.max(0, SETS.indexOf(set));
+    for (const span of document.querySelectorAll("span.ic[data-i]")) {
+      const name = ICONS[span.dataset.i]?.[k];
+      if (!name) continue;
+      const url = `url("icons/${PREFIX[k]}/${name}.svg")`;
+      span.style.maskImage = url;
+      span.style.webkitMaskImage = url;
+    }
+  }
+  const screens = [...document.querySelectorAll(".screen")];
+  const nav = document.getElementById("mocknav");
+  nav.innerHTML = "<b>UI round 6</b>";
+  const link = (label, fn) => { const a = document.createElement("a"); a.textContent = label; a.onclick = fn; nav.appendChild(a); return a; };
+  const sep = () => { const s = document.createElement("span"); s.className = "sep"; nav.appendChild(s); };
+  const themeLinks = ["light", "dark"].map((t) => [t, link(t === "light" ? "Light" : "Dark", () => setTheme(t))]);
+  sep();
+  const iconLinks = SETS.map((n) => [n, link(n, () => setIcons(n))]);
+  function setIcons(n) { paintIcons(n); for (const [k, a] of iconLinks) a.classList.toggle("on", k === n); }
+  sep();
+  const screenLinks = screens.map((s) => [s.id, link(s.dataset.title, () => (location.hash = s.id.slice(2)))]);
+  sep();
+  const back = document.createElement("a"); back.href = "../index.html"; back.textContent = "All rounds"; nav.appendChild(back);
+  function setTheme(t) { document.body.dataset.theme = t; for (const [k, a] of themeLinks) a.classList.toggle("on", k === t); }
+  function show() {
+    const target = document.getElementById("s-" + (location.hash.slice(1) || "home")) || screens[0];
+    for (const s of screens) s.classList.toggle("on", s === target);
+    for (const [k, a] of screenLinks) a.classList.toggle("on", k === target.id);
+  }
+  const q = new URLSearchParams(location.search);
+  setIcons(q.get("icons") || "Iconoir");
+  setTheme(q.get("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+  addEventListener("hashchange", show);
+  show();
+</script>
+</body>
+</html>
