@@ -62,7 +62,17 @@ function Checks({ title, items, icon }: { title: string; items: ReviewItem[]; ic
   );
 }
 
-function Artifact({ api, task, files }: { api: TostWorkApi; task: TaskT; files: FileChange[] }) {
+function Artifact({
+  api,
+  task,
+  files,
+  onError,
+}: {
+  api: TostWorkApi;
+  task: TaskT;
+  files: FileChange[];
+  onError: (err: unknown) => void;
+}) {
   const t = useT();
   const [picked, setPicked] = useState<string | null>(null);
   // Follow the newest file while the task writes, unless the user picked one.
@@ -94,11 +104,19 @@ function Artifact({ api, task, files }: { api: TostWorkApi; task: TaskT; files: 
           </>
         )}
         <span className="grow" />
-        <button type="button" className="tbtn" onClick={() => void api.files.reveal(task.id, current.path)}>
+        <button
+          type="button"
+          className="tbtn"
+          onClick={() => void api.files.reveal(task.id, current.path).catch(onError)}
+        >
           <Icon name="folder-open" />
           {t("preview.reveal")}
         </button>
-        <button type="button" className="tbtn" onClick={() => void api.files.open(task.id, current.path)}>
+        <button
+          type="button"
+          className="tbtn"
+          onClick={() => void api.files.open(task.id, current.path).catch(onError)}
+        >
           <Icon name="external-link" />
           {t("preview.open")}
         </button>
@@ -117,6 +135,7 @@ export function Task({
   onAnswer,
   onStop,
   onOpenProject,
+  onError,
 }: {
   api: TostWorkApi;
   task: TaskT;
@@ -125,6 +144,8 @@ export function Task({
   onAnswer: (answer: string) => Promise<boolean>;
   onStop: () => void;
   onOpenProject: () => void;
+  /** Shows a failed action, such as a file that was moved before Open, in the app's alert. */
+  onError: (err: unknown) => void;
 }) {
   const t = useT();
   const [answer, setAnswer] = useState("");
@@ -200,7 +221,7 @@ export function Task({
                   </p>
                 ),
               )}
-              {made.length > 0 && <Artifact api={api} task={task} files={made} />}
+              {made.length > 0 && <Artifact api={api} task={task} files={made} onError={onError} />}
               {task.status === "stopped" && <p className="agent t3">{t("task.stopped")}</p>}
               {task.status === "failed" && <p className="agent">{t("task.failed", { error: task.error ?? "" })}</p>}
               {task.review && (

@@ -63,20 +63,20 @@ export function registerIpc(store: Store, runner: TaskRunner, window: () => Brow
   );
   ipcMain.handle(IPC.tasksStop, (_e, id: unknown) => runner.stop(text(id, "id", 100)));
 
-  const fileOf = async (taskId: unknown, path: unknown) => {
+  const fileOf = async (taskId: unknown, path: unknown, limitSize = true) => {
     const task = store.getTask(text(taskId, "taskId", 100));
     if (!task) throw new Error("That task doesn't exist");
-    return readablePath(task, absolutePath(path, "path"));
+    return readablePath(task, absolutePath(path, "path"), limitSize);
   };
   ipcMain.handle(IPC.filesRead, async (_e, taskId: unknown, path: unknown) => {
     const real = await fileOf(taskId, path);
     return { ...describe(real), bytes: new Uint8Array(await readFile(real)) };
   });
   ipcMain.handle(IPC.filesOpen, async (_e, taskId: unknown, path: unknown) => {
-    const error = await shell.openPath(await fileOf(taskId, path));
+    const error = await shell.openPath(await fileOf(taskId, path, false));
     if (error) throw new Error(error);
   });
   ipcMain.handle(IPC.filesReveal, async (_e, taskId: unknown, path: unknown) =>
-    shell.showItemInFolder(await fileOf(taskId, path)),
+    shell.showItemInFolder(await fileOf(taskId, path, false)),
   );
 }

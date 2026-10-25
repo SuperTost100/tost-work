@@ -1,6 +1,8 @@
+import { constants } from "node:fs";
 import { copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { EngineEvent, Review } from "../../shared/model";
+import { freeName } from "../files";
 import type { Engine, RunContext } from "./engine";
 
 /** A scripted run, for building the interface before the real engine is wired. */
@@ -86,10 +88,15 @@ export class FakeEngine implements Engine {
       };
       await sleep(this.stepMs, signal);
       for (const f of s.files.filter((f) => f.afterStep === i)) {
-        const path = join(workdir, f.path);
+        // Stop can land during the sleep above, and a stopped task writes nothing more.
+        if (signal.aborted) return yield { type: "stopped" };
+        let path = join(workdir, f.path);
         if (this.samples) {
           await mkdir(workdir, { recursive: true });
-          await copyFile(join(this.samples, f.path), path);
+          // Never replace a file already in the folder: the sample goes under a free name, and the exclusive copy
+          // also refuses a link left at that name.
+          path = await freeName(workdir, f.path);
+          await copyFile(join(this.samples, f.path), path, constants.COPYFILE_EXCL);
         }
         yield { type: "file", change: { path, kind: f.kind, role: "made" } };
       }

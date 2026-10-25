@@ -144,6 +144,7 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
           }
           onStop={() => void api.tasks.stop(task.id).catch(report)}
           onOpenProject={() => project && setRoute({ name: "project", id: project.id })}
+          onError={report}
         />
       ) : null;
   } else {

@@ -162,6 +162,29 @@ describe("a typed answer", () => {
   });
 });
 
+describe("file actions", () => {
+  it("shows why Open did nothing", async () => {
+    const api = createMemoryApi();
+    api.files.open = async () => {
+      throw new Error("The file was moved or deleted");
+    };
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    const option = await screen.findByRole("button", { name: /We do/ });
+    await act(async () => {
+      fireEvent.click(option);
+    });
+    const open = await screen.findByRole("button", { name: "Open" });
+    await act(async () => {
+      fireEvent.click(open);
+    });
+    expect(screen.getByRole("alert").textContent).toMatch(/moved or deleted/);
+  });
+});
+
 describe("projects", () => {
   it("creates a project from a folder and names it after the folder", async () => {
     const api = createMemoryApi();

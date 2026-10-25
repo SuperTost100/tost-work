@@ -1,10 +1,10 @@
 /** @vitest-environment node */
-import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, symlink, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Task } from "../shared/model";
-import { readablePath } from "./files";
+import { MAX_PREVIEW_BYTES, readablePath } from "./files";
 
 let root = "";
 let work = "";
@@ -63,5 +63,20 @@ describe("readablePath", () => {
     await expect(readablePath(base([], [notes]), notes)).resolves.toMatch(/notes\.docx$/);
     const path = join(work, "Proposta.docx");
     await expect(readablePath(base([{ path, kind: "delete", role: "made" }]), path)).rejects.toThrow(/isn't part/);
+  });
+
+  it("allows a name that starts with two dots", async () => {
+    const path = join(work, "..notes.md");
+    await writeFile(path, "x");
+    await expect(readablePath(base([{ path, kind: "add", role: "made" }]), path)).resolves.toMatch(/\.\.notes\.md$/);
+  });
+
+  it("limits the size for a preview only", async () => {
+    const path = join(work, "big.pdf");
+    await writeFile(path, "");
+    await truncate(path, MAX_PREVIEW_BYTES + 1);
+    const task = base([{ path, kind: "add", role: "made" }]);
+    await expect(readablePath(task, path)).rejects.toThrow(/too big/);
+    await expect(readablePath(task, path, false)).resolves.toMatch(/big\.pdf$/);
   });
 });

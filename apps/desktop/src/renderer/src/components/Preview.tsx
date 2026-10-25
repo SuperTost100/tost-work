@@ -71,8 +71,13 @@ function Docx({ bytes }: { bytes: Uint8Array }) {
   return <div className="pv-docx" ref={ref} />;
 }
 
+/** PDF pages beyond this many are left out of the preview, with a note to open the file. */
+const MAX_PAGES = 20;
+
 function Pdf({ bytes }: { bytes: Uint8Array }) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(0);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -83,9 +88,13 @@ function Pdf({ bytes }: { bytes: Uint8Array }) {
       pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
       // pdf.js takes ownership of the buffer it gets, so it gets a copy.
       const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+      // A newer PDF may have rendered meanwhile; an old load must not clear it.
+      if (!alive) return;
       el.replaceChildren();
-      for (let n = 1; n <= Math.min(doc.numPages, 20) && alive; n++) {
+      setMore(Math.max(0, doc.numPages - MAX_PAGES));
+      for (let n = 1; n <= Math.min(doc.numPages, MAX_PAGES); n++) {
         const page = await doc.getPage(n);
+        if (!alive) return;
         const viewport = page.getViewport({ scale: 1.4 });
         const canvas = document.createElement("canvas");
         canvas.width = viewport.width;
@@ -98,7 +107,12 @@ function Pdf({ bytes }: { bytes: Uint8Array }) {
       alive = false;
     };
   }, [bytes]);
-  return <div className="pv-pdf" ref={ref} />;
+  return (
+    <>
+      <div className="pv-pdf" ref={ref} />
+      {more > 0 && <p className="pv-note">{t("preview.morePages", { n: String(more) })}</p>}
+    </>
+  );
 }
 
 function Html({ html }: { html: string }) {
@@ -129,21 +143,25 @@ export function Preview({
   useEffect(() => {
     const request = `${taskId}|${path}|${version}`;
     latest.current = request;
-    let url: string | undefined;
     api.files
       .read(taskId, path)
       .then(load)
       .then((loaded) => {
-        if (loaded.kind === "image") url = loaded.url;
         if (latest.current === request) setState({ loaded });
+        // A read that came back after a newer one started is dropped, and so is its image.
+        else if (loaded.kind === "image") URL.revokeObjectURL(loaded.url);
       })
       .catch(
         (e: unknown) => latest.current === request && setState({ error: e instanceof Error ? e.message : String(e) }),
       );
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
   }, [api, taskId, path, version]);
+
+  // An image's URL lives as long as it's on screen: it goes when the next preview replaces it, or on unmount.
+  const shown = state.loaded?.kind === "image" ? state.loaded.url : undefined;
+  useEffect(() => {
+    if (!shown) return;
+    return () => URL.revokeObjectURL(shown);
+  }, [shown]);
 
   const { loaded, error } = state;
   if (error) return <p className="pv-note">{error}</p>;
