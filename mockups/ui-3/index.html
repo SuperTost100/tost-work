@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Tost Work · UI round 3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>
+/* ===== Tokens: near-monochrome, one teal accent, colour only for state ===== */
+body[data-theme="light"] {
+  --desk: #E4E4E7; --canvas: #F6F6F7; --side: #F1F1F3; --surface: #FFFFFF; --raised: #FFFFFF;
+  --border: #E4E4E7; --hair: rgba(0,0,0,.06); --hover: rgba(0,0,0,.035); --sel: #FFFFFF;
+  --t1: #18181B; --t2: #52525B; --t3: #71717A;
+  --accent: #0F766E; --accent-hover: #0B5F59; --accent-soft: #E6F4F2; --on-accent: #FFFFFF;
+  --need: #B45309; --need-soft: #FDF3E3; --done: #3B8C5A; --done-soft: #E8F3EC; --err: #B42318; --err-soft: #FBEAE8;
+  --float: 0 8px 24px rgba(0,0,0,.12);
+}
+body[data-theme="dark"] {
+  --desk: #0A0A0B; --canvas: #141416; --side: #111113; --surface: #1C1C1F; --raised: #232327;
+  --border: rgba(255,255,255,.08); --hair: rgba(255,255,255,.05); --hover: rgba(255,255,255,.04); --sel: #1C1C1F;
+  --t1: #ECECEE; --t2: #A1A1AA; --t3: #84848D;
+  --accent: #3FB8AB; --accent-hover: #5CC7BB; --accent-soft: #15302D; --on-accent: #07201D;
+  --need: #EDA850; --need-soft: #33261A; --done: #5FB47E; --done-soft: #173023; --err: #F0716A; --err-soft: #3A1E1C;
+  --float: 0 8px 24px rgba(0,0,0,.5);
+}
+body {
+  --font: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif; --mono: "Geist Mono", ui-monospace, monospace;
+  --r-chip: 6px; --r-ctl: 8px; --r-card: 10px; --r-float: 12px;
+  --h-head: 48px; --h-ctl: 32px; --h-ctl-sm: 28px; --w-side: 240px; --w-col: 736px; --w-peek: 360px;
+}
+
+/* ===== Base ===== */
+* { box-sizing: border-box; }
+html { background: var(--desk); }
+body { margin: 0; min-width: 1180px; font: 400 14px/1.45 var(--font); color: var(--t1); background: var(--desk); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; cursor: pointer; }
+p, h1, h2, h3 { margin: 0; }
+i[data-i] { font-size: 16px; line-height: 1; flex: none; color: var(--t2); }
+.row { display: flex; align-items: center; gap: 8px; }
+.grow { flex: 1; min-width: 0; }
+.t2 { color: var(--t2); } .t3 { color: var(--t3); }
+.meta { font-size: 12px; color: var(--t3); white-space: nowrap; }
+.truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.window { margin: 46px auto 86px; width: min(1400px, calc(100vw - 36px)); height: calc(100vh - 132px); min-height: 700px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; background: var(--canvas); box-shadow: 0 20px 50px rgba(0,0,0,.14); }
+.titlebar { height: 38px; flex: none; display: flex; align-items: center; padding: 0 14px; background: var(--side); border-bottom: 1px solid var(--hair); font-size: 12px; color: var(--t3); }
+.lights { display: flex; gap: 8px; width: 200px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.lights i:nth-child(1) { background: #FF5F57; } .lights i:nth-child(2) { background: #FEBC2E; } .lights i:nth-child(3) { background: #28C840; }
+.titlebar .ttl { flex: 1; text-align: center; padding-right: 200px; }
+.screen { display: none; flex: 1; min-height: 0; }
+.screen.on { display: flex; }
+.shell { display: grid; grid-template-columns: var(--w-side) 1fr; flex: 1; min-height: 0; }
+.content { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--canvas); }
+
+/* ===== Sidebar ===== */
+.side { background: var(--side); border-right: 1px solid var(--hair); display: flex; flex-direction: column; min-height: 0; padding: 0 8px 8px; }
+.side .top { height: var(--h-head); display: flex; align-items: center; gap: 8px; padding: 0 6px; }
+.mark { width: 22px; height: 22px; border-radius: 6px; background: var(--t1); color: var(--canvas); display: grid; place-items: center; font: 600 12px/1 var(--font); }
+.side .top b { font-weight: 600; font-size: 14px; }
+.nav { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border-radius: var(--r-ctl); color: var(--t2); }
+.nav:hover { background: var(--hover); color: var(--t1); }
+.nav.on { background: var(--sel); color: var(--t1); font-weight: 500; }
+body[data-theme="light"] .nav.on { box-shadow: 0 0 0 1px var(--hair); }
+.nav.on i { color: var(--t1); }
+.side h4 { margin: 16px 10px 4px; font-size: 12px; font-weight: 500; color: var(--t3); }
+.spacer { flex: 1; }
+
+/* ===== Controls ===== */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--h-ctl); padding: 0 12px; border-radius: var(--r-ctl); border: 1px solid var(--border); background: var(--surface); color: var(--t1); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.btn:hover { background: var(--canvas); }
+.btn:active { transform: scale(.98); }
+.btn.sm { height: var(--h-ctl-sm); padding: 0 10px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn.primary i { color: var(--on-accent); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--t2); }
+.btn.ghost:hover { background: var(--hover); }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: var(--r-chip); border: 1px solid var(--border); background: var(--surface); color: var(--t2); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.chip i { font-size: 14px; }
+.chip.flat { border-color: transparent; background: var(--hover); }
+.dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--t3); opacity: .5; }
+.dot.run { background: var(--accent); opacity: 1; animation: pulse 1.4s ease-in-out infinite; }
+.dot.need { background: var(--need); opacity: 1; } .dot.done { background: var(--done); opacity: 1; }
+@keyframes pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .dot.run { animation: none; } }
+.status { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--t2); white-space: nowrap; }
+
+/* ===== Page header, the same 48px everywhere ===== */
+.phead { height: var(--h-head); flex: none; display: flex; align-items: center; gap: 8px; padding: 0 20px; border-bottom: 1px solid var(--hair); }
+.crumb { display: flex; align-items: center; gap: 6px; color: var(--t2); font-size: 13px; }
+.crumb b { color: var(--t1); font-weight: 500; }
+.crumb .sl { color: var(--t3); }
+.scroll { flex: 1; overflow: auto; min-height: 0; }
+.col { max-width: var(--w-col); margin: 0 auto; padding: 32px 0 56px; display: grid; gap: 28px; }
+.title { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; }
+.sec { font-size: 13px; font-weight: 600; color: var(--t2); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: baseline; }
+.sec .n { color: var(--t3); font-weight: 400; margin-left: 4px; }
+.sec a { font-weight: 400; color: var(--t3); }
+
+/* ===== Composer ===== */
+.composer { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); }
+.composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.composer textarea { width: 100%; border: 0; resize: none; background: transparent; color: var(--t1); font: 400 14px/1.5 var(--font); padding: 12px 14px 4px; min-height: 72px; }
+.composer textarea:focus { outline: none; }
+.composer textarea::placeholder { color: var(--t3); }
+.composer .bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px 10px; }
+
+/* ===== Lists ===== */
+.list { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); overflow: hidden; }
+.li { display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 8px 14px; border-top: 1px solid var(--hair); }
+.li:first-child { border-top: 0; }
+.li:hover { background: var(--hover); }
+.li .status { width: 84px; }
+/* Needs you and questions: a left rule and a faint tint, never a filled box */
+.attn { background: color-mix(in srgb, var(--need) 7%, var(--surface)); border: 1px solid var(--border); border-left: 3px solid var(--need); border-radius: var(--r-card); }
+.attn.li-like { display: flex; align-items: center; gap: 12px; padding: 10px 14px; }
+
+/* ===== Running task ===== */
+.task { display: grid; grid-template-columns: 1fr 300px; flex: 1; min-height: 0; }
+.task .main { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.task .scroll { padding: 0 32px; }
+.task .col { padding-bottom: 0; gap: 0; }
+.progress { display: flex; gap: 3px; margin: 18px 0 8px; }
+.progress span { flex: 1; height: 4px; border-radius: 2px; background: var(--border); }
+.progress span.d { background: var(--accent); }
+.progress span.n { background: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.paper { margin-top: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card); padding: 32px 40px; }
+body[data-theme="dark"] .paper { background: rgba(255,255,255,.06); }
+.paper h3 { font-size: 15px; font-weight: 600; margin: 18px 0 6px; }
+.paper h3:first-child { margin-top: 0; }
+.paper p { font-size: 15px; line-height: 1.7; margin-bottom: 10px; color: var(--t1); }
+.writing { box-shadow: inset 2px 0 0 var(--accent); padding-left: 12px; color: var(--t2) !important; }
+.caret { display: inline-block; width: 2px; height: 16px; background: var(--accent); vertical-align: -3px; animation: pulse 1s steps(1) infinite; }
+.dock { max-width: var(--w-col); width: 100%; margin: 0 auto; padding: 16px 0 18px; display: grid; gap: 8px; }
+.qcard { padding: 12px 14px; display: grid; gap: 10px; }
+.qcard .who { font-size: 12px; font-weight: 600; color: var(--need); display: flex; gap: 6px; align-items: center; }
+.qcard .who i { color: var(--need); }
+.opts { display: grid; gap: 6px; }
+.opt { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--r-ctl); text-align: left; font-size: 14px; }
+.opt:hover { border-color: var(--t3); }
+.opt .k { width: 20px; height: 20px; border-radius: 5px; background: var(--hover); display: grid; place-items: center; font: 500 11px/1 var(--mono); color: var(--t2); }
+.earlier { font-size: 12px; color: var(--t3); padding: 0 2px; }
+.rpanel { border-left: 1px solid var(--hair); background: var(--side); display: flex; flex-direction: column; min-height: 0; }
+.rpanel .body { overflow: auto; padding: 16px 14px; display: grid; gap: 20px; align-content: start; }
+.rpanel h3 { font-size: 12px; font-weight: 600; color: var(--t3); margin-bottom: 6px; }
+.file { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r-ctl); }
+.file:hover { background: var(--hover); }
+.file .fi { width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--border); }
+.file .fi i { font-size: 15px; }
+.file .sub { font-size: 12px; color: var(--t3); }
+.file .sub.live { color: var(--accent); }
+
+/* ===== Board ===== */
+.board { display: grid; grid-template-columns: 1fr var(--w-peek); flex: 1; min-height: 0; }
+.board .main { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.filters { display: flex; align-items: center; gap: 6px; padding: 10px 20px; border-bottom: 1px solid var(--hair); }
+.qf { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--t2); font-size: 13px; }
+.qf .n { color: var(--t3); }
+.seg { display: inline-flex; padding: 2px; border-radius: var(--r-ctl); background: var(--hover); }
+.seg a { height: 24px; padding: 0 10px; border-radius: 6px; font-size: 13px; color: var(--t2); display: flex; gap: 6px; align-items: center; }
+.seg a.on { background: var(--surface); color: var(--t1); box-shadow: 0 0 0 1px var(--hair); }
+.grp { display: flex; align-items: center; gap: 8px; height: 36px; padding: 12px 20px 0; font-size: 13px; font-weight: 600; color: var(--t2); }
+.grp .n { color: var(--t3); font-weight: 400; }
+.trow { display: grid; grid-template-columns: 6px 1fr 150px 220px 76px; gap: 12px; align-items: center; height: 40px; padding: 0 20px; border-bottom: 1px solid var(--hair); font-size: 14px; }
+.trow:hover { background: var(--hover); }
+.trow > span:nth-child(2) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.trow.sel { background: color-mix(in srgb, var(--accent) 6%, transparent); box-shadow: inset 2px 0 0 var(--accent); }
+.trow .p { color: var(--t3); font-size: 13px; }
+.trow .w { color: var(--t3); font-size: 12px; text-align: right; }
+.trow .outs { display: flex; gap: 4px; min-width: 0; }
+.trow .outs .chip { height: 22px; font-size: 12px; padding: 0 6px; }
+.trow .outs .chip:first-child { flex: 0 1 auto; min-width: 0; display: block; line-height: 20px; overflow: hidden; text-overflow: ellipsis; }
+.decision { margin: 6px 20px 10px 38px; }
+.peek { border-left: 1px solid var(--hair); background: var(--side); display: flex; flex-direction: column; min-height: 0; }
+.peek .body { overflow: auto; padding: 18px 18px; display: grid; gap: 20px; align-content: start; }
+.peek h2 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.peek h3 { font-size: 12px; font-weight: 600; color: var(--t3); margin-bottom: 6px; }
+.msg { font-size: 14px; color: var(--t1); }
+.msg .who { display: block; font-size: 12px; color: var(--t3); }
+
+/* ===== Mockup bar ===== */
+.mocknav { position: fixed; left: 0; right: 0; bottom: 14px; margin: 0 auto; width: max-content; display: flex; align-items: center; gap: 3px; padding: 5px 6px; background: #FFFEF8; border: 1.5px dashed #B9B29A; border-radius: 10px; font: 12.5px/1.2 system-ui, sans-serif; color: #3A372E; z-index: 50; }
+.mocknav b { padding: 0 8px; }
+.mocknav a { padding: 5px 9px; border-radius: 6px; cursor: pointer; }
+.mocknav a:hover { background: #F2EFE2; }
+.mocknav a.on { background: #E6E0CA; color: #111; font-weight: 600; }
+.mocknav .sep { width: 1px; height: 18px; background: #D8D2BD; margin: 0 4px; }
+.cap { position: fixed; top: 10px; left: 0; right: 0; margin: 0 auto; width: max-content; font: 12.5px/1.3 system-ui, sans-serif; color: #6B6550; background: #FFFEF8; border: 1.5px dashed #B9B29A; border-radius: 8px; padding: 5px 12px; z-index: 50; }
+</style>
+</head>
+<body data-theme="light">
+<div class="cap">Definitive look: near-monochrome, one teal accent, Figtree, borders instead of shadows, the same 48px header on every panel.</div>
+<div class="window">
+  <div class="titlebar"><span class="lights"><i></i><i></i><i></i></span><span class="ttl" id="ttl">Tost Work</span></div>
+
+  <!-- ===== Work home ===== -->
+  <section class="screen" id="s-home" data-title="Work home">
+    <div class="shell">
+      <aside class="side" data-side data-on="work"></aside>
+      <div class="content">
+        <div class="phead"><span class="crumb"><b>Work</b></span><span class="grow"></span><button class="btn ghost sm"><i data-i="magnifying-glass"></i>Search</button></div>
+        <div class="scroll"><div class="col">
+          <h1 class="title">Good morning, Giulia</h1>
+          <div class="composer">
+            <textarea>Write a proposal for Alpi Logistica from yesterday's call notes. Use our proposal template, price between 8 and 10k, in Italian.</textarea>
+            <div class="bar">
+              <span class="chip"><i data-i="folder-simple"></i>Client proposals<i data-i="caret-down"></i></span>
+              <span class="chip flat"><i data-i="file-text"></i>notes-call-alpi.docx</span>
+              <button class="btn ghost sm" title="Attach files"><i data-i="paperclip"></i></button>
+              <span class="grow"></span>
+              <span class="chip">GPT-5.5<i data-i="caret-down"></i></span>
+              <span class="chip">Reasoning effort: medium<i data-i="caret-down"></i></span>
+              <a class="btn primary" href="#task">Start task<i data-i="arrow-up"></i></a>
+            </div>
+          </div>
+          <a class="list li" style="min-height:52px" href="#">
+            <i data-i="file-arrow-up" style="font-size:18px"></i>
+            <span class="grow"><b style="font-weight:500">Quick edit, no project</b> <span class="t3">· drop one file and say what to change</span></span>
+            <span class="btn sm">Choose file</span>
+          </a>
+          <div>
+            <div class="sec"><span>Needs you<span class="n">1</span></span></div>
+            <div class="attn li-like">
+              <span class="grow"><b style="font-weight:500">Supplier contracts summary</b><br><span class="meta">Wants to overwrite contracts-summary.xlsx · Q3 expense reports</span></span>
+              <button class="btn sm">Save as new file</button><button class="btn sm">Allow overwrite</button>
+            </div>
+          </div>
+          <div>
+            <div class="sec"><span>Recent tasks</span><a href="#board">Open board</a></div>
+            <div class="list">
+              <a class="li" href="#task"><span class="status"><span class="dot run"></span>Running</span><span class="grow">Proposal for Alpi Logistica</span><span class="meta">Client proposals · step 3 of 6</span></a>
+              <a class="li"><span class="status"><span class="dot done"></span>Done</span><span class="grow">Proposal for Cantina Ferraris</span><span class="meta">Client proposals · to review</span></a>
+              <a class="li"><span class="status"><span class="dot done"></span>Done</span><span class="grow">Monday press review</span><span class="meta">October newsletter · job · 08:00</span></a>
+              <a class="li"><span class="status"><span class="dot done"></span>Done</span><span class="grow">Rewrite the About page</span><span class="meta">Website · reviewed</span></a>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Running task ===== -->
+  <section class="screen" id="s-task" data-title="Running task">
+    <div class="shell">
+      <aside class="side" data-side data-on="work"></aside>
+      <div class="content"><div class="task">
+        <div class="main">
+          <div class="phead"><span class="crumb">Client proposals<span class="sl">/</span><b>Proposal for Alpi Logistica</b></span><span class="grow"></span><button class="btn sm"><i data-i="stop"></i>Stop</button></div>
+          <div class="scroll"><div class="col">
+            <div class="row" style="flex-wrap:wrap; margin-top:-4px">
+              <span class="chip flat">GPT-5.5</span><span class="chip flat">Reasoning effort: medium</span><span class="chip flat"><i data-i="puzzle-piece"></i>Proposal writer v3</span><span class="chip flat">Brief<i data-i="caret-down"></i></span>
+            </div>
+            <div class="progress"><span class="d"></span><span class="d"></span><span class="n"></span><span></span><span></span><span></span></div>
+            <div class="row" style="font-size:13px"><span class="status"><span class="dot run"></span>Step 3 of 6</span><b style="font-weight:500">Draft scope and timeline</b><a class="t3" href="#">· all steps</a></div>
+            <div class="paper">
+              <h3>1. Premessa</h3>
+              <p>Alpi Logistica ci ha chiesto di ridurre i tempi di preparazione delle offerte di trasporto, che oggi richiedono in media due giorni lavorativi.</p>
+              <h3>2. Obiettivi</h3>
+              <p>Portare la preparazione di un'offerta standard sotto le quattro ore entro il 15 novembre, senza cambiare i gestionali in uso.</p>
+              <h3>3. Ambito e tempi</h3>
+              <p class="writing">Il progetto si svolge in tre fasi: analisi delle offerte degli ultimi sei mesi, costruzione delle skill<span class="caret"></span></p>
+            </div>
+          </div></div>
+          <div style="padding:0 32px; border-top:1px solid var(--hair); background:var(--canvas)"><div class="dock">
+            <a class="earlier" href="#">3 earlier messages</a>
+            <div class="attn qcard">
+              <span class="who"><i data-i="question"></i>Question · it keeps writing the other sections while you decide</span>
+              <p>The notes don't say who pays the transport insurance. What should the proposal say?</p>
+              <div class="opts">
+                <button class="opt"><span class="k">1</span>Alpi Logistica pays it</button>
+                <button class="opt"><span class="k">2</span>Include it in our price</button>
+                <button class="opt"><span class="k">3</span>Leave it out and mark it as open</button>
+              </div>
+            </div>
+            <div class="composer">
+              <textarea style="min-height:44px" placeholder="Answer, or write anything else to the agent"></textarea>
+              <div class="bar"><span class="meta">Or type your own answer</span><span class="grow"></span><button class="btn sm primary">Send<i data-i="arrow-up"></i></button></div>
+            </div>
+          </div></div>
+        </div>
+        <aside class="rpanel">
+          <div class="phead" style="padding:0 14px"><span class="crumb"><b>Files</b></span></div>
+          <div class="body">
+            <div>
+              <h3>Made by this task</h3>
+              <div class="file"><span class="fi"><i data-i="file-text"></i></span><span class="grow"><span class="truncate" style="display:block">Proposta_AlpiLogistica.docx</span><span class="sub live">Writing now</span></span></div>
+              <div class="file"><span class="fi"><i data-i="table"></i></span><span class="grow"><span class="truncate" style="display:block">prezzi-alpi.xlsx</span><span class="sub">New · 2 min ago</span></span></div>
+            </div>
+            <div>
+              <h3>Read</h3>
+              <div class="file"><span class="fi"><i data-i="file-text"></i></span><span class="grow"><span class="truncate" style="display:block">notes-call-alpi.docx</span><span class="sub">Attached</span></span></div>
+              <div class="file"><span class="fi"><i data-i="file-text"></i></span><span class="grow"><span class="truncate" style="display:block">template-proposal.docx</span><span class="sub">From project folder</span></span></div>
+            </div>
+            <button class="btn"><i data-i="folder-open"></i>Show in folder</button>
+          </div>
+        </aside>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ===== Board ===== -->
+  <section class="screen" id="s-board" data-title="Board">
+    <div class="shell">
+      <aside class="side" data-side data-on="board"></aside>
+      <div class="content"><div class="board">
+        <div class="main">
+          <div class="phead">
+            <span class="crumb"><b>Board</b></span><span class="chip" style="margin-left:6px">Everything<i data-i="caret-down"></i></span>
+            <span class="grow"></span>
+            <span class="seg"><a class="on"><i data-i="list-bullets"></i>List</a><a><i data-i="columns"></i>Columns</a></span>
+            <button class="btn sm"><i data-i="faders-horizontal"></i>Display</button>
+            <button class="btn sm primary"><i data-i="plus"></i>New task</button>
+          </div>
+          <div class="filters"><span class="qf">Needs me <span class="n">1</span></span><span class="qf">Running <span class="n">1</span></span><span class="qf">To review <span class="n">1</span></span><span class="qf">From jobs <span class="n">1</span></span><span class="qf">Has files</span></div>
+          <div class="scroll">
+            <div class="grp"><span class="dot need"></span>Needs you<span class="n">1</span></div>
+            <a class="trow"><span class="dot need"></span><span>Supplier contracts summary</span><span class="p">Q3 expense reports</span><span class="outs"><span class="chip">contracts-summary.xlsx</span></span><span class="w">12 min</span></a>
+            <div class="attn li-like decision"><span class="grow" style="font-size:13px">Wants to overwrite <b style="font-weight:600">contracts-summary.xlsx</b>, which you edited on Friday.</span><button class="btn sm">Save as new file</button><button class="btn sm">Allow</button></div>
+            <div class="grp"><span class="dot run"></span>Running<span class="n">1</span></div>
+            <a class="trow sel" href="#task"><span class="dot run"></span><span>Proposal for Alpi Logistica <span class="t3" style="font-size:13px">· step 3 of 6</span></span><span class="p">Client proposals</span><span class="outs"><span class="chip">Proposta_AlpiLogistica.docx</span><span class="chip">+1</span></span><span class="w">9:12</span></a>
+            <div class="grp"><span class="dot"></span>To do<span class="n">3</span></div>
+            <a class="trow"><span class="dot"></span><span>Proposal for Brera Design <span class="t3" style="font-size:13px">· waiting for notes</span></span><span class="p">Client proposals</span><span class="outs"></span><span class="w">Thu</span></a>
+            <a class="trow"><span class="dot"></span><span>Write three case studies</span><span class="p">Website</span><span class="outs"></span><span class="w">Wed</span></a>
+            <a class="trow"><span class="dot"></span><span>September receipts</span><span class="p">Q3 expense reports</span><span class="outs"></span><span class="w">Tue</span></a>
+            <div class="grp"><span class="dot done"></span>Done this week<span class="n">3</span></div>
+            <a class="trow"><span class="dot done"></span><span>Proposal for Cantina Ferraris <span style="font-size:13px; color:var(--need)">· to review</span></span><span class="p">Client proposals</span><span class="outs"><span class="chip">Proposta_Ferraris.docx</span><span class="chip">+2</span></span><span class="w">yesterday</span></a>
+            <a class="trow"><span class="dot done"></span><span>Monday press review <span class="t3" style="font-size:12px">· job</span></span><span class="p">October newsletter</span><span class="outs"><span class="chip">this-week.md</span></span><span class="w">08:00</span></a>
+            <a class="trow"><span class="dot done"></span><span>Rewrite the About page</span><span class="p">Website</span><span class="outs"><span class="chip">about.md</span></span><span class="w">Fri</span></a>
+          </div>
+        </div>
+        <aside class="peek">
+          <div class="phead" style="padding:0 18px"><span class="crumb">Client proposals</span><span class="grow"></span><a class="btn sm" href="#task">Open task</a><button class="btn ghost sm" title="Close"><i data-i="x"></i></button></div>
+          <div class="body">
+            <div style="display:grid; gap:6px"><h2>Proposal for Alpi Logistica</h2><span class="status"><span class="dot run"></span>Step 3 of 6 · Draft scope and timeline</span></div>
+            <div><h3>Files so far</h3>
+              <div class="file"><span class="fi"><i data-i="file-text"></i></span><span class="grow"><span class="truncate" style="display:block">Proposta_AlpiLogistica.docx</span><span class="sub live">Writing now</span></span></div>
+              <div class="file"><span class="fi"><i data-i="table"></i></span><span class="grow"><span class="truncate" style="display:block">prezzi-alpi.xlsx</span><span class="sub">New</span></span></div>
+            </div>
+            <div><h3>Brief</h3><p style="font-size:13px; line-height:1.55; color:var(--t2)">Write a proposal for Alpi Logistica from yesterday's call notes. Use our proposal template, price between 8 and 10k, in Italian.</p></div>
+            <div><h3>Last message</h3><p class="msg"><span class="who">Agent</span>Added the payment term to section 5.</p></div>
+          </div>
+        </aside>
+      </div></div>
+    </div>
+  </section>
+</div>
+
+<nav class="mocknav" id="mocknav"></nav>
+
+<template id="side">
+  <div class="top"><span class="mark">T</span><b>Tost Work</b><span class="grow"></span><button class="btn ghost sm" title="Collapse sidebar"><i data-i="sidebar-simple"></i></button></div>
+  <a class="nav" data-k="work" href="#home"><i data-i="house"></i>Work</a>
+  <a class="nav" data-k="projects"><i data-i="folder-simple"></i>Projects</a>
+  <a class="nav" data-k="skills"><i data-i="puzzle-piece"></i>Skills</a>
+  <a class="nav" data-k="jobs"><i data-i="clock-clockwise"></i>Jobs</a>
+  <a class="nav" data-k="board" href="#board"><i data-i="kanban"></i>Board</a>
+  <a class="nav" data-k="quick"><i data-i="file-arrow-up"></i>Quick edit</a>
+  <h4>Pinned projects</h4>
+  <a class="nav"><span class="dot run" style="margin:0 5px"></span>Client proposals</a>
+  <a class="nav"><span class="dot need" style="margin:0 5px"></span>Q3 expense reports</a>
+  <a class="nav"><span class="dot" style="margin:0 5px"></span>October newsletter</a>
+  <span class="spacer"></span>
+  <a class="nav" data-k="about"><i data-i="info"></i>About</a>
+  <a class="nav" data-k="settings"><i data-i="gear-six"></i>Settings</a>
+</template>
+
+<script>
+  for (const s of document.querySelectorAll("[data-side]")) {
+    s.append(document.getElementById("side").content.cloneNode(true));
+    s.querySelector(`[data-k="${s.dataset.on}"]`)?.classList.add("on");
+  }
+  for (const i of document.querySelectorAll("i[data-i]")) i.className = `ph ph-${i.dataset.i}`;
+  const screens = [...document.querySelectorAll(".screen")];
+  const nav = document.getElementById("mocknav");
+  nav.innerHTML = "<b>UI round 3</b>";
+  const link = (label, fn) => { const a = document.createElement("a"); a.textContent = label; a.onclick = fn; nav.appendChild(a); return a; };
+  const sep = () => { const s = document.createElement("span"); s.className = "sep"; nav.appendChild(s); };
+  const themeLinks = ["light", "dark"].map((t) => [t, link(t === "light" ? "Light" : "Dark", () => setTheme(t))]);
+  sep();
+  const screenLinks = screens.map((s) => [s.id, link(s.dataset.title, () => (location.hash = s.id.slice(2)))]);
+  sep();
+  const back = document.createElement("a"); back.href = "../index.html"; back.textContent = "All rounds"; nav.appendChild(back);
+  function setTheme(t) {
+    document.body.dataset.theme = t;
+    for (const [k, a] of themeLinks) a.classList.toggle("on", k === t);
+  }
+  function show() {
+    const target = document.getElementById("s-" + (location.hash.slice(1) || "home")) || screens[0];
+    for (const s of screens) s.classList.toggle("on", s === target);
+    for (const [k, a] of screenLinks) a.classList.toggle("on", k === target.id);
+    document.getElementById("ttl").textContent = "Tost Work · " + target.dataset.title;
+  }
+  const q = new URLSearchParams(location.search);
+  setTheme(q.get("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+  addEventListener("hashchange", show);
+  show();
+</script>
+</body>
+</html>
