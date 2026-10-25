@@ -1,0 +1,40 @@
+import type { EngineEvent, Task } from "./model";
+
+/** Applies one engine event to a task. Pure, so the main process and the tests share it. */
+export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
+  const next: Task = { ...task, updatedAt: at };
+  switch (event.type) {
+    case "plan":
+      return { ...next, steps: event.steps };
+    case "message":
+      return { ...next, messages: [...task.messages, { from: "agent", text: event.text, at }] };
+    case "file": {
+      // A later change to the same path replaces the earlier one, so each file is listed once.
+      const others = task.files.filter((f) => f.path !== event.change.path);
+      return { ...next, files: [...others, event.change] };
+    }
+    case "question":
+      return { ...next, status: "needs-you", question: event.question };
+    case "approval":
+      return { ...next, status: "needs-you", approval: event.approval };
+    case "review":
+      return { ...next, review: event.review };
+    case "done":
+      return {
+        ...next,
+        status: "done",
+        question: null,
+        approval: null,
+        steps: task.steps.map((s) => ({ ...s, status: "done" })),
+      };
+    case "failed":
+      return { ...next, status: "failed", error: event.error, question: null, approval: null };
+    case "stopped":
+      return { ...next, status: "stopped", question: null, approval: null };
+  }
+}
+
+/** Clears a question or approval once the user has answered, and puts the task back to running. */
+export function resume(task: Task, at: string): Task {
+  return { ...task, status: "running", question: null, approval: null, updatedAt: at };
+}

@@ -1,5 +1,10 @@
 import { join } from "node:path";
 import { app, BrowserWindow, nativeTheme, shell } from "electron";
+import { IPC } from "../shared/api";
+import { FakeEngine } from "./engine/fake";
+import { TaskRunner } from "./engine/runner";
+import { registerIpc } from "./ipc";
+import { Store } from "./store/store";
 
 const isMac = process.platform === "darwin";
 
@@ -38,10 +43,18 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
+let mainWindow: BrowserWindow | null = null;
+
 app.whenReady().then(() => {
-  createWindow();
+  const store = new Store(join(app.getPath("userData"), "tost-work.db"));
+  store.stopInterrupted(new Date().toISOString());
+  // shortcut: every task runs on the fake engine until the cli-funnel engine lands (cli-funnel #126 to #128).
+  const runner = new TaskRunner(store, new FakeEngine(), (task) => mainWindow?.webContents.send(IPC.taskChanged, task));
+  registerIpc(store, runner, () => mainWindow);
+  app.on("before-quit", () => store.close());
+  mainWindow = createWindow();
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
   });
 });
 
