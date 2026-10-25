@@ -1,0 +1,23 @@
+# Packaging for Tost Work. 0.0.1 is unsigned: on a Mac, the first launch needs right-click > Open.
+appId: one.tost.work
+productName: Tost Work
+executableName: tost-work
+directories:
+  output: release
+files:
+  - out/**
+  # The fake engine copies these sample files into tasks until the real engine lands.
+  - resources/fake/**
+  - package.json
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # shortcut: unsigned and not notarized; sign and notarize before the private alpha goes beyond Tost.
+  identity: null
+linux:
+  category: Office
+  target: [AppImage]
+win:
+  target: [nsis]

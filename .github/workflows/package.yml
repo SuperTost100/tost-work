@@ -1,0 +1,38 @@
+name: Package
+
+# Builds the unsigned Mac app. It runs by hand, and on pull requests that change the packaging, so a broken build
+# shows up before a release needs it. It publishes nothing: the DMGs are workflow artifacts.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - apps/desktop/electron-builder.yml
+      - apps/desktop/package.json
+      - .github/workflows/package.yml
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    name: Mac app (unsigned)
+    runs-on: macos-latest
+    env:
+      # electron-builder downloads its own Electron for the target, so the dev binary isn't needed.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tost-work/desktop build
+      - run: pnpm --filter @tost-work/desktop exec electron-builder --mac --publish never
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tost-work-mac
+          path: apps/desktop/release/*.dmg
+          retention-days: 14
