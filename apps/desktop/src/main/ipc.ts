@@ -49,7 +49,7 @@ export function registerIpc(store: Store, runner: TaskRunner, window: () => Brow
     // A task without a project works in a temporary folder of its own, as a quick edit does.
     const workdir = project?.folder ?? join(tmpdir(), "tost-work", "quick", task.id);
     if (!project) await mkdir(workdir, { recursive: true });
-    void runner.start(task.id, workdir);
+    runner.launch(task.id, workdir);
     return task;
   });
 

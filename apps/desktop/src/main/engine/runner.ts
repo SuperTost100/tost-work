@@ -64,8 +64,8 @@ export class TaskRunner {
     const project: Project | null = task.projectId ? (this.store.getProject(task.projectId) ?? null) : null;
     const controller = new AbortController();
     this.running.set(taskId, controller);
-    task = this.save({ ...task, status: "running", error: null, updatedAt: this.now() });
     try {
+      task = this.save({ ...task, status: "running", error: null, updatedAt: this.now() });
       for await (const event of this.engine.run({ task, project, workdir, signal: controller.signal })) {
         // Read the stored task each time, so an answer saved meanwhile isn't overwritten.
         task = this.save(applyEvent(this.mustGet(taskId), event, this.now()));
@@ -78,6 +78,13 @@ export class TaskRunner {
       this.running.delete(taskId);
     }
     return task;
+  }
+
+  /** Starts the task without waiting for it. A failure the task couldn't record itself is logged, so it can't crash the app. */
+  launch(taskId: string, workdir: string): void {
+    this.start(taskId, workdir).catch((err: unknown) => {
+      console.error(`Task ${taskId} failed and its state couldn't be saved`, err);
+    });
   }
 
   answer(taskId: string, answer: string): Task {

@@ -1,5 +1,5 @@
 /** @vitest-environment node */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Task } from "../../shared/model";
 import { Store } from "../store/store";
 import { FakeEngine, PROPOSAL_SCRIPT } from "./fake";
@@ -84,5 +84,40 @@ describe("TaskRunner notifications", () => {
     const final = await runner.start(task.id, "/tmp/p");
     expect(final.status).toBe("done");
     expect(store.getTask(task.id)?.attachments).toEqual(["/notes.docx"]);
+  });
+});
+
+describe("TaskRunner when saving fails", () => {
+  const brokenSetup = () => {
+    const store = new Store(":memory:");
+    const runner = new TaskRunner(store, new FakeEngine(PROPOSAL_SCRIPT, 0), () => {});
+    const task = runner.create({ projectId: null, brief: "Write a proposal" });
+    const save = store.saveTask.bind(store);
+    return { store, runner, task, save };
+  };
+
+  it("doesn't leave the task marked as running when the first save fails", async () => {
+    const { store, runner, task, save } = brokenSetup();
+    store.saveTask = (t) => {
+      if (t.status === "running") throw new Error("disk full");
+      save(t);
+    };
+    const final = await runner.start(task.id, "/tmp/p");
+    expect(final.status).toBe("failed");
+    expect(final.error).toBe("disk full");
+    expect(runner.isRunning(task.id)).toBe(false);
+  });
+
+  it("logs, instead of rejecting, when even the failure can't be saved", async () => {
+    const { store, runner, task } = brokenSetup();
+    store.saveTask = () => {
+      throw new Error("disk gone");
+    };
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    runner.launch(task.id, "/tmp/p");
+    await vi.waitFor(() => expect(log).toHaveBeenCalledOnce());
+    expect(String(log.mock.calls[0]?.[1])).toMatch(/disk gone/);
+    expect(runner.isRunning(task.id)).toBe(false);
+    log.mockRestore();
   });
 });
