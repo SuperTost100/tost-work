@@ -29,3 +29,32 @@ The sidebar in A wasn't loved, and none of the directions had good jobs.
 - Navigation has three variants: a lighter sidebar, an icon rail and a top bar.
 - Jobs have three variants: a week view with a sentence editor, cards with a four-step builder, and an agenda.
 - The board shows columns, with a "By project" view whose quiet projects fold into one line.
+
+## Round 2, 2026-10-25
+
+| Area | Verdict |
+| --- | --- |
+| Navigation | Sidebar and icon rail together, as one sidebar you collapse. No top bar. |
+| Focus button | Not needed, because collapsing the sidebar does the same. |
+| Work home | Clean, simple, understood at a glance. |
+| Running task | Good, but a Conversation tab on the right plus a box at the bottom is confusing. |
+| Done task | The box disappears and there's no way to chat. The review shows the document without saying what to look for. |
+| Save as skill | Unclear what gets saved. It should run a skill that turns the task into a skill, in a branch of the task. |
+| Quick edit | Good. The changes panel needs per-change accept and reject, like Grammarly, and "Undo one" was unclear. |
+| Projects | Fine. Colours and icons belong to the UI round. |
+| One project | Easy, close to Claude projects. Unclear whether skills are bound to the project. |
+| Skills | The editor is liked, but it used only half the width. |
+| Jobs | Cards and builder are the best setup, and the agenda is the best overview. Combine them. Jobs belong to Intermediate and up. |
+| Board | Still not liked. Look at Paperclip and Jira. |
+
+## What round 3 changed
+
+- One sidebar with a collapse button that turns it into the icon rail. The top bar and Focus are gone.
+- Two places for the chat, switched from the dashed bar: above the only input box, or in a Chat tab with its own box and a badge for questions. Done tasks keep the same box.
+- Done tasks open on "Check it against your brief": what you asked with a tick each, what it decided on its own with a Change button, and what's worth checking yourself.
+- "Make a skill from this task" opens a draft written by a built-in Skill maker in a copy of the task. It highlights the lines that came from your corrections and points to a similar skill you already have.
+- Quick edit lists one card per change with Accept, Reject and alternatives, then saves a copy with the accepted ones.
+- The one-project screen says skills are available everywhere unless you turn them off, and a project can add its own. This is open question 1.
+- The skill editor uses the full width, with "Try it", availability and versions in a side column.
+- Jobs show the cards and the agenda side by side, and the builder opens in place of the agenda.
+- The board is a list grouped by Needs you, Running, To do and Done, with quick filters, a Display menu, a side panel for details and a Columns option. It follows Linear and Paperclip.

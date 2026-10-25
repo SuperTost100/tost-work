@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Tost Work · Round 3</title>
+<link rel="stylesheet" href="../shared/wire.css?v=4">
+<style>
+  /* Sidebar: expanded or collapsed to icons, toggled by the user. */
+  .shell { display: grid; flex: 1; min-height: 0; grid-template-columns: 216px 1fr; }
+  body[data-nav="rail"] .shell { grid-template-columns: 64px 1fr; }
+  .side { min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); background: var(--bg-2); }
+  .side .collapse { display: flex; align-items: center; justify-content: space-between; padding: 10px 10px 4px 16px; }
+  .side .collapse b { font-size: 13px; }
+  .side .sec { padding: 6px 8px; display: grid; gap: 1px; }
+  .side .item { padding: 6px 10px; gap: 10px; }
+  .side .item i { width: 18px; height: 18px; flex: none; border: 1.5px solid currentColor; border-radius: 5px; opacity: .6; }
+  .side .item.on { background: var(--bg-3); font-weight: 500; }
+  .side h4 { font-size: 12px; color: var(--muted); font-weight: 500; padding: 12px 10px 4px; }
+  .side .scroll { flex: 1; overflow: auto; padding: 0 8px; }
+  .side .dropmini { margin: 8px; border: 1.5px dashed var(--line); border-radius: 8px; padding: 10px; font-size: 12.5px; color: var(--muted); text-align: center; }
+  body[data-nav="rail"] .side .label-t, body[data-nav="rail"] .side h4, body[data-nav="rail"] .side .scroll, body[data-nav="rail"] .side .collapse b { display: none; }
+  body[data-nav="rail"] .side .collapse { justify-content: center; padding: 10px 0 4px; }
+  body[data-nav="rail"] .side .item { justify-content: center; padding: 9px 0; }
+  body[data-nav="rail"] .side .dropmini { padding: 10px 0; font-size: 0; }
+  body[data-nav="rail"] .side .dropmini::before { content: "⎘"; font-size: 16px; }
+  body[data-nav="rail"] .side .spacer { flex: 1; }
+
+  .main { min-height: 0; overflow: auto; }
+  .page { max-width: 940px; margin: 0 auto; padding: 28px 32px 48px; }
+  .task { display: grid; grid-template-columns: 1fr 330px; min-height: 0; }
+  .task .center { overflow: auto; padding: 22px 36px 0; display: flex; flex-direction: column; min-width: 0; }
+  .task .right { border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  .task .right .body { flex: 1; overflow: auto; padding: 14px; }
+  .followup { position: sticky; bottom: 0; background: var(--bg); padding: 10px 0 18px; margin-top: auto; }
+
+  /* Conversation variants: body[data-chat="1"] thread by the box, "2" chat in the side panel. */
+  body[data-chat="1"] .c2, body[data-chat="2"] .c1 { display: none !important; }
+  .right .pane-b { display: none; }
+  .right.open .pane-b { display: flex; }
+  .right.open .pane-a { display: none; }
+  .right .t-a, .right.open .t-b { color: var(--ink); border-color: var(--ink); }
+  .right.open .t-a { color: var(--muted); border-color: transparent; }
+  .pane-b { flex-direction: column; flex: 1; min-height: 0; }
+  .pane-b .msgs { flex: 1; overflow: auto; padding: 14px; }
+  .pane-b .in { border-top: 1px solid var(--line); padding: 10px; }
+  .badge { display: inline-grid; place-items: center; min-width: 17px; height: 17px; border-radius: 9px; background: #d99a2b; color: #fff; font-size: 11px; padding: 0 5px; margin-left: 4px; }
+  .thread { border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--bg-2); padding: 10px 12px; }
+  .thread + .composer { border-top-left-radius: 0; border-top-right-radius: 0; }
+  .thread .msg { background: var(--bg); }
+  .thread .msg.me { background: var(--accent-bg); }
+  .thread .ask { border: 1px solid #e6c48c; background: var(--warn-bg); }
+
+  .strip { display: flex; gap: 4px; margin: 14px 0 6px; }
+  .strip span { flex: 1; height: 6px; border-radius: 3px; background: var(--line-2); }
+  .strip span.d { background: var(--ok); }
+  .strip span.n { background: var(--accent); }
+  .planline { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  details.plan summary { cursor: pointer; list-style: none; }
+  details.plan[open] .steps { margin-top: 8px; }
+  .paper { border: 1px solid var(--line); border-radius: 8px; padding: 26px 32px; margin-top: 10px; background: var(--bg); }
+  .paper h3 { font-size: 15px; margin: 16px 0 6px; }
+  .paper h3:first-child { margin-top: 0; }
+  .paper p { font-size: 14.5px; line-height: 1.65; margin: 0 0 10px; }
+  .paper-head { display: flex; align-items: center; gap: 8px; margin-top: 18px; }
+  .writing-line { border-left: 2px solid var(--accent); padding-left: 10px; color: var(--ink-2); }
+  .caret { display: inline-block; width: 2px; height: 16px; background: var(--accent); vertical-align: -3px; animation: pulse 1s steps(1) infinite; }
+  .hl { background: #fff3c4; border-bottom: 2px solid #e8c95a; }
+  .sheet-md { display: none; }
+  .sheet-md.open { display: block; }
+
+  /* Review against the brief */
+  .review { border: 1px solid var(--line); border-radius: 8px; margin-top: 16px; }
+  .review .head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line-2); }
+  .review .grp { padding: 10px 14px; border-top: 1px solid var(--line-2); }
+  .review .grp:first-of-type { border-top: 0; }
+  .review h4 { font-size: 12px; color: var(--muted); font-weight: 500; margin-bottom: 6px; }
+  .check { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; align-items: start; padding: 5px 0; }
+  .check .mk { width: 16px; height: 16px; border-radius: 50%; margin-top: 2px; }
+  .check .mk.ok { background: var(--ok); }
+  .check .mk.as { border: 2px solid #d99a2b; }
+  .check .mk.eye { border: 2px solid var(--accent); }
+
+  /* Quick edit change cards, Grammarly style */
+  .ccard { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; }
+  .ccard + .ccard { margin-top: 8px; }
+  .ccard .kind { font-size: 11.5px; color: var(--muted); }
+  .ccard .ba { font-size: 14px; line-height: 1.5; }
+  .ccard.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .ccard.done { opacity: .55; }
+  .del { background: #fbe9e7; color: #9b2c1f; text-decoration: line-through; }
+  .ins { background: var(--ok-bg); color: var(--ok); }
+  .alt { display: flex; gap: 6px; flex-wrap: wrap; }
+  .alt span { border: 1px dashed var(--line); border-radius: 12px; padding: 2px 9px; font-size: 12.5px; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .pcard { padding: 14px; display: grid; gap: 8px; }
+  .pcard:hover { background: var(--bg-2); }
+  .mini { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .mini span { background: var(--bg-2); border-radius: 4px; padding: 5px; font-size: 11.5px; color: var(--muted); text-align: center; }
+  .result { display: flex; gap: 12px; align-items: center; padding: 10px 12px; }
+  .result:hover { background: var(--bg-2); }
+
+  .split { display: grid; grid-template-columns: 240px 1fr; min-height: 0; }
+  .split > .list-pane { border-right: 1px solid var(--line); overflow: auto; padding: 14px 10px; }
+  .editor { display: grid; grid-template-columns: 1fr 270px; min-height: 0; }
+  .editor .doc { overflow: auto; padding: 24px 36px; }
+  .editor .meta { border-left: 1px solid var(--line); overflow: auto; padding: 20px 16px; background: var(--bg-2); }
+  .editor .meta h3 { font-size: 12px; color: var(--muted); font-weight: 500; margin: 18px 0 6px; }
+  .editor .meta h3:first-child { margin-top: 0; }
+  .doc-h { font-size: 12px; color: var(--muted); font-weight: 500; margin: 20px 0 6px; display: flex; gap: 8px; align-items: center; }
+  .doc-h::after { content: ""; flex: 1; border-top: 1px solid var(--line-2); }
+  .editable { padding: 6px 8px; margin: 0 -8px; border-radius: var(--radius); font-size: 14.5px; line-height: 1.65; }
+  .editable:hover { background: var(--bg-2); }
+  .banner { border: 1px solid #b9c9ee; background: var(--accent-bg); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
+
+  /* Jobs */
+  .jobs { display: grid; grid-template-columns: 1fr 380px; gap: 16px; align-items: start; }
+  .jobcard { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; padding: 14px; }
+  .jobcard:hover { background: var(--bg-2); }
+  .jobcard .when { font-weight: 600; }
+  .stepper { display: flex; gap: 6px; }
+  .stepper span { flex: 1; font-size: 12px; padding: 6px 8px; border-radius: 6px; background: var(--bg-2); color: var(--muted); }
+  .stepper span.on { background: var(--ink); color: #fff; }
+  .stepper span.d { background: var(--ok-bg); color: var(--ok); }
+  .agenda h3 { font-size: 12.5px; color: var(--muted); font-weight: 500; margin: 14px 0 6px; }
+  .agenda h3:first-child { margin-top: 0; }
+  .agenda .row-a { display: grid; grid-template-columns: 74px 1fr auto; gap: 10px; align-items: center; padding: 9px 12px; border-top: 1px solid var(--line-2); font-size: 13px; }
+  .agenda .box > .row-a:first-child { border-top: 0; }
+
+  /* Board: list-first, Linear and Paperclip style */
+  .bhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .qf { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 14px; font-size: 12.5px; background: var(--bg); white-space: nowrap; }
+  .qf.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .qf .n { color: var(--muted); }
+  .qf.on .n { color: #cfcfcf; }
+  .bwrap { display: grid; grid-template-columns: 1fr; min-height: 0; flex: 1; }
+  .bwrap.peek { grid-template-columns: 1fr 400px; }
+  .bwrap .lst { overflow: auto; padding: 18px 26px 30px; }
+  .grp-h { display: flex; align-items: center; gap: 8px; padding: 14px 4px 6px; font-size: 13px; font-weight: 600; }
+  .grp-h .n { color: var(--muted); font-weight: 400; }
+  .grp-h.fold { color: var(--muted); font-weight: 500; }
+  .trow { display: grid; grid-template-columns: 22px 1fr 150px 210px 86px; gap: 10px; align-items: center; padding: 9px 10px; border-top: 1px solid var(--line-2); font-size: 13.5px; }
+  .trow:hover { background: var(--bg-2); }
+  .trow.sel { background: var(--accent-bg); }
+  .trow .proj { color: var(--muted); font-size: 12.5px; }
+  .trow .when { color: var(--muted); font-size: 12px; text-align: right; }
+  .trow .outs { display: flex; gap: 4px; overflow: hidden; }
+  .glyph { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--line); }
+  .glyph.run { border-color: var(--accent); border-width: 4px; animation: pulse 1.4s ease-in-out infinite; }
+  .glyph.need { background: #d99a2b; border-color: #d99a2b; }
+  .glyph.done { background: var(--ok); border-color: var(--ok); }
+  .clock { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 9px; padding: 0 6px; margin-left: 6px; }
+  .decision { margin: 2px 0 8px 32px; border: 1px solid #e6c48c; background: var(--warn-bg); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .peekp { border-left: 1px solid var(--line); overflow: auto; padding: 18px; display: none; }
+  .bwrap.peek .peekp { display: block; }
+  .bview-cols { display: none; }
+  #boardMain.cols .bview-cols { display: grid; }
+  #boardMain.cols .bview-list { display: none; }
+  .cols4 { grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 18px 26px; }
+  .col { background: var(--bg-2); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .col h3 { font-size: 13px; display: flex; justify-content: space-between; padding: 2px 4px 4px; }
+  .card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; display: grid; gap: 6px; font-size: 13px; }
+  .menu { position: relative; }
+  .menu .pop { display: none; position: absolute; right: 0; top: 34px; width: 250px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.1); padding: 10px; z-index: 5; }
+  .menu.open .pop { display: grid; gap: 8px; }
+</style>
+</head>
+<body data-nav="full" data-chat="1">
+<div class="window">
+  <div class="titlebar"><span class="dots"><i></i><i></i><i></i></span>Tost Work · <span class="where"></span></div>
+
+  <!-- ============ WORK HOME ============ -->
+  <section class="screen" id="s-home" data-title="Work home" data-nav-on="work">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <main class="main">
+        <div class="page stack-lg">
+          <h1>Good morning, Giulia</h1>
+          <div class="composer">
+            <textarea placeholder="Describe the work. Attach the files it needs.">Write a proposal for Alpi Logistica from yesterday's call notes. Use our proposal template, price between 8 and 10k, in Italian.</textarea>
+            <div class="bar">
+              <span class="select">Client proposals</span>
+              <span class="chip file">notes-call-alpi.docx</span>
+              <button class="btn sm ghost">+ Attach</button>
+              <span class="grow"></span>
+              <span class="select">GPT-5.5</span>
+              <span class="select">Reasoning effort: medium</span>
+              <a class="btn primary" href="#task">Start task</a>
+            </div>
+          </div>
+          <a class="drop" href="#quick">
+            <div class="file" style="border-style:dashed"><div class="ic">doc</div></div>
+            <div class="grow"><h3>Quick edit, no project</h3><p class="muted small">Drop one file and say what to change. You get the file back.</p></div>
+            <span class="btn">Choose file</span>
+          </a>
+          <div class="stack">
+            <h2>Needs you <span class="muted small">· 1</span></h2>
+            <div class="box"><div class="item">
+              <span class="status needs">Needs you</span>
+              <div class="grow"><div>Supplier contracts summary</div><div class="muted small">Wants to overwrite <span class="mono">contracts-summary.xlsx</span> · Q3 expense reports</div></div>
+              <button class="btn sm">Save as new file</button><button class="btn sm primary">Allow overwrite</button>
+            </div></div>
+          </div>
+          <div class="stack">
+            <div class="row between"><h2>Recent tasks</h2><a class="muted small" href="#board">Open board →</a></div>
+            <div class="box"><ul class="list">
+              <li><a class="item" href="#task"><span class="status running">Running</span><span class="grow">Proposal for Alpi Logistica</span><span class="muted small">Client proposals · step 3 of 6</span></a></li>
+              <li><a class="item" href="#done"><span class="status done">Done</span><span class="grow">Proposal for Cantina Ferraris</span><span class="muted small">Client proposals · 3 files · to review</span></a></li>
+              <li><a class="item" href="#done"><span class="status done">Done</span><span class="grow">Monday press review</span><span class="muted small">October newsletter · from a job · today 08:00</span></a></li>
+              <li><a class="item" href="#done"><span class="status done">Done</span><span class="grow">Rewrite the About page</span><span class="muted small">Website · 2 files · reviewed</span></a></li>
+            </ul></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <!-- ============ RUNNING TASK ============ -->
+  <section class="screen" id="s-task" data-title="Running task" data-nav-on="work">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <div class="task">
+        <div class="center">
+          <div class="row between"><div class="muted small">Client proposals ›</div><button class="btn sm">Stop</button></div>
+          <h1 style="margin-top:4px">Proposal for Alpi Logistica</h1>
+          <div class="row wrap" style="margin-top:8px">
+            <span class="chip">GPT-5.5</span><span class="chip">Reasoning effort: medium</span><span class="chip skill">Proposal writer v3</span>
+            <a href="#" class="chip" data-toggle="#briefT">Brief ▾</a>
+          </div>
+          <div class="box soft pad stack sheet-md" id="briefT" style="margin-top:10px">
+            <p>Write a proposal for Alpi Logistica from yesterday's call notes. Use our proposal template, price between 8 and 10k, in Italian.</p>
+            <div class="row"><span class="chip file">notes-call-alpi.docx</span></div>
+          </div>
+          <details class="plan" style="margin-top:6px">
+            <summary>
+              <div class="strip"><span class="d"></span><span class="d"></span><span class="n"></span><span></span><span></span><span></span></div>
+              <div class="planline"><span class="status running">Step 3 of 6</span><b>Draft scope and timeline</b><span class="muted">· show all steps ▾</span></div>
+            </summary>
+            <ol class="steps">
+              <li class="done">Read the call notes</li><li class="done">Open the proposal template</li><li class="now">Draft scope and timeline</li>
+              <li class="wait">Build the price table, €8,000 to €10,000</li><li class="wait">Check against the proposal checklist</li><li class="wait">Save the .docx and a PDF copy</li>
+            </ol>
+          </details>
+          <div class="paper-head"><span class="muted small">Live preview of</span><b class="small">Proposta_AlpiLogistica.docx</b></div>
+          <div class="paper">
+            <h3>1. Premessa</h3>
+            <p>Alpi Logistica ci ha chiesto di ridurre i tempi di preparazione delle offerte di trasporto, che oggi richiedono in media due giorni lavorativi.</p>
+            <h3>2. Obiettivi</h3>
+            <p>Portare la preparazione di un'offerta standard sotto le quattro ore entro il 15 novembre, senza cambiare i gestionali in uso.</p>
+            <h3>3. Ambito e tempi</h3>
+            <p class="writing-line">Il progetto si svolge in tre fasi: analisi delle offerte degli ultimi sei mesi, costruzione delle skill<span class="caret"></span></p>
+          </div>
+
+          <!-- Chat variant 1: the thread sits on top of the only input box. -->
+          <div class="followup c1">
+            <div class="thread">
+              <div class="row between" style="margin-bottom:8px"><span class="small muted">Conversation · 3 messages</span><a class="small muted" href="#">Show all</a></div>
+              <div class="msg ask"><span class="who">Agent · question</span>The notes don't say if travel costs are included. I assumed they're excluded. Is that right?</div>
+              <div class="msg me"><span class="who">You</span>Right, excluded. Also add the 30-day payment term.</div>
+              <div class="msg"><span class="who">Agent</span>Added to section 5.</div>
+            </div>
+            <div class="composer">
+              <textarea placeholder="Write to the agent. It reads this before its next step." style="min-height:44px"></textarea>
+              <div class="bar"><span class="note">Variant 1: one box, and the conversation sits right above it. The side panel only shows files.</span><span class="grow"></span><button class="btn sm primary">Send</button></div>
+            </div>
+          </div>
+          <div class="c2" style="height:24px"></div>
+        </div>
+        <aside class="right" id="rTask">
+          <div class="tabs c2" style="padding:0 10px"><a href="#" class="t-a" data-close="#rTask">Files</a><a href="#" class="t-b" data-open="#rTask">Chat <span class="badge">1</span></a></div>
+          <div class="body pane-a stack-lg">
+            <div class="stack">
+              <h3>Made by this task</h3>
+              <div class="file writing"><div class="ic">docx</div><div class="grow"><div class="truncate">Proposta_AlpiLogistica.docx</div><div class="tag">Writing now · previewed</div></div></div>
+              <div class="file new"><div class="ic">xlsx</div><div class="grow"><div class="truncate">prezzi-alpi.xlsx</div><div class="tag">New · 2 min ago</div></div><button class="btn sm">Preview</button></div>
+            </div>
+            <div class="stack">
+              <h3>Read</h3>
+              <div class="file"><div class="ic">docx</div><div class="grow"><div class="truncate">notes-call-alpi.docx</div><div class="tag">Attached</div></div></div>
+              <div class="file"><div class="ic">docx</div><div class="grow"><div class="truncate">template-proposal.docx</div><div class="tag">From project folder</div></div></div>
+            </div>
+            <button class="btn" style="width:100%">Show in folder</button>
+          </div>
+          <div class="pane-b c2">
+            <div class="msgs">
+              <div class="msg ask" style="border:1px solid #e6c48c;background:var(--warn-bg)"><span class="who">Agent · question</span>The notes don't say if travel costs are included. I assumed they're excluded. Is that right?</div>
+              <div class="msg me"><span class="who">You</span>Right, excluded. Also add the 30-day payment term.</div>
+              <div class="msg"><span class="who">Agent</span>Added to section 5.</div>
+            </div>
+            <div class="in"><textarea class="field small" style="min-height:56px" placeholder="Write to the agent"></textarea><p class="note" style="margin-top:8px">Variant 2: the chat has its own box in the side panel, and there's no box under the result. A question from the agent puts a badge on the Chat tab.</p></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DONE TASK ============ -->
+  <section class="screen" id="s-done" data-title="Done task" data-nav-on="work">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <div class="task">
+        <div class="center">
+          <div class="muted small">Client proposals ›</div>
+          <h1 style="margin-top:4px">Proposal for Cantina Ferraris</h1>
+          <div class="row wrap" style="margin-top:8px"><span class="status done">Done yesterday at 17:42 in 6 min</span><span class="chip">GPT-5.5</span><span class="chip">Reasoning effort: medium</span></div>
+
+          <div class="review">
+            <div class="head"><b class="grow">Check it against your brief</b><a class="btn sm" href="#skilldraft">Make a skill from this task</a><button class="btn sm primary">Mark reviewed</button></div>
+            <div class="grp">
+              <h4>What you asked · 4 of 4 done</h4>
+              <div class="check"><span class="mk ok"></span><span>A proposal from the call notes. It uses all 5 requirements in <span class="chip file">notes-call-ferraris.docx</span></span><a class="small muted" href="#">Show</a></div>
+              <div class="check"><span class="mk ok"></span><span>Our template, with all 6 sections filled</span><a class="small muted" href="#">Show</a></div>
+              <div class="check"><span class="mk ok"></span><span>Price between €8,000 and €10,000: <b>€9,450</b></span><a class="small muted" href="#">Show in table</a></div>
+              <div class="check"><span class="mk ok"></span><span>In Italian</span><span></span></div>
+            </div>
+            <div class="grp">
+              <h4>What it decided on its own · 2</h4>
+              <div class="check"><span class="mk as"></span><span>Travel costs are excluded, because the notes don't mention them</span><button class="btn sm">Change</button></div>
+              <div class="check"><span class="mk as"></span><span>Work starts on 1 December, the first Monday after the client's deadline for signing</span><button class="btn sm">Change</button></div>
+            </div>
+            <div class="grp">
+              <h4>Worth checking yourself · 1</h4>
+              <div class="check"><span class="mk eye"></span><span>The client's VAT number was copied from the notes, where it was handwritten: IT 0123 4567 890</span><a class="small muted" href="#">Show</a></div>
+            </div>
+          </div>
+          <p class="note" style="margin-top:10px">The review answers "did it do what I asked?" first. The agent writes it at the end of every task. The file is below it.</p>
+
+          <div class="paper-head">
+            <div class="tabs" style="border:0"><a class="on">Proposta_Ferraris.docx</a><a>Proposta_Ferraris.pdf</a><a>prezzi-ferraris.xlsx</a></div>
+            <span class="grow"></span><button class="btn sm">Open in Word</button>
+          </div>
+          <div class="paper">
+            <h3>1. Premessa</h3>
+            <p>Cantina Ferraris vuole un sito di vendita diretta per i propri vini, collegato al magazzino che usa oggi.</p>
+            <h3>5. Condizioni</h3>
+            <p>Il prezzo non comprende <span class="hl">le spese di trasferta</span>. Pagamento a 30 giorni dalla fattura.</p>
+          </div>
+
+          <div class="followup c1">
+            <div class="composer">
+              <textarea placeholder="Ask for changes. The task picks up from here." style="min-height:44px"></textarea>
+              <div class="bar"><span class="muted small">Example: "Include travel costs, €400 flat."</span><span class="grow"></span><button class="btn sm primary">Send</button></div>
+            </div>
+          </div>
+          <div class="c2" style="height:24px"></div>
+        </div>
+        <aside class="right" id="rDone">
+          <div class="tabs c2" style="padding:0 10px"><a href="#" class="t-a" data-close="#rDone">Files</a><a href="#" class="t-b" data-open="#rDone">Chat</a></div>
+          <div class="body pane-a stack-lg">
+            <div class="stack">
+              <h3>Made by this task</h3>
+              <div class="file new"><div class="ic">docx</div><div class="grow">Proposta_Ferraris.docx<div class="tag">New</div></div></div>
+              <div class="file new"><div class="ic">pdf</div><div class="grow">Proposta_Ferraris.pdf<div class="tag">New</div></div></div>
+              <div class="file new"><div class="ic">xlsx</div><div class="grow">prezzi-ferraris.xlsx<div class="tag">New</div></div></div>
+            </div>
+            <details><summary class="small muted" style="cursor:pointer">Steps it took (6)</summary>
+              <ol class="steps small" style="margin-top:8px"><li class="done">Read the call notes</li><li class="done">Opened the template</li><li class="done">Wrote 6 sections</li><li class="done">Built the price table</li><li class="done">Checklist: 11 of 11</li><li class="done">Saved .docx and PDF</li></ol>
+            </details>
+            <button class="btn" style="width:100%">Show in folder</button>
+          </div>
+          <div class="pane-b c2">
+            <div class="msgs"><div class="msg"><span class="who">Agent</span>Done. The price came to €9,450, inside the range you gave.</div></div>
+            <div class="in"><textarea class="field small" style="min-height:56px" placeholder="Ask for changes"></textarea></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SKILL DRAFTED FROM A TASK ============ -->
+  <section class="screen" id="s-skilldraft" data-title="Skill from task" data-nav-on="skills">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <div class="editor">
+        <div class="doc">
+          <div class="banner"><div class="grow"><b>Draft made from "Proposal for Cantina Ferraris"</b><div class="small">The built-in Skill maker read the brief, the 6 steps and your 2 corrections, in a copy of the task. Nothing is saved until you press Save.</div></div><button class="btn sm">Discard</button><button class="btn sm primary">Save as new skill</button></div>
+          <div class="row between" style="margin-top:20px"><h1>Wine shop proposals</h1><button class="btn sm">SKILL.md</button></div>
+          <div class="doc-h">When to use it</div>
+          <div class="editable">When the user asks for a proposal for an e-commerce site for a winery or food producer.</div>
+          <div class="doc-h">What to do</div>
+          <ol class="editable" style="padding-left:28px; margin:0">
+            <li>Read the call notes and list every requirement.</li>
+            <li>Fill the proposal template, all 6 sections.</li>
+            <li>Price between the range given, without VAT. <span class="hl">Exclude travel costs unless the brief says otherwise.</span></li>
+            <li><span class="hl">Add the 30-day payment term to the conditions.</span></li>
+            <li>Save a .docx and a PDF copy.</li>
+          </ol>
+          <div class="doc-h">Files it brings</div>
+          <div class="row"><span class="chip file">template-proposal.docx</span><button class="btn sm ghost">+ Add</button></div>
+          <p class="note" style="margin-top:18px">Highlighted lines come from your corrections during the task, so the skill learns what you had to fix.</p>
+        </div>
+        <aside class="meta">
+          <h3>Where it came from</h3>
+          <a class="item link small" href="#done"><span class="status done"></span>Proposal for Cantina Ferraris</a>
+          <h3>Similar skill you already have</h3>
+          <div class="box pad small stack"><b>Proposal writer v3</b><span class="muted">80% the same. You could add the two highlighted lines there instead.</span><button class="btn sm">Add to Proposal writer</button></div>
+          <h3>Try it first</h3>
+          <div class="box pad small stack"><span class="muted">Run the draft on another file without saving anything.</span><button class="btn sm">Choose a file</button></div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ QUICK EDIT ============ -->
+  <section class="screen" id="s-quick" data-title="Quick edit" data-nav-on="quick">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <div class="task" style="grid-template-columns: 1fr 420px">
+        <div class="center">
+          <div class="row between"><h1>Quick edit</h1><span class="muted small">Not in a project</span></div>
+          <div class="stack" style="margin-top:18px; max-width:620px">
+            <div class="msg me"><span class="who">You · letter-bank.docx</span>Fix the typos and make it more formal. Keep it to one page.</div>
+            <div class="msg"><span class="who">Agent</span>I found 7 changes: 4 typos and 3 to make it formal. Review them on the right. The original file isn't touched.</div>
+          </div>
+          <div class="followup">
+            <div class="composer"><textarea style="min-height:44px" placeholder="Ask for another change"></textarea>
+              <div class="bar"><button class="btn sm">Move to a project…</button><span class="grow"></span><button class="btn sm primary">Send</button></div></div>
+          </div>
+        </div>
+        <aside class="right">
+          <div class="row" style="padding:12px 14px; border-bottom:1px solid var(--line)"><b class="grow">7 changes · 2 accepted</b><button class="btn sm">Reject the rest</button><button class="btn sm primary">Accept all</button></div>
+          <div class="body">
+            <div class="ccard done"><span class="kind">Typo · accepted</span><div class="ba">chiusra → chiusura</div><a class="small muted" href="#">Undo</a></div>
+            <div class="ccard done"><span class="kind">Typo · accepted</span><div class="ba">perche → poiché</div><a class="small muted" href="#">Undo</a></div>
+            <div class="ccard sel">
+              <span class="kind">More formal · greeting</span>
+              <div class="ba"><span class="del">Ciao Marta,</span> <span class="ins">Gentile dott.ssa Bianchi,</span></div>
+              <span class="small muted">You asked for a formal tone, and the bank's letters to you use her title.</span>
+              <div class="alt"><span>Egregia dott.ssa Bianchi,</span><span>Spett.le Banca Alpina,</span><span>Other…</span></div>
+              <div class="row"><button class="btn sm">Reject</button><button class="btn sm primary">Accept</button></div>
+            </div>
+            <div class="ccard"><span class="kind">More formal · closing</span><div class="ba"><span class="del">Grazie mille, a presto!</span> <span class="ins">Cordiali saluti,</span></div><div class="row"><button class="btn sm">Reject</button><button class="btn sm primary">Accept</button></div></div>
+            <div class="ccard"><span class="kind">Typo</span><div class="ba">intestatto → intestato</div><div class="row"><button class="btn sm">Reject</button><button class="btn sm primary">Accept</button></div></div>
+            <p class="note" style="margin-top:12px">One card per change, as in Grammarly. Each can be accepted, rejected or swapped for an alternative. Nothing is all-or-nothing.</p>
+            <button class="btn" style="width:100%; margin-top:10px">Save a copy with the accepted changes</button>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PROJECTS ============ -->
+  <section class="screen" id="s-projects" data-title="Projects" data-nav-on="projects">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <main class="main"><div class="page stack-lg">
+        <div class="row between"><h1>Projects</h1><button class="btn primary">New project</button></div>
+        <div class="grid2">
+          <a class="box pcard" href="#project"><div class="row between"><h3>Client proposals</h3><span class="status running">1 running</span></div><p class="small">Commercial proposals and quotes for clients.</p><div class="mini"><span>To do 1</span><span>Running 1</span><span>Needs you 0</span><span>Done 12</span></div><p class="muted small">Last result: Proposta_Ferraris.docx, yesterday</p></a>
+          <a class="box pcard" href="#project"><div class="row between"><h3>Q3 expense reports</h3><span class="status needs">1 needs you</span></div><p class="small">Receipts, card statements and the quarterly summary.</p><div class="mini"><span>To do 2</span><span>Running 0</span><span style="color:var(--warn)">Needs you 1</span><span>Done 6</span></div><p class="muted small">Job: monthly expense check, 1st of the month</p></a>
+          <a class="box pcard" href="#project"><div class="row between"><h3>October newsletter</h3><span class="muted small">Job on Mondays</span></div><p class="small">The weekly client newsletter.</p><div class="mini"><span>To do 0</span><span>Running 0</span><span>Needs you 0</span><span>Done 6</span></div><p class="muted small">Last result: this-week.md, today 08:00</p></a>
+          <a class="box pcard" href="#project"><div class="row between"><h3>Website</h3></div><p class="small">Copy for studiorossi.it.</p><div class="mini"><span>To do 1</span><span>Running 0</span><span>Needs you 0</span><span>Done 3</span></div><p class="muted small">Last result: about.md, 3 days ago</p></a>
+        </div>
+        <p class="muted small">Unchanged from round 2. Colours and icons per project belong to the UI round.</p>
+      </div></main>
+    </div>
+  </section>
+
+  <!-- ============ ONE PROJECT ============ -->
+  <section class="screen" id="s-project" data-title="One project" data-nav-on="projects">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <main class="main"><div class="page stack-lg" style="max-width:1080px">
+        <div class="stack">
+          <div class="muted small">Projects ›</div>
+          <div class="row between"><h1>Client proposals</h1><button class="btn">Project settings</button></div>
+          <p>Commercial proposals and quotes for clients.</p>
+        </div>
+        <div class="composer">
+          <textarea style="min-height:48px" placeholder="Start a task in Client proposals…"></textarea>
+          <div class="bar"><button class="btn sm ghost">+ Attach</button><span class="grow"></span><span class="select">GPT-5.5</span><span class="select">Reasoning effort: medium</span><a class="btn sm primary" href="#task">Start task</a></div>
+        </div>
+        <div class="grid2" style="grid-template-columns: 1.5fr 1fr; align-items:start">
+          <div class="stack-lg">
+            <div class="stack"><h2>Now</h2>
+              <div class="box"><a class="item" href="#task"><span class="status running">Running</span><span class="grow">Proposal for Alpi Logistica</span><span class="muted small">step 3 of 6</span></a></div>
+            </div>
+            <div class="stack">
+              <div class="row between"><h2>Results</h2><a class="muted small">All 12 →</a></div>
+              <div class="box"><ul class="list">
+                <li><a class="result" href="#done"><div class="file" style="border:0;padding:0"><div class="ic">docx</div></div><div class="grow"><b>Proposta_Ferraris.docx</b><div class="muted small">Proposal for Cantina Ferraris · yesterday · to review</div></div></a></li>
+                <li><a class="result" href="#done"><div class="file" style="border:0;padding:0"><div class="ic">docx</div></div><div class="grow"><b>template-proposal.docx</b><div class="muted small">Update prices in the template · 12 Oct</div></div></a></li>
+                <li><a class="result" href="#done"><div class="file" style="border:0;padding:0"><div class="ic">docx</div></div><div class="grow"><b>Proposal_Brera_EN.docx</b><div class="muted small">Translate Brera to English · 8 Oct</div></div></a></li>
+              </ul></div>
+            </div>
+          </div>
+          <div class="stack-lg">
+            <div class="box pad stack">
+              <h3>How the AI works here</h3>
+              <p class="small">Proposals are in Italian unless the client is foreign. Prices are without VAT. Sign as Giulia Rossi, Studio Rossi.</p>
+              <button class="btn sm" style="justify-self:start">Edit instructions</button>
+            </div>
+            <div class="box pad stack">
+              <h3>Skills</h3>
+              <p class="small">All 5 of your skills are available here. The AI picks one when the task matches its "When to use it".</p>
+              <div class="row wrap"><span class="small muted">Only in this project:</span><span class="chip skill">Price table</span></div>
+              <div class="row"><button class="btn sm">Turn some off here</button><button class="btn sm">+ Project-only skill</button></div>
+            </div>
+            <div class="box pad stack"><h3>Jobs</h3><p class="small muted">None. <a style="text-decoration:underline" href="#jobnew">Add one</a> to run a task on a schedule.</p></div>
+            <p class="muted small">Folder: <span class="mono">~/Documents/Proposals</span> · 41 files</p>
+          </div>
+        </div>
+        <p class="note">Skills: shown here as my recommendation, see question 1 in the chat. Every skill works everywhere unless you turn it off, and a project can add its own.</p>
+      </div></main>
+    </div>
+  </section>
+
+  <!-- ============ SKILLS: full width editor ============ -->
+  <section class="screen" id="s-skills" data-title="Skills" data-nav-on="skills">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <div class="split">
+        <div class="list-pane stack">
+          <div class="row between" style="padding:0 6px 6px"><h2>Skills</h2><button class="btn sm primary">New skill</button></div>
+          <a class="item sel"><span class="grow">Proposal writer</span><span class="muted small">v3</span></a>
+          <a class="item link"><span class="grow">Brand tone of voice</span><span class="muted small">v1</span></a>
+          <a class="item link"><span class="grow">Meeting notes to actions</span><span class="muted small">v2</span></a>
+          <a class="item link"><span class="grow">Price table</span><span class="muted small">v1</span></a>
+          <a class="item link"><span class="grow">Newsletter from links</span><span class="muted small">v4</span></a>
+          <hr>
+          <a class="item link small" href="#skilldraft">Make one from a finished task</a>
+          <a class="item link small">Import a SKILL.md folder</a>
+        </div>
+        <div class="editor">
+          <div class="doc">
+            <div class="row between">
+              <h1>Proposal writer</h1>
+              <div class="row"><button class="btn sm" data-toggle="#skillMd">SKILL.md</button><button class="btn sm primary">Save</button></div>
+            </div>
+            <pre class="code sheet-md" id="skillMd" style="margin-top:14px">---
+name: proposal-writer
+description: When the user asks for a commercial proposal or quote for a client.
+---
+
+1. Read the call notes and list the client's requirements.
+2. Fill the proposal template section by section. Never invent requirements.
+3. Prices without VAT, rounded to €50.
+4. End with the payment terms from the project instructions.</pre>
+            <div class="doc-h">When to use it</div>
+            <div class="editable">When the user asks for a commercial proposal or quote for a client.</div>
+            <div class="doc-h">What to do</div>
+            <ol class="editable" style="padding-left:28px; margin:0">
+              <li>Read the call notes and list the client's requirements.</li>
+              <li>Fill the proposal template section by section. Never invent requirements.</li>
+              <li>Prices without VAT, rounded to €50.</li>
+              <li>End with the payment terms from the project instructions.</li>
+            </ol>
+            <div class="doc-h">Files it brings</div>
+            <div class="row"><span class="chip file">template-proposal.docx</span><span class="chip file">checklist.md</span><button class="btn sm ghost">+ Add</button></div>
+          </div>
+          <aside class="meta">
+            <h3>Try it</h3>
+            <div class="box pad small stack"><span class="muted">Run it on a file without saving anything.</span><button class="btn sm">Choose a file</button></div>
+            <h3>Where it's available</h3>
+            <p class="small">Everywhere · used 11 times, all in Client proposals</p>
+            <h3>Versions</h3>
+            <div class="small stack"><span>v3 · today · price rounding</span><span class="muted">v2 · 3 Oct · checklist added</span><span class="muted">v1 · 21 Sep</span></div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ JOBS: cards + agenda ============ -->
+  <section class="screen" id="s-jobs" data-title="Jobs" data-nav-on="jobs">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <main class="main"><div class="page stack-lg" style="max-width:1120px">
+        <div class="row between"><h1>Jobs</h1><a class="btn primary" href="#jobnew">New job</a></div>
+        <div class="jobs">
+          <div class="stack">
+            <h2>Your jobs</h2>
+            <div class="box"><ul class="list">
+              <li><a class="jobcard"><span class="when">Mondays at 08:00</span><span class="status done">ran today</span><span>Writes the "This week" section from links.md</span><span class="chip file">this-week.md</span><span class="muted small">October newsletter · Newsletter from links</span></a></li>
+              <li><a class="jobcard"><span class="when">1st of the month at 09:00</span><span class="status needs">needed you</span><span>Checks the month's invoices against receipts</span><span class="chip file">check-oct.xlsx</span><span class="muted small">Q3 expense reports · Invoice checker</span></a></li>
+              <li><a class="jobcard"><span class="when">Weekdays at 18:00</span><span class="status off">off</span><span>Sums up the day's email</span><span></span><span class="muted small">Needs the Gmail integration (0.2)</span></a></li>
+            </ul></div>
+          </div>
+          <div class="agenda">
+            <h3>Coming up</h3>
+            <div class="box">
+              <div class="row-a"><b>Today 18:00</b><span class="muted">Daily inbox digest · off</span><span></span></div>
+              <div class="row-a"><b>Sun 09:00</b><span>Monthly expense check</span><button class="btn sm">Skip once</button></div>
+              <div class="row-a"><b>Mon 08:00</b><span>Monday press review</span><button class="btn sm">Skip once</button></div>
+            </div>
+            <h3>Already ran</h3>
+            <div class="box">
+              <div class="row-a"><b>Today 08:00</b><span>Monday press review</span><a class="chip file" href="#done">this-week.md</a></div>
+              <div class="row-a"><b>1 Oct 09:00</b><span>Monthly expense check</span><span class="status needs">needed you</span></div>
+            </div>
+          </div>
+        </div>
+        <p class="note">Round 2's cards on the left to see and change jobs, the agenda on the right for what runs when.</p>
+      </div></main>
+    </div>
+  </section>
+
+  <section class="screen" id="s-jobnew" data-title="New job" data-nav-on="jobs">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <main class="main"><div class="page stack-lg" style="max-width:1120px">
+        <div class="row between"><h1>Jobs</h1></div>
+        <div class="jobs">
+          <div class="box"><ul class="list">
+            <li><a class="jobcard"><span class="when">Mondays at 08:00</span><span class="status done">ran today</span><span>Writes the "This week" section from links.md</span><span></span></a></li>
+            <li><a class="jobcard"><span class="when">1st of the month at 09:00</span><span class="status needs">needed you</span><span>Checks the month's invoices against receipts</span><span></span></a></li>
+            <li><a class="jobcard"><span class="when">Weekdays at 18:00</span><span class="status off">off</span><span>Sums up the day's email</span><span></span></a></li>
+          </ul></div>
+          <div class="box pad stack-lg">
+            <div class="row between"><h2>New job</h2><a class="btn sm ghost" href="#jobs">Cancel</a></div>
+            <div class="stepper"><span class="d">1 What</span><span class="on">2 When</span><span>3 Result</span><span>4 Try it</span></div>
+            <div class="stack">
+              <label class="label">How often</label>
+              <div class="row wrap"><span class="btn sm">Every day</span><span class="btn sm">Weekdays</span><span class="btn sm primary">Every week</span><span class="btn sm">Every month</span><span class="btn sm">Custom…</span></div>
+              <label class="label">On</label>
+              <div class="row wrap"><span class="btn sm primary">Mon</span><span class="btn sm">Tue</span><span class="btn sm">Wed</span><span class="btn sm">Thu</span><span class="btn sm">Fri</span><span class="btn sm">Sat</span><span class="btn sm">Sun</span></div>
+              <label class="label">At</label><span class="select" style="justify-self:start">08:00</span>
+              <label class="label">If the computer is off then</label><span class="select" style="justify-self:start">Run when it wakes up</span>
+            </div>
+            <div class="row"><button class="btn sm">Back</button><span class="grow"></span><button class="btn sm primary">Next: result</button></div>
+          </div>
+        </div>
+        <p class="note">The builder from round 2 opens in place of the agenda, so the existing jobs stay in view.</p>
+      </div></main>
+    </div>
+  </section>
+
+  <!-- ============ BOARD ============ -->
+  <section class="screen" id="s-board" data-title="Board" data-nav-on="board">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <main class="main" id="boardMain" style="display:flex; flex-direction:column">
+        <div style="padding:20px 26px 12px; border-bottom:1px solid var(--line)" class="stack">
+          <div class="row between">
+            <div class="row"><h1>Board</h1><span class="select">View: Everything</span></div>
+            <div class="row">
+              <div class="tabs" style="border:0"><a href="#" class="on" onclick="boardMain.classList.remove('cols');this.classList.add('on');this.nextElementSibling.classList.remove('on');return false">List</a><a href="#" onclick="boardMain.classList.add('cols');this.classList.add('on');this.previousElementSibling.classList.remove('on');return false">Columns</a></div>
+              <div class="menu" id="dispMenu"><a class="btn sm" href="#" data-toggle="#dispMenu">Display ▾</a>
+                <div class="pop small">
+                  <label class="label">Group by</label>
+                  <div class="row wrap"><span class="btn sm primary">Status</span><span class="btn sm">Project</span><span class="btn sm" title="Advanced level">Agent</span></div>
+                  <label class="label">Show on each row</label>
+                  <div class="row wrap"><span class="chip">Project ✓</span><span class="chip">Files ✓</span><span class="chip">Model</span><span class="chip">Skill</span></div>
+                  <label class="label">Done tasks</label><span class="select">This week</span>
+                </div>
+              </div>
+              <button class="btn sm primary">New task</button>
+            </div>
+          </div>
+          <div class="bhead">
+            <span class="qf">Needs me <span class="n">1</span></span>
+            <span class="qf">Running <span class="n">1</span></span>
+            <span class="qf">To review <span class="n">1</span></span>
+            <span class="qf">From jobs <span class="n">1</span></span>
+            <span class="qf">Has files</span>
+            <span class="muted small" style="margin-left:6px">One click narrows the list, and filters add up.</span>
+          </div>
+        </div>
+        <div class="bwrap peek bview-list" style="min-height:0; flex:1">
+          <div class="lst">
+            <div class="grp-h"><span class="glyph need"></span>Needs you <span class="n">1</span></div>
+            <a class="trow"><span class="glyph need"></span><span>Supplier contracts summary</span><span class="proj">Q3 expense reports</span><span class="outs"><span class="chip file">contracts-summary.xlsx</span></span><span class="when">12 min</span></a>
+            <div class="decision"><span class="grow">Wants to overwrite <b>contracts-summary.xlsx</b>, which you edited on Friday.</span><button class="btn sm">Save as new file</button><button class="btn sm primary">Allow overwrite</button></div>
+
+            <div class="grp-h"><span class="glyph run"></span>Running <span class="n">1</span></div>
+            <a class="trow sel"><span class="glyph run"></span><span>Proposal for Alpi Logistica <span class="muted small">· step 3 of 6</span></span><span class="proj">Client proposals</span><span class="outs"><span class="chip file">Proposta_AlpiLogistica.docx</span><span class="chip file">+1</span></span><span class="when">started 9:12</span></a>
+
+            <div class="grp-h"><span class="glyph"></span>To do <span class="n">3</span></div>
+            <a class="trow"><span class="glyph"></span><span>Proposal for Brera Design <span class="muted small">· waiting for the call notes</span></span><span class="proj">Client proposals</span><span class="outs"></span><span class="when">Thu</span></a>
+            <a class="trow"><span class="glyph"></span><span>Write three case studies</span><span class="proj">Website</span><span class="outs"></span><span class="when">Wed</span></a>
+            <a class="trow"><span class="glyph"></span><span>September receipts</span><span class="proj">Q3 expense reports</span><span class="outs"></span><span class="when">Tue</span></a>
+
+            <div class="grp-h"><span class="glyph done"></span>Done this week <span class="n">3</span></div>
+            <a class="trow" href="#done"><span class="glyph done"></span><span>Proposal for Cantina Ferraris <span class="small" style="color:var(--warn)">· to review</span></span><span class="proj">Client proposals</span><span class="outs"><span class="chip file">Proposta_Ferraris.docx</span><span class="chip file">+2</span></span><span class="when">yesterday</span></a>
+            <a class="trow" href="#done"><span class="glyph done"></span><span>Monday press review<span class="clock">job</span></span><span class="proj">October newsletter</span><span class="outs"><span class="chip file">this-week.md</span></span><span class="when">today 08:00</span></a>
+            <a class="trow"><span class="glyph done"></span><span>Rewrite the About page</span><span class="proj">Website</span><span class="outs"><span class="chip file">about.md</span></span><span class="when">Fri</span></a>
+            <div class="grp-h fold">▸ Older · 21</div>
+            <p class="note" style="margin-top:14px">From Linear and Paperclip: a list grouped by what needs you, quick filters on top, and the detail in a side panel so you keep your place. The files each task made are on its row.</p>
+          </div>
+          <aside class="peekp stack-lg">
+            <div class="row between"><span class="muted small">Client proposals</span><span class="row"><a class="btn sm" href="#task">Open task</a><a class="btn sm ghost">✕</a></span></div>
+            <div class="stack"><h2>Proposal for Alpi Logistica</h2><span class="status running">Step 3 of 6 · Draft scope and timeline</span></div>
+            <div class="stack"><h3>Files so far</h3>
+              <div class="file writing"><div class="ic">docx</div><div class="grow">Proposta_AlpiLogistica.docx<div class="tag">Writing now</div></div></div>
+              <div class="file new"><div class="ic">xlsx</div><div class="grow">prezzi-alpi.xlsx<div class="tag">New</div></div></div>
+            </div>
+            <div class="stack"><h3>Brief</h3><p class="small">Write a proposal for Alpi Logistica from yesterday's call notes. Use our proposal template, price between 8 and 10k, in Italian.</p></div>
+            <div class="stack"><h3>Last message</h3><div class="msg"><span class="who">Agent</span>Added the payment term to section 5.</div></div>
+            <p class="note">Space or a click opens this panel. Enter or "Open task" goes to the full task.</p>
+          </aside>
+        </div>
+        <div class="bview-cols cols4">
+          <div class="col"><h3>To do <span class="muted">3</span></h3><div class="card"><b>Proposal for Brera Design</b><span class="muted small">Client proposals</span></div><div class="card"><b>Write three case studies</b><span class="muted small">Website</span></div><div class="card"><b>September receipts</b><span class="muted small">Q3 expense reports</span></div></div>
+          <div class="col"><h3>Running <span class="muted">1</span></h3><a class="card" href="#task"><b>Proposal for Alpi Logistica</b><span class="status running">Step 3 of 6</span><span class="chip file">Proposta_AlpiLogistica.docx</span></a></div>
+          <div class="col"><h3>Needs you <span class="muted">1</span></h3><div class="card"><b>Supplier contracts summary</b><span class="small">Wants to overwrite contracts-summary.xlsx</span><div class="row"><button class="btn sm">New file</button><button class="btn sm primary">Allow</button></div></div></div>
+          <div class="col"><h3>Done this week <span class="muted">3</span></h3><a class="card" href="#done"><b>Proposal for Cantina Ferraris</b><span class="small" style="color:var(--warn)">To review</span><span class="chip file">Proposta_Ferraris.docx</span></a><a class="card" href="#done"><b>Monday press review <span class="clock">job</span></b><span class="chip file">this-week.md</span></a><div class="card"><b>Rewrite the About page</b><span class="chip file">about.md</span></div></div>
+        </div>
+      </main>
+    </div>
+  </section>
+</div>
+
+<nav class="mocknav"><b>Round 3</b><span id="chatpick"></span><span class="sep"></span></nav>
+
+<template id="side">
+  <div class="collapse"><b>Tost Work</b><a class="btn sm ghost" href="#" data-collapse title="Collapse or expand the sidebar">⇤</a></div>
+  <div class="sec">
+    <a class="item link" title="Work" data-k="work" href="#home"><i></i><span class="label-t">Work</span></a>
+    <a class="item link" title="Projects" data-k="projects" href="#projects"><i></i><span class="label-t">Projects</span></a>
+    <a class="item link" title="Skills" data-k="skills" href="#skills"><i></i><span class="label-t">Skills</span></a>
+    <a class="item link" title="Jobs" data-k="jobs" href="#jobs"><i></i><span class="label-t">Jobs</span></a>
+    <a class="item link" title="Board" data-k="board" href="#board"><i></i><span class="label-t">Board</span></a>
+  </div>
+  <div class="scroll">
+    <h4>Pinned projects</h4>
+    <a class="item link" href="#project"><span class="status running"></span><span class="truncate">Client proposals</span></a>
+    <a class="item link" href="#project"><span class="status needs"></span><span class="truncate">Q3 expense reports</span></a>
+    <a class="item link" href="#project"><span class="status off"></span><span class="truncate">October newsletter</span></a>
+  </div>
+  <span class="spacer"></span>
+  <a class="dropmini" data-k="quick" href="#quick">Drop a file here to quick-edit it</a>
+  <div class="sec" style="border-top:1px solid var(--line)">
+    <a class="item link"><i style="border-radius:50%"></i><span class="label-t">About</span></a>
+    <a class="item link"><i></i><span class="label-t">Settings</span></a>
+  </div>
+</template>
+<script>
+  for (const s of document.querySelectorAll("[data-side]")) {
+    s.append(document.getElementById("side").content.cloneNode(true));
+    const k = s.closest(".screen").dataset.navOn;
+    for (const a of s.querySelectorAll(`[data-k="${k}"]`)) a.classList.add("on");
+  }
+  // Collapse and expand the sidebar.
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-collapse]")) return;
+    e.preventDefault();
+    const rail = document.body.dataset.nav !== "rail";
+    document.body.dataset.nav = rail ? "rail" : "full";
+    for (const b of document.querySelectorAll("[data-collapse]")) b.textContent = rail ? "⇥" : "⇤";
+  });
+  // Conversation variant picker in the mockup bar.
+  const pick = document.getElementById("chatpick");
+  const labels = { 1: "Chat 1 · above the box", 2: "Chat 2 · side panel" };
+  for (const n of [1, 2]) {
+    const a = document.createElement("a");
+    a.href = "#";
+    a.textContent = labels[n];
+    a.dataset.chat = n;
+    pick.appendChild(a);
+  }
+  function setChat(n) {
+    document.body.dataset.chat = n;
+    for (const a of pick.querySelectorAll("a")) a.classList.toggle("on", a.dataset.chat === String(n));
+  }
+  pick.addEventListener("click", (e) => {
+    const a = e.target.closest("a[data-chat]");
+    if (!a) return;
+    e.preventDefault();
+    setChat(a.dataset.chat);
+  });
+  setChat(1);
+</script>
+<script src="../shared/wire.js?v=3"></script>
+</body>
+</html>
