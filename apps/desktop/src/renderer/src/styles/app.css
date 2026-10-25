@@ -2478,3 +2478,78 @@ fieldset.fld > legend {
   box-shadow: var(--page-shadow);
   max-width: 100%;
 }
+
+/* Setup steps built from the mockup's option cards */
+.opts {
+  display: grid;
+  gap: 10px;
+}
+.opts {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+label.opt {
+  cursor: pointer;
+  position: relative;
+}
+label.opt:hover:not(.on) {
+  box-shadow: 0 0 0 1px var(--t3);
+}
+/* The radio stays in the page for the keyboard and screen readers; the card shows the choice. */
+label.opt input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+label.opt:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.opt.off b,
+.opt.off .d {
+  color: var(--t3);
+}
+.opt .soon {
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.opt .d.ok {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+}
+.opt .d.ok .ic {
+  width: 14px;
+  height: 14px;
+}
+.opt .d.err {
+  color: var(--need);
+  margin-top: 6px;
+}
+.opt .link {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink);
+}
+.opt .cmd {
+  display: block;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font:
+    400 12.5px / 1.4 "IBM Plex Mono",
+    monospace;
+  user-select: all;
+}
