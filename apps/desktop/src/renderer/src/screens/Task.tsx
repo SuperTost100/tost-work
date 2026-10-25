@@ -78,12 +78,14 @@ export function Task({
   const [answer, setAnswer] = useState("");
   // One answer at a time: a second click before the first returns would be refused and shown as an error.
   const sending = useRef(false);
-  const send = (text: string, clearDraft: boolean) => {
+  const send = (text: string) => {
     if (sending.current) return;
     sending.current = true;
+    // Once the answer is in, the draft goes, unless it was edited while the answer was sending.
+    const draft = answer;
     void onAnswer(text).then((sent) => {
       sending.current = false;
-      if (sent && clearDraft) setAnswer("");
+      if (sent) setAnswer((current) => (current === draft ? "" : current));
     });
   };
   const made = task.files.filter((f) => f.role === "made");
@@ -168,7 +170,7 @@ export function Task({
                   value={answer}
                   onChange={setAnswer}
                   onSubmit={() => {
-                    send(answer.trim(), true);
+                    send(answer.trim());
                   }}
                   placeholder={t("composer.answer")}
                   sendLabel={t("composer.start")}
@@ -176,7 +178,7 @@ export function Task({
                 >
                   <div className="q">{task.question.text}</div>
                   {task.question.options.map((option, i) => (
-                    <button type="button" key={option} className="o" onClick={() => send(option, false)}>
+                    <button type="button" key={option} className="o" onClick={() => send(option)}>
                       <span className="n">{i + 1}</span>
                       {option}
                     </button>

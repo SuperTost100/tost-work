@@ -84,6 +84,50 @@ describe("answering twice", () => {
   });
 });
 
+describe("the answer draft", () => {
+  const startAndWait = async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    const box = (await screen.findByRole("textbox", { name: "Or answer in your own words" })) as HTMLTextAreaElement;
+    return { api, box };
+  };
+
+  it("goes when an option is picked instead", async () => {
+    const { api, box } = await startAndWait();
+    fireEvent.change(box, { target: { value: "Maybe half" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /We do/ }));
+    });
+    // The next question of the same task starts with an empty box.
+    act(() =>
+      api.emit("t1", { type: "question", question: { id: "q2", text: "Which template?", options: ["A", "B"] } }),
+    );
+    expect((screen.getByRole("textbox", { name: "Or answer in your own words" }) as HTMLTextAreaElement).value).toBe(
+      "",
+    );
+  });
+
+  it("keeps what was typed while the answer was sending", async () => {
+    const { api, box } = await startAndWait();
+    // The send succeeds later, and the question stays open, so the box stays on screen.
+    const [waiting] = await api.tasks.list();
+    let finish = () => {};
+    api.tasks.answer = () =>
+      new Promise((resolve) => {
+        finish = () => waiting && resolve(waiting);
+      });
+    fireEvent.change(box, { target: { value: "Half and half" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    fireEvent.change(box, { target: { value: "Also add a note" } });
+    await act(async () => finish());
+    expect(box.value).toBe("Also add a note");
+  });
+});
+
 describe("a typed answer", () => {
   it("stays in the box when sending it fails, and goes once it's sent", async () => {
     const api = createMemoryApi();
