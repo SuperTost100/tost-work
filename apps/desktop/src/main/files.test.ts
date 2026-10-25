@@ -163,4 +163,22 @@ describe("saving and copying files", () => {
     expect((await readdir(dest)).sort()).toEqual(["a (2).txt", "a.txt", "b.txt", "c.txt"]);
     expect(await readFile(join(dest, "c.txt"), "utf8")).toBe("old c");
   });
+
+  it("saves nothing over a file when the user picks the folder it's already in", async () => {
+    const dir = await folder();
+    const source = join(dir, "a.txt");
+    await writeFile(source, "mine");
+    const result = await saveCopies(
+      [source],
+      dir,
+      async () => {
+        throw new Error("nothing should be asked");
+      },
+      async () => {
+        throw new Error("nothing should be trashed");
+      },
+    );
+    expect(result).toEqual({ saved: [source], cancelled: false });
+    expect(await readFile(source, "utf8")).toBe("mine");
+  });
 });

@@ -3,6 +3,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import type { Task } from "../../shared/model";
 import { fileGuard } from "../guard";
 import { Store } from "../store/store";
 import { FakeEngine, type FakeScript, PROPOSAL_SCRIPT } from "./fake";
@@ -92,6 +93,52 @@ describe("overwrite approvals", () => {
     await expect(runner.decide(task.id, true)).rejects.toThrow(/already being carried out/);
     await first;
     runner.stop(task.id);
+  });
+});
+
+describe("approvals and Stop", () => {
+  it("leaves a task stopped when Stop lands while the copy is being kept", async () => {
+    const { store, runner, task, work, status } = await setup();
+    await writeFile(join(work, "Proposta.docx"), "old");
+    // A guard that holds the copy until the test lets it go.
+    let release = () => {};
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    const slow = {
+      keep: async (_t: Task, path: string) => {
+        await held;
+        return { path, copy: "/kept/x", at: "", reason: "overwrite" as const };
+      },
+      trash: async () => {},
+      restore: async () => {},
+    };
+    (runner as unknown as { guard: typeof slow }).guard = slow;
+    const done = runner.start(task.id);
+    await waitFor(() => status()?.approval != null);
+    const deciding = runner.decide(task.id, true);
+    runner.stop(task.id);
+    await done;
+    release();
+    const after = await deciding;
+    expect(after.status).toBe("stopped");
+    expect(store.getTask(task.id)?.status).toBe("stopped");
+    expect(store.getTask(task.id)?.kept).toHaveLength(1);
+  });
+
+  it("refuses a second restore while one is under way", async () => {
+    const { runner, task, work, status } = await setup();
+    const path = join(work, "Proposta.docx");
+    await writeFile(path, "old");
+    const done = runner.start(task.id);
+    await waitFor(() => status()?.approval != null);
+    await runner.decide(task.id, true);
+    await waitFor(() => status()?.question != null);
+    runner.answer(task.id, "The client pays it");
+    await done;
+    const first = runner.restore(task.id, path);
+    await expect(runner.restore(task.id, path)).rejects.toThrow(/already in progress/);
+    expect((await first).kept?.map((k) => k.reason)).toEqual(["overwrite", "restore"]);
   });
 });
 

@@ -64,4 +64,25 @@ describe("FakeEngine samples", () => {
     expect(events.at(-1)).toEqual({ type: "stopped" });
     expect(await readdir(work)).toEqual([]);
   });
+
+  it("doesn't hang when Stop lands just before it asks for an approval", async () => {
+    const { samples, work } = await folders();
+    await writeFile(join(work, "old.txt"), "x");
+    const remove: FakeScript = { steps: ["Tidy"], files: [], remove: { path: "old.txt", afterStep: 0 }, summary: "" };
+    const controller = new AbortController();
+    const engine = new FakeEngine(remove, 50, samples);
+    const events: EngineEvent[] = [];
+    const task = { id: "t", files: [], attachments: [] } as unknown as Task;
+    for await (const e of engine.run({
+      task,
+      project: null,
+      workdir: work,
+      followUp: null,
+      signal: controller.signal,
+    })) {
+      events.push(e);
+      if (e.type === "plan") controller.abort();
+    }
+    expect(events.at(-1)).toEqual({ type: "stopped" });
+  });
 });

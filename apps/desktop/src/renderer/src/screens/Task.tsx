@@ -63,10 +63,11 @@ function KeptRow({
 }) {
   const t = useT();
   const [error, setError] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
   const latest = (task.kept ?? []).filter((k) => k.path === path).at(-1);
   if (!latest) return null;
   const restored = latest.reason === "restore";
-  const busy = task.status === "running" || task.status === "needs-you";
+  const busy = restoring || task.status === "running" || task.status === "needs-you";
   return (
     <div className="kept">
       <Icon name="history" />
@@ -79,7 +80,10 @@ function KeptRow({
         disabled={busy}
         onClick={() => {
           setError(null);
-          onRestore(path).catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+          setRestoring(true);
+          onRestore(path)
+            .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
+            .finally(() => setRestoring(false));
         }}
       >
         {restored ? t("kept.undo") : t("kept.restore")}

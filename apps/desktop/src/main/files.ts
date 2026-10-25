@@ -103,13 +103,19 @@ export async function saveCopies(
   trash: (path: string) => Promise<void>,
 ): Promise<{ saved: string[]; cancelled: boolean }> {
   const saved: string[] = [];
+  const destination = await realpath(folder);
   for (const source of sources) {
-    let target = join(folder, basename(source));
+    let target = join(destination, basename(source));
+    // The user picked the folder the file is already in: it's saved, and Replace would trash the only copy.
+    if (target === source) {
+      saved.push(target);
+      continue;
+    }
     if (await exists(target)) {
       const choice = await ask(basename(source));
       if (choice === "cancel") return { saved, cancelled: true };
       if (choice === "replace") await trash(target);
-      else target = await freeName(folder, basename(source));
+      else target = await freeName(destination, basename(source));
     }
     await copyFile(source, target, constants.COPYFILE_EXCL);
     saved.push(target);

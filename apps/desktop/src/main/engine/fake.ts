@@ -93,6 +93,8 @@ export class FakeEngine implements Engine {
 
   /** Resolves with the user's reply, or null when the task is stopped first. */
   private reply(id: string, signal: AbortSignal): Promise<string | boolean | null> {
+    // An abort that already happened never fires its event, so it's checked here.
+    if (signal.aborted) return Promise.resolve(null);
     const replied = new Promise<string | boolean>((resolve) => this.waiting.set(id, resolve));
     const stopped = new Promise<null>((r) => signal.addEventListener("abort", () => r(null), { once: true }));
     return Promise.race([replied, stopped]).finally(() => this.waiting.delete(id));

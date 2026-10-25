@@ -34,6 +34,8 @@ export class TaskRunner {
   private running = new Map<string, AbortController>();
   /** Tasks whose decision is being carried out, so a double click can't trash or copy twice. */
   private deciding = new Set<string>();
+  /** Tasks with a restore under way, so a double click can't record two copies from one snapshot. */
+  private restoring = new Set<string>();
 
   constructor(
     private store: Store,
@@ -147,7 +149,12 @@ export class TaskRunner {
         }
       }
       const current = this.mustGet(taskId);
-      const next = this.save({ ...resume(current, this.now()), kept: [...(current.kept ?? []), ...kept] });
+      const allKept = [...(current.kept ?? []), ...kept];
+      // Stop can land while the copies or the Trash are being done. Then the task stays as it is, with the copies
+      // recorded, rather than going back to running with nothing running it.
+      if (current.status !== "needs-you" || current.approval?.id !== approval.id)
+        return kept.length ? this.save({ ...current, kept: allKept, updatedAt: this.now() }) : current;
+      const next = this.save({ ...resume(current, this.now()), kept: allKept });
       this.engine.decide(taskId, approval.id, allow);
       return next;
     } finally {
@@ -159,12 +166,19 @@ export class TaskRunner {
   async restore(taskId: string, path: string): Promise<Task> {
     const task = this.mustGet(taskId);
     if (this.running.has(taskId)) throw new Error("Wait for the task to finish before restoring");
+    if (this.restoring.has(taskId)) throw new Error("A restore is already in progress");
     const latest = (task.kept ?? []).filter((k) => k.path === path).at(-1);
     if (!latest) throw new Error("There's no kept copy of that file");
-    const current = await this.guard.keep(task, path, "restore");
-    await this.guard.restore(task, latest);
-    const at = this.now();
-    return this.save({ ...task, kept: [...(task.kept ?? []), current], updatedAt: at });
+    this.restoring.add(taskId);
+    try {
+      const current = await this.guard.keep(task, path, "restore");
+      await this.guard.restore(task, latest);
+      // Read the task again: it may have changed while the files were copied.
+      const fresh = this.mustGet(taskId);
+      return this.save({ ...fresh, kept: [...(fresh.kept ?? []), current], updatedAt: this.now() });
+    } finally {
+      this.restoring.delete(taskId);
+    }
   }
 
   stop(taskId: string): void {
