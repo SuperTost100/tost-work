@@ -141,6 +141,7 @@ export class TaskRunner {
     const approval = task.approval;
     if (!approval) throw new Error("This task isn't waiting for a decision");
     if (this.deciding.has(taskId)) throw new Error("This decision is already being carried out");
+    if (this.restoring.has(taskId)) throw new Error("Wait for the restore to finish");
     this.deciding.add(taskId);
     try {
       const kept: KeptCopy[] = [];
@@ -155,6 +156,7 @@ export class TaskRunner {
       if (allow) {
         try {
           for (const path of approval.paths) {
+            if (approval.done?.includes(path)) continue;
             if (approval.action === "delete") {
               await this.guard.trash(task, path);
               trashed.push(path);
@@ -162,7 +164,13 @@ export class TaskRunner {
           }
         } catch (err) {
           // What was done before the failure stays recorded: a file already in the Trash, a copy already kept.
-          if (trashed.length || kept.length) this.save({ ...record(this.mustGet(taskId)), updatedAt: this.now() });
+          if (trashed.length || kept.length) {
+            const latest = record(this.mustGet(taskId));
+            const handled = [...(approval.done ?? []), ...trashed, ...kept.map((k) => k.path)];
+            // A retry of the same approval skips what's done; a file already in the Trash can't be trashed again.
+            const pending = latest.approval?.id === approval.id ? { ...approval, done: handled } : latest.approval;
+            this.save({ ...latest, approval: pending, updatedAt: this.now() });
+          }
           throw err;
         }
       }
@@ -184,6 +192,8 @@ export class TaskRunner {
     const task = this.mustGet(taskId);
     if (this.running.has(taskId)) throw new Error("Wait for the task to finish before restoring");
     if (this.restoring.has(taskId)) throw new Error("A restore is already in progress");
+    // Stop can end the run while a decision still copies or trashes files; the restore waits for it.
+    if (this.deciding.has(taskId)) throw new Error("Wait for the decision to finish");
     const latest = (task.kept ?? []).filter((k) => k.path === path).at(-1);
     if (!latest) throw new Error("There's no kept copy of that file");
     this.restoring.add(taskId);

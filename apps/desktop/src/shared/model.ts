@@ -36,6 +36,8 @@ export interface Approval {
   /** What the agent wants to do, for example overwrite or delete a file. */
   action: "overwrite" | "delete";
   paths: string[];
+  /** Paths already handled when an earlier try failed part way, so a retry does only the rest. */
+  done?: string[];
 }
 
 /** A copy Tost Work kept before a file was replaced, so the user can put it back. */

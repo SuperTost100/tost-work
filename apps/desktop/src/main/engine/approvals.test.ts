@@ -173,6 +173,49 @@ describe("approvals and Stop", () => {
     const files = store.getTask(task.id)?.files ?? [];
     expect(files).toContainEqual({ path: a, kind: "delete", role: "made" });
     expect(files.some((f) => f.path === b)).toBe(false);
+
+    // The retry does only what's left.
+    const tried: string[] = [];
+    (runner as unknown as { guard: unknown }).guard = {
+      keep: async () => {
+        throw new Error("no copies here");
+      },
+      trash: async (_t: Task, path: string) => {
+        tried.push(path);
+      },
+      restore: async () => {},
+    };
+    await runner.decide(task.id, true);
+    expect(tried).toEqual([b]);
+    expect(store.getTask(task.id)?.files).toContainEqual({ path: b, kind: "delete", role: "made" });
+  });
+
+  it("refuses a restore while a decision stopped midway is still copying", async () => {
+    const { store, runner, task, work, status } = await setup();
+    const path = join(work, "Proposta.docx");
+    await writeFile(path, "old");
+    let release = () => {};
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    (runner as unknown as { guard: unknown }).guard = {
+      keep: async (_t: Task, p: string) => {
+        await held;
+        return { path: p, copy: "/kept/x", at: "", reason: "overwrite" as const };
+      },
+      trash: async () => {},
+      restore: async () => {},
+    };
+    const done = runner.start(task.id);
+    await waitFor(() => status()?.approval != null);
+    // An earlier kept copy, so Restore has something to put back.
+    store.saveTask({ ...(status() as Task), kept: [{ path, copy: "/kept/earlier", at: "", reason: "overwrite" }] });
+    const deciding = runner.decide(task.id, true);
+    runner.stop(task.id);
+    await done;
+    await expect(runner.restore(task.id, path)).rejects.toThrow(/decision to finish/);
+    release();
+    await deciding;
   });
 
   it("refuses a second restore while one is under way", async () => {
