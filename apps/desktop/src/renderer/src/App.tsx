@@ -35,8 +35,8 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
 
   const openProjectId = route.name === "project" ? route.id : null;
   useEffect(() => {
-    if (openProjectId) loadProject(openProjectId);
-  }, [openProjectId, loadProject]);
+    if (openProjectId) loadProject(openProjectId).catch(report);
+  }, [openProjectId, loadProject, report]);
   // Counted in the store, because the task list here holds only the recent ones.
   useEffect(() => {
     if (route.name === "projects") void api?.projects.taskCounts().then(setCounts, report);

@@ -107,6 +107,26 @@ describe("projects", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: "Proposals" })).toBeTruthy());
   });
 
+  it("says so when a project's history fails to load", async () => {
+    const api = createMemoryApi();
+    api.tasks.listForProject = async () => {
+      throw new Error("Couldn't read the tasks");
+    };
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.click(screen.getByRole("button", { name: "Projects" }));
+    fireEvent.click(screen.getByRole("button", { name: "New project" }));
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: "Choose folder" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: /Proposals/ }));
+    });
+    expect((await screen.findByRole("alert")).textContent).toMatch(/Couldn't read the tasks/);
+  });
+
   it("shows a placeholder for sections that aren't built yet", () => {
     render(<App userName="Giulia" api={createMemoryApi()} />);
     fireEvent.click(screen.getByRole("button", { name: "Jobs" }));
