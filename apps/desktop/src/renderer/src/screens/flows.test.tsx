@@ -263,7 +263,12 @@ describe("approvals", () => {
       fireEvent.click(screen.getByRole("button", { name: "Restore" }));
     });
     expect(screen.getByText("You restored the earlier version")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Undo" })).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    });
+    // Undo puts the edited version back, so the row is back to offering Restore.
+    expect(screen.getByText("The version before the edit is kept")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Restore" })).toBeTruthy();
   });
 });
 

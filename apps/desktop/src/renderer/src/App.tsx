@@ -88,7 +88,10 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
     api && {
       files: list,
       onAdd: () =>
-        void api.files.pick().then((picked) => set((prev) => [...new Set([...prev, ...picked])].slice(0, MAX_FILES))),
+        void api.files
+          .pick()
+          .then((picked) => set((prev) => [...new Set([...prev, ...picked])].slice(0, MAX_FILES)))
+          .catch(report),
       onRemove: (path) => set((prev) => prev.filter((p) => p !== path)),
     };
 

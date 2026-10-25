@@ -38,7 +38,12 @@ export async function savablePaths(task: Task): Promise<string[]> {
   const made = [...new Set(task.files.filter((f) => f.role === "made" && f.kind !== "delete").map((f) => f.path))];
   const real: string[] = [];
   for (const path of made) {
-    const resolved = await realpath(path);
+    // A file removed outside the app has nothing to save; the rest still are.
+    const resolved = await realpath(path).catch((err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") return null;
+      throw err;
+    });
+    if (resolved === null) continue;
     if (!inside(folder, resolved)) throw new Error("That file is outside the task's folder");
     real.push(resolved);
   }

@@ -148,12 +148,16 @@ export class TaskRunner {
           else kept.push(await this.guard.keep(task, path, "overwrite"));
         }
       }
-      const current = this.mustGet(taskId);
+      let current = this.mustGet(taskId);
+      // Files in the Trash are gone from the task too, whatever the engine reports next, and even after a Stop.
+      if (allow && approval.action === "delete")
+        for (const path of approval.paths)
+          current = applyEvent(current, { type: "file", change: { path, kind: "delete", role: "made" } }, this.now());
       const allKept = [...(current.kept ?? []), ...kept];
       // Stop can land while the copies or the Trash are being done. Then the task stays as it is, with the copies
       // recorded, rather than going back to running with nothing running it.
       if (current.status !== "needs-you" || current.approval?.id !== approval.id)
-        return kept.length ? this.save({ ...current, kept: allKept, updatedAt: this.now() }) : current;
+        return allow ? this.save({ ...current, kept: allKept, updatedAt: this.now() }) : current;
       const next = this.save({ ...resume(current, this.now()), kept: allKept });
       this.engine.decide(taskId, approval.id, allow);
       return next;

@@ -64,9 +64,12 @@ function KeptRow({
   const t = useT();
   const [error, setError] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
-  const latest = (task.kept ?? []).filter((k) => k.path === path).at(-1);
-  if (!latest) return null;
-  const restored = latest.reason === "restore";
+  const copies = (task.kept ?? []).filter((k) => k.path === path);
+  if (copies.length === 0) return null;
+  // Each restore swaps the file with its last kept copy, so an odd number of restores since the agent's last
+  // overwrite means the older version is in place.
+  const sinceOverwrite = copies.length - 1 - copies.map((k) => k.reason).lastIndexOf("overwrite");
+  const restored = sinceOverwrite % 2 === 1;
   const busy = restoring || task.status === "running" || task.status === "needs-you";
   return (
     <div className="kept">

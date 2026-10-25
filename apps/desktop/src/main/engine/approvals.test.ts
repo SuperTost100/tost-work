@@ -126,6 +126,36 @@ describe("approvals and Stop", () => {
     expect(store.getTask(task.id)?.kept).toHaveLength(1);
   });
 
+  it("records a deletion made just before Stop", async () => {
+    const remove: FakeScript = { steps: ["Tidy"], files: [], remove: { path: "draft.txt", afterStep: 0 }, summary: "" };
+    const { store, runner, task, work, status } = await setup(remove);
+    await writeFile(join(work, "draft.txt"), "draft");
+    let release = () => {};
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    (runner as unknown as { guard: unknown }).guard = {
+      keep: async () => {
+        throw new Error("no copies here");
+      },
+      trash: async () => held,
+      restore: async () => {},
+    };
+    const done = runner.start(task.id);
+    await waitFor(() => status()?.approval != null);
+    const deciding = runner.decide(task.id, true);
+    runner.stop(task.id);
+    await done;
+    release();
+    await deciding;
+    expect(store.getTask(task.id)?.status).toBe("stopped");
+    expect(store.getTask(task.id)?.files).toContainEqual({
+      path: join(work, "draft.txt"),
+      kind: "delete",
+      role: "made",
+    });
+  });
+
   it("refuses a second restore while one is under way", async () => {
     const { runner, task, work, status } = await setup();
     const path = join(work, "Proposta.docx");

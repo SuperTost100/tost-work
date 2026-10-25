@@ -181,4 +181,14 @@ describe("saving and copying files", () => {
     expect(result).toEqual({ saved: [source], cancelled: false });
     expect(await readFile(source, "utf8")).toBe("mine");
   });
+
+  it("skips a made file that was removed outside the app when saving", async () => {
+    const kept = join(work, "kept.docx");
+    await writeFile(kept, "x");
+    const files: Task["files"] = [
+      { path: join(work, "removed.docx"), kind: "add", role: "made" },
+      { path: kept, kind: "add", role: "made" },
+    ];
+    expect(await savablePaths(base(files))).toHaveLength(1);
+  });
 });
