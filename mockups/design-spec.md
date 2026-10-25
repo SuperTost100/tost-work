@@ -1,6 +1,6 @@
 # Tost Work design spec, draft
 
-This is the visual system shown in [UI round 4](ui-4/index.html). It's calm like the Claude desktop app, and it carries tost.one's identity: paper, ink and taupe, Schibsted Grotesk, the T logo, and the small mono status tags from the site. Status: draft until Tost approves round 4.
+This is the visual system shown in [UI round 4](ui-4/index.html), refined in rounds 5 to 7. It's calm like the Claude desktop app, and it carries tost.one's identity: paper, ink and taupe, Schibsted Grotesk, the T logo, and the small mono status tags from the site. Status: draft until Tost approves round 4.
 
 ## Principles
 
@@ -37,7 +37,7 @@ The primary button is ink: dark on light, paper on dark. There is no accent colo
 - Borders and hairlines first. A soft shadow appears only under real paper: the composer, page previews and the home card.
 - The sidebar is 248px and holds the traffic lights, the logo and wordmark, search, navigation, recent tasks and the user.
 - The content column is 720px wide.
-- Icons: Phosphor regular at 17px, in text 2.
+- Icons: [MingCute](https://www.mingcute.com/), line style, at 17px in text 2 (Apache 2.0). Skills uses `magic-2-line`, because MingCute has no puzzle icon. The SVGs come from the `@iconify-json/mingcute` package.
 
 ## Banned
 
