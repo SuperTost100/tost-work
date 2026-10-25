@@ -198,11 +198,16 @@ export class TaskRunner {
     if (!latest) throw new Error("There's no kept copy of that file");
     this.restoring.add(taskId);
     try {
-      const current = await this.guard.keep(task, path, "restore");
+      // The version being replaced is kept so Undo can bring it back. A file removed since has nothing to keep.
+      const current = await this.guard.keep(task, path, "restore").catch((err: NodeJS.ErrnoException) => {
+        if (err.code === "ENOENT") return null;
+        throw err;
+      });
       await this.guard.restore(task, latest);
       // Read the task again: it may have changed while the files were copied.
       const fresh = this.mustGet(taskId);
-      return this.save({ ...fresh, kept: [...(fresh.kept ?? []), current], updatedAt: this.now() });
+      const kept = current ? [...(fresh.kept ?? []), current] : (fresh.kept ?? []);
+      return this.save({ ...fresh, kept, updatedAt: this.now() });
     } finally {
       this.restoring.delete(taskId);
     }

@@ -1,10 +1,10 @@
 /** @vitest-environment node */
-import { mkdir, mkdtemp, readdir, readFile, rm, symlink, truncate, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Task } from "../shared/model";
-import { copyInto, freeName, MAX_PREVIEW_BYTES, readablePath, savablePaths, saveCopies } from "./files";
+import { copyInto, freeName, MAX_PREVIEW_BYTES, readablePath, savablePaths, saveCopies, writablePath } from "./files";
 
 let root = "";
 let work = "";
@@ -190,5 +190,13 @@ describe("saving and copying files", () => {
       { path: kept, kind: "add", role: "made" },
     ];
     expect(await savablePaths(base(files))).toHaveLength(1);
+  });
+
+  it("lets a missing file be written back inside the folder, but not through a broken link or outside", async () => {
+    const task = base([]);
+    expect(await writablePath(task, join(work, "back.docx"))).toBe(join(await realpath(work), "back.docx"));
+    await symlink(join(root, "nowhere.docx"), join(work, "broken.docx"));
+    await expect(writablePath(task, join(work, "broken.docx"))).rejects.toThrow(/broken link/);
+    await expect(writablePath(task, join(root, "outside.docx"))).rejects.toThrow(/outside/);
   });
 });

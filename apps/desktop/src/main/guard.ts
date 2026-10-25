@@ -3,7 +3,7 @@ import { constants } from "node:fs";
 import { copyFile, mkdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type { KeptCopy, Task } from "../shared/model";
-import { taskFile } from "./files";
+import { taskFile, writablePath } from "./files";
 
 /** What Tost Work does to files on the user's behalf, so the rules hold whatever the agent does. */
 export interface Guard {
@@ -32,7 +32,8 @@ export function fileGuard(keptDir: string, trashItem: (path: string) => Promise<
       await trashItem(await taskFile(task, path));
     },
     async restore(task, kept) {
-      await copyFile(kept.copy, await taskFile(task, kept.path));
+      // The file may be gone, removed by the user after the edit; restoring puts it back.
+      await copyFile(kept.copy, await writablePath(task, kept.path));
     },
   };
 }

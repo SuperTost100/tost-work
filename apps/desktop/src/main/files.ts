@@ -1,6 +1,6 @@
 import { constants } from "node:fs";
 import { copyFile, lstat, realpath, stat } from "node:fs/promises";
-import { basename, extname, isAbsolute, join, relative } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
 import type { Task } from "../shared/model";
 
 /** The biggest file the interface may load for a preview. */
@@ -55,6 +55,28 @@ export async function taskFile(task: Task, path: string): Promise<string> {
   const real = await realpath(path);
   if (!inside(await realpath(task.workdir), real)) throw new Error("That file is outside the task's folder");
   return real;
+}
+
+/**
+ * Where to write a file of the task that may no longer exist, such as one the user removed before restoring it. An
+ * existing file goes through taskFile; a missing one must sit in a folder inside the task's folder, and a broken link
+ * left at its name is refused, since writing through it would land wherever it points.
+ */
+export async function writablePath(task: Task, path: string): Promise<string> {
+  try {
+    return await taskFile(task, path);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+  }
+  const link = await lstat(path).catch((err: NodeJS.ErrnoException) => {
+    if (err.code === "ENOENT") return null;
+    throw err;
+  });
+  if (link) throw new Error("That file is a broken link");
+  const folder = await realpath(task.workdir);
+  const parent = await realpath(dirname(path));
+  if (parent !== folder && !inside(folder, parent)) throw new Error("That file is outside the task's folder");
+  return join(parent, basename(path));
 }
 
 export const describe = (path: string) => ({ name: basename(path), ext: extname(path).slice(1).toLowerCase() });

@@ -84,6 +84,22 @@ describe("overwrite approvals", () => {
     expect(await readFile(path, "utf8")).toBe("new");
   });
 
+  it("restores a file the user removed after the edit", async () => {
+    const { runner, task, work, status } = await setup();
+    const path = join(work, "Proposta.docx");
+    await writeFile(path, "old");
+    const done = runner.start(task.id);
+    await waitFor(() => status()?.approval != null);
+    await runner.decide(task.id, true);
+    await waitFor(() => status()?.question != null);
+    runner.answer(task.id, "The client pays it");
+    await done;
+    await rm(path);
+    const restored = await runner.restore(task.id, path);
+    expect(await readFile(path, "utf8")).toBe("old");
+    expect(restored.kept?.map((k) => k.reason)).toEqual(["overwrite"]);
+  });
+
   it("refuses a second decision while the first is carried out", async () => {
     const { runner, task, work, status } = await setup();
     await writeFile(join(work, "Proposta.docx"), "old");
