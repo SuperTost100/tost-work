@@ -15,7 +15,8 @@ export class Accounts {
   constructor(
     private source: AccountSource,
     private emit: (event: SignInEvent) => void,
-    private openUrl: (url: string) => void,
+    /** Opens a page in the user's browser; rejects when the system can't. */
+    private openUrl: (url: string) => Promise<void>,
   ) {}
 
   async status(): Promise<CodexAccount> {
@@ -50,27 +51,41 @@ export class Accounts {
   }
 
   private async follow(session: LoginSession): Promise<void> {
+    // After a cancel, events already queued in the old session must not reach a newer sign-in.
+    const current = () => this.session === session;
+    const emit = (event: SignInEvent) => {
+      if (current()) this.emit(event);
+    };
     try {
       for await (const event of session) {
+        if (!current()) break;
         if (event.type === "open-url") {
           // Only web pages: a sign-in link is never a file or another app's scheme.
           if (!event.url.startsWith("https://")) continue;
-          if (!event.opened) this.openUrl(event.url);
-          this.emit({ type: "link", url: event.url });
+          // The link is shown either way, so the user can open it by hand if the browser didn't.
+          emit({ type: "link", url: event.url });
+          if (!event.opened)
+            await this.openUrl(event.url).catch((err: unknown) =>
+              emit({
+                type: "error",
+                message: `The browser didn't open: ${err instanceof Error ? err.message : String(err)}`,
+              }),
+            );
         } else if (event.type === "code-prompt") {
-          this.emit({ type: "code", message: event.message });
+          emit({ type: "code", message: event.message });
         } else if (event.type === "needs-terminal") {
-          this.emit({ type: "error", message: `Run this in a terminal: ${event.command.join(" ")}` });
+          emit({ type: "error", message: `Run this in a terminal: ${event.command.join(" ")}` });
         } else if (event.type === "done") {
-          this.emit({ type: "done", account: await this.status() });
+          const account = await this.status();
+          emit({ type: "done", account });
         } else if (event.type === "error") {
-          this.emit({ type: "error", message: event.message });
+          emit({ type: "error", message: event.message });
         }
       }
     } catch (err) {
-      this.emit({ type: "error", message: err instanceof Error ? err.message : String(err) });
+      emit({ type: "error", message: err instanceof Error ? err.message : String(err) });
     } finally {
-      if (this.session === session) this.session = null;
+      if (current()) this.session = null;
     }
   }
 }

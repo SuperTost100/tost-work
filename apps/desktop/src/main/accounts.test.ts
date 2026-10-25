@@ -30,7 +30,10 @@ const setup = (events: LoginEvent[], state?: { installed: boolean; loggedIn: boo
   const accounts = new Accounts(
     src,
     (e) => seen.push(e),
-    (url) => opened.push(url),
+    async (url) => {
+      if (url.includes("fail")) throw new Error("no browser");
+      opened.push(url);
+    },
   );
   return { accounts, seen, opened, codes };
 };
@@ -75,5 +78,23 @@ describe("Accounts", () => {
     const { accounts, seen } = setup([{ type: "error", message: "Timed out" }]);
     await accounts.signIn();
     expect(seen).toEqual([{ type: "error", message: "Timed out" }]);
+  });
+
+  it("says so when the browser doesn't open, and still shows the link", async () => {
+    const { accounts, seen } = setup([{ type: "open-url", url: "https://auth.openai.com/fail" }]);
+    await accounts.signIn();
+    expect(seen[0]).toEqual({ type: "link", url: "https://auth.openai.com/fail" });
+    expect(seen[1]).toMatchObject({ type: "error", message: expect.stringMatching(/browser didn't open/) });
+  });
+
+  it("drops what a cancelled sign-in still had queued", async () => {
+    const { accounts, seen } = setup([
+      { type: "code-prompt", message: "old prompt" },
+      { type: "done", status: { loggedIn: true } },
+    ]);
+    const flow = accounts.signIn();
+    accounts.cancel();
+    await flow;
+    expect(seen).toEqual([]);
   });
 });

@@ -77,7 +77,7 @@ app.whenReady().then(() => {
     (event) => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.accountSignInEvent, event);
     },
-    (url) => void shell.openExternal(url),
+    (url) => shell.openExternal(url),
   );
   registerIpc(store, runner, accounts, () => mainWindow);
   app.on("before-quit", () => {
