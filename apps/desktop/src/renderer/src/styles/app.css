@@ -2335,3 +2335,86 @@ fieldset.fld > legend {
   font-size: 14px;
   z-index: 50;
 }
+
+/* ===== File previews ===== */
+.ftabs button {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--t2);
+}
+.ftabs button.on {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.page.pv {
+  height: auto;
+  max-height: 460px;
+  overflow: auto;
+  mask-image: none;
+  -webkit-mask-image: none;
+  padding: 0;
+}
+.pv-note {
+  padding: 20px 24px;
+  color: var(--t3);
+  font-size: 13.5px;
+}
+.pv-md {
+  padding: 26px 36px;
+  font-size: 14.5px;
+  line-height: 1.65;
+}
+.pv-md h1,
+.pv-md h2,
+.pv-md h3 {
+  font-size: 16px;
+  margin: 16px 0 6px;
+}
+.pv-md h1:first-child {
+  margin-top: 0;
+}
+.pv-text {
+  margin: 0;
+  padding: 20px 24px;
+  font:
+    12.5px / 1.6 "IBM Plex Mono",
+    monospace;
+  white-space: pre-wrap;
+}
+.pv-img {
+  display: block;
+  max-width: 100%;
+  margin: 0 auto;
+}
+.pv-table {
+  padding: 8px 14px 14px;
+  overflow: auto;
+}
+.pv-table td {
+  white-space: nowrap;
+}
+.pv-pdf {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  justify-items: center;
+  background: var(--panel);
+}
+.pv-pdf canvas {
+  max-width: 100%;
+  height: auto;
+  box-shadow: var(--page-shadow);
+}
+/* docx-preview draws real pages; on the panel they look like paper. */
+.pv-docx {
+  padding: 16px;
+  background: var(--panel);
+}
+.pv-docx section.docx {
+  margin: 0 auto 16px;
+  box-shadow: var(--page-shadow);
+  max-width: 100%;
+}

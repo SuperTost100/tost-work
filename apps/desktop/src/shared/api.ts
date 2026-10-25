@@ -12,6 +12,13 @@ export interface NewTaskInput {
   attachments?: string[];
 }
 
+export interface FileContent {
+  name: string;
+  /** Lower-case extension without the dot, for example "docx". */
+  ext: string;
+  bytes: Uint8Array;
+}
+
 /** What the preload exposes to the interface as `window.tostWork`. */
 export interface TostWorkApi {
   platform: "darwin" | "win32" | "linux";
@@ -37,6 +44,14 @@ export interface TostWorkApi {
     /** Called with the full task every time it changes. Returns a function that stops listening. */
     onChange(listener: (task: Task) => void): () => void;
   };
+  files: {
+    /** Reads a file the task made, used or was given, for a preview. */
+    read(taskId: string, path: string): Promise<FileContent>;
+    /** Opens the file in its usual app, for example Word. */
+    open(taskId: string, path: string): Promise<void>;
+    /** Shows the file in Finder or Explorer. */
+    reveal(taskId: string, path: string): Promise<void>;
+  };
 }
 
 /** IPC channel names, kept in one place so main and preload can't drift apart. */
@@ -52,4 +67,7 @@ export const IPC = {
   tasksAnswer: "tasks:answer",
   tasksStop: "tasks:stop",
   taskChanged: "tasks:changed",
+  filesRead: "files:read",
+  filesOpen: "files:open",
+  filesReveal: "files:reveal",
 } as const;

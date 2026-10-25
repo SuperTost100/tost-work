@@ -1,9 +1,11 @@
 import { useRef, useState } from "react";
 import { Composer } from "@/components/Composer";
+import { Preview } from "@/components/Preview";
 import { TaskTag } from "@/components/TaskTag";
 import { Icon } from "@/lib/Icon";
 import { keyed } from "@/lib/keys";
 import { useT } from "@/lib/useT";
+import type { TostWorkApi } from "../../../shared/api";
 import type { FileChange, Project, ReviewItem, Task as TaskT } from "../../../shared/model";
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
@@ -60,19 +62,90 @@ function Checks({ title, items, icon }: { title: string; items: ReviewItem[]; ic
   );
 }
 
+function Artifact({
+  api,
+  task,
+  files,
+  onError,
+}: {
+  api: TostWorkApi;
+  task: TaskT;
+  files: FileChange[];
+  onError: (err: unknown) => void;
+}) {
+  const t = useT();
+  const [picked, setPicked] = useState<string | null>(null);
+  // Follow the newest file while the task writes, unless the user picked one.
+  const current = files.find((f) => f.path === picked) ?? files[files.length - 1];
+  if (!current) return null;
+  const live = task.status === "running" || task.status === "needs-you";
+  return (
+    <div className="artifact">
+      <div className="head">
+        {files.length > 1 ? (
+          <div className="ftabs" role="tablist">
+            {files.map((f) => (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={f.path === current.path}
+                key={f.path}
+                className={f.path === current.path ? "on" : undefined}
+                onClick={() => setPicked(f.path)}
+              >
+                {fileName(f.path)}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <>
+            {live && <span className="t3">{t("preview.live")}</span>}
+            <b>{fileName(current.path)}</b>
+          </>
+        )}
+        <span className="grow" />
+        <button
+          type="button"
+          className="tbtn"
+          onClick={() => void api.files.reveal(task.id, current.path).catch(onError)}
+        >
+          <Icon name="folder-open" />
+          {t("preview.reveal")}
+        </button>
+        <button
+          type="button"
+          className="tbtn"
+          onClick={() => void api.files.open(task.id, current.path).catch(onError)}
+        >
+          <Icon name="external-link" />
+          {t("preview.open")}
+        </button>
+      </div>
+      <div className="page pv">
+        <Preview api={api} taskId={task.id} path={current.path} version={live ? task.updatedAt : "final"} />
+      </div>
+    </div>
+  );
+}
+
 export function Task({
+  api,
   task,
   project,
   onAnswer,
   onStop,
   onOpenProject,
+  onError,
 }: {
+  api: TostWorkApi;
   task: TaskT;
   project: Project | null;
   /** Resolves true once the answer is sent, false when it failed and the draft should stay. */
   onAnswer: (answer: string) => Promise<boolean>;
   onStop: () => void;
   onOpenProject: () => void;
+  /** Shows a failed action, such as a file that was moved before Open, in the app's alert. */
+  onError: (err: unknown) => void;
 }) {
   const t = useT();
   const [answer, setAnswer] = useState("");
@@ -148,6 +221,7 @@ export function Task({
                   </p>
                 ),
               )}
+              {made.length > 0 && <Artifact api={api} task={task} files={made} onError={onError} />}
               {task.status === "stopped" && <p className="agent t3">{t("task.stopped")}</p>}
               {task.status === "failed" && <p className="agent">{t("task.failed", { error: task.error ?? "" })}</p>}
               {task.review && (

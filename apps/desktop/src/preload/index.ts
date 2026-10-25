@@ -24,6 +24,11 @@ const api: TostWorkApi = {
       return () => ipcRenderer.removeListener(IPC.taskChanged, handler);
     },
   },
+  files: {
+    read: (taskId, path) => ipcRenderer.invoke(IPC.filesRead, taskId, path),
+    open: (taskId, path) => ipcRenderer.invoke(IPC.filesOpen, taskId, path),
+    reveal: (taskId, path) => ipcRenderer.invoke(IPC.filesReveal, taskId, path),
+  },
 };
 
 contextBridge.exposeInMainWorld("tostWork", api);

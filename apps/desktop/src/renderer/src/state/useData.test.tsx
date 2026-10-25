@@ -10,6 +10,7 @@ const task = (id: string, updatedAt: string, title = id): Task => ({
   title,
   brief: id,
   attachments: [],
+  workdir: "/tmp",
   model: "m",
   effort: "medium",
   status: "running",

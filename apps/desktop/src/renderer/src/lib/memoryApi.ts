@@ -59,6 +59,7 @@ export function createMemoryApi(): TostWorkApi & { emit(id: string, e: EngineEve
           title: input.brief.split("\n")[0] ?? "",
           brief: input.brief,
           attachments: input.attachments ?? [],
+          workdir: "/tmp/quick",
           model: "gpt-5.5",
           effort: "medium",
           status: "running",
@@ -98,6 +99,15 @@ export function createMemoryApi(): TostWorkApi & { emit(id: string, e: EngineEve
         listeners.add(l);
         return () => listeners.delete(l);
       },
+    },
+    files: {
+      read: async (_taskId, path) => ({
+        name: path.split("/").pop() ?? path,
+        ext: "md",
+        bytes: new TextEncoder().encode("# Proposta\n\nAlpi Logistica ci ha chiesto di ridurre i tempi."),
+      }),
+      open: async () => {},
+      reveal: async () => {},
     },
   };
 }

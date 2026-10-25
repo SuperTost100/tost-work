@@ -21,7 +21,9 @@ describe("starting and finishing a task", () => {
     });
     await screen.findByText("Check it against your brief");
     expect(screen.getByText("Travel not included")).toBeTruthy();
-    expect(screen.getByText("Proposta.docx")).toBeTruthy();
+    // The file shows in the side panel and as the preview's title, and its content is drawn.
+    expect(screen.getAllByText("Proposta.docx")).toHaveLength(2);
+    expect(await screen.findByText(/ci ha chiesto di ridurre i tempi/)).toBeTruthy();
     expect(screen.queryByText("Who pays the insurance?")).toBeNull();
   });
 });
@@ -157,6 +159,29 @@ describe("a typed answer", () => {
       fireEvent.keyDown(box, { key: "Enter" });
     });
     expect(await screen.findByText("Split it half and half")).toBeTruthy();
+  });
+});
+
+describe("file actions", () => {
+  it("shows why Open did nothing", async () => {
+    const api = createMemoryApi();
+    api.files.open = async () => {
+      throw new Error("The file was moved or deleted");
+    };
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    const option = await screen.findByRole("button", { name: /We do/ });
+    await act(async () => {
+      fireEvent.click(option);
+    });
+    const open = await screen.findByRole("button", { name: "Open" });
+    await act(async () => {
+      fireEvent.click(open);
+    });
+    expect(screen.getByRole("alert").textContent).toMatch(/moved or deleted/);
   });
 });
 
