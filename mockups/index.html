@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tost Work · UX round 1</title>
+<link rel="stylesheet" href="shared/wire.css">
+<style>
+  body { min-width: 0; background: var(--bg); }
+  main { max-width: 860px; margin: 0 auto; padding: 40px 22px 80px; }
+  h1 { font-size: 26px; }
+  .lead { font-size: 15.5px; color: var(--ink-2); margin: 10px 0 28px; line-height: 1.6; }
+  .dir { display: grid; grid-template-columns: 1fr auto; gap: 6px 20px; padding: 18px; border: 1px solid var(--line); border-radius: 10px; }
+  .dir + .dir { margin-top: 12px; }
+  .dir:hover { background: var(--bg-2); }
+  .dir h2 { font-size: 18px; }
+  .dir p { color: var(--ink-2); }
+  .dir .open { grid-row: 1 / span 3; grid-column: 2; align-self: center; }
+  h2.s { margin: 36px 0 10px; }
+  ol.q { padding-left: 20px; line-height: 1.7; }
+  ul.same { padding-left: 20px; line-height: 1.7; color: var(--ink-2); }
+  @media (max-width: 640px) { .dir { grid-template-columns: 1fr; } .dir .open { grid-row: auto; grid-column: 1; justify-self: start; } }
+</style>
+</head>
+<body>
+<main>
+  <p class="muted small">Tost Work · UX round 1 · 25 October 2026</p>
+  <h1>Three ways to organise the work</h1>
+  <p class="lead">These are wireframes. They compare where the work lives and how you follow it, so the look is plain on purpose and nothing behind the buttons works. Each one has the same screens with the same fake data: Giulia runs a small consulting studio and has four projects. Yellow notes explain the choice behind a screen, and the dashed bar at the bottom moves between screens.</p>
+
+  <a class="dir" href="a-desk/index.html">
+    <h2>A · Desk</h2>
+    <p>Projects and their tasks in a sidebar, the open task in the middle with its plan, and the files it made on the right. Closest to Codex and T3 Code, without the code.</p>
+    <p class="small muted">Bets on: a list you scan. Best when someone runs many small tasks.</p>
+    <span class="btn primary open">Open A</span>
+  </a>
+  <a class="dir" href="b-document/index.html">
+    <h2>B · Document</h2>
+    <p>Each task is a page. You write the brief at the top and the result is written below it while you watch. Follow-ups are comments on the text. Quick edit shows changes to accept or reject, like track changes.</p>
+    <p class="small muted">Bets on: reading the output, not the process. Best for people who live in Word and Google Docs.</p>
+    <span class="btn primary open">Open B</span>
+  </a>
+  <a class="dir" href="c-board/index.html">
+    <h2>C · Board</h2>
+    <p>Each project is a board and every piece of work is a card. Opening a card shows the brief, the checklist and the files without leaving the board. Jobs have a week view.</p>
+    <p class="small muted">Bets on: seeing everything at once. Closest to Paperclip, and the one that grows best into Advanced.</p>
+    <span class="btn primary open">Open C</span>
+  </a>
+
+  <h2 class="s">The same in all three</h2>
+  <ul class="same">
+    <li>Everything happens inside a project, which is a folder plus instructions plus skills. The only exception is quick edit: drop one file and say what to change.</li>
+    <li>A running task shows its plan and the files it creates. Chat exists, but in a side tab.</li>
+    <li>When the agent wants to overwrite a file or has a question, the task moves to "Needs you" with the buttons right there.</li>
+    <li>Model and reasoning effort use their real names.</li>
+    <li>Skills have a form and the raw SKILL.md, and can be made from a finished task.</li>
+    <li>A job is a saved task with a schedule, and each run becomes a normal task.</li>
+  </ul>
+
+  <h2 class="s">What to tell me after looking</h2>
+  <ol class="q">
+    <li>Which direction feels closest, or which parts of each to combine. Mixing is fine: for example, A's layout with B's live result and C's week view for jobs.</li>
+    <li>Does a running task show the right things: brief, plan, files, chat in a tab? What's missing or too much?</li>
+    <li>Is quick edit right as the only chat? Should it give back a new file (A and C) or changes to accept (B)?</li>
+    <li>Is the board home (C), a view you visit (A), or a filter over pages (B)?</li>
+    <li>Anything a course participant would get stuck on in the first five minutes.</li>
+  </ol>
+  <p class="muted small" style="margin-top:28px">Laptop screens show these best. On a phone they open zoomed out.</p>
+</main>
+</body>
+</html>
