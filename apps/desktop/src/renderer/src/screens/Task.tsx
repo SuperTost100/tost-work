@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Composer } from "@/components/Composer";
 import { TaskTag } from "@/components/TaskTag";
 import { Icon } from "@/lib/Icon";
@@ -76,6 +76,16 @@ export function Task({
 }) {
   const t = useT();
   const [answer, setAnswer] = useState("");
+  // One answer at a time: a second click before the first returns would be refused and shown as an error.
+  const sending = useRef(false);
+  const send = (text: string, clearDraft: boolean) => {
+    if (sending.current) return;
+    sending.current = true;
+    void onAnswer(text).then((sent) => {
+      sending.current = false;
+      if (sent && clearDraft) setAnswer("");
+    });
+  };
   const made = task.files.filter((f) => f.role === "made");
   const used = task.files.filter((f) => f.role === "used");
   const current = task.steps.findIndex((s) => s.status === "in_progress");
@@ -158,7 +168,7 @@ export function Task({
                   value={answer}
                   onChange={setAnswer}
                   onSubmit={() => {
-                    void onAnswer(answer.trim()).then((sent) => sent && setAnswer(""));
+                    send(answer.trim(), true);
                   }}
                   placeholder={t("composer.answer")}
                   sendLabel={t("composer.start")}
@@ -166,7 +176,7 @@ export function Task({
                 >
                   <div className="q">{task.question.text}</div>
                   {task.question.options.map((option, i) => (
-                    <button type="button" key={option} className="o" onClick={() => void onAnswer(option)}>
+                    <button type="button" key={option} className="o" onClick={() => send(option, false)}>
                       <span className="n">{i + 1}</span>
                       {option}
                     </button>

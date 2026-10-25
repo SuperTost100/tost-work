@@ -60,6 +60,30 @@ describe("failures and double clicks", () => {
   });
 });
 
+describe("answering twice", () => {
+  it("sends one answer when an option is clicked twice", async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    const option = await screen.findByRole("button", { name: /We do/ });
+    let calls = 0;
+    const realAnswer = api.tasks.answer;
+    api.tasks.answer = (id, answer) => {
+      calls++;
+      return realAnswer(id, answer);
+    };
+    await act(async () => {
+      fireEvent.click(option);
+      fireEvent.click(option);
+    });
+    expect(calls).toBe(1);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
 describe("a typed answer", () => {
   it("stays in the box when sending it fails, and goes once it's sent", async () => {
     const api = createMemoryApi();
