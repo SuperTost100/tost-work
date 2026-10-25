@@ -118,6 +118,8 @@ export class TaskRunner {
   followUp(taskId: string, text: string): Task {
     const task = this.mustGet(taskId);
     if (this.running.has(taskId)) throw new Error("This task is still working");
+    // A run started now could write to a file the restore is about to put back.
+    if (this.restoring.has(taskId)) throw new Error("Wait for the restore to finish");
     if (task.question || task.approval) throw new Error("This task is waiting for an answer");
     const at = this.now();
     // The old review checked the old brief, so it goes until the agent writes a new one.

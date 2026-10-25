@@ -168,6 +168,7 @@ describe("approvals and Stop", () => {
     await done;
     const first = runner.restore(task.id, path);
     await expect(runner.restore(task.id, path)).rejects.toThrow(/already in progress/);
+    expect(() => runner.followUp(task.id, "Shorter, please")).toThrow(/restore to finish/);
     expect((await first).kept?.map((k) => k.reason)).toEqual(["overwrite", "restore"]);
   });
 });
