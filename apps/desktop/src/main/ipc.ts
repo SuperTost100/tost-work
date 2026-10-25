@@ -6,19 +6,41 @@ import { app, type BrowserWindow, dialog, ipcMain, type OpenDialogOptions, shell
 import { IPC, type NewProjectInput, type NewTaskInput, type SaveResult } from "../shared/api";
 import { languageFrom, type MessageKey, translate } from "../shared/i18n";
 import type { Project } from "../shared/model";
+import type { Accounts } from "./accounts";
 import type { TaskRunner } from "./engine/runner";
 import { type Conflict, copyInto, describe, readablePath, savablePaths, saveCopies } from "./files";
 import type { Store } from "./store/store";
-import { absolutePath, paths, text } from "./validate";
+import { absolutePath, paths, settingsPatch, text } from "./validate";
 
 /** Validates everything that comes from the interface, because IPC is a trust boundary. */
-export function registerIpc(store: Store, runner: TaskRunner, window: () => BrowserWindow | null): void {
-  // Native dialogs speak the interface's language, which also comes from the system locale.
-  const t = (key: MessageKey, vars?: Record<string, string>) => translate(languageFrom(app.getLocale()), key, vars);
+export function registerIpc(
+  store: Store,
+  runner: TaskRunner,
+  accounts: Accounts,
+  window: () => BrowserWindow | null,
+): void {
+  // Native dialogs speak the interface's language: the saved choice, or the system's.
+  const t = (key: MessageKey, vars?: Record<string, string>) =>
+    translate(store.getSettings().language ?? languageFrom(app.getLocale()), key, vars);
   const openDialog = (options: OpenDialogOptions) => {
     const win = window();
     return win ? dialog.showOpenDialog(win, options) : dialog.showOpenDialog(options);
   };
+
+  ipcMain.handle(IPC.settingsGet, () => store.getSettings());
+  ipcMain.handle(IPC.settingsUpdate, (_e, patch: unknown) => {
+    const settings = { ...store.getSettings(), ...settingsPatch(patch) };
+    store.saveSettings(settings);
+    return settings;
+  });
+
+  ipcMain.handle(IPC.accountStatus, () => accounts.status());
+  // The sign-in runs on after this returns; its progress and any failure go out as sign-in events.
+  ipcMain.handle(IPC.accountSignIn, () => {
+    void accounts.signIn();
+  });
+  ipcMain.handle(IPC.accountSendCode, (_e, code: unknown) => accounts.sendCode(text(code, "code", 200).trim()));
+  ipcMain.handle(IPC.accountCancel, () => accounts.cancel());
 
   ipcMain.handle(IPC.projectsList, () => store.listProjects());
 

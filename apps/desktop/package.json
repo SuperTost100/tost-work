@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
+    "cli-funnel": "0.5.1",
     "docx-preview": "0.4.1",
     "dompurify": "3.4.17",
     "marked": "18.1.1",

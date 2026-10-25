@@ -1,6 +1,8 @@
 import { join } from "node:path";
+import { createFunnel } from "cli-funnel";
 import { app, BrowserWindow, nativeTheme, shell } from "electron";
 import { IPC } from "../shared/api";
+import { Accounts } from "./accounts";
 import { FakeEngine } from "./engine/fake";
 import { TaskRunner } from "./engine/runner";
 import { fileGuard } from "./guard";
@@ -65,8 +67,24 @@ app.whenReady().then(() => {
     undefined,
     guard,
   );
-  registerIpc(store, runner, () => mainWindow);
-  app.on("before-quit", () => store.close());
+  const funnel = createFunnel();
+  const accounts = new Accounts(
+    {
+      detect: () => funnel.providers.codex.detect(),
+      authStatus: () => funnel.authStatus("codex"),
+      login: () => funnel.login("codex"),
+    },
+    (event) => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.accountSignInEvent, event);
+    },
+    (url) => void shell.openExternal(url),
+  );
+  registerIpc(store, runner, accounts, () => mainWindow);
+  app.on("before-quit", () => {
+    accounts.cancel();
+    funnel.close();
+    store.close();
+  });
   mainWindow = createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
