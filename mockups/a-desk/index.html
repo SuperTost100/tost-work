@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Tost Work · Mockup A · Desk</title>
+<link rel="stylesheet" href="../shared/wire.css">
+<style>
+  .shell { display: grid; grid-template-columns: 248px 1fr; flex: 1; min-height: 0; }
+  .side { border-right: 1px solid var(--line); background: var(--bg-2); display: flex; flex-direction: column; min-height: 0; }
+  .side .top { padding: 12px; display: grid; gap: 6px; }
+  .side .scroll { flex: 1; overflow: auto; padding: 4px 8px 12px; }
+  .side .bottom { border-top: 1px solid var(--line); padding: 8px; display: grid; gap: 1px; }
+  .side h4 { font-size: 12px; color: var(--muted); font-weight: 500; padding: 12px 8px 4px; }
+  .side .item { padding: 6px 8px; }
+  .side .proj { font-weight: 500; }
+  .side .sub { padding-left: 22px; font-size: 13px; }
+  .side .count { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .main { min-height: 0; overflow: auto; }
+  .page { max-width: 920px; margin: 0 auto; padding: 28px 32px 48px; }
+  .task { display: grid; grid-template-columns: 1fr 340px; min-height: 0; flex: 1; }
+  .task .center { overflow: auto; padding: 24px 32px 0; display: flex; flex-direction: column; }
+  .task .right { border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  .task .right .body { flex: 1; overflow: auto; padding: 14px; }
+  .followup { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0 18px; margin-top: auto; }
+  .right .panel-convo { display: none; }
+  .right.open .panel-convo { display: block; }
+  .right.open .panel-files { display: none; }
+  .right .t-files, .right.open .t-convo { color: var(--ink); border-color: var(--ink); }
+  .right.open .t-files { color: var(--muted); border-color: transparent; }
+  .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 0 24px 24px; flex: 1; min-height: 0; }
+  .col { background: var(--bg-2); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; overflow: auto; }
+  .col h3 { font-size: 13px; display: flex; justify-content: space-between; padding: 2px 4px 4px; }
+  .card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; display: grid; gap: 6px; }
+  .card:hover { border-color: #c5c5c5; }
+  .split { display: grid; grid-template-columns: 280px 1fr; flex: 1; min-height: 0; }
+  .split > .list-pane { border-right: 1px solid var(--line); overflow: auto; padding: 14px 10px; }
+  .split > .detail { overflow: auto; padding: 24px 32px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .pcard { padding: 14px; display: grid; gap: 8px; }
+  .pcard:hover { background: var(--bg-2); }
+</style>
+</head>
+<body>
+<div class="window">
+  <div class="titlebar"><span class="dots"><i></i><i></i><i></i></span>Tost Work · <span class="where"></span></div>
+
+  <!-- ============ 1. WORK HOME ============ -->
+  <section class="screen" id="s-home" data-title="Work home">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <main class="main">
+        <div class="page stack-lg">
+          <div class="row between">
+            <h1>Good morning, Giulia</h1>
+            <span class="note">Home is a launch pad. The composer starts a task inside a project, so nothing is ever loose.</span>
+          </div>
+
+          <div class="composer">
+            <textarea placeholder="Describe the work. Attach the files it needs.">Write a proposal for Alpi Logistica from yesterday's call notes. Use our proposal template, price between 8 and 10k, in Italian.</textarea>
+            <div class="bar">
+              <span class="select">Client proposals</span>
+              <span class="chip file">notes-call-alpi.docx</span>
+              <button class="btn sm ghost">+ Attach</button>
+              <span class="grow"></span>
+              <span class="select">GPT-5.5</span>
+              <span class="select">Reasoning effort: medium</span>
+              <a class="btn primary" href="#task">Start task</a>
+            </div>
+          </div>
+
+          <a class="drop" href="#quick">
+            <div class="file" style="border-style:dashed"><div class="ic">doc</div></div>
+            <div class="grow">
+              <h3>Quick edit, no project</h3>
+              <p class="muted small">Drop one file and say what to change. You get the file back. It's the only chat in the app.</p>
+            </div>
+            <span class="btn">Choose file</span>
+          </a>
+
+          <div class="stack">
+            <h2>Needs you <span class="muted small">· 1</span></h2>
+            <div class="box">
+              <div class="item">
+                <span class="status needs">Needs you</span>
+                <div class="grow">
+                  <div>Supplier contracts summary</div>
+                  <div class="muted small">Wants to overwrite <span class="mono">contracts-summary.xlsx</span> · Q3 expense reports</div>
+                </div>
+                <button class="btn sm">Save as new file</button>
+                <button class="btn sm primary">Allow overwrite</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="row between"><h2>Recent tasks</h2><a class="muted small" href="#board">Open board →</a></div>
+            <div class="box">
+              <ul class="list">
+                <li><a class="item" href="#task"><span class="status running">Running</span><span class="grow">Proposal for Alpi Logistica</span><span class="muted small">Client proposals · step 3 of 6</span></a></li>
+                <li><a class="item" href="#task"><span class="status done">Done</span><span class="grow">Rewrite the About page</span><span class="muted small">Website · 2 files · 1 h ago</span></a></li>
+                <li><a class="item" href="#task"><span class="status done">Done</span><span class="grow">Monday press review</span><span class="muted small">October newsletter · from a job · today 08:00</span></a></li>
+                <li><a class="item" href="#task"><span class="status done">Done</span><span class="grow">Proposal for Cantina Ferraris</span><span class="muted small">Client proposals · 3 files · yesterday</span></a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <!-- ============ 2. RUNNING TASK ============ -->
+  <section class="screen" id="s-task" data-title="Running task">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <div class="task">
+        <div class="center">
+          <div class="stack">
+            <div class="muted small">Client proposals ›</div>
+            <div class="row between">
+              <h1>Proposal for Alpi Logistica</h1>
+              <div class="row"><span class="status running">Running · step 3 of 6</span><button class="btn sm">Stop</button></div>
+            </div>
+            <div class="row wrap">
+              <span class="chip">GPT-5.5</span><span class="chip">Reasoning effort: medium</span>
+              <span class="chip">Can edit files in the project folder</span><span class="chip skill">Proposal writer v3</span>
+            </div>
+          </div>
+
+          <div class="box soft pad stack" style="margin-top:18px">
+            <div class="row between"><h3>Brief</h3><button class="btn sm ghost">Edit</button></div>
+            <p>Write a proposal for Alpi Logistica from yesterday's call notes. Use our proposal template, price between 8 and 10k, in Italian.</p>
+            <div class="row"><span class="chip file">notes-call-alpi.docx</span><span class="chip file">template-proposal.docx</span></div>
+          </div>
+
+          <div class="stack" style="margin-top:22px">
+            <div class="row between"><h3>Plan</h3><span class="note">The plan is the main view, so you read progress instead of scrolling a transcript.</span></div>
+            <ol class="steps">
+              <li class="done"><span>Read the call notes<span class="detail">Found 4 requirements and a deadline of 15 November.</span></span></li>
+              <li class="done"><span>Open the proposal template<span class="detail">Using the 2026 template, 6 sections.</span></span></li>
+              <li class="now"><span>Draft scope and timeline<span class="detail">Writing section 3 of 6 in Proposta_AlpiLogistica.docx</span></span></li>
+              <li class="wait"><span>Build the price table between €8,000 and €10,000</span></li>
+              <li class="wait"><span>Check the draft against the proposal checklist</span></li>
+              <li class="wait"><span>Save the .docx and a PDF copy</span></li>
+            </ol>
+            <details>
+              <summary class="muted small" style="cursor:pointer">Show the full log (14 actions)</summary>
+              <pre class="code" style="margin-top:8px">read  notes-call-alpi.docx         2 pages
+read  template-proposal.docx       6 sections
+write Proposta_AlpiLogistica.docx  sections 1-2
+write Proposta_AlpiLogistica.docx  section 3 …</pre>
+            </details>
+          </div>
+
+          <div class="followup">
+            <div class="composer">
+              <textarea placeholder="Add an instruction. It applies from the next step." style="min-height:44px"></textarea>
+              <div class="bar"><span class="muted small">Example: "Keep the timeline to one page."</span><span class="grow"></span><button class="btn sm primary">Send</button></div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="right" id="rightA">
+          <div class="tabs" style="padding:0 10px">
+            <a href="#" class="t-files" data-close="#rightA">Files</a>
+            <a href="#" class="t-convo" data-open="#rightA">Conversation</a>
+          </div>
+          <div class="body panel-files stack-lg">
+            <div class="stack">
+              <h3>Made by this task</h3>
+              <div class="file writing"><div class="ic">docx</div><div class="grow"><div class="truncate">Proposta_AlpiLogistica.docx</div><div class="tag">Writing now · section 3</div></div><button class="btn sm">Open</button></div>
+              <div class="file new"><div class="ic">xlsx</div><div class="grow"><div class="truncate">prezzi-alpi.xlsx</div><div class="tag">New · 2 min ago</div></div><button class="btn sm">Open</button></div>
+            </div>
+            <div class="stack">
+              <h3>Read</h3>
+              <div class="file"><div class="ic">docx</div><div class="grow"><div class="truncate">notes-call-alpi.docx</div><div class="tag">Attached</div></div></div>
+              <div class="file"><div class="ic">docx</div><div class="grow"><div class="truncate">template-proposal.docx</div><div class="tag">From project folder</div></div></div>
+            </div>
+            <button class="btn" style="width:100%">Show in folder</button>
+            <p class="note">Files made in this session are always one click away, which answers "where did it save it?"</p>
+          </div>
+          <div class="body panel-convo">
+            <div class="msg"><span class="who">Agent</span>The notes don't say if travel costs are included. I assumed they're excluded and wrote that in the terms.</div>
+            <div class="msg me"><span class="who">You</span>Right, excluded. Also add the 30-day payment term.</div>
+            <div class="msg"><span class="who">Agent</span>Added to section 5.</div>
+            <p class="note" style="margin-top:12px">Chat exists, one tab away. Questions the agent asks also appear here.</p>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2b. QUICK EDIT ============ -->
+  <section class="screen" id="s-quick" data-title="Quick edit">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <div class="task">
+        <div class="center">
+          <div class="row between"><h1>Quick edit</h1><span class="muted small">Not in a project</span></div>
+          <div class="stack" style="margin-top:18px; max-width:640px">
+            <div class="msg me"><span class="who">You · letter-bank.docx</span>Fix the typos and make it more formal. Keep it to one page.</div>
+            <div class="msg"><span class="who">Agent</span>Done: 7 typos fixed, "Ciao" changed to "Gentile dott.ssa Bianchi", and the closing changed to "Cordiali saluti". It's still one page.</div>
+            <div class="file new" style="max-width:360px"><div class="ic">docx</div><div class="grow"><div>letter-bank (edited).docx</div><div class="tag">New · next to the original</div></div><button class="btn sm">Open</button></div>
+            <div class="msg me"><span class="who">You</span>Also add the account number at the top.</div>
+          </div>
+          <div class="followup">
+            <div class="composer"><textarea style="min-height:44px" placeholder="Ask for another change"></textarea>
+              <div class="bar"><button class="btn sm">Move to a project…</button><span class="grow"></span><button class="btn sm primary">Send</button></div></div>
+          </div>
+        </div>
+        <aside class="right"><div class="body stack">
+          <h3>Files</h3>
+          <div class="file"><div class="ic">docx</div><div class="grow">letter-bank.docx<div class="tag">Original, untouched</div></div></div>
+          <div class="file new"><div class="ic">docx</div><div class="grow">letter-bank (edited).docx<div class="tag">New</div></div></div>
+          <p class="note">The original is never overwritten in a quick edit. "Move to a project" keeps the history.</p>
+        </div></aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3. PROJECTS ============ -->
+  <section class="screen" id="s-projects" data-title="Projects">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <main class="main"><div class="page stack-lg">
+        <div class="row between"><h1>Projects</h1><button class="btn primary">New project</button></div>
+        <div class="grid3">
+          <a class="box pcard" href="#project"><h3>Client proposals</h3><p class="muted small">~/Documents/Proposals</p><div class="row"><span class="status running">1 running</span><span class="muted small">· 14 tasks · 3 skills</span></div></a>
+          <a class="box pcard" href="#project"><h3>October newsletter</h3><p class="muted small">~/Documents/Newsletter</p><div class="row"><span class="muted small">6 tasks · 1 job, Mondays 08:00</span></div></a>
+          <a class="box pcard" href="#project"><h3>Q3 expense reports</h3><p class="muted small">~/Documents/Accounting/Q3</p><div class="row"><span class="status needs">1 needs you</span><span class="muted small">· 9 tasks</span></div></a>
+          <a class="box pcard" href="#project"><h3>Website</h3><p class="muted small">~/Documents/Website copy</p><div class="row"><span class="muted small">4 tasks</span></div></a>
+          <div class="box pcard placeholder"><h3>New project</h3><p class="small">Pick a folder. Everything the AI makes for this project goes there.</p></div>
+        </div>
+      </div></main>
+    </div>
+  </section>
+
+  <section class="screen" id="s-project" data-title="One project">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <main class="main"><div class="page stack-lg">
+        <div class="stack">
+          <div class="row between"><h1>Client proposals</h1><a class="btn primary" href="#home">New task here</a></div>
+          <p class="muted small">Folder ~/Documents/Proposals · 41 files · created 2 September</p>
+        </div>
+        <div class="tabs"><a class="on">Tasks</a><a>Files</a><a>Instructions</a><a>Skills</a><a>Jobs</a></div>
+        <div class="grid2" style="grid-template-columns: 1.4fr 1fr; align-items:start">
+          <div class="box"><ul class="list">
+            <li><a class="item" href="#task"><span class="status running">Running</span><span class="grow">Proposal for Alpi Logistica</span><span class="muted small">now</span></a></li>
+            <li><a class="item" href="#task"><span class="status done">Done</span><span class="grow">Proposal for Cantina Ferraris</span><span class="muted small">yesterday</span></a></li>
+            <li><a class="item" href="#task"><span class="status done">Done</span><span class="grow">Update prices in the template</span><span class="muted small">12 Oct</span></a></li>
+            <li><a class="item" href="#task"><span class="status done">Done</span><span class="grow">Translate the Brera proposal to English</span><span class="muted small">8 Oct</span></a></li>
+          </ul></div>
+          <div class="stack-lg">
+            <div class="box pad stack">
+              <div class="row between"><h3>Project instructions</h3><button class="btn sm ghost">Edit</button></div>
+              <p class="small">Every task here reads this first. Proposals are in Italian unless the client is foreign. Prices are without VAT. Sign as Giulia Rossi, Studio Rossi.</p>
+            </div>
+            <div class="box pad stack">
+              <h3>Skills on in this project</h3>
+              <div class="row wrap"><span class="chip skill">Proposal writer v3</span><span class="chip skill">Brand tone of voice</span><span class="chip skill">Price table</span></div>
+            </div>
+            <p class="note">A project is a folder plus instructions plus skills. Tasks, files and jobs all hang off it.</p>
+          </div>
+        </div>
+      </div></main>
+    </div>
+  </section>
+
+  <!-- ============ 4. SKILLS ============ -->
+  <section class="screen" id="s-skills" data-title="Skills">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <div class="split">
+        <div class="list-pane stack">
+          <div class="row between" style="padding:0 6px 6px"><h2>Skills</h2><button class="btn sm primary">New skill</button></div>
+          <a class="item sel"><span class="grow">Proposal writer</span><span class="muted small">v3</span></a>
+          <a class="item link"><span class="grow">Brand tone of voice</span><span class="muted small">v1</span></a>
+          <a class="item link"><span class="grow">Meeting notes to actions</span><span class="muted small">v2</span></a>
+          <a class="item link"><span class="grow">Price table</span><span class="muted small">v1</span></a>
+          <a class="item link"><span class="grow">Newsletter from links</span><span class="muted small">v4</span></a>
+          <hr>
+          <div class="box soft pad stack small">
+            <h3>Other ways to make one</h3>
+            <a class="item link">From a finished task</a>
+            <a class="item link">Import a SKILL.md folder</a>
+          </div>
+        </div>
+        <div class="detail stack-lg">
+          <div class="row between">
+            <div class="stack"><h1>Proposal writer</h1><p class="muted small">Used in Client proposals · last used now · version 3</p></div>
+            <div class="row"><button class="btn">Try it on a file</button><button class="btn">History</button><button class="btn primary">Save</button></div>
+          </div>
+          <div class="tabs"><a class="on">Form</a><a>SKILL.md</a></div>
+          <div class="stack">
+            <label class="label">Name</label><input class="field" value="Proposal writer">
+          </div>
+          <div class="stack">
+            <label class="label">When should the AI use it? (the description)</label>
+            <input class="field" value="When the user asks for a commercial proposal or quote for a client.">
+          </div>
+          <div class="stack">
+            <label class="label">Instructions</label>
+            <textarea class="field" style="min-height:150px">1. Read the call notes and list the client's requirements.
+2. Fill the proposal template section by section. Never invent requirements.
+3. Prices without VAT, rounded to €50.
+4. End with the payment terms from the project instructions.</textarea>
+          </div>
+          <div class="stack">
+            <label class="label">Files the skill brings with it</label>
+            <div class="row"><span class="chip file">template-proposal.docx</span><span class="chip file">checklist.md</span><button class="btn sm ghost">+ Add</button></div>
+          </div>
+          <p class="note">Form for beginners, raw SKILL.md one tab away. Both edit the same standard file.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5. JOBS ============ -->
+  <section class="screen" id="s-jobs" data-title="Jobs">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <div class="split" style="grid-template-columns: 1fr 380px">
+        <div class="detail stack-lg" style="border-right:1px solid var(--line)">
+          <div class="row between"><h1>Jobs</h1><button class="btn primary">New job</button></div>
+          <table>
+            <tr><th>Job</th><th>When</th><th>Project</th><th>Last run</th><th>Next run</th></tr>
+            <tr class="link"><td><b>Monday press review</b><div class="muted small">Skill: Newsletter from links</div></td><td>Mondays 08:00</td><td>October newsletter</td><td><span class="status done">Today 08:00</span></td><td>2 Nov 08:00</td></tr>
+            <tr class="link"><td><b>Monthly expense check</b><div class="muted small">Skill: Invoice checker</div></td><td>1st of the month 09:00</td><td>Q3 expense reports</td><td><span class="status needs">1 Oct · needed you</span></td><td>1 Nov 09:00</td></tr>
+            <tr class="link"><td><b>Daily inbox digest</b><div class="muted small">Needs the Gmail integration</div></td><td>Weekdays 18:00</td><td>None</td><td><span class="status off">Off</span></td><td class="muted">Integrations come in 0.2</td></tr>
+          </table>
+          <p class="note">A job is a saved task with a schedule. Each run shows up as a normal task with its files.</p>
+        </div>
+        <div class="detail stack-lg">
+          <h2>Monday press review</h2>
+          <div class="stack"><label class="label">Brief</label><textarea class="field">Read the links in links.md, pick the 5 most relevant for our clients and write the "This week" section of the newsletter.</textarea></div>
+          <div class="stack"><label class="label">Runs</label><div class="row"><span class="select">Every week</span><span class="select">Monday</span><span class="select">08:00</span></div><p class="mono muted">0 8 * * 1</p></div>
+          <div class="stack"><label class="label">If the computer is off at 08:00</label><span class="select">Run when it wakes up</span></div>
+          <div class="stack"><label class="label">Last 3 runs</label>
+            <a class="item link" href="#task"><span class="status done">Done</span><span class="grow">26 Oct</span><span class="muted small">this-week.md</span></a>
+            <a class="item link"><span class="status done">Done</span><span class="grow">19 Oct</span><span class="muted small">this-week.md</span></a>
+            <a class="item link"><span class="status done">Done</span><span class="grow">12 Oct</span><span class="muted small">this-week.md</span></a>
+          </div>
+          <div class="row"><button class="btn">Run now</button><button class="btn primary">Save</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6. BOARD ============ -->
+  <section class="screen" id="s-board" data-title="Board">
+    <div class="shell">
+      <aside class="side" data-side></aside>
+      <main class="main" style="display:flex; flex-direction:column">
+        <div class="row between" style="padding:20px 24px 14px">
+          <h1>Board</h1>
+          <div class="row"><span class="select">All projects</span><button class="btn primary">New task</button></div>
+        </div>
+        <div class="board">
+          <div class="col"><h3>To do <span class="muted">2</span></h3>
+            <div class="card"><span class="muted small">Website</span><b>Write three case studies</b><div class="row"><span class="chip file">3 files</span></div></div>
+            <div class="card"><span class="muted small">Client proposals</span><b>Proposal for Brera Design</b><span class="muted small">Waiting for the call notes</span></div>
+          </div>
+          <div class="col"><h3>Running <span class="muted">1</span></h3>
+            <a class="card" href="#task"><span class="muted small">Client proposals</span><b>Proposal for Alpi Logistica</b><span class="status running">Step 3 of 6</span></a>
+          </div>
+          <div class="col"><h3>Needs you <span class="muted">1</span></h3>
+            <div class="card"><span class="muted small">Q3 expense reports</span><b>Supplier contracts summary</b><span class="small">Wants to overwrite contracts-summary.xlsx</span><div class="row"><button class="btn sm">New file</button><button class="btn sm primary">Allow</button></div></div>
+          </div>
+          <div class="col"><h3>Done <span class="muted">3</span></h3>
+            <a class="card" href="#task"><span class="muted small">October newsletter · job</span><b>Monday press review</b><span class="chip file">this-week.md</span></a>
+            <div class="card"><span class="muted small">Website</span><b>Rewrite the About page</b><span class="chip file">2 files</span></div>
+            <div class="card"><span class="muted small">Client proposals</span><b>Proposal for Cantina Ferraris</b><span class="chip file">3 files</span></div>
+          </div>
+        </div>
+        <p class="note" style="margin:0 24px 18px">In Desk the board is one more view of the same tasks. You can ignore it and live in the sidebar.</p>
+      </main>
+    </div>
+  </section>
+</div>
+
+<nav class="mocknav"><b>A · Desk</b></nav>
+
+<template id="side">
+  <div class="top">
+    <a class="btn primary" href="#home">New task</a>
+    <a class="btn" href="#quick">Quick edit</a>
+  </div>
+  <div class="scroll">
+    <h4>Projects</h4>
+    <a class="item link proj" href="#project">▾ Client proposals<span class="count">14</span></a>
+    <a class="item link sub" href="#task"><span class="status running"></span><span class="truncate">Proposal for Alpi Logistica</span></a>
+    <a class="item link sub" href="#task"><span class="status done"></span><span class="truncate">Proposal for Cantina Ferraris</span></a>
+    <a class="item link sub" href="#task"><span class="status done"></span><span class="truncate">Update prices in the template</span></a>
+    <a class="item link proj" href="#project">▸ October newsletter<span class="count">6</span></a>
+    <a class="item link proj" href="#project">▸ Q3 expense reports<span class="count" style="color:var(--warn)">1 waiting</span></a>
+    <a class="item link proj" href="#project">▸ Website<span class="count">4</span></a>
+    <a class="item link muted" href="#projects">All projects</a>
+    <h4>Quick edits</h4>
+    <a class="item link sub" style="padding-left:8px" href="#quick"><span class="truncate">letter-bank.docx</span></a>
+  </div>
+  <div class="bottom">
+    <a class="item link" href="#board">Board</a>
+    <a class="item link" href="#skills">Skills</a>
+    <a class="item link" href="#jobs">Jobs</a>
+    <a class="item link">About</a>
+    <a class="item link">Settings</a>
+  </div>
+</template>
+<script>
+  for (const s of document.querySelectorAll("[data-side]")) s.append(document.getElementById("side").content.cloneNode(true));
+</script>
+<script src="../shared/wire.js"></script>
+</body>
+</html>
