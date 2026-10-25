@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
+import { ApprovalCard } from "@/components/Approval";
 import { Composer } from "@/components/Composer";
 import { Preview } from "@/components/Preview";
 import { TaskTag } from "@/components/TaskTag";
@@ -50,6 +51,43 @@ function FileLine({ file, onOpen }: { file: FileChange; onOpen?: () => void }) {
   );
 }
 
+/** Under a file the task replaced: the kept copy and a button to put it back, or to undo that. */
+function KeptRow({
+  task,
+  path,
+  onRestore,
+}: {
+  task: TaskT;
+  path: string;
+  onRestore: (path: string) => Promise<unknown>;
+}) {
+  const t = useT();
+  const [error, setError] = useState<string | null>(null);
+  const latest = (task.kept ?? []).filter((k) => k.path === path).at(-1);
+  if (!latest) return null;
+  const restored = latest.reason === "restore";
+  const busy = task.status === "running" || task.status === "needs-you";
+  return (
+    <div className="kept">
+      <Icon name="history" />
+      <span className="grow" role={error ? "alert" : undefined}>
+        {error ?? (restored ? t("kept.restored") : t("kept.note"))}
+      </span>
+      <button
+        type="button"
+        className="tbtn"
+        disabled={busy}
+        onClick={() => {
+          setError(null);
+          onRestore(path).catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+        }}
+      >
+        {restored ? t("kept.undo") : t("kept.restore")}
+      </button>
+    </div>
+  );
+}
+
 /** The quick edit's side panel: the files it changed, and Save a copy, which asks for a folder every time. */
 function WhatChanged({
   api,
@@ -58,6 +96,7 @@ function WhatChanged({
   live,
   onSaveCopy,
   onError,
+  onRestore,
 }: {
   api: TostWorkApi;
   task: TaskT;
@@ -65,6 +104,7 @@ function WhatChanged({
   live: boolean;
   onSaveCopy: () => Promise<SaveResult | null>;
   onError: (err: unknown) => void;
+  onRestore: (path: string) => Promise<unknown>;
 }) {
   const t = useT();
   const [saved, setSaved] = useState<SaveResult | null>(null);
@@ -89,7 +129,10 @@ function WhatChanged({
       <>
         <h3>{title}</h3>
         {files.map((f) => (
-          <FileLine key={f.path} file={f} onOpen={() => void api.files.open(task.id, f.path).catch(onError)} />
+          <Fragment key={f.path}>
+            <FileLine file={f} onOpen={() => void api.files.open(task.id, f.path).catch(onError)} />
+            <KeptRow task={task} path={f.path} onRestore={onRestore} />
+          </Fragment>
         ))}
       </>
     );
@@ -204,7 +247,7 @@ function Artifact({
         </button>
       </div>
       <div className="page pv">
-        <Preview api={api} taskId={task.id} path={current.path} version={live ? task.updatedAt : "final"} />
+        <Preview api={api} taskId={task.id} path={current.path} version={task.updatedAt} />
       </div>
     </div>
   );
@@ -217,6 +260,8 @@ export function Task({
   onAnswer,
   onFollowUp,
   onSaveCopy,
+  onDecide,
+  onRestore,
   onStop,
   onOpenProject,
   onError,
@@ -228,6 +273,8 @@ export function Task({
   onAnswer: (answer: string) => Promise<boolean>;
   onFollowUp: (text: string) => void;
   onSaveCopy: () => Promise<SaveResult | null>;
+  onDecide: (allow: boolean) => Promise<unknown>;
+  onRestore: (path: string) => Promise<unknown>;
   onStop: () => void;
   onOpenProject: () => void;
   /** Shows a failed action, such as a file that was moved before Open, in the app's alert. */
@@ -374,6 +421,8 @@ export function Task({
                     </button>
                   ))}
                 </Composer>
+              ) : task.approval ? (
+                <ApprovalCard approval={task.approval} t={t} onDecide={onDecide} />
               ) : (
                 <Composer
                   value={live ? "" : message}
@@ -392,7 +441,15 @@ export function Task({
           </div>
         </div>
         {quick ? (
-          <WhatChanged api={api} task={task} made={made} live={live} onSaveCopy={onSaveCopy} onError={onError} />
+          <WhatChanged
+            api={api}
+            task={task}
+            made={made}
+            live={live}
+            onSaveCopy={onSaveCopy}
+            onRestore={onRestore}
+            onError={onError}
+          />
         ) : (
           <aside className="rp">
             <div className="body">
@@ -403,7 +460,10 @@ export function Task({
                 </p>
               )}
               {made.map((f) => (
-                <FileLine key={f.path} file={f} />
+                <Fragment key={f.path}>
+                  <FileLine file={f} />
+                  <KeptRow task={task} path={f.path} onRestore={onRestore} />
+                </Fragment>
               ))}
               {used.length > 0 && <h3>{t("task.used")}</h3>}
               {used.map((f) => (

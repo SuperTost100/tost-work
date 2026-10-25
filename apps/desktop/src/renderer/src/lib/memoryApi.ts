@@ -94,6 +94,16 @@ export function createMemoryApi(): TostWorkApi & { emit(id: string, e: EngineEve
         emit(id, { type: "done" });
         return tasks.get(id) ?? t;
       },
+      decide: async (id, allow) => {
+        const t = tasks.get(id);
+        if (!t?.approval) throw new Error("This task isn't waiting for a decision");
+        const path = t.approval.paths[0] ?? "";
+        const kept = allow ? [{ path, copy: `/kept/${id}`, at: now(), reason: "overwrite" as const }] : [];
+        save({ ...resume(t, now()), kept: [...(t.kept ?? []), ...kept] });
+        emit(id, { type: "file", change: { path, kind: "update", role: "made" } });
+        emit(id, { type: "done" });
+        return tasks.get(id) ?? t;
+      },
       followUp: async (id, text) => {
         const t = tasks.get(id);
         if (!t || t.status === "running" || t.question) throw new Error("This task can't take a follow-up now");
@@ -128,6 +138,14 @@ export function createMemoryApi(): TostWorkApi & { emit(id: string, e: EngineEve
       }),
       open: async () => {},
       reveal: async () => {},
+      restore: async (taskId, path) => {
+        const t = tasks.get(taskId);
+        if (!t) throw new Error("That task doesn't exist");
+        return save({
+          ...t,
+          kept: [...(t.kept ?? []), { path, copy: `/kept/${taskId}-2`, at: now(), reason: "restore" }],
+        });
+      },
     },
   };
 }

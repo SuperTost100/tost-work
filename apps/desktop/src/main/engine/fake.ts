@@ -13,6 +13,8 @@ export interface FakeScript {
   files: { path: string; kind: "add" | "update"; afterStep: number }[];
   /** Reports files that already exist as changed: the copies a quick edit was given, or the last file made. */
   touches?: { which: "attachments" | "last-made"; afterStep: number };
+  /** Asks to delete this file, relative to the task's folder, after the step. */
+  remove?: { path: string; afterStep: number };
   review?: Review;
   summary: string;
 }
@@ -78,8 +80,9 @@ const sleep = (ms: number, signal: AbortSignal) =>
   });
 
 /** Replays a script with a delay between steps, and waits for real answers to its question. */
+/** Replays a script with a delay between steps, and waits for real answers to its questions and approvals. */
 export class FakeEngine implements Engine {
-  private waiting = new Map<string, (answer: string) => void>();
+  private waiting = new Map<string, (reply: string | boolean) => void>();
 
   constructor(
     private script: FakeScript = PROPOSAL_SCRIPT,
@@ -87,6 +90,13 @@ export class FakeEngine implements Engine {
     /** Folder with sample files to copy into the task's folder, so previews have something real to show. */
     private samples?: string,
   ) {}
+
+  /** Resolves with the user's reply, or null when the task is stopped first. */
+  private reply(id: string, signal: AbortSignal): Promise<string | boolean | null> {
+    const replied = new Promise<string | boolean>((resolve) => this.waiting.set(id, resolve));
+    const stopped = new Promise<null>((r) => signal.addEventListener("abort", () => r(null), { once: true }));
+    return Promise.race([replied, stopped]).finally(() => this.waiting.delete(id));
+  }
 
   async *run({ task, workdir, followUp, signal }: RunContext): AsyncIterable<EngineEvent> {
     const quickEdit = task.projectId === null && task.attachments.length > 0;
@@ -96,15 +106,11 @@ export class FakeEngine implements Engine {
       if (signal.aborted) return yield { type: "stopped" };
       if (s.question && s.question.beforeStep === i) {
         const id = `${task.id}-q`;
-        const answered = new Promise<string>((resolve) => this.waiting.set(id, resolve));
+        const answer = this.reply(id, signal);
         yield { type: "question", question: { id, text: s.question.text, options: s.question.options } };
-        const answer = await Promise.race([
-          answered,
-          new Promise<null>((r) => signal.addEventListener("abort", () => r(null), { once: true })),
-        ]);
-        this.waiting.delete(id);
-        if (answer === null) return yield { type: "stopped" };
-        yield { type: "message", text: `Noted: ${answer}.` };
+        const reply = await answer;
+        if (reply === null) return yield { type: "stopped" };
+        yield { type: "message", text: `Noted: ${reply}.` };
       }
       yield {
         type: "plan",
@@ -117,10 +123,20 @@ export class FakeEngine implements Engine {
         let path = join(workdir, f.path);
         if (this.samples) {
           await mkdir(workdir, { recursive: true });
-          // Never replace a file already in the folder: the sample goes under a free name, and the exclusive copy
-          // also refuses a link left at that name.
-          path = await freeName(workdir, f.path);
-          await copyFile(join(this.samples, f.path), path, constants.COPYFILE_EXCL);
+          // A file already in the folder (or a link left at its name) is replaced only when the user allows it,
+          // as the real agent must; otherwise the sample goes under a free name with an exclusive copy.
+          const free = await freeName(workdir, f.path);
+          let replace = false;
+          if (free !== path) {
+            const id = `${task.id}-o${i}`;
+            const decision = this.reply(id, signal);
+            yield { type: "approval", approval: { id, action: "overwrite", paths: [path] } };
+            const allowed = await decision;
+            if (allowed === null) return yield { type: "stopped" };
+            replace = allowed === true;
+          }
+          if (!replace) path = free;
+          await copyFile(join(this.samples, f.path), path, replace ? 0 : constants.COPYFILE_EXCL);
         }
         yield { type: "file", change: { path, kind: f.kind, role: "made" } };
       }
@@ -128,6 +144,16 @@ export class FakeEngine implements Engine {
         const lastMade = task.files.filter((f) => f.role === "made" && f.kind !== "delete").at(-1)?.path;
         const paths = s.touches.which === "attachments" ? task.attachments : lastMade ? [lastMade] : [];
         for (const path of paths) yield { type: "file", change: { path, kind: "update", role: "made" } };
+      }
+      if (s.remove?.afterStep === i) {
+        const path = join(workdir, s.remove.path);
+        const id = `${task.id}-d${i}`;
+        const decision = this.reply(id, signal);
+        yield { type: "approval", approval: { id, action: "delete", paths: [path] } };
+        const allowed = await decision;
+        if (allowed === null) return yield { type: "stopped" };
+        // Tost Work moved the file to the Trash before passing the decision on, so the engine only reports it.
+        if (allowed) yield { type: "file", change: { path, kind: "delete", role: "made" } };
       }
     }
     if (signal.aborted) return yield { type: "stopped" };
@@ -140,7 +166,7 @@ export class FakeEngine implements Engine {
     this.waiting.get(questionId)?.(answer);
   }
 
-  decide(): void {
-    // The script asks no approvals.
+  decide(_taskId: string, approvalId: string, allow: boolean): void {
+    this.waiting.get(approvalId)?.(allow);
   }
 }

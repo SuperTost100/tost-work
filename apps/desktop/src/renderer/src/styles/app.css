@@ -874,6 +874,31 @@ h3 {
   color: var(--t3);
   font-size: 13px;
 }
+.asking .q .d {
+  margin: 4px 0 0;
+}
+.asking .q .err {
+  color: var(--need);
+}
+.approve .acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 16px 14px;
+}
+.kept {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0 6px 42px;
+  font-size: 13px;
+  color: var(--t3);
+}
+.kept .ic {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
 .asking .o.own {
   color: var(--t3);
 }

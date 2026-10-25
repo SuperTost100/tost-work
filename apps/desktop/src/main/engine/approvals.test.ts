@@ -1,0 +1,142 @@
+/** @vitest-environment node */
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { fileGuard } from "../guard";
+import { Store } from "../store/store";
+import { FakeEngine, type FakeScript, PROPOSAL_SCRIPT } from "./fake";
+import { TaskRunner } from "./runner";
+
+const waitFor = async (check: () => boolean) => {
+  for (let i = 0; i < 300 && !check(); i++) await new Promise((r) => setTimeout(r, 2));
+  if (!check()) throw new Error("timed out");
+};
+
+async function setup(script: FakeScript = PROPOSAL_SCRIPT) {
+  const temp = (prefix: string) => mkdtemp(join(tmpdir(), prefix));
+  const [samples, work, kept] = await Promise.all([temp("tw-samples-"), temp("tw-work-"), temp("tw-kept-")]);
+  await writeFile(join(samples, "Proposta.docx"), "new");
+  await writeFile(join(samples, "prezzi.xlsx"), "prices");
+  const trashed: string[] = [];
+  const store = new Store(":memory:");
+  const guard = fileGuard(kept, async (path) => {
+    trashed.push(path);
+    await rm(path);
+  });
+  const runner = new TaskRunner(store, new FakeEngine(script, 0, samples), () => {}, undefined, guard);
+  const task = runner.create({ projectId: "p1", brief: "Write a proposal", workdir: work });
+  const status = () => store.getTask(task.id);
+  return { store, runner, task, work, trashed, status };
+}
+
+describe("overwrite approvals", () => {
+  it("asks before replacing a file, and keeps a copy of it when allowed", async () => {
+    const { runner, task, work, status } = await setup();
+    await writeFile(join(work, "Proposta.docx"), "old");
+    const done = runner.start(task.id);
+
+    await waitFor(() => status()?.approval != null);
+    expect(status()?.approval).toMatchObject({ action: "overwrite", paths: [join(work, "Proposta.docx")] });
+    await runner.decide(task.id, true);
+    await waitFor(() => status()?.question != null);
+    runner.answer(task.id, "The client pays it");
+    const final = await done;
+
+    expect(await readFile(join(work, "Proposta.docx"), "utf8")).toBe("new");
+    expect(final.kept).toHaveLength(1);
+    expect(final.kept?.[0]?.reason).toBe("overwrite");
+    expect(await readFile(final.kept?.[0]?.copy ?? "", "utf8")).toBe("old");
+  });
+
+  it("saves under a new name when refused, and leaves the file alone", async () => {
+    const { runner, task, work, status } = await setup();
+    await writeFile(join(work, "Proposta.docx"), "old");
+    const done = runner.start(task.id);
+    await waitFor(() => status()?.approval != null);
+    await runner.decide(task.id, false);
+    await waitFor(() => status()?.question != null);
+    runner.answer(task.id, "The client pays it");
+    const final = await done;
+
+    expect(await readFile(join(work, "Proposta.docx"), "utf8")).toBe("old");
+    expect(await readFile(join(work, "Proposta (2).docx"), "utf8")).toBe("new");
+    expect(final.files.map((f) => f.path)).toContain(join(work, "Proposta (2).docx"));
+    expect(final.kept ?? []).toHaveLength(0);
+  });
+
+  it("restores the kept copy, and restoring again undoes it", async () => {
+    const { runner, task, work, status } = await setup();
+    const path = join(work, "Proposta.docx");
+    await writeFile(path, "old");
+    const done = runner.start(task.id);
+    await waitFor(() => status()?.approval != null);
+    await runner.decide(task.id, true);
+    await waitFor(() => status()?.question != null);
+    runner.answer(task.id, "The client pays it");
+    await done;
+
+    const restored = await runner.restore(task.id, path);
+    expect(await readFile(path, "utf8")).toBe("old");
+    expect(restored.kept?.map((k) => k.reason)).toEqual(["overwrite", "restore"]);
+    await runner.restore(task.id, path);
+    expect(await readFile(path, "utf8")).toBe("new");
+  });
+
+  it("refuses a second decision while the first is carried out", async () => {
+    const { runner, task, work, status } = await setup();
+    await writeFile(join(work, "Proposta.docx"), "old");
+    void runner.start(task.id);
+    await waitFor(() => status()?.approval != null);
+    const first = runner.decide(task.id, true);
+    await expect(runner.decide(task.id, true)).rejects.toThrow(/already being carried out/);
+    await first;
+    runner.stop(task.id);
+  });
+});
+
+describe("delete approvals", () => {
+  const removing = (path: string): FakeScript => ({
+    steps: ["Tidy up"],
+    files: [],
+    remove: { path, afterStep: 0 },
+    summary: "Done.",
+  });
+
+  it("moves an allowed deletion to the Trash before the agent goes on", async () => {
+    const { runner, task, work, trashed, status } = await setup(removing("draft.txt"));
+    await writeFile(join(work, "draft.txt"), "draft");
+    const done = runner.start(task.id);
+    await waitFor(() => status()?.approval != null);
+    expect(status()?.approval?.action).toBe("delete");
+    await runner.decide(task.id, true);
+    const final = await done;
+
+    expect(trashed).toHaveLength(1);
+    expect(await readdir(work)).toEqual([]);
+    expect(final.files).toEqual([{ path: join(work, "draft.txt"), kind: "delete", role: "made" }]);
+  });
+
+  it("keeps the file when refused", async () => {
+    const { runner, task, work, trashed, status } = await setup(removing("draft.txt"));
+    await writeFile(join(work, "draft.txt"), "draft");
+    const done = runner.start(task.id);
+    await waitFor(() => status()?.approval != null);
+    await runner.decide(task.id, false);
+    await done;
+    expect(trashed).toEqual([]);
+    expect(await readdir(work)).toEqual(["draft.txt"]);
+  });
+
+  it("refuses to delete a file outside the task's folder, and keeps asking", async () => {
+    const { runner, task, work, trashed, status } = await setup(removing("../outside.txt"));
+    await writeFile(join(work, "..", "outside.txt"), "not yours");
+    void runner.start(task.id);
+    await waitFor(() => status()?.approval != null);
+    await expect(runner.decide(task.id, true)).rejects.toThrow(/outside/);
+    expect(trashed).toEqual([]);
+    expect(status()?.approval).not.toBeNull();
+    runner.stop(task.id);
+    await rm(join(work, "..", "outside.txt"));
+  });
+});

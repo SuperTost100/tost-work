@@ -170,6 +170,8 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
           }
           onFollowUp={(text) => void api.tasks.followUp(task.id, text).catch(report)}
           onSaveCopy={() => api.tasks.saveCopy(task.id)}
+          onDecide={(allow) => api.tasks.decide(task.id, allow)}
+          onRestore={(path) => api.files.restore(task.id, path)}
           onStop={() => void api.tasks.stop(task.id).catch(report)}
           onOpenProject={() => project && setRoute({ name: "project", id: project.id })}
           onError={report}
