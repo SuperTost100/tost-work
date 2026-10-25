@@ -62,6 +62,8 @@ export interface Task {
   title: string;
   brief: string;
   attachments: string[];
+  /** The folder the agent works in: the project folder, or a temporary folder for a task without a project. */
+  workdir: string;
   model: string;
   effort: string;
   status: TaskStatus;

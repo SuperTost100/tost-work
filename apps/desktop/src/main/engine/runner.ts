@@ -7,6 +7,7 @@ import type { Engine } from "./engine";
 export interface NewTask {
   projectId: string | null;
   brief: string;
+  workdir: string;
   attachments?: string[];
   model?: string;
   effort?: string;
@@ -40,6 +41,7 @@ export class TaskRunner {
       title: titleFrom(input.brief),
       brief: input.brief,
       attachments: input.attachments ?? [],
+      workdir: input.workdir,
       model: input.model ?? "gpt-5.5",
       effort: input.effort ?? "medium",
       status: "draft",
@@ -58,8 +60,9 @@ export class TaskRunner {
   }
 
   /** Runs the task to the end. Resolves with the final task; questions pause it until `answer` is called. */
-  async start(taskId: string, workdir: string): Promise<Task> {
+  async start(taskId: string): Promise<Task> {
     let task = this.mustGet(taskId);
+    const workdir = task.workdir;
     if (this.running.has(taskId)) throw new Error("This task is already running");
     const project: Project | null = task.projectId ? (this.store.getProject(task.projectId) ?? null) : null;
     const controller = new AbortController();
@@ -81,8 +84,8 @@ export class TaskRunner {
   }
 
   /** Starts the task without waiting for it. A failure the task couldn't record itself is logged, so it can't crash the app. */
-  launch(taskId: string, workdir: string): void {
-    this.start(taskId, workdir).catch((err: unknown) => {
+  launch(taskId: string): void {
+    this.start(taskId).catch((err: unknown) => {
       console.error(`Task ${taskId} failed and its state couldn't be saved`, err);
     });
   }
