@@ -209,6 +209,8 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
           void api?.tasks.remove(id).then((gone) => {
             if (!gone) return;
             removeTask(id);
+            // Project cards count tasks in the store, so they ask again.
+            void api.projects.taskCounts().then(setCounts, report);
             setRoute((r) => (r.name === "task" && r.id === id ? { name: "home" } : r));
           }, report)
         }

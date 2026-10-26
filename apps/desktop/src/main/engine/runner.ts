@@ -108,8 +108,12 @@ export class TaskRunner {
         // Read the stored task each time, so an answer saved meanwhile isn't overwritten.
         task = this.save(applyEvent(this.mustGet(taskId), event, this.now()));
       }
-      if (task.status === "running" && !this.queued.has(taskId))
-        task = this.save(applyEvent(task, { type: "done" }, this.now()));
+      // The stored task, not the last snapshot: a rename may have landed while the engine finished.
+      const latest = this.mustGet(taskId);
+      task =
+        latest.status === "running" && !this.queued.has(taskId)
+          ? this.save(applyEvent(latest, { type: "done" }, this.now()))
+          : latest;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       task = this.save(applyEvent(this.mustGet(taskId), { type: "failed", error: message }, this.now()));
