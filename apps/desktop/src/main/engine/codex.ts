@@ -15,10 +15,10 @@ const END_TURN =
 
 /**
  * Shell commands that delete, where a command starts: the line, after ; & | ( { or $(, after a keyword such as then
- * or do, or run by xargs, find -exec, env, exec or sudo.
+ * or do, or run by xargs or find -exec. env and sudo with their options, and NAME=value settings, may come first.
  */
 const SHELL_DELETES =
-  /(^|[\n;&|(`{!]|\$\(|\b(then|do|else|elif|exec|command|env|nohup|time|xargs(\s+-\S+)*)\s|-exec\s)\s*(sudo\s+)?(rm|rmdir|del|erase|rd|unlink|shred|trash)(\s|$)|(^|\s)find\s[^\n]*\s-delete\b/im;
+  /(^|[\n;&|(`{!]|\$\(|\b(then|do|else|elif|exec|command|nohup|time|xargs(\s+-\S+)*)\s|-exec\s)\s*((env|sudo)(\s+-\S+(\s+\w+)?)*\s+)?(\w+=\S*\s+)*(sudo(\s+-\S+(\s+\w+)?)*\s+)?(rm|rmdir|del|erase|rd|unlink|shred|trash)(\s|$)|(^|\s)find\s[^\n]*\s-delete\b/im;
 /** Deletions in code a command runs, such as a Python, Node or PowerShell script. Looked for in the whole command. */
 const CODE_DELETES =
   /os\.(remove|unlink|rmdir)\(|shutil\.rmtree\(|\.(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync)\(|Remove-Item/i;

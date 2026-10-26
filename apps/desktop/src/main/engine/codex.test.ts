@@ -375,6 +375,10 @@ describe("deletesFiles", () => {
       "if test -f old.docx; then rm old.docx; fi",
       'for f in *.tmp; do rm "$f"; done',
       "cat <<EOF > plan.md\n$(rm old.docx)\nEOF",
+      "env -i rm x",
+      "FOO=1 rm old.docx",
+      "env FOO=1 rm x",
+      "sudo -u bob rm x",
     ])
       expect(deletesFiles(command), command).toBe(true);
   });
