@@ -79,6 +79,8 @@ export interface Task {
   attachments: string[];
   /** The folder the agent works in: the project folder, or a temporary folder for a task without a project. */
   workdir: string;
+  /** The agent the task runs on. Missing on tasks from before Claude, which all ran on Codex. */
+  provider?: AgentProvider;
   model: string;
   effort: string;
   status: TaskStatus;
@@ -129,8 +131,17 @@ export interface Settings {
   sections: Partial<Record<SectionKey, boolean>>;
   textSize: TextSize;
   theme: Theme;
+  /** The account new tasks run on. null picks the first one signed in. */
+  defaultAi: AiId | null;
   setupDone: boolean;
 }
+
+/** The ways to connect an AI: a ChatGPT subscription or a Claude subscription. */
+export type AiId = "chatgpt" | "claude";
+export const AIS: AiId[] = ["chatgpt", "claude"];
+/** The agent CLI each subscription runs through. */
+export type AgentProvider = "codex" | "claude";
+export const PROVIDER_OF: Record<AiId, AgentProvider> = { chatgpt: "codex", claude: "claude" };
 
 export const LEVELS: Level[] = ["beginner", "intermediate", "advanced", "expert"];
 export type TextSize = "small" | "normal" | "large";
@@ -160,5 +171,6 @@ export const DEFAULT_SETTINGS: Settings = {
   sections: {},
   textSize: "normal",
   theme: "system",
+  defaultAi: null,
   setupDone: false,
 };

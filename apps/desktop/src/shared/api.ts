@@ -1,4 +1,4 @@
-import type { Project, Settings, Task } from "./model";
+import type { AgentProvider, Project, Settings, Task } from "./model";
 
 export interface NewProjectInput {
   name: string;
@@ -25,8 +25,8 @@ export interface SaveResult {
   saved: string[];
 }
 
-/** Codex, which the ChatGPT subscription runs through. */
-export interface CodexAccount {
+/** An agent CLI and the subscription signed in to it: Codex for ChatGPT, Claude Code for Claude. */
+export interface AgentAccount {
   installed: boolean;
   version?: string;
   loggedIn: boolean;
@@ -38,7 +38,7 @@ export interface CodexAccount {
 export type SignInEvent =
   | { type: "link"; url: string }
   | { type: "code"; message: string }
-  | { type: "done"; account: CodexAccount }
+  | { type: "done"; account: AgentAccount }
   | { type: "error"; message: string };
 
 /** What the preload exposes to the interface as `window.tostWork`. */
@@ -50,15 +50,16 @@ export interface TostWorkApi {
     /** Saves the fields given and returns all settings. */
     update(patch: Partial<Settings>): Promise<Settings>;
   };
+  /** The subscriptions, one per agent CLI. */
   account: {
-    status(): Promise<CodexAccount>;
-    /** Opens the ChatGPT sign-in page through Codex. Progress arrives through `onSignIn`. */
-    signIn(): Promise<void>;
-    sendCode(code: string): Promise<void>;
-    cancel(): Promise<void>;
-    /** Signs out of ChatGPT in Codex and resolves with the new state. */
-    signOut(): Promise<CodexAccount>;
-    onSignIn(listener: (event: SignInEvent) => void): () => void;
+    status(provider: AgentProvider): Promise<AgentAccount>;
+    /** Opens the sign-in page through the CLI. Progress arrives through `onSignIn`. */
+    signIn(provider: AgentProvider): Promise<void>;
+    sendCode(provider: AgentProvider, code: string): Promise<void>;
+    cancel(provider: AgentProvider): Promise<void>;
+    /** Signs out in the CLI and resolves with the new state. */
+    signOut(provider: AgentProvider): Promise<AgentAccount>;
+    onSignIn(listener: (provider: AgentProvider, event: SignInEvent) => void): () => void;
   };
   projects: {
     list(): Promise<Project[]>;

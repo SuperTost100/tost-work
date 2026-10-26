@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { AccountRow } from "@/components/AccountRow";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
-import { useChatGpt } from "@/lib/useChatGpt";
 import { useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
 import {
+  AIS,
+  type AiId,
   LEVELS,
   SECTION_LEVEL,
   type SectionKey,
@@ -15,7 +17,6 @@ import {
   THEMES,
 } from "../../../shared/model";
 
-const CODEX_INSTALL = "npm install -g @openai/codex";
 const GROUPS = [
   { id: "level", icon: "layers", key: "settings.level" },
   { id: "accounts", icon: "key-2", key: "settings.accounts" },
@@ -57,83 +58,6 @@ function Choice<T extends string>({
   );
 }
 
-/** The ChatGPT row: its state, and sign in or sign out. */
-function ChatGptRow({ api }: { api: TostWorkApi }) {
-  const t = useT();
-  const { account, checking, signingIn, signingOut, link, codePrompt, error, check, signIn, sendCode, signOut } =
-    useChatGpt(api);
-  const [code, setCode] = useState("");
-
-  let detail: React.ReactNode = t("settings.notConnected");
-  let action: React.ReactNode = null;
-  if (checking) detail = t("ai.checking");
-  else if (account && !account.installed) {
-    detail = (
-      <>
-        {t("ai.missing")} <code className="cmd">{CODEX_INSTALL}</code>
-      </>
-    );
-    action = (
-      <button type="button" className="btn" onClick={() => void check()}>
-        {t("ai.checkAgain")}
-      </button>
-    );
-  } else if (account?.loggedIn) {
-    detail = account.account ? t("ai.connected", { account: account.account }) : t("ai.connectedPlain");
-    action = (
-      <button type="button" className="btn" disabled={signingOut} onClick={() => void signOut()}>
-        {t("settings.signOut")}
-      </button>
-    );
-  } else if (signingIn) {
-    detail = (
-      <>
-        {t("ai.waiting")}{" "}
-        {link && (
-          <a href={link} target="_blank" rel="noreferrer" className="link">
-            {t("ai.openLink")}
-          </a>
-        )}
-      </>
-    );
-  } else if (account) {
-    action = (
-      <button type="button" className="btn" onClick={() => void signIn()}>
-        {t("ai.signIn")}
-      </button>
-    );
-  }
-
-  return (
-    <div className="acct">
-      <span>
-        <b>{t("ai.chatgpt")}</b>
-        <span>{detail}</span>
-        {codePrompt && (
-          <span className="keybox">
-            <input
-              className="input grow"
-              aria-label={t("ai.code")}
-              placeholder={codePrompt}
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-            />
-            <button type="button" className="btn" disabled={!code.trim()} onClick={() => sendCode(code.trim())}>
-              {t("ai.sendCode")}
-            </button>
-          </span>
-        )}
-        {error && (
-          <span className="err" role="alert">
-            {error}
-          </span>
-        )}
-      </span>
-      {action}
-    </div>
-  );
-}
-
 /** Settings: level and sections, AI accounts, language, text size and theme, one pane each. Each change is saved at once. */
 export function Settings({
   api,
@@ -147,6 +71,12 @@ export function Settings({
   const t = useT();
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState<Group>("level");
+  const [connected, setConnected] = useState<Partial<Record<AiId, boolean>>>({});
+  const onConnected = useCallback((ai: AiId, c: boolean) => setConnected((prev) => ({ ...prev, [ai]: c })), []);
+  // Without a choice, new tasks run on the first account signed in, in this order.
+  const signedIn = AIS.filter((ai) => connected[ai]);
+  const shownDefault: AiId =
+    settings.defaultAi && signedIn.includes(settings.defaultAi) ? settings.defaultAi : (signedIn[0] ?? "chatgpt");
   const save = (patch: Partial<SettingsData>) => {
     setError(null);
     api.settings.update(patch).then(onChange, (err: unknown) => setError(errorText(err)));
@@ -259,15 +189,40 @@ export function Settings({
             {active === "accounts" && (
               <section aria-labelledby="settings-accounts">
                 <h1 id="settings-accounts">{t("settings.accounts")}</h1>
-                <ChatGptRow api={api} />
-                {(["claude", "key"] as const).map((k) => (
-                  <div className="acct" key={k}>
-                    <span>
-                      <b>{t(`ai.${k}` as MessageKey)}</b>
-                      <span>{t("ai.later")}</span>
-                    </span>
-                  </div>
+                {AIS.map((ai) => (
+                  <AccountRow
+                    key={ai}
+                    api={api}
+                    ai={ai}
+                    variant="settings"
+                    onConnected={onConnected}
+                    // The account signed in last runs new tasks; signing out of it leaves the choice to the others.
+                    onSignedIn={(signedIn) => save({ defaultAi: signedIn })}
+                    onSignedOut={(out) => settings.defaultAi === out && save({ defaultAi: null })}
+                  />
                 ))}
+                <div className="acct">
+                  <span>
+                    <b>{t("ai.key")}</b>
+                    <span>{t("ai.later")}</span>
+                  </span>
+                </div>
+                {signedIn.length > 1 && (
+                  <div className="srow">
+                    <div className="lbl">
+                      <b>{t("settings.defaultAi")}</b>
+                      <span>{t("settings.defaultAi.d")}</span>
+                    </div>
+                    <Choice<AiId>
+                      label={t("settings.defaultAi")}
+                      name="default-ai"
+                      options={signedIn}
+                      value={shownDefault}
+                      text={(ai) => t(`ai.${ai}.short` as MessageKey)}
+                      onChange={(defaultAi) => save({ defaultAi })}
+                    />
+                  </div>
+                )}
               </section>
             )}
 

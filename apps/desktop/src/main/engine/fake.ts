@@ -92,7 +92,7 @@ export class FakeEngine implements Engine {
   ) {}
 
   async defaults() {
-    return { model: "gpt-5.5", effort: "medium" };
+    return { provider: "codex" as const, model: "gpt-5.5", effort: "medium" };
   }
 
   /** Resolves with the user's reply, or null when the task is stopped first. */

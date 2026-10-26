@@ -3,9 +3,10 @@ import { createFunnel } from "cli-funnel";
 import { app, BrowserWindow, nativeTheme, shell } from "electron";
 import { IPC } from "../shared/api";
 import { languageFrom } from "../shared/i18n";
+import type { AgentProvider } from "../shared/model";
 import { Accounts } from "./accounts";
 import { documentTools } from "./documents";
-import { CodexEngine } from "./engine/codex";
+import { AgentEngine } from "./engine/agent";
 import type { Engine } from "./engine/engine";
 import { FakeEngine } from "./engine/fake";
 import { TaskRunner } from "./engine/runner";
@@ -13,6 +14,7 @@ import { fileGuard } from "./guard";
 import { registerIpc } from "./ipc";
 import { applyLook } from "./look";
 import { ToolServer } from "./mcp/server";
+import { pickAi } from "./pickAi";
 import { Store } from "./store/store";
 
 const isMac = process.platform === "darwin";
@@ -69,20 +71,35 @@ app.whenReady().then(async () => {
   const funnel = createFunnel();
   const language = () => store.getSettings().language ?? languageFrom(app.getLocale());
 
-  // Tasks run on Codex. TOST_WORK_ENGINE=fake replays a script instead, for trying the interface without an account.
+  // Tasks run on Codex or Claude Code. TOST_WORK_ENGINE=fake replays a script instead, for trying the interface without an account.
   let engine: Engine;
   let tools: ToolServer | null = null;
   if (process.env.TOST_WORK_ENGINE === "fake") {
     engine = new FakeEngine(undefined, undefined, join(app.getAppPath(), "resources", "fake"));
   } else {
-    const codex = new CodexEngine(funnel, language, documentTools(), () => {
-      const { name, work, notes } = store.getSettings();
-      return { name, work, notes };
-    });
-    tools = new ToolServer(codex);
+    const agent = new AgentEngine(
+      funnel,
+      language,
+      documentTools(),
+      () => {
+        const { name, work, notes } = store.getSettings();
+        return { name, work, notes };
+      },
+      () =>
+        pickAi(
+          store.getSettings().defaultAi,
+          // A failed check is unknown (null), not signed out.
+          (provider) =>
+            funnel.authStatus(provider).then(
+              (status) => status.loggedIn,
+              () => null,
+            ),
+        ),
+    );
+    tools = new ToolServer(agent);
     await tools.start();
-    codex.attachTools(tools);
-    engine = codex;
+    agent.attachTools(tools);
+    engine = agent;
   }
 
   // shortcut: kept copies are never cleaned up; add a size limit or an age limit before the public beta.
@@ -97,21 +114,26 @@ app.whenReady().then(async () => {
     undefined,
     guard,
   );
-  const accounts = new Accounts(
-    {
-      detect: () => funnel.providers.codex.detect(),
-      authStatus: () => funnel.authStatus("codex"),
-      login: () => funnel.login("codex"),
-      logout: () => funnel.logout("codex"),
-    },
-    (event) => {
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.accountSignInEvent, event);
-    },
-    (url) => shell.openExternal(url),
-  );
+  // One sign-in per agent CLI. Their progress goes to the window tagged with the CLI it belongs to.
+  const accountsFor = (provider: AgentProvider) =>
+    new Accounts(
+      {
+        detect: () => funnel.providers[provider].detect(),
+        authStatus: () => funnel.authStatus(provider),
+        login: () => funnel.login(provider),
+        logout: () => funnel.logout(provider),
+      },
+      (event) => {
+        if (mainWindow && !mainWindow.isDestroyed())
+          mainWindow.webContents.send(IPC.accountSignInEvent, provider, event);
+      },
+      (url) => shell.openExternal(url),
+    );
+  const accounts = { codex: accountsFor("codex"), claude: accountsFor("claude") };
   registerIpc(store, runner, accounts, () => mainWindow);
   app.on("before-quit", () => {
-    accounts.cancel();
+    accounts.codex.cancel();
+    accounts.claude.cancel();
     void tools?.stop();
     funnel.close();
     store.close();

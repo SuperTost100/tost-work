@@ -1,12 +1,19 @@
 import type {
-  CodexAccount,
+  AgentAccount,
   NewProjectInput,
   NewTaskInput,
   SignInEvent,
   TaskMenuAction,
   TostWorkApi,
 } from "../../../shared/api";
-import { DEFAULT_SETTINGS, type EngineEvent, type Project, type Settings, type Task } from "../../../shared/model";
+import {
+  type AgentProvider,
+  DEFAULT_SETTINGS,
+  type EngineEvent,
+  type Project,
+  type Settings,
+  type Task,
+} from "../../../shared/model";
 import { applyEvent, resume } from "../../../shared/reduce";
 
 /**
@@ -20,8 +27,11 @@ export function createMemoryApi(
   const tasks = new Map<string, Task>();
   const listeners = new Set<(t: Task) => void>();
   let settings: Settings = { ...DEFAULT_SETTINGS, ...initial };
-  let account: CodexAccount = { installed: true, version: "0.164.0", loggedIn: false };
-  const signInListeners = new Set<(e: SignInEvent) => void>();
+  const accounts: Record<AgentProvider, AgentAccount> = {
+    codex: { installed: true, version: "0.164.0", loggedIn: false },
+    claude: { installed: true, version: "2.1.310", loggedIn: false },
+  };
+  const signInListeners = new Set<(provider: AgentProvider, e: SignInEvent) => void>();
   let n = 0;
   const now = () => new Date(Date.UTC(2026, 9, 26, 9, 0, n++)).toISOString();
   const save = (t: Task) => {
@@ -53,16 +63,17 @@ export function createMemoryApi(
       },
     },
     account: {
-      status: async () => account,
-      signIn: async () => {
-        account = { ...account, loggedIn: true, account: "giulia@example.com" };
-        for (const l of signInListeners) l({ type: "done", account });
+      status: async (provider) => accounts[provider],
+      signIn: async (provider) => {
+        const account = { ...accounts[provider], loggedIn: true, account: "giulia@example.com" };
+        accounts[provider] = account;
+        for (const l of signInListeners) l(provider, { type: "done", account });
       },
       sendCode: async () => {},
       cancel: async () => {},
-      signOut: async () => {
-        account = { ...account, loggedIn: false, account: undefined };
-        return account;
+      signOut: async (provider) => {
+        accounts[provider] = { ...accounts[provider], loggedIn: false, account: undefined };
+        return accounts[provider];
       },
       onSignIn: (l) => {
         signInListeners.add(l);

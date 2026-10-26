@@ -1,4 +1,4 @@
-import type { EngineEvent, Project, Task } from "../../shared/model";
+import type { AgentProvider, EngineEvent, Project, Task } from "../../shared/model";
 
 export interface RunContext {
   task: Task;
@@ -12,8 +12,8 @@ export interface RunContext {
 
 /** Something that does the work of a task: the real one wraps cli-funnel, the fake one replays a script. */
 export interface Engine {
-  /** The model and effort a new task starts with. */
-  defaults(): Promise<{ model: string; effort: string }>;
+  /** The agent, model and effort a new task starts with. */
+  defaults(): Promise<{ provider: AgentProvider; model: string; effort: string }>;
   run(ctx: RunContext): AsyncIterable<EngineEvent>;
   /**
    * The user picked an answer, or wrote one, for the question the engine asked. Returns false when no run is waiting

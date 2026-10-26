@@ -1,106 +1,40 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { AccountRow } from "@/components/AccountRow";
 import { Sprigs } from "@/components/Sprigs";
 import { errorText } from "@/lib/errorText";
-import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
-import { useChatGpt } from "@/lib/useChatGpt";
 import { useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
-import type { Level, Settings } from "../../../shared/model";
+import { AIS, type AiId, type Level, type Settings } from "../../../shared/model";
 
 const TOTAL = 5;
 const LEVELS: Level[] = ["beginner", "intermediate", "advanced", "expert"];
-const CODEX_INSTALL = "npm install -g @openai/codex";
 const folderName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? "";
 
-/** The ChatGPT option: whether Codex is there and signed in, and the sign-in itself. */
-function Connect({ api, onConnected }: { api: TostWorkApi; onConnected: (connected: boolean) => void }) {
+/** The ways to connect an AI: the two subscriptions, and the course key, which comes later. */
+function Connect({
+  api,
+  onConnected,
+  onSignedIn,
+}: {
+  api: TostWorkApi;
+  onConnected: (ai: AiId, connected: boolean) => void;
+  onSignedIn: (ai: AiId) => void;
+}) {
   const t = useT();
-  const { account, checking, signingIn, link, codePrompt, error, check, signIn, sendCode } = useChatGpt(
-    api,
-    onConnected,
-  );
-  const [code, setCode] = useState("");
-
-  let detail: React.ReactNode = <span className="d">{t("ai.chatgpt.d")}</span>;
-  let action: React.ReactNode = null;
-  if (checking) detail = <span className="d">{t("ai.checking")}</span>;
-  else if (account && !account.installed) {
-    detail = (
-      <span className="d">
-        {t("ai.missing")}
-        <code className="cmd">{CODEX_INSTALL}</code>
-      </span>
-    );
-    action = (
-      <button type="button" className="btn" onClick={() => void check()}>
-        {t("ai.checkAgain")}
-      </button>
-    );
-  } else if (account?.loggedIn) {
-    detail = (
-      <span className="d ok">
-        <Icon name="check" />
-        {account.account ? t("ai.connected", { account: account.account }) : t("ai.connectedPlain")}
-      </span>
-    );
-  } else if (signingIn) {
-    detail = (
-      <span className="d">
-        {t("ai.waiting")}
-        {link && (
-          <a href={link} target="_blank" rel="noreferrer" className="link">
-            {t("ai.openLink")}
-          </a>
-        )}
-      </span>
-    );
-  } else if (account) {
-    action = (
-      <button type="button" className="btn dark" onClick={() => void signIn()}>
-        {t("ai.signIn")}
-      </button>
-    );
-  }
-
   return (
     <div className="opts">
-      <div className={account?.loggedIn ? "opt on" : "opt"}>
-        <span>
-          <b>{t("ai.chatgpt")}</b>
-          {detail}
-          {codePrompt && (
-            <span className="keybox">
-              <input
-                className="input grow"
-                aria-label={t("ai.code")}
-                placeholder={codePrompt}
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-              />
-              <button type="button" className="btn" disabled={!code.trim()} onClick={() => sendCode(code.trim())}>
-                {t("ai.sendCode")}
-              </button>
-            </span>
-          )}
-          {error && (
-            <span className="d err" role="alert">
-              {error}
-            </span>
-          )}
-        </span>
-        {action}
-      </div>
-      {(["claude", "key"] as const).map((k) => (
-        <div className="opt off" key={k} aria-disabled="true">
-          <span>
-            <b>{t(`ai.${k}` as MessageKey)}</b>
-            <span className="d">{t(`ai.${k}.d` as MessageKey)}</span>
-          </span>
-          <span className="t3 soon">{t("ai.later")}</span>
-        </div>
+      {AIS.map((ai) => (
+        <AccountRow key={ai} api={api} ai={ai} variant="setup" onConnected={onConnected} onSignedIn={onSignedIn} />
       ))}
+      <div className="opt off" aria-disabled="true">
+        <span>
+          <b>{t("ai.key")}</b>
+          <span className="d">{t("ai.key.d")}</span>
+        </span>
+        <span className="t3 soon">{t("ai.later")}</span>
+      </div>
     </div>
   );
 }
@@ -121,7 +55,9 @@ export function Setup({
   const [work, setWork] = useState(settings.work);
   const [notes, setNotes] = useState(settings.notes);
   const aboutFilled = Boolean(work.trim() || notes.trim());
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState<Partial<Record<AiId, boolean>>>({});
+  const anyConnected = Object.values(connected).some(Boolean);
+  const onConnected = useCallback((ai: AiId, c: boolean) => setConnected((prev) => ({ ...prev, [ai]: c })), []);
   const [folder, setFolder] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -280,7 +216,12 @@ export function Setup({
           {step === 3 && (
             <>
               <p className="lede">{t("setup.ai.lede")}</p>
-              <Connect api={api} onConnected={setConnected} />
+              <Connect
+                api={api}
+                onConnected={onConnected}
+                // The account signed in last runs new tasks.
+                onSignedIn={(ai) => void save({ defaultAi: ai }).catch((err: unknown) => setError(errorText(err)))}
+              />
             </>
           )}
 
@@ -350,11 +291,11 @@ export function Setup({
                 </span>
                 <button
                   type="button"
-                  className={connected ? "btn dark" : "btn"}
+                  className={anyConnected ? "btn dark" : "btn"}
                   disabled={busy}
                   onClick={() => void go(4)}
                 >
-                  {connected ? t("setup.next") : t("setup.skip")}
+                  {anyConnected ? t("setup.next") : t("setup.skip")}
                 </button>
               </>
             )}

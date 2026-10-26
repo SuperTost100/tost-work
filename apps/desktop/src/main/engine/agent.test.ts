@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { FunnelEvent, RunRequest } from "cli-funnel";
 import { describe, expect, it } from "vitest";
 import type { EngineEvent, Task } from "../../shared/model";
-import { CodexEngine, type CodexFunnel, deletesFiles } from "./codex";
+import { AgentEngine, type AgentFunnel, deletesFiles } from "./agent";
 
 type Emit = (event: FunnelEvent) => void;
 type Script = (input: RunRequest, emit: Emit) => Promise<{ text: string; finishReason?: string }>;
@@ -40,7 +40,7 @@ function fakeFunnel(script: Script) {
         },
       };
     },
-  } as unknown as CodexFunnel;
+  } as unknown as AgentFunnel;
   return { funnel, inputs };
 }
 
@@ -69,7 +69,7 @@ const task = (over: Partial<Task> = {}): Task =>
 
 function setup(script: Script) {
   const { funnel, inputs } = fakeFunnel(script);
-  const engine = new CodexEngine(funnel, () => "it");
+  const engine = new AgentEngine(funnel, () => "it");
   const closed: string[] = [];
   engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: (t) => closed.push(t) });
   const controller = new AbortController();
@@ -96,7 +96,7 @@ function setup(script: Script) {
 /** An engine whose runs nobody answers: the test decides by hand, after the run has ended. */
 function bare(script: Script) {
   const { funnel } = fakeFunnel(script);
-  const engine = new CodexEngine(funnel, () => "it");
+  const engine = new AgentEngine(funnel, () => "it");
   engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
   const drain = async (followUp: string | null) => {
     const seen: EngineEvent[] = [];
@@ -113,7 +113,7 @@ const update = (path: string) => ({
   input: { changes: { changes: [{ path, kind: { type: "update" } }] } },
 });
 
-describe("CodexEngine", () => {
+describe("AgentEngine", () => {
   it("runs Codex at supervised with the instructions and the tool server, and maps its events", async () => {
     const { inputs, seen, run, closed } = setup(async (_input, emit) => {
       emit({ type: "session", sessionId: "s1" });
@@ -146,7 +146,7 @@ describe("CodexEngine", () => {
   });
 
   it("puts ask_user's question on the task and tells the agent to end its turn", async () => {
-    const holder: { engine?: CodexEngine } = {};
+    const holder: { engine?: AgentEngine } = {};
     let reply = "";
     const { engine, seen, run } = setup(async () => {
       reply = (await holder.engine?.ask("t1", { text: "Who pays?", options: ["Us", "Them"] })) ?? "";
@@ -254,7 +254,7 @@ describe("CodexEngine", () => {
   });
 
   it("puts nothing new on a task once it's stopped", async () => {
-    const holder: { engine?: CodexEngine } = {};
+    const holder: { engine?: AgentEngine } = {};
     const { engine, seen, controller, run } = setup(async () => {
       controller.abort();
       const reply = await holder.engine
@@ -308,7 +308,7 @@ describe("CodexEngine", () => {
   });
 
   it("carries the Tost Work tools' questions, files and review into the task", async () => {
-    const holder: { engine?: CodexEngine } = {};
+    const holder: { engine?: AgentEngine } = {};
     const { engine, seen, run } = setup(async () => {
       await holder.engine?.ask("t1", { text: "Which template?", options: ["A", "B"] });
       await holder.engine?.reportFile("t1", { path: "/w/a.docx", kind: "add" });
@@ -346,11 +346,79 @@ describe("CodexEngine", () => {
 
   it("starts tasks on the model Codex lists first", async () => {
     const { engine } = setup(async () => ({ text: "" }));
-    expect(await engine.defaults()).toEqual({ model: "gpt-6-sol", effort: "medium" });
+    expect(await engine.defaults()).toEqual({ provider: "codex", model: "gpt-6-sol", effort: "medium" });
+  });
+
+  it("starts tasks on Claude Sonnet at medium when Claude is the default", async () => {
+    const { funnel } = fakeFunnel(async () => ({ text: "" }));
+    const efforts = [{ id: "low" }, { id: "medium" }, { id: "high" }];
+    (funnel as { models: unknown }).models = async (provider: string) =>
+      provider === "claude"
+        ? [
+            { id: "claude-fable-5-1", efforts },
+            { id: "claude-sonnet-5-5", efforts },
+          ]
+        : [];
+    const engine = new AgentEngine(
+      funnel,
+      () => "it",
+      null,
+      undefined,
+      async () => "claude",
+    );
+    expect(await engine.defaults()).toEqual({ provider: "claude", model: "claude-sonnet-5-5", effort: "medium" });
+  });
+
+  it("runs a Claude task on Claude Code, with its tools held to the same rules", async () => {
+    const workdir = await realpath(await mkdtemp(join(tmpdir(), "tw-claude-")));
+    await writeFile(join(workdir, "theirs.docx"), "x");
+    const decisions: unknown[] = [];
+    const { funnel, inputs } = fakeFunnel(async (input) => {
+      const ask = (tool: string, toolInput: unknown) => input.onApproval?.({ id: tool, tool, input: toolInput });
+      decisions.push(await ask("Write", { file_path: "new.docx", content: "x" }));
+      decisions.push(await ask("Write", { file_path: "/etc/elsewhere.docx", content: "x" }));
+      decisions.push(await ask("Write", { file_path: "../outside.docx", content: "x" }));
+      decisions.push(await ask("Edit", { file_path: join(workdir, "theirs.docx"), old_string: "x", new_string: "y" }));
+      decisions.push(await ask("Bash", { command: "rm theirs.docx" }));
+      decisions.push(await ask("Bash", { command: "ls" }));
+      decisions.push(await ask("AskUserQuestion", { questions: [] }));
+      return { text: "" };
+    });
+    const engine = new AgentEngine(funnel, () => "it");
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const t = task({ provider: "claude", model: "claude-sonnet-5-5", workdir });
+    const seen: EngineEvent[] = [];
+    for await (const e of engine.run({
+      task: t,
+      project: null,
+      workdir,
+      followUp: null,
+      signal: new AbortController().signal,
+    })) {
+      seen.push(e);
+      // The user refuses the overwrite.
+      if (e.type === "approval") engine.decide(t.id, e.approval.id, false);
+    }
+    expect(inputs[0]?.selection).toMatchObject({ provider: "claude", model: "claude-sonnet-5-5", cwd: workdir });
+    expect(decisions).toEqual([
+      "allow",
+      { decision: "deny", message: "Work only inside the task's folder." },
+      { decision: "deny", message: "Work only inside the task's folder." },
+      expect.objectContaining({ decision: "deny", message: expect.stringMatching(/keep the file/) }),
+      expect.objectContaining({ decision: "deny", message: expect.stringMatching(/Don't delete files/) }),
+      "allow",
+      expect.objectContaining({ decision: "deny", message: expect.stringMatching(/ask_user/) }),
+    ]);
+    expect(seen.filter((e) => e.type === "approval")).toEqual([
+      {
+        type: "approval",
+        approval: expect.objectContaining({ action: "overwrite", paths: [join(workdir, "theirs.docx")] }),
+      },
+    ]);
   });
 });
 
-describe("CodexEngine with the document tools", () => {
+describe("AgentEngine with the document tools", () => {
   const made: [string, string][] = [];
   const documents = {
     skills: "/app/skills",
@@ -369,7 +437,7 @@ describe("CodexEngine with the document tools", () => {
       return { text: "" };
     });
     let reply = "";
-    const engine = new CodexEngine(
+    const engine = new AgentEngine(
       funnel,
       () => "it",
       documents,
@@ -407,7 +475,7 @@ describe("CodexEngine with the document tools", () => {
       );
       return { text: "" };
     });
-    const engine = new CodexEngine(funnel, () => "it", documents);
+    const engine = new AgentEngine(funnel, () => "it", documents);
     engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
     const signal = new AbortController().signal;
     for await (const _ of engine.run({

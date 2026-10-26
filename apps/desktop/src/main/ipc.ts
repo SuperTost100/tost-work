@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { app, type BrowserWindow, dialog, ipcMain, Menu, type OpenDialogOptions, shell } from "electron";
 import { IPC, type NewProjectInput, type NewTaskInput, type SaveResult, type TaskMenuAction } from "../shared/api";
 import { languageFrom, type MessageKey, translate } from "../shared/i18n";
-import type { Project } from "../shared/model";
+import type { AgentProvider, Project } from "../shared/model";
 import type { Accounts } from "./accounts";
 import type { TaskRunner } from "./engine/runner";
 import { type Conflict, copyInto, describe, readablePath, savablePaths, saveCopies } from "./files";
@@ -17,9 +17,13 @@ import { absolutePath, paths, settingsPatch, text } from "./validate";
 export function registerIpc(
   store: Store,
   runner: TaskRunner,
-  accounts: Accounts,
+  accounts: Record<AgentProvider, Accounts>,
   window: () => BrowserWindow | null,
 ): void {
+  const account = (provider: unknown): Accounts => {
+    if (provider !== "codex" && provider !== "claude") throw new Error("provider must be codex or claude");
+    return accounts[provider];
+  };
   // Native dialogs speak the interface's language: the saved choice, or the system's.
   const t = (key: MessageKey, vars?: Record<string, string>) =>
     translate(store.getSettings().language ?? languageFrom(app.getLocale()), key, vars);
@@ -39,14 +43,16 @@ export function registerIpc(
     return settings;
   });
 
-  ipcMain.handle(IPC.accountStatus, () => accounts.status());
+  ipcMain.handle(IPC.accountStatus, (_e, provider: unknown) => account(provider).status());
   // The sign-in runs on after this returns; its progress and any failure go out as sign-in events.
-  ipcMain.handle(IPC.accountSignIn, () => {
-    void accounts.signIn();
+  ipcMain.handle(IPC.accountSignIn, (_e, provider: unknown) => {
+    void account(provider).signIn();
   });
-  ipcMain.handle(IPC.accountSendCode, (_e, code: unknown) => accounts.sendCode(text(code, "code", 200).trim()));
-  ipcMain.handle(IPC.accountCancel, () => accounts.cancel());
-  ipcMain.handle(IPC.accountSignOut, () => accounts.signOut());
+  ipcMain.handle(IPC.accountSendCode, (_e, provider: unknown, code: unknown) =>
+    account(provider).sendCode(text(code, "code", 200).trim()),
+  );
+  ipcMain.handle(IPC.accountCancel, (_e, provider: unknown) => account(provider).cancel());
+  ipcMain.handle(IPC.accountSignOut, (_e, provider: unknown) => account(provider).signOut());
 
   ipcMain.handle(IPC.projectsList, () => store.listProjects());
 
@@ -88,14 +94,14 @@ export function registerIpc(
     const workdir = project?.folder ?? join(tmpdir(), "tost-work", "quick", randomUUID());
     const given = paths(input?.attachments, "attachments");
     // Before any copying: if the engine can't start a task, no folder or copies are left behind.
-    const { model, effort } = await runner.defaults();
+    const { provider, model, effort } = await runner.defaults();
     let attachments = given;
     if (!project) {
       await mkdir(workdir, { recursive: true });
       // The agent edits copies, so the user's originals stay as they are until they save a copy.
       attachments = await copyInto(given, workdir);
     }
-    const task = runner.create({ projectId, brief, workdir, attachments, model, effort });
+    const task = runner.create({ projectId, brief, workdir, attachments, provider, model, effort });
     runner.launch(task.id);
     return task;
   });

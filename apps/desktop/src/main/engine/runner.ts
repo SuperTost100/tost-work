@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Approval, KeptCopy, Project, Task } from "../../shared/model";
+import type { AgentProvider, Approval, KeptCopy, Project, Task } from "../../shared/model";
 import { applyEvent, resume } from "../../shared/reduce";
 import type { Guard } from "../guard";
 import type { Store } from "../store/store";
@@ -10,6 +10,7 @@ export interface NewTask {
   brief: string;
   workdir: string;
   attachments?: string[];
+  provider?: AgentProvider;
   model?: string;
   effort?: string;
 }
@@ -59,7 +60,7 @@ export class TaskRunner {
     private guard: Guard = REFUSE,
   ) {}
 
-  defaults(): Promise<{ model: string; effort: string }> {
+  defaults(): Promise<{ provider: AgentProvider; model: string; effort: string }> {
     return this.engine.defaults();
   }
 
@@ -72,6 +73,7 @@ export class TaskRunner {
       brief: input.brief,
       attachments: input.attachments ?? [],
       workdir: input.workdir,
+      provider: input.provider ?? "codex",
       model: input.model ?? "gpt-5.5",
       effort: input.effort ?? "medium",
       status: "draft",

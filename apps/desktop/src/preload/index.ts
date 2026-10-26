@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { SignInEvent } from "../shared/api";
 import { IPC, type TostWorkApi } from "../shared/api";
-import type { Task } from "../shared/model";
+import type { AgentProvider, Task } from "../shared/model";
 
 const api: TostWorkApi = {
   platform: process.platform as TostWorkApi["platform"],
@@ -11,13 +11,13 @@ const api: TostWorkApi = {
     update: (patch) => ipcRenderer.invoke(IPC.settingsUpdate, patch),
   },
   account: {
-    status: () => ipcRenderer.invoke(IPC.accountStatus),
-    signIn: () => ipcRenderer.invoke(IPC.accountSignIn),
-    sendCode: (code) => ipcRenderer.invoke(IPC.accountSendCode, code),
-    cancel: () => ipcRenderer.invoke(IPC.accountCancel),
-    signOut: () => ipcRenderer.invoke(IPC.accountSignOut),
+    status: (provider) => ipcRenderer.invoke(IPC.accountStatus, provider),
+    signIn: (provider) => ipcRenderer.invoke(IPC.accountSignIn, provider),
+    sendCode: (provider, code) => ipcRenderer.invoke(IPC.accountSendCode, provider, code),
+    cancel: (provider) => ipcRenderer.invoke(IPC.accountCancel, provider),
+    signOut: (provider) => ipcRenderer.invoke(IPC.accountSignOut, provider),
     onSignIn: (listener) => {
-      const handler = (_: unknown, event: SignInEvent) => listener(event);
+      const handler = (_: unknown, provider: AgentProvider, event: SignInEvent) => listener(provider, event);
       ipcRenderer.on(IPC.accountSignInEvent, handler);
       return () => ipcRenderer.removeListener(IPC.accountSignInEvent, handler);
     },

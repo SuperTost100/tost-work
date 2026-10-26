@@ -182,7 +182,7 @@ function turnTaking(steps: ((ctx: RunContext) => EngineEvent[])[]) {
   const prompts: (string | null)[] = [];
   let release: (() => void) | null = null;
   const engine: Engine = {
-    defaults: async () => ({ model: "m", effort: "low" }),
+    defaults: async () => ({ provider: "codex", model: "m", effort: "low" }),
     async *run(ctx) {
       prompts.push(ctx.followUp);
       const step = steps.shift();
@@ -298,7 +298,7 @@ describe("a rename while the run ends", () => {
   it("keeps the new name when the engine ends without a last event", async () => {
     let release: () => void = () => {};
     const engine: Engine = {
-      defaults: async () => ({ model: "m", effort: "low" }),
+      defaults: async () => ({ provider: "codex", model: "m", effort: "low" }),
       // Ends without yielding anything, as an engine may.
       async *run() {
         await new Promise<void>((r) => (release = r));

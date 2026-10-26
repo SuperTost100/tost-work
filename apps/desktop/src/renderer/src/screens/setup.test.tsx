@@ -34,9 +34,10 @@ describe("first-run setup", () => {
     expect((screen.getByLabelText(/Advanced/) as HTMLInputElement).checked).toBe(true);
     await click("Next");
 
-    // Claude and the API key are there, greyed out.
-    expect(screen.getAllByText("Arrives in a later version")).toHaveLength(2);
-    await click("Sign in");
+    // Claude can sign in too; the course key is there, greyed out.
+    expect(screen.getByRole("button", { name: "Sign in to Claude" })).toBeTruthy();
+    expect(screen.getAllByText("Arrives in a later version")).toHaveLength(1);
+    await click("Sign in to ChatGPT");
     expect(await screen.findByText("Connected as giulia@example.com")).toBeTruthy();
     await click("Next");
 
@@ -47,6 +48,7 @@ describe("first-run setup", () => {
     expect(await screen.findByText(/Giulia\./)).toBeTruthy();
     expect(await api.settings.get()).toMatchObject({
       name: "Giulia",
+      defaultAi: "chatgpt",
       work: "I sell olive oil",
       notes: "Clients are in Japan",
       level: "advanced",
@@ -67,8 +69,8 @@ describe("first-run setup", () => {
     expect(screen.getByRole("button", { name: "Skip for now" })).toBeTruthy();
 
     installed = true;
-    await click("Check again");
-    expect(await screen.findByRole("button", { name: "Sign in" })).toBeTruthy();
+    await click("Check again for Codex");
+    expect(await screen.findByRole("button", { name: "Sign in to ChatGPT" })).toBeTruthy();
   });
 
   it("switches the language as soon as it's picked", async () => {
@@ -87,9 +89,9 @@ describe("first-run setup", () => {
 
   it("ends an open sign-in when the user leaves the step", async () => {
     const api = createMemoryApi({ name: "Giulia" });
-    let cancelled = 0;
-    api.account.cancel = async () => {
-      cancelled++;
+    const cancelled: string[] = [];
+    api.account.cancel = async (provider) => {
+      cancelled.push(provider);
     };
     // A sign-in that stays open until it's cancelled.
     api.account.signIn = () => new Promise(() => {});
@@ -97,10 +99,10 @@ describe("first-run setup", () => {
     await click("Next");
     await click("Skip for now");
     await click("Next");
-    await click("Sign in");
+    await click("Sign in to ChatGPT");
     expect(await screen.findByText("Finish signing in on the page that opened.")).toBeTruthy();
     await click("Back");
-    expect(cancelled).toBe(1);
+    expect(cancelled.sort()).toEqual(["claude", "codex"]);
   });
 
   it("shows a language that couldn't be saved", async () => {

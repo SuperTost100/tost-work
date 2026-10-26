@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { app } from "electron";
-import type { DocumentTools } from "./engine/codex";
+import type { DocumentTools } from "./engine/agent";
 import { makePdf } from "./pdf";
 
 /**

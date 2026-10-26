@@ -54,10 +54,30 @@ describe("settings", () => {
     render(<Root api={createMemoryApi()} />);
     await click("Settings");
     await click("AI accounts");
-    await click("Sign in");
+    await click("Sign in to ChatGPT");
     expect(await screen.findByText("Connected as giulia@example.com")).toBeTruthy();
-    await click("Sign out");
-    expect(await screen.findByText("Not connected")).toBeTruthy();
+    await click("Sign out of ChatGPT");
+    expect(await screen.findByRole("button", { name: "Sign in to ChatGPT" })).toBeTruthy();
+  });
+
+  it("makes the account signed in last the default, and offers the choice once both are in", async () => {
+    const api = createMemoryApi();
+    render(<Root api={api} />);
+    await click("Settings");
+    await click("AI accounts");
+    expect(screen.queryByRole("radiogroup", { name: "Default AI" })).toBeNull();
+
+    await click("Sign in to Claude");
+    expect((await api.settings.get()).defaultAi).toBe("claude");
+    await click("Sign in to ChatGPT");
+    expect((await api.settings.get()).defaultAi).toBe("chatgpt");
+
+    await click("Claude", "radio");
+    expect((await api.settings.get()).defaultAi).toBe("claude");
+    // Signing out of the default leaves the choice to the account still signed in.
+    await click("Sign out of Claude");
+    expect((await api.settings.get()).defaultAi).toBeNull();
+    expect(screen.queryByRole("radiogroup", { name: "Default AI" })).toBeNull();
   });
 
   it("starts tasks in a project when quick edit is off", async () => {

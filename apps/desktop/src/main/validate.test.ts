@@ -60,6 +60,12 @@ describe("settingsPatch", () => {
     expect(() => settingsPatch({ theme: "blue" })).toThrow(/light, dark or system/);
   });
 
+  it("takes the default AI, or null for the first one signed in", () => {
+    expect(settingsPatch({ defaultAi: "claude" })).toEqual({ defaultAi: "claude" });
+    expect(settingsPatch({ defaultAi: null })).toEqual({ defaultAi: null });
+    expect(() => settingsPatch({ defaultAi: "gemini" })).toThrow(/chatgpt, claude or null/);
+  });
+
   it("refuses unknown keys and wrong values", () => {
     expect(() => settingsPatch({ admin: true })).toThrow(/Unknown setting/);
     expect(() => settingsPatch({ level: "guru" })).toThrow(/four levels/);

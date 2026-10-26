@@ -1,5 +1,5 @@
 import type { AuthStatus, Installation, LoginSession } from "cli-funnel";
-import type { CodexAccount, SignInEvent } from "../shared/api";
+import type { AgentAccount, SignInEvent } from "../shared/api";
 
 /** The parts of cli-funnel the sign-in uses, so tests can stand in for the real Codex. */
 export interface AccountSource {
@@ -20,7 +20,7 @@ export class Accounts {
     private openUrl: (url: string) => Promise<void>,
   ) {}
 
-  async status(): Promise<CodexAccount> {
+  async status(): Promise<AgentAccount> {
     const install = await this.source.detect();
     if (!install.installed) return { installed: false, loggedIn: false };
     const auth = await this.source.authStatus();
@@ -52,7 +52,7 @@ export class Accounts {
   }
 
   /** Signs out of ChatGPT in Codex, ending any sign-in still open, and returns the new state. */
-  async signOut(): Promise<CodexAccount> {
+  async signOut(): Promise<AgentAccount> {
     this.cancel();
     await this.source.logout();
     return this.status();

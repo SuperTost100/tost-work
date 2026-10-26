@@ -91,6 +91,7 @@ describe("Store", () => {
       sections: {},
       textSize: "normal",
       theme: "system",
+      defaultAi: null,
       setupDone: false,
     });
     store.saveSettings({ ...DEFAULT_SETTINGS, name: "Giulia", level: "advanced", language: "it", setupDone: true });

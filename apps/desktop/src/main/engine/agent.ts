@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { realpath } from "node:fs/promises";
-import { basename, dirname, extname } from "node:path";
+import { realpath, stat } from "node:fs/promises";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
-import type { EngineEvent, Review } from "../../shared/model";
+import type { AgentProvider, AiId, EngineEvent, Review } from "../../shared/model";
+import { PROVIDER_OF } from "../../shared/model";
 import { freeName, inside } from "../files";
 import type { ToolHandler } from "../mcp/server";
 import type { Engine, RunContext } from "./engine";
@@ -81,8 +82,8 @@ export interface DocumentTools {
   makePdf(source: string, target: string): Promise<void>;
 }
 
-/** The parts of cli-funnel the engine uses, so tests can stand in for Codex. */
-export type CodexFunnel = Pick<Funnel, "stream" | "models">;
+/** The parts of cli-funnel the engine uses, so tests can stand in for Codex and Claude Code. */
+export type AgentFunnel = Pick<Funnel, "stream" | "models">;
 
 /** The tool server's session calls, so the engine can open one per run. */
 export interface ToolSessions {
@@ -146,11 +147,62 @@ function changesOf(input: unknown): { path: string; kind: string }[] {
 }
 
 /**
- * Runs tasks on Codex through cli-funnel, with the ChatGPT sign-in. Codex works at `supervised`: its sandbox keeps
- * writes inside the folder, every file change comes here first, and Tost Work's tools carry questions, approvals,
- * files and the review.
+ * Claude's default. Sonnet rather than Opus, because a Pro plan's limits run out quickly on Opus and most office work
+ * doesn't need it.
  */
-export class CodexEngine implements Engine, ToolHandler {
+const CLAUDE_MODEL = "claude-sonnet-5-5";
+/** Claude Code's tools that write one file, and the input field with its path. */
+const CLAUDE_WRITES: Record<string, string> = {
+  Write: "file_path",
+  Edit: "file_path",
+  MultiEdit: "file_path",
+  NotebookEdit: "notebook_path",
+};
+
+/** A path with its links resolved, for a file that may not exist yet: the nearest existing folder is resolved. */
+async function realTarget(path: string): Promise<string> {
+  const rest: string[] = [];
+  let dir = path;
+  while (true) {
+    try {
+      return join(await realpath(dir), ...rest);
+    } catch {
+      const parent = dirname(dir);
+      if (parent === dir) return path;
+      rest.unshift(basename(dir));
+      dir = parent;
+    }
+  }
+}
+
+/**
+ * A Claude Code approval request in the shape Codex sends, so one policy covers both: Bash becomes a command, and a
+ * tool that writes a file becomes a file change, an add when the file isn't there yet. Null for a write outside the
+ * folder, which Codex's sandbox would have stopped. Links are resolved first, because on a Mac a temporary folder
+ * under /var is really under /private/var.
+ */
+export async function asCodexRequest(request: ApprovalRequest, workdir: string): Promise<ApprovalRequest | null> {
+  const input = (request.input ?? {}) as Record<string, unknown>;
+  if (request.tool === "Bash") return { ...request, tool: "command", input: { command: input.command } };
+  const field = CLAUDE_WRITES[request.tool];
+  const target = field ? input[field] : undefined;
+  if (typeof target !== "string") return request;
+  const path = resolve(workdir, target);
+  if (!inside(await realTarget(workdir), await realTarget(path))) return null;
+  const exists = await stat(path).then(
+    () => true,
+    () => false,
+  );
+  return { ...request, tool: "file_change", input: { changes: [{ path, kind: exists ? "update" : "add" }] } };
+}
+
+/**
+ * Runs tasks through cli-funnel on Codex (the ChatGPT sign-in) or Claude Code (the Claude sign-in), at `supervised`:
+ * every file change comes here first, and Tost Work's tools carry questions, approvals, files and the review.
+ * shortcut: Codex's sandbox keeps commands' writes inside the folder, but Claude Code's commands can write anywhere;
+ * turn on Claude Code's sandbox through cli-funnel when it offers it.
+ */
+export class AgentEngine implements Engine, ToolHandler {
   private live = new Map<string, Live>();
   private waiting = new Map<string, (reply: boolean | null) => void>();
   /** Every approval put on a task, by id, so a decision that comes after the run knows its files. */
@@ -160,11 +212,13 @@ export class CodexEngine implements Engine, ToolHandler {
   private tools: ToolSessions | null = null;
 
   constructor(
-    private funnel: CodexFunnel,
+    private funnel: AgentFunnel,
     private language: () => "en" | "it",
     private documents: DocumentTools | null = null,
     /** The user's profile: their name, which new Office files carry as author, what they do, and notes. */
     private user: () => { name: string; work: string; notes: string } = () => ({ name: "", work: "", notes: "" }),
+    /** The account new tasks run on. */
+    private ai: () => Promise<AiId> = async () => "chatgpt",
   ) {}
 
   /** The tool server takes this engine as its handler, so it's attached after both exist. */
@@ -172,11 +226,15 @@ export class CodexEngine implements Engine, ToolHandler {
     this.tools = tools;
   }
 
-  async defaults(): Promise<{ model: string; effort: string }> {
-    // Codex lists its recommended model first.
-    const [first] = await this.funnel.models("codex");
-    if (!first) throw new Error("Codex lists no models. Check that it's installed and signed in.");
-    return { model: first.id, effort: first.defaultEffort ?? first.efforts[0]?.id ?? "medium" };
+  async defaults(): Promise<{ provider: AgentProvider; model: string; effort: string }> {
+    const provider = PROVIDER_OF[await this.ai()];
+    const models = await this.funnel.models(provider);
+    // Codex lists its recommended model first. Claude's list starts with the largest model, so it's picked by name.
+    const model = (provider === "claude" && models.find((m) => m.id === CLAUDE_MODEL)) || models[0];
+    if (!model)
+      throw new Error(`${provider === "claude" ? "Claude Code" : "Codex"} lists no models. Check that it's installed.`);
+    const medium = model.efforts.some((e) => e.id === "medium") ? "medium" : undefined;
+    return { provider, model: model.id, effort: model.defaultEffort ?? medium ?? model.efforts[0]?.id ?? "medium" };
   }
 
   async *run({ task, project, workdir, followUp, signal }: RunContext): AsyncIterable<EngineEvent> {
@@ -196,7 +254,13 @@ export class CodexEngine implements Engine, ToolHandler {
     const tools = this.tools;
 
     const stream = this.funnel.stream({
-      selection: { provider: "codex", model: task.model, effort: task.effort, cwd: workdir, access: "supervised" },
+      selection: {
+        provider: task.provider ?? "codex",
+        model: task.model,
+        effort: task.effort,
+        cwd: workdir,
+        access: "supervised",
+      },
       prompt: followUp ?? task.brief,
       system: instructionsFor(
         task,
@@ -217,7 +281,12 @@ export class CodexEngine implements Engine, ToolHandler {
           autoApprove: true,
         },
       },
-      onApproval: (request) => this.policy(task.id, request),
+      onApproval: async (request) => {
+        if (task.provider !== "claude") return this.policy(task.id, request);
+        const translated = await asCodexRequest(request, workdir);
+        if (!translated) return { decision: "deny", message: "Work only inside the task's folder." };
+        return this.policy(task.id, translated);
+      },
     });
 
     const pump = (async () => {
@@ -331,6 +400,9 @@ export class CodexEngine implements Engine, ToolHandler {
     const live = this.live.get(taskId);
     if (!live) return { decision: "deny", message: "This task isn't running any more." };
     if (request.tool.startsWith("mcp:")) return "allow";
+    // Claude Code's own question tool can't reach the user from here, so questions go through ask_user.
+    if (request.tool === "AskUserQuestion")
+      return { decision: "deny", message: "Ask the user with the ask_user tool, then end your turn." };
     if (request.tool === "command") {
       const command = String((request.input as { command?: unknown } | undefined)?.command ?? "");
       if (deletesFiles(command))
