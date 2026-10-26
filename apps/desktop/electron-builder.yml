@@ -1,7 +1,7 @@
-# Packaging for Tost Work. 0.0.1 is unsigned: on a Mac, the first launch needs right-click > Open.
+# Packaging for Tost Work. The Mac app has no Apple signature yet, so its first launch needs
+# System Settings > Privacy & Security > Open Anyway.
 appId: one.tost.work
 productName: Tost Work
-executableName: tost-work
 directories:
   output: release
 files:
@@ -14,9 +14,14 @@ mac:
   target:
     - target: dmg
       arch: [arm64, x64]
-  # shortcut: unsigned and not notarized; sign and notarize before the private alpha goes beyond Tost.
-  identity: null
+  # Ad-hoc signature: without one, macOS calls the downloaded app "damaged" and offers only the Trash.
+  # shortcut: no Developer ID and no notarization; sign and notarize before the private alpha goes beyond Tost.
+  identity: "-"
+  # With an ad-hoc signature the hardened runtime blocks Electron's own libraries, so it waits for a real identity.
+  hardenedRuntime: false
 linux:
+  # Set here and not at the top level, where it would also rename the Mac bundle to tost-work.app.
+  executableName: tost-work
   category: Office
   target: [AppImage]
 win:
