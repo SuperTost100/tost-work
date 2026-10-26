@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Icon } from "@/lib/Icon";
+import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
 
 /** Files attached to a brief, kept by whoever owns the brief so they survive a trip to another section. */
@@ -88,7 +89,7 @@ export function Composer({
         <button
           type="button"
           className="send"
-          title={sendLabel}
+          title={withShortcut(sendLabel, "Enter")}
           aria-label={sendLabel}
           disabled={!canSend}
           onClick={onSubmit}

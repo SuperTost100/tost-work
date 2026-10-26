@@ -11,9 +11,9 @@ import { Projects } from "@/screens/Projects";
 import { Settings as SettingsScreen } from "@/screens/Settings";
 import { Soon } from "@/screens/Soon";
 import { Task } from "@/screens/Task";
-import { type Section, Sidebar } from "@/shell/Sidebar";
+import { RECENT, type Section, Sidebar } from "@/shell/Sidebar";
 import { useData } from "@/state/useData";
-import type { TostWorkApi } from "../../shared/api";
+import type { MenuAction, TostWorkApi } from "../../shared/api";
 import { DEFAULT_SETTINGS, type Settings, sectionOn } from "../../shared/model";
 
 /** The main process accepts up to 20 attachments per task. */
@@ -54,6 +54,7 @@ export function App({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const starting = useRef(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
   const report = useCallback((err: unknown) => setError(errorText(err)), []);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const isMac = api?.platform === "darwin";
@@ -136,6 +137,37 @@ export function App({
   // With quick edit turned off, the home composer always works in a project: the chosen one, or the first.
   const homeProjectId = quickEdit ? projectId : (projectId ?? projects[0]?.id ?? null);
 
+  // The menu bar's items. The handler is read through a ref, so the subscription doesn't change with every render.
+  const focusComposer = () =>
+    requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus());
+  const openTask = route.name === "task" ? tasks.find((x) => x.id === route.id) : undefined;
+  const onMenu = (action: MenuAction) => {
+    if (action === "new-task") {
+      setRoute({ name: "home" });
+      focusComposer();
+    } else if (action === "new-project") setDialogOpen(true);
+    else if (action === "settings") setRoute({ name: "settings" });
+    else if (action === "quick-edit") {
+      if (!api || !quickEdit) return;
+      void api.files.pick().then((picked) => {
+        if (!picked.length) return;
+        setFiles(picked.slice(0, MAX_FILES));
+        setProjectId(null);
+        setRoute({ name: "home" });
+        focusComposer();
+      }, report);
+    } else if (action === "send") document.querySelector<HTMLButtonElement>(".composer .send:not(:disabled)")?.click();
+    else if (!openTask || !api) return;
+    else if (action === "stop") {
+      if (openTask.status === "running" || openTask.status === "needs-you")
+        void api.tasks.stop(openTask.id).catch(report);
+    } else if (action === "rename") setRenaming(openTask.id);
+    else if (action === "reveal") void api.tasks.reveal(openTask.id).catch(report);
+  };
+  const menuHandler = useRef(onMenu);
+  menuHandler.current = onMenu;
+  useEffect(() => api?.onMenu((action) => menuHandler.current(action)), [api]);
+
   let screen: React.ReactNode;
   if (route.name === "home") {
     screen = (
@@ -215,6 +247,11 @@ export function App({
           onStop={() => void api.tasks.stop(task.id).catch(report)}
           onOpenProject={() => project && setRoute({ name: "project", id: project.id })}
           onError={report}
+          renaming={renaming === task.id && !tasks.slice(0, RECENT).some((x) => x.id === task.id)}
+          onRenamed={(title) => {
+            setRenaming(null);
+            if (title && title !== task.title) void api.tasks.rename(task.id, title).catch(report);
+          }}
         />
       ) : null;
   } else if (route.name === "profile") {
@@ -239,6 +276,8 @@ export function App({
         onTaskMenu={openTaskMenu}
         onRenameTask={(id, title) => void api?.tasks.rename(id, title).catch(report)}
         onRevealTask={(id) => void api?.tasks.reveal(id).catch(report)}
+        renaming={renaming}
+        onRenamingChange={setRenaming}
         onDeleteTask={(id) =>
           void api?.tasks.remove(id).then((gone) => {
             if (!gone) return;

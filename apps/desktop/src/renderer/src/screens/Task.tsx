@@ -6,7 +6,9 @@ import { TaskTag } from "@/components/TaskTag";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { keyed } from "@/lib/keys";
+import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
+import { RenameField } from "@/shell/Sidebar";
 import type { SaveResult, TostWorkApi } from "../../../shared/api";
 import type { FileChange, Project, ReviewItem, Task as TaskT } from "../../../shared/model";
 import { AgentMessage } from "../components/AgentMessage";
@@ -295,6 +297,8 @@ export function Task({
   onStop,
   onOpenProject,
   onError,
+  renaming = false,
+  onRenamed,
 }: {
   api: TostWorkApi;
   task: TaskT;
@@ -309,6 +313,9 @@ export function Task({
   onOpenProject: () => void;
   /** Shows a failed action, such as a file that was moved before Open, in the app's alert. */
   onError: (err: unknown) => void;
+  /** The menu bar's Rename, for a task Recent doesn't show: its title in the header becomes the field. */
+  renaming?: boolean;
+  onRenamed?: (title: string | null) => void;
 }) {
   const t = useT();
   const [answer, setAnswer] = useState("");
@@ -367,13 +374,17 @@ export function Task({
               <span className="t3">/</span>
             </>
           )}
-          {!quick && <b>{task.title}</b>}
+          {renaming ? (
+            <RenameField title={task.title} label={t("menu.rename")} onDone={(title) => onRenamed?.(title)} />
+          ) : (
+            !quick && <b>{task.title}</b>
+          )}
         </span>
         <span className="grow" />
         {/* While it runs, the line above the composer and Recent already say so: a third sign would be noise. */}
         {task.status !== "running" && <TaskTag task={task} />}
         {live && (
-          <button type="button" className="tbtn" onClick={onStop}>
+          <button type="button" className="tbtn" title={withShortcut(t("task.stop"), ".")} onClick={onStop}>
             <Icon name="stop" />
             {t("task.stop")}
           </button>

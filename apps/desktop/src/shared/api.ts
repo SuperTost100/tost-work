@@ -42,6 +42,9 @@ export type SignInEvent =
   | { type: "done"; account: AgentAccount }
   | { type: "error"; message: string };
 
+/** What a menu bar item asks the window to do. */
+export type MenuAction = "new-task" | "new-project" | "quick-edit" | "settings" | "send" | "stop" | "rename" | "reveal";
+
 /** What the preload exposes to the interface as `window.tostWork`. */
 export interface TostWorkApi {
   platform: "darwin" | "win32" | "linux";
@@ -50,7 +53,11 @@ export interface TostWorkApi {
     get(): Promise<Settings>;
     /** Saves the fields given and returns all settings. */
     update(patch: Partial<Settings>): Promise<Settings>;
+    /** Settings changed from outside the window, such as the text size from the View menu. */
+    onChange(listener: (settings: Settings) => void): () => void;
   };
+  /** The menu bar's items, which the window carries out. */
+  onMenu(listener: (action: MenuAction) => void): () => void;
   /** The subscriptions, one per agent CLI. */
   account: {
     status(provider: AgentProvider): Promise<AgentAccount>;
@@ -132,6 +139,8 @@ export const IPC = {
   accountCancel: "account:cancel",
   accountSignOut: "account:sign-out",
   accountInstall: "account:install",
+  settingsChanged: "settings:changed",
+  menuAction: "menu:action",
   keyInfo: "key:info",
   keySave: "key:save",
   keyRemove: "key:remove",

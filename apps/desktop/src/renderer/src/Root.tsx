@@ -16,6 +16,8 @@ export function Root({ api = window.tostWork }: { api?: TostWorkApi }) {
   useEffect(() => {
     api?.settings.get().then(setSettings, (err: unknown) => setError(errorText(err)));
   }, [api]);
+  // The View menu changes the text size from outside the window.
+  useEffect(() => api?.settings.onChange(setSettings), [api]);
   useEffect(() => {
     document.documentElement.lang = lang;
   }, [lang]);

@@ -1,5 +1,6 @@
 import type {
   AgentAccount,
+  MenuAction,
   NewProjectInput,
   NewTaskInput,
   SignInEvent,
@@ -22,9 +23,14 @@ import { applyEvent, resume } from "../../../shared/reduce";
  * An in-memory `window.tostWork` for tests: tasks run a short script synchronously, stop at one question,
  * and finish when it's answered.
  */
-export function createMemoryApi(
-  initial: Partial<Settings> = { name: "Giulia", setupDone: true },
-): TostWorkApi & { emit(id: string, e: EngineEvent): void; pickInMenu(action: TaskMenuAction | null): void } {
+export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", setupDone: true }): TostWorkApi & {
+  emit(id: string, e: EngineEvent): void;
+  pickInMenu(action: TaskMenuAction | null): void;
+  /** Picks an item in the menu bar, as the user would. */
+  pressMenu(action: MenuAction): void;
+  /** Changes settings from outside the window, as the View menu does. */
+  changeSettings(patch: Partial<Settings>): void;
+} {
   const projects: Project[] = [];
   const tasks = new Map<string, Task>();
   const listeners = new Set<(t: Task) => void>();
@@ -34,6 +40,8 @@ export function createMemoryApi(
     claude: { installed: true, version: "2.1.310", loggedIn: false },
   };
   let courseKey: CourseKey | null = null;
+  const settingsListeners = new Set<(s: Settings) => void>();
+  const menuListeners = new Set<(a: MenuAction) => void>();
   const signInListeners = new Set<(provider: AgentProvider, e: SignInEvent) => void>();
   let n = 0;
   const now = () => new Date(Date.UTC(2026, 9, 26, 9, 0, n++)).toISOString();
@@ -56,9 +64,24 @@ export function createMemoryApi(
       menuPick = action;
     },
     versions: { app: "0.0.1", electron: "test" },
+    onMenu: (l) => {
+      menuListeners.add(l);
+      return () => menuListeners.delete(l);
+    },
+    pressMenu: (action) => {
+      for (const l of menuListeners) l(action);
+    },
+    changeSettings: (patch) => {
+      settings = { ...settings, ...patch };
+      for (const l of settingsListeners) l(settings);
+    },
     emit,
     settings: {
       get: async () => settings,
+      onChange: (l) => {
+        settingsListeners.add(l);
+        return () => settingsListeners.delete(l);
+      },
       update: async (patch) => {
         // Sections are merged as in the main process: a patch names only the switches it changes.
         settings = { ...settings, ...patch, sections: { ...settings.sections, ...patch.sections } };

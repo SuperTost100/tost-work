@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { SignInEvent } from "../shared/api";
+import type { MenuAction, SignInEvent } from "../shared/api";
 import { IPC, type TostWorkApi } from "../shared/api";
-import type { AgentProvider, Task } from "../shared/model";
+import type { AgentProvider, Settings, Task } from "../shared/model";
 
 const api: TostWorkApi = {
   platform: process.platform as TostWorkApi["platform"],
@@ -9,6 +9,16 @@ const api: TostWorkApi = {
   settings: {
     get: () => ipcRenderer.invoke(IPC.settingsGet),
     update: (patch) => ipcRenderer.invoke(IPC.settingsUpdate, patch),
+    onChange: (listener) => {
+      const handler = (_: unknown, settings: Settings) => listener(settings);
+      ipcRenderer.on(IPC.settingsChanged, handler);
+      return () => ipcRenderer.removeListener(IPC.settingsChanged, handler);
+    },
+  },
+  onMenu: (listener) => {
+    const handler = (_: unknown, action: MenuAction) => listener(action);
+    ipcRenderer.on(IPC.menuAction, handler);
+    return () => ipcRenderer.removeListener(IPC.menuAction, handler);
   },
   account: {
     status: (provider) => ipcRenderer.invoke(IPC.accountStatus, provider),

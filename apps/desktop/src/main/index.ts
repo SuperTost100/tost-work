@@ -1,10 +1,11 @@
 import { join } from "node:path";
 import { createFunnel } from "cli-funnel";
-import { app, BrowserWindow, nativeTheme, safeStorage, shell } from "electron";
+import { app, BrowserWindow, dialog, Menu, nativeTheme, safeStorage, shell } from "electron";
 import { IPC } from "../shared/api";
-import { languageFrom } from "../shared/i18n";
+import { languageFrom, translate } from "../shared/i18n";
 import type { AgentProvider } from "../shared/model";
 import { Accounts } from "./accounts";
+import { menuTemplate, nextTextSize } from "./appMenu";
 import { documentTools } from "./documents";
 import { AgentEngine } from "./engine/agent";
 import type { Engine } from "./engine/engine";
@@ -139,7 +140,53 @@ app.whenReady().then(async () => {
       (url) => shell.openExternal(url),
     );
   const accounts = { codex: accountsFor("codex"), claude: accountsFor("claude") };
-  registerIpc(store, runner, accounts, keys, new Installer(), () => mainWindow);
+  // The menu bar speaks the interface's language and follows the settings, so it's rebuilt when they change.
+  const refreshMenu = () => {
+    const settings = store.getSettings();
+    const lang = language();
+    const menu = menuTemplate({
+      t: (key) => translate(lang, key),
+      isMac,
+      settings,
+      dev: !app.isPackaged,
+      send: (action) => {
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.menuAction, action);
+      },
+      textSize: (step) => {
+        const current = store.getSettings();
+        const next = { ...current, textSize: nextTextSize(current.textSize, step) };
+        store.saveSettings(next);
+        applyLook(mainWindow, next);
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.settingsChanged, next);
+      },
+      // Only a Mac's About panel shows the build, so Windows and Linux get a small dialog with both.
+      about: () => {
+        if (isMac) return app.showAboutPanel();
+        const options = {
+          type: "info" as const,
+          title: translate(lang, "appMenu.about"),
+          message: "Tost Work",
+          detail: translate(lang, "about.version", { version: __APP_VERSION__, build: __APP_BUILD__ }),
+        };
+        void (mainWindow ? dialog.showMessageBox(mainWindow, options) : dialog.showMessageBox(options));
+      },
+      openSite: () => void shell.openExternal("https://tost.one"),
+    });
+    Menu.setApplicationMenu(Menu.buildFromTemplate(menu));
+  };
+  refreshMenu();
+  registerIpc(
+    store,
+    runner,
+    accounts,
+    keys,
+    new Installer(),
+    () => mainWindow,
+    (settings) => {
+      applyLook(mainWindow, settings);
+      refreshMenu();
+    },
+  );
   app.on("before-quit", () => {
     accounts.codex.cancel();
     accounts.claude.cancel();

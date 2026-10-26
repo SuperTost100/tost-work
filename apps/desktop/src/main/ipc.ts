@@ -5,13 +5,12 @@ import { join } from "node:path";
 import { app, type BrowserWindow, dialog, ipcMain, Menu, type OpenDialogOptions, shell } from "electron";
 import { IPC, type NewProjectInput, type NewTaskInput, type SaveResult, type TaskMenuAction } from "../shared/api";
 import { languageFrom, type MessageKey, translate } from "../shared/i18n";
-import type { AgentProvider, Project } from "../shared/model";
+import type { AgentProvider, Project, Settings } from "../shared/model";
 import type { Accounts } from "./accounts";
 import type { TaskRunner } from "./engine/runner";
 import { type Conflict, copyInto, describe, readablePath, savablePaths, saveCopies } from "./files";
 import type { Installer } from "./installer";
 import type { KeyStore } from "./keys";
-import { applyLook } from "./look";
 import type { Store } from "./store/store";
 import { absolutePath, paths, settingsPatch, text } from "./validate";
 
@@ -23,6 +22,8 @@ export function registerIpc(
   keys: KeyStore,
   installer: Installer,
   window: () => BrowserWindow | null,
+  /** Applies saved settings to the window and the menu bar. */
+  settingsSaved: (settings: Settings) => void,
 ): void {
   const account = (provider: unknown): Accounts => {
     if (provider !== "codex" && provider !== "claude") throw new Error("provider must be codex or claude");
@@ -43,7 +44,7 @@ export function registerIpc(
     // A patch names only the section switches it changes, so two quick toggles can't undo each other.
     const settings = { ...current, ...changes, sections: { ...current.sections, ...changes.sections } };
     store.saveSettings(settings);
-    applyLook(window(), settings);
+    settingsSaved(settings);
     return settings;
   });
 

@@ -1,10 +1,14 @@
 import { type MouseEvent, useEffect, useRef, useState } from "react";
 import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
+import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
 import type { TaskMenuAction } from "../../../shared/api";
 import type { SectionKey, Task } from "../../../shared/model";
 import { WorkingDots } from "../components/TaskTag";
+
+/** How many tasks Recent shows. */
+export const RECENT = 8;
 
 export type Section = "home" | "projects" | "skills" | "jobs" | "board" | "settings" | "profile";
 
@@ -35,6 +39,8 @@ export function Sidebar({
   onRenameTask,
   onRevealTask,
   onDeleteTask,
+  renaming: renamingProp,
+  onRenamingChange,
 }: {
   current: Section | null;
   onNavigate: (s: Section) => void;
@@ -50,9 +56,15 @@ export function Sidebar({
   onRenameTask: (id: string, title: string) => void;
   onRevealTask: (id: string) => void;
   onDeleteTask: (id: string) => void;
+  /** The task whose title is being edited, when the parent holds that state. */
+  renaming?: string | null;
+  onRenamingChange?: (id: string | null) => void;
 }) {
   const t = useT();
-  const [renaming, setRenaming] = useState<string | null>(null);
+  const [ownRenaming, setOwnRenaming] = useState<string | null>(null);
+  // The menu bar's Rename starts it from outside, so the parent may hold this state.
+  const renaming = renamingProp === undefined ? ownRenaming : renamingProp;
+  const setRenaming = onRenamingChange ?? setOwnRenaming;
   const menu = async (id: string) => {
     const action = await onTaskMenu(id);
     if (action === "rename") setRenaming(id);
@@ -89,6 +101,7 @@ export function Sidebar({
             key={n.id}
             className={current === n.id ? "nav on" : "nav"}
             aria-current={current === n.id ? "page" : undefined}
+            title={n.id === "home" ? withShortcut(t(n.key), "N", isMac) : undefined}
             onClick={() => onNavigate(n.id)}
           >
             <Icon name={n.icon} />
@@ -102,7 +115,7 @@ export function Sidebar({
           {t("recent.empty")}
         </p>
       )}
-      {tasks.slice(0, 8).map((task) => (
+      {tasks.slice(0, RECENT).map((task) => (
         <div key={task.id} className={`rec split${openTaskId === task.id ? " on" : ""}`}>
           {renaming === task.id ? (
             <RenameField
@@ -160,7 +173,7 @@ export function Sidebar({
           type="button"
           className={`iconbtn${current === "settings" ? " on" : ""}`}
           aria-current={current === "settings" ? "page" : undefined}
-          title={t("nav.settings")}
+          title={withShortcut(t("nav.settings"), ",", isMac)}
           aria-label={t("nav.settings")}
           onClick={() => onNavigate("settings")}
         >
@@ -172,7 +185,8 @@ export function Sidebar({
 }
 
 /** The task's name, editable in place. Enter or leaving the field keeps the new name; Escape keeps the old one. */
-function RenameField({
+/** A title being renamed: Enter or leaving the field saves, Escape cancels. */
+export function RenameField({
   title,
   label,
   onDone,
