@@ -34,6 +34,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tost-work/desktop build
       - run: pnpm --filter @tost-work/desktop exec electron-builder --mac --publish never
+      # An app whose signature doesn't match its contents opens on no Mac: macOS calls it "damaged".
+      - name: Check the apps' signatures
+        working-directory: apps/desktop/release
+        run: |
+          for app in mac-arm64/*.app mac/*.app; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+          done
       - uses: actions/upload-artifact@v7
         with:
           name: tost-work-mac
