@@ -33,15 +33,15 @@ const text = (value: string) => ({ content: [{ type: "text" as const, text: valu
 interface Session {
   taskId: string;
   mcp?: { server: McpServer; transport: StreamableHTTPServerTransport };
-  /** A controller for each tool call whose HTTP request is still open, by JSON-RPC id. */
-  open: Map<string, AbortController>;
+  /** A controller for each tool call whose HTTP request is still open, by JSON-RPC id, keeping 1 and "1" apart. */
+  open: Map<string | number, AbortController>;
 }
 
 function toolsFor(session: Session, handler: ToolHandler): McpServer {
   const { taskId } = session;
   // Aborts when the agent gives up: it cancels the call, or the connection carrying the call closes.
   const giveUp = (extra: { signal: AbortSignal; requestId: string | number }) => {
-    const dropped = session.open.get(String(extra.requestId))?.signal;
+    const dropped = session.open.get(extra.requestId)?.signal;
     return dropped ? AbortSignal.any([extra.signal, dropped]) : extra.signal;
   };
   const server = new McpServer({ name: "tost-work", version: "0.0.1" });
@@ -190,7 +190,7 @@ export class ToolServer {
 
     try {
       let body: unknown;
-      const calls: string[] = [];
+      const calls: [string | number, AbortController][] = [];
       if (req.method === "POST") {
         try {
           body = JSON.parse(await readBody(req));
@@ -201,16 +201,17 @@ export class ToolServer {
         for (const message of Array.isArray(body) ? body : [body]) {
           const m = message as { method?: unknown; id?: unknown };
           if (m?.method === "tools/call" && (typeof m.id === "string" || typeof m.id === "number")) {
-            const id = String(m.id);
-            session.open.set(id, new AbortController());
-            calls.push(id);
+            const controller = new AbortController();
+            session.open.set(m.id, controller);
+            calls.push([m.id, controller]);
           }
         }
       }
       res.on("close", () => {
-        for (const id of calls) {
-          session.open.get(id)?.abort();
-          session.open.delete(id);
+        for (const [id, controller] of calls) {
+          controller.abort();
+          // Only this request's controller: a later call may reuse the id.
+          if (session.open.get(id) === controller) session.open.delete(id);
         }
       });
       if (!session.mcp) {

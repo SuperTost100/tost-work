@@ -180,4 +180,52 @@ describe("ToolServer", () => {
     await client.close();
     await waiting.stop();
   });
+
+  it('keeps calls with ids 1 and "1" apart when one connection drops', async () => {
+    const signals = new Map<string, AbortSignal>();
+    const waiting = new ToolServer({
+      ...handler,
+      ask: (_taskId, q, signal) => {
+        if (signal) signals.set(q.text, signal);
+        return new Promise(() => {});
+      },
+    });
+    await waiting.start();
+    const { url, token } = waiting.open("task-1");
+    const headers: Record<string, string> = {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+    };
+    const post = (body: unknown, signal?: AbortSignal) =>
+      fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal });
+    const init = await post({
+      jsonrpc: "2.0",
+      id: 0,
+      method: "initialize",
+      params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "raw", version: "1" } },
+    });
+    headers["mcp-session-id"] = init.headers.get("mcp-session-id") ?? "";
+    await init.text();
+    await (await post({ jsonrpc: "2.0", method: "notifications/initialized" })).text();
+    const call = (id: number | string, question: string, signal?: AbortSignal) =>
+      post(
+        {
+          jsonrpc: "2.0",
+          id,
+          method: "tools/call",
+          params: { name: "ask_user", arguments: { question, options: ["a", "b"] } },
+        },
+        signal,
+      ).catch(() => null);
+    const first = new AbortController();
+    void call(1, "number", first.signal);
+    void call("1", "string");
+    for (let i = 0; i < 200 && signals.size < 2; i++) await new Promise((r) => setTimeout(r, 5));
+    first.abort();
+    for (let i = 0; i < 100 && !signals.get("number")?.aborted; i++) await new Promise((r) => setTimeout(r, 5));
+    expect(signals.get("number")?.aborted).toBe(true);
+    expect(signals.get("string")?.aborted).toBe(false);
+    await waiting.stop();
+  });
 });
