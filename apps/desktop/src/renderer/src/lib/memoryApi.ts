@@ -47,7 +47,8 @@ export function createMemoryApi(
     settings: {
       get: async () => settings,
       update: async (patch) => {
-        settings = { ...settings, ...patch };
+        // Sections are merged as in the main process: a patch names only the switches it changes.
+        settings = { ...settings, ...patch, sections: { ...settings.sections, ...patch.sections } };
         return settings;
       },
     },
@@ -59,6 +60,10 @@ export function createMemoryApi(
       },
       sendCode: async () => {},
       cancel: async () => {},
+      signOut: async () => {
+        account = { ...account, loggedIn: false, account: undefined };
+        return account;
+      },
       onSignIn: (l) => {
         signInListeners.add(l);
         return () => signInListeners.delete(l);

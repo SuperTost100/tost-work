@@ -125,8 +125,31 @@ export interface Settings {
   level: Level;
   /** null follows the system language. */
   language: "en" | "it" | null;
+  /** Sections the user turned on or off by hand. A section missing here follows the level. */
+  sections: Partial<Record<SectionKey, boolean>>;
+  textSize: TextSize;
+  theme: Theme;
   setupDone: boolean;
 }
+
+export const LEVELS: Level[] = ["beginner", "intermediate", "advanced", "expert"];
+export type TextSize = "small" | "normal" | "large";
+export const TEXT_SIZES: TextSize[] = ["small", "normal", "large"];
+export type Theme = "light" | "dark" | "system";
+export const THEMES: Theme[] = ["light", "dark", "system"];
+
+/** The sections a user can turn off, and the lowest level that shows each one. */
+export const SECTION_LEVEL = {
+  skills: "beginner",
+  quickEdit: "beginner",
+  jobs: "intermediate",
+  board: "intermediate",
+} as const satisfies Record<string, Level>;
+export type SectionKey = keyof typeof SECTION_LEVEL;
+
+/** Whether a section shows: the user's own choice if they made one, otherwise their level's. */
+export const sectionOn = (settings: Pick<Settings, "level" | "sections">, key: SectionKey): boolean =>
+  settings.sections[key] ?? LEVELS.indexOf(settings.level) >= LEVELS.indexOf(SECTION_LEVEL[key]);
 
 export const DEFAULT_SETTINGS: Settings = {
   name: "",
@@ -134,5 +157,8 @@ export const DEFAULT_SETTINGS: Settings = {
   notes: "",
   level: "beginner",
   language: null,
+  sections: {},
+  textSize: "normal",
+  theme: "system",
   setupDone: false,
 };

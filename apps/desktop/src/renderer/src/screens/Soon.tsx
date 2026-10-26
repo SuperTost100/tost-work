@@ -1,7 +1,7 @@
 import { useT } from "@/lib/useT";
 
 /** The placeholder for a section that isn't built yet. */
-export function Soon({ section, showVersion = false }: { section: string; showVersion?: boolean }) {
+export function Soon({ section }: { section: string }) {
   const t = useT();
   return (
     <div className="main">
@@ -14,11 +14,6 @@ export function Soon({ section, showVersion = false }: { section: string; showVe
           <p className="t2" style={{ fontSize: 15 }}>
             {t("soon.body")}
           </p>
-          {showVersion && (
-            <p className="t3" style={{ fontSize: 13, marginTop: 24 }}>
-              {t("about.version", { version: __APP_VERSION__, build: __APP_BUILD__ })}
-            </p>
-          )}
         </div>
       </div>
     </div>

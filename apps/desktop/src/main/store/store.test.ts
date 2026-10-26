@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import type { Task } from "../../shared/model";
+import { DEFAULT_SETTINGS, type Task } from "../../shared/model";
 import { Store } from "./store";
 
 const task = (id: string, status: Task["status"], updatedAt: string): Task => ({
@@ -88,9 +88,12 @@ describe("Store", () => {
       notes: "",
       level: "beginner",
       language: null,
+      sections: {},
+      textSize: "normal",
+      theme: "system",
       setupDone: false,
     });
-    store.saveSettings({ name: "Giulia", work: "", notes: "", level: "advanced", language: "it", setupDone: true });
+    store.saveSettings({ ...DEFAULT_SETTINGS, name: "Giulia", level: "advanced", language: "it", setupDone: true });
     expect(store.getSettings().name).toBe("Giulia");
     expect(store.getSettings().level).toBe("advanced");
   });

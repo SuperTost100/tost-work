@@ -11,6 +11,7 @@ import { FakeEngine } from "./engine/fake";
 import { TaskRunner } from "./engine/runner";
 import { fileGuard } from "./guard";
 import { registerIpc } from "./ipc";
+import { applyLook } from "./look";
 import { ToolServer } from "./mcp/server";
 import { Store } from "./store/store";
 
@@ -20,7 +21,7 @@ const isMac = process.platform === "darwin";
 app.setAboutPanelOptions({ applicationVersion: __APP_VERSION__, version: __APP_BUILD__ });
 let mainWindow: BrowserWindow | null = null;
 
-function createWindow(): BrowserWindow {
+function createWindow(store: Store): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -42,6 +43,8 @@ function createWindow(): BrowserWindow {
   });
 
   win.once("ready-to-show", () => win.show());
+  // A load resets the zoom, so the text size goes back on after each one.
+  win.webContents.on("did-finish-load", () => applyLook(win, store.getSettings()));
   win.on("closed", () => {
     if (mainWindow === win) mainWindow = null;
   });
@@ -61,6 +64,8 @@ function createWindow(): BrowserWindow {
 app.whenReady().then(async () => {
   const store = new Store(join(app.getPath("userData"), "tost-work.db"));
   store.stopInterrupted(new Date().toISOString());
+  // Before the window, so its background colour already follows the chosen theme.
+  applyLook(null, store.getSettings());
   const funnel = createFunnel();
   const language = () => store.getSettings().language ?? languageFrom(app.getLocale());
 
@@ -97,6 +102,7 @@ app.whenReady().then(async () => {
       detect: () => funnel.providers.codex.detect(),
       authStatus: () => funnel.authStatus("codex"),
       login: () => funnel.login("codex"),
+      logout: () => funnel.logout("codex"),
     },
     (event) => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.accountSignInEvent, event);
@@ -110,9 +116,9 @@ app.whenReady().then(async () => {
     funnel.close();
     store.close();
   });
-  mainWindow = createWindow();
+  mainWindow = createWindow(store);
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow(store);
   });
 });
 

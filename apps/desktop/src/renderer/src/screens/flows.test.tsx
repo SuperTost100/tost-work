@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { describe, expect, it } from "vitest";
 import { App } from "@/App";
 import { createMemoryApi } from "@/lib/memoryApi";
+import { DEFAULT_SETTINGS } from "../../../shared/model";
 
 describe("starting and finishing a task", () => {
   it("starts a task from the home, answers its question and shows the review", async () => {
@@ -318,7 +319,8 @@ describe("projects", () => {
   });
 
   it("shows a placeholder for sections that aren't built yet", () => {
-    render(<App userName="Giulia" api={createMemoryApi()} />);
+    const settings = { ...DEFAULT_SETTINGS, name: "Giulia", level: "intermediate" as const, setupDone: true };
+    render(<App userName="Giulia" api={createMemoryApi()} settings={settings} />);
     fireEvent.click(screen.getByRole("button", { name: "Jobs" }));
     expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/arrives in a later version/);
   });

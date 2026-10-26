@@ -46,6 +46,20 @@ describe("settingsPatch", () => {
     expect(() => settingsPatch({ notes: "x".repeat(4001) })).toThrow();
   });
 
+  it("takes sections, text size and theme, and refuses anything else in them", () => {
+    expect(settingsPatch({ sections: { jobs: false, board: true }, textSize: "large", theme: "dark" })).toEqual({
+      sections: { jobs: false, board: true },
+      textSize: "large",
+      theme: "dark",
+    });
+    expect(() => settingsPatch({ sections: { code: true } })).toThrow(/Unknown section/);
+    expect(() => settingsPatch({ sections: { toString: true } })).toThrow(/Unknown section/);
+    expect(() => settingsPatch({ sections: { jobs: "on" } })).toThrow(/on or off/);
+    expect(() => settingsPatch({ sections: null })).toThrow(/object/);
+    expect(() => settingsPatch({ textSize: "huge" })).toThrow(/small, normal or large/);
+    expect(() => settingsPatch({ theme: "blue" })).toThrow(/light, dark or system/);
+  });
+
   it("refuses unknown keys and wrong values", () => {
     expect(() => settingsPatch({ admin: true })).toThrow(/Unknown setting/);
     expect(() => settingsPatch({ level: "guru" })).toThrow(/four levels/);

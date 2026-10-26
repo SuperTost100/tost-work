@@ -8,11 +8,14 @@ export function ProjectPicker({
   value,
   onChange,
   onNewProject,
+  allowNone = true,
 }: {
   projects: Project[];
   value: string | null;
   onChange: (id: string | null) => void;
   onNewProject: () => void;
+  /** Whether "No project", a quick edit, is on offer. Settings can turn quick edit off. */
+  allowNone?: boolean;
 }) {
   const t = useT();
   const current = projects.find((p) => p.id === value);
@@ -25,10 +28,12 @@ export function ProjectPicker({
       <Menu.Portal>
         <Menu.Positioner sideOffset={6} align="start">
           <Menu.Popup className="menu">
-            <Menu.Item className="menu-item" onClick={() => onChange(null)}>
-              {t("composer.noProject")}
-              {value === null && <Icon name="check" className="menu-check" />}
-            </Menu.Item>
+            {allowNone && (
+              <Menu.Item className="menu-item" onClick={() => onChange(null)}>
+                {t("composer.noProject")}
+                {value === null && <Icon name="check" className="menu-check" />}
+              </Menu.Item>
+            )}
             {projects.map((p) => (
               <Menu.Item key={p.id} className="menu-item" onClick={() => onChange(p.id)}>
                 {p.name}

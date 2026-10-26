@@ -6,6 +6,7 @@ export interface AccountSource {
   detect(): Promise<Installation>;
   authStatus(): Promise<AuthStatus>;
   login(): LoginSession;
+  logout(): Promise<void>;
 }
 
 /** The ChatGPT sign-in through Codex. One sign-in at a time; its progress goes out through `emit`. */
@@ -48,6 +49,13 @@ export class Accounts {
   cancel(): void {
     this.session?.cancel();
     this.session = null;
+  }
+
+  /** Signs out of ChatGPT in Codex, ending any sign-in still open, and returns the new state. */
+  async signOut(): Promise<CodexAccount> {
+    this.cancel();
+    await this.source.logout();
+    return this.status();
   }
 
   private async follow(session: LoginSession): Promise<void> {

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Sprigs } from "@/components/Sprigs";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
+import { useChatGpt } from "@/lib/useChatGpt";
 import { useT } from "@/lib/useT";
-import type { CodexAccount, TostWorkApi } from "../../../shared/api";
+import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
 import type { Level, Settings } from "../../../shared/model";
 
@@ -16,59 +17,11 @@ const folderName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?
 /** The ChatGPT option: whether Codex is there and signed in, and the sign-in itself. */
 function Connect({ api, onConnected }: { api: TostWorkApi; onConnected: (connected: boolean) => void }) {
   const t = useT();
-  const [account, setAccount] = useState<CodexAccount | null>(null);
-  const [checking, setChecking] = useState(true);
-  const [signingIn, setSigningIn] = useState(false);
-  const [link, setLink] = useState<string | null>(null);
-  const [codePrompt, setCodePrompt] = useState<string | null>(null);
+  const { account, checking, signingIn, link, codePrompt, error, check, signIn, sendCode } = useChatGpt(
+    api,
+    onConnected,
+  );
   const [code, setCode] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const check = useCallback(async () => {
-    setChecking(true);
-    setError(null);
-    try {
-      const status = await api.account.status();
-      setAccount(status);
-      onConnected(status.loggedIn);
-    } catch (err) {
-      setError(errorText(err));
-    } finally {
-      setChecking(false);
-    }
-  }, [api, onConnected]);
-
-  // Leaving the step (Back, Skip) ends a sign-in still open, so the next one can start.
-  useEffect(() => () => void api.account.cancel(), [api]);
-
-  useEffect(() => {
-    void check();
-    return api.account.onSignIn((event) => {
-      if (event.type === "link") setLink(event.url);
-      else if (event.type === "code") setCodePrompt(event.message);
-      else if (event.type === "error") {
-        setError(event.message);
-        setSigningIn(false);
-      } else {
-        setAccount(event.account);
-        onConnected(event.account.loggedIn);
-        setSigningIn(false);
-        setCodePrompt(null);
-      }
-    });
-  }, [api, check, onConnected]);
-
-  const signIn = async () => {
-    setError(null);
-    setLink(null);
-    setSigningIn(true);
-    try {
-      await api.account.signIn();
-    } catch (err) {
-      setError(errorText(err));
-      setSigningIn(false);
-    }
-  };
 
   let detail: React.ReactNode = <span className="d">{t("ai.chatgpt.d")}</span>;
   let action: React.ReactNode = null;
@@ -126,12 +79,7 @@ function Connect({ api, onConnected }: { api: TostWorkApi; onConnected: (connect
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
               />
-              <button
-                type="button"
-                className="btn"
-                disabled={!code.trim()}
-                onClick={() => void api.account.sendCode(code.trim()).catch((e: Error) => setError(e.message))}
-              >
+              <button type="button" className="btn" disabled={!code.trim()} onClick={() => sendCode(code.trim())}>
                 {t("ai.sendCode")}
               </button>
             </span>

@@ -15,6 +15,7 @@ const api: TostWorkApi = {
     signIn: () => ipcRenderer.invoke(IPC.accountSignIn),
     sendCode: (code) => ipcRenderer.invoke(IPC.accountSendCode, code),
     cancel: () => ipcRenderer.invoke(IPC.accountCancel),
+    signOut: () => ipcRenderer.invoke(IPC.accountSignOut),
     onSignIn: (listener) => {
       const handler = (_: unknown, event: SignInEvent) => listener(event);
       ipcRenderer.on(IPC.accountSignInEvent, handler);

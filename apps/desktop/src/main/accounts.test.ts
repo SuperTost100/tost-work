@@ -9,6 +9,9 @@ function source(events: LoginEvent[], state = { installed: true, loggedIn: false
   const src: AccountSource = {
     detect: async () => ({ installed: state.installed, version: "0.158.0", testedRange: { min: "0.150.0" } }),
     authStatus: async () => (state.loggedIn ? { loggedIn: true, account: "giulia@example.com" } : { loggedIn: false }),
+    logout: async () => {
+      state.loggedIn = false;
+    },
     login: (): LoginSession => ({
       sendCode: (code) => codes.push(code),
       cancel: () => {},
@@ -39,6 +42,12 @@ const setup = (events: LoginEvent[], state?: { installed: boolean; loggedIn: boo
 };
 
 describe("Accounts", () => {
+  it("signs out and reports the account as signed out", async () => {
+    const { accounts } = setup([], { installed: true, loggedIn: true });
+    expect((await accounts.status()).loggedIn).toBe(true);
+    expect(await accounts.signOut()).toMatchObject({ installed: true, loggedIn: false });
+  });
+
   it("reports Codex missing without asking for an account", async () => {
     const { accounts } = setup([], { installed: false, loggedIn: false });
     expect(await accounts.status()).toEqual({ installed: false, loggedIn: false });

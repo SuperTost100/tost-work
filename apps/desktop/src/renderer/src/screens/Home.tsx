@@ -18,6 +18,7 @@ export function Home({
   attach,
   onOpenTask,
   onNewProject,
+  allowNoProject = true,
   now = new Date(),
 }: {
   userName: string;
@@ -31,6 +32,8 @@ export function Home({
   attach?: Attachments;
   onOpenTask: (id: string) => void;
   onNewProject: () => void;
+  /** Whether "No project" (a quick edit) is on offer. */
+  allowNoProject?: boolean;
   now?: Date;
 }) {
   const t = useT();
@@ -67,6 +70,7 @@ export function Home({
               value={projectId}
               onChange={onProjectChange}
               onNewProject={onNewProject}
+              allowNone={allowNoProject}
             />
           </div>
           {waiting.map((task) => (

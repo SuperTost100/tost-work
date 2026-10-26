@@ -2017,7 +2017,9 @@ ol.editable li::before {
   gap: 2px;
   align-content: start;
 }
-.snav a {
+.snav a,
+.snav button,
+.snav .off {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2027,10 +2029,13 @@ ol.editable li::before {
   font-size: 14px;
   color: var(--t2);
 }
-.snav a .ic {
+.snav a .ic,
+.snav button .ic,
+.snav .off .ic {
   color: var(--t3);
 }
-.snav a.on {
+.snav a.on,
+.snav button.on {
   background: var(--sel);
   color: var(--ink);
   font-weight: 500;
@@ -2048,7 +2053,8 @@ ol.editable li::before {
   letter-spacing: -0.03em;
   margin-bottom: 4px;
 }
-.sbody > p {
+.sbody > p,
+.sbody > section > p {
   color: var(--t3);
   margin-bottom: 18px;
 }
@@ -2127,7 +2133,7 @@ ol.editable li::before {
   font-size: 15px;
   font-weight: 700;
 }
-.lv p {
+.lv .d {
   font-size: 12.5px;
   color: var(--t2);
   line-height: 1.45;
@@ -2146,6 +2152,8 @@ ol.editable li::before {
 }
 .acct b {
   font-weight: 500;
+  font-size: 14.5px;
+  color: var(--ink);
   display: block;
 }
 .acct span {
@@ -2162,6 +2170,45 @@ ol.editable li::before {
 .lock .ic {
   width: 12px;
   height: 12px;
+}
+
+.snav .off {
+  color: var(--t3);
+  cursor: default;
+}
+.snav .off .lock {
+  margin-left: auto;
+}
+.lv {
+  position: relative;
+  cursor: pointer;
+}
+.lv input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.lv:has(input:focus-visible),
+.switch:focus-visible,
+.choice input:focus-visible + span {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.switch:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.choice label {
+  cursor: pointer;
+}
+.acct .err {
+  display: block;
+  color: var(--need);
+  margin-top: 4px;
+}
+.sbody .version {
+  margin-top: 40px;
+  font-size: 13px;
 }
 
 /* First-run setup, About and empty states */

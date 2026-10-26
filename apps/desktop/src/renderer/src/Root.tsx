@@ -19,6 +19,19 @@ export function Root({ api = window.tostWork }: { api?: TostWorkApi }) {
   useEffect(() => {
     document.documentElement.lang = lang;
   }, [lang]);
+  // The page gets the theme as an attribute, because on Linux Electron's theme choice doesn't reach the
+  // colour-scheme media query. "Same as system" follows the system as it changes.
+  const theme = settings?.theme;
+  useEffect(() => {
+    if (!theme) return;
+    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
+    const apply = () => {
+      document.documentElement.dataset.theme = theme === "system" ? (media?.matches ? "dark" : "light") : theme;
+    };
+    apply();
+    media?.addEventListener("change", apply);
+    return () => media?.removeEventListener("change", apply);
+  }, [theme]);
 
   let screen: React.ReactNode;
   if (!api) screen = <App api={api} />;

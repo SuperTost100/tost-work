@@ -9,6 +9,7 @@ import type { Project } from "../shared/model";
 import type { Accounts } from "./accounts";
 import type { TaskRunner } from "./engine/runner";
 import { type Conflict, copyInto, describe, readablePath, savablePaths, saveCopies } from "./files";
+import { applyLook } from "./look";
 import type { Store } from "./store/store";
 import { absolutePath, paths, settingsPatch, text } from "./validate";
 
@@ -29,8 +30,12 @@ export function registerIpc(
 
   ipcMain.handle(IPC.settingsGet, () => store.getSettings());
   ipcMain.handle(IPC.settingsUpdate, (_e, patch: unknown) => {
-    const settings = { ...store.getSettings(), ...settingsPatch(patch) };
+    const current = store.getSettings();
+    const changes = settingsPatch(patch);
+    // A patch names only the section switches it changes, so two quick toggles can't undo each other.
+    const settings = { ...current, ...changes, sections: { ...current.sections, ...changes.sections } };
     store.saveSettings(settings);
+    applyLook(window(), settings);
     return settings;
   });
 
@@ -41,6 +46,7 @@ export function registerIpc(
   });
   ipcMain.handle(IPC.accountSendCode, (_e, code: unknown) => accounts.sendCode(text(code, "code", 200).trim()));
   ipcMain.handle(IPC.accountCancel, () => accounts.cancel());
+  ipcMain.handle(IPC.accountSignOut, () => accounts.signOut());
 
   ipcMain.handle(IPC.projectsList, () => store.listProjects());
 

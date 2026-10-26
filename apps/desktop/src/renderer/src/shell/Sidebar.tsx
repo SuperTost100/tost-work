@@ -3,7 +3,7 @@ import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
 import { useT } from "@/lib/useT";
 import type { TaskMenuAction } from "../../../shared/api";
-import type { Task } from "../../../shared/model";
+import type { SectionKey, Task } from "../../../shared/model";
 import { WorkingDots } from "../components/TaskTag";
 
 export type Section = "home" | "projects" | "skills" | "jobs" | "board" | "settings" | "profile";
@@ -12,17 +12,20 @@ const NAV: {
   id: Section;
   icon: string;
   key: "nav.newTask" | "nav.projects" | "nav.skills" | "nav.jobs" | "nav.board";
+  /** The switch in Settings that hides it. */
+  section?: SectionKey;
 }[] = [
   { id: "home", icon: "edit", key: "nav.newTask" },
   { id: "projects", icon: "folder", key: "nav.projects" },
-  { id: "skills", icon: "magic-2", key: "nav.skills" },
-  { id: "jobs", icon: "calendar", key: "nav.jobs" },
-  { id: "board", icon: "task", key: "nav.board" },
+  { id: "skills", icon: "magic-2", key: "nav.skills", section: "skills" },
+  { id: "jobs", icon: "calendar", key: "nav.jobs", section: "jobs" },
+  { id: "board", icon: "task", key: "nav.board", section: "board" },
 ];
 
 export function Sidebar({
   current,
   onNavigate,
+  showSection = () => true,
   userName,
   isMac,
   tasks,
@@ -35,6 +38,8 @@ export function Sidebar({
 }: {
   current: Section | null;
   onNavigate: (s: Section) => void;
+  /** Whether the level and the user's switches show a section. */
+  showSection?: (key: SectionKey) => boolean;
   userName: string;
   isMac: boolean;
   tasks: Task[];
@@ -78,7 +83,7 @@ export function Sidebar({
         <kbd>{isMac ? "⌘K" : "Ctrl K"}</kbd>
       </button>
       <nav aria-label="Sections">
-        {NAV.map((n) => (
+        {NAV.filter((n) => !n.section || showSection(n.section)).map((n) => (
           <button
             type="button"
             key={n.id}

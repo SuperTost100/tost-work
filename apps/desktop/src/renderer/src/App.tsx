@@ -8,12 +8,13 @@ import { Home } from "@/screens/Home";
 import { Profile } from "@/screens/Profile";
 import { Project } from "@/screens/Project";
 import { Projects } from "@/screens/Projects";
+import { Settings as SettingsScreen } from "@/screens/Settings";
 import { Soon } from "@/screens/Soon";
 import { Task } from "@/screens/Task";
 import { type Section, Sidebar } from "@/shell/Sidebar";
 import { useData } from "@/state/useData";
 import type { TostWorkApi } from "../../shared/api";
-import { DEFAULT_SETTINGS, type Settings } from "../../shared/model";
+import { DEFAULT_SETTINGS, type Settings, sectionOn } from "../../shared/model";
 
 /** The main process accepts up to 20 attachments per task. */
 const MAX_FILES = 20;
@@ -24,7 +25,8 @@ type Route =
   | { name: "project"; id: string }
   | { name: "task"; id: string }
   | { name: "profile" }
-  | { name: "soon"; section: "skills" | "jobs" | "board" | "settings" };
+  | { name: "settings" }
+  | { name: "soon"; section: "skills" | "jobs" | "board" };
 
 export function App({
   userName = "Giulia",
@@ -34,11 +36,13 @@ export function App({
 }: {
   userName?: string;
   api?: TostWorkApi;
-  /** The saved settings, for the profile. Without them the profile shows the name only. */
+  /** The saved settings. Without them the app uses the defaults with this user's name. */
   settings?: Settings;
   onSettings?: (settings: Settings) => void;
 }) {
   const t = useT();
+  const current = settings ?? { ...DEFAULT_SETTINGS, name: userName, setupDone: true };
+  const quickEdit = sectionOn(current, "quickEdit");
   const { projects, tasks, addProject, loadProject, removeTask } = useData(api);
   const [route, setRoute] = useState<Route>({ name: "home" });
   // The briefs live here so they survive a trip to another section.
@@ -82,6 +86,8 @@ export function App({
         return route.section;
       case "profile":
         return "profile";
+      case "settings":
+        return "settings";
       default:
         return null;
     }
@@ -91,6 +97,7 @@ export function App({
     if (s === "home") setRoute({ name: "home" });
     else if (s === "projects") setRoute({ name: "projects" });
     else if (s === "profile") setRoute({ name: "profile" });
+    else if (s === "settings") setRoute({ name: "settings" });
     else setRoute({ name: "soon", section: s });
   };
 
@@ -121,12 +128,13 @@ export function App({
       onRemove: (path) => set((prev) => prev.filter((p) => p !== path)),
     };
 
-  const sectionTitle: Record<"skills" | "jobs" | "board" | "settings", string> = {
+  const sectionTitle: Record<"skills" | "jobs" | "board", string> = {
     skills: t("nav.skills"),
     jobs: t("nav.jobs"),
     board: t("nav.board"),
-    settings: t("nav.settings"),
   };
+  // With quick edit turned off, the home composer always works in a project: the chosen one, or the first.
+  const homeProjectId = quickEdit ? projectId : (projectId ?? projects[0]?.id ?? null);
 
   let screen: React.ReactNode;
   if (route.name === "home") {
@@ -135,15 +143,18 @@ export function App({
         userName={userName}
         brief={brief}
         onBriefChange={setBrief}
-        projectId={projectId}
+        projectId={homeProjectId}
         onProjectChange={setProjectId}
+        allowNoProject={quickEdit}
         projects={projects}
         tasks={tasks}
         onStart={() =>
-          void start(brief, projectId, files, () => {
-            setBrief("");
-            setFiles([]);
-          })
+          !quickEdit && homeProjectId === null
+            ? setDialogOpen(true)
+            : void start(brief, homeProjectId, files, () => {
+                setBrief("");
+                setFiles([]);
+              })
         }
         attach={attach(files, setFiles)}
         onOpenTask={(id) => setRoute({ name: "task", id })}
@@ -207,15 +218,11 @@ export function App({
         />
       ) : null;
   } else if (route.name === "profile") {
-    screen = (
-      <Profile
-        api={api}
-        settings={settings ?? { ...DEFAULT_SETTINGS, name: userName, setupDone: true }}
-        onSaved={(next) => onSettings?.(next)}
-      />
-    );
+    screen = <Profile api={api} settings={current} onSaved={(next) => onSettings?.(next)} />;
+  } else if (route.name === "settings") {
+    screen = api ? <SettingsScreen api={api} settings={current} onChange={(next) => onSettings?.(next)} /> : null;
   } else {
-    screen = <Soon section={sectionTitle[route.section]} showVersion={route.section === "settings"} />;
+    screen = <Soon section={sectionTitle[route.section]} />;
   }
 
   return (
@@ -223,6 +230,7 @@ export function App({
       <Sidebar
         current={section}
         onNavigate={navigate}
+        showSection={(key) => sectionOn(current, key)}
         userName={userName}
         isMac={isMac}
         tasks={tasks}

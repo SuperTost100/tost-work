@@ -1,5 +1,15 @@
 import { isAbsolute } from "node:path";
-import type { Level, Settings } from "../shared/model";
+import {
+  LEVELS,
+  type Level,
+  SECTION_LEVEL,
+  type SectionKey,
+  type Settings,
+  TEXT_SIZES,
+  type TextSize,
+  THEMES,
+  type Theme,
+} from "../shared/model";
 
 /** Checks for values that come from the interface, because IPC is a trust boundary. */
 export const text = (v: unknown, field: string, max = 20_000): string => {
@@ -22,8 +32,6 @@ export const paths = (v: unknown, field: string, max = 20): string[] => {
   return v.map((p) => absolutePath(p, field));
 };
 
-const LEVELS: Level[] = ["beginner", "intermediate", "advanced", "expert"];
-
 /** Only the known settings, each with the right type. Anything else is refused rather than stored. */
 export const settingsPatch = (v: unknown): Partial<Settings> => {
   if (typeof v !== "object" || v === null || Array.isArray(v)) throw new Error("settings must be an object");
@@ -40,6 +48,22 @@ export const settingsPatch = (v: unknown): Partial<Settings> => {
     } else if (key === "language") {
       if (value !== null && value !== "en" && value !== "it") throw new Error("language must be en, it or null");
       patch.language = value;
+    } else if (key === "sections") {
+      if (typeof value !== "object" || value === null || Array.isArray(value))
+        throw new Error("sections must be an object");
+      const sections: Settings["sections"] = {};
+      for (const [name, on] of Object.entries(value)) {
+        if (!Object.hasOwn(SECTION_LEVEL, name)) throw new Error(`Unknown section: ${name}`);
+        if (typeof on !== "boolean") throw new Error(`The ${name} section must be on or off`);
+        sections[name as SectionKey] = on;
+      }
+      patch.sections = sections;
+    } else if (key === "textSize") {
+      if (!TEXT_SIZES.includes(value as TextSize)) throw new Error("textSize must be small, normal or large");
+      patch.textSize = value as TextSize;
+    } else if (key === "theme") {
+      if (!THEMES.includes(value as Theme)) throw new Error("theme must be light, dark or system");
+      patch.theme = value as Theme;
     } else if (key === "setupDone") {
       if (typeof value !== "boolean") throw new Error("setupDone must be true or false");
       patch.setupDone = value;

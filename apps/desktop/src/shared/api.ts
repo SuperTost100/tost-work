@@ -56,6 +56,8 @@ export interface TostWorkApi {
     signIn(): Promise<void>;
     sendCode(code: string): Promise<void>;
     cancel(): Promise<void>;
+    /** Signs out of ChatGPT in Codex and resolves with the new state. */
+    signOut(): Promise<CodexAccount>;
     onSignIn(listener: (event: SignInEvent) => void): () => void;
   };
   projects: {
@@ -117,6 +119,7 @@ export const IPC = {
   accountSignIn: "account:sign-in",
   accountSendCode: "account:send-code",
   accountCancel: "account:cancel",
+  accountSignOut: "account:sign-out",
   accountSignInEvent: "account:sign-in-event",
   projectsList: "projects:list",
   projectsCreate: "projects:create",
