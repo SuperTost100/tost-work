@@ -74,6 +74,10 @@ export function createMemoryApi(
       },
       sendCode: async () => {},
       cancel: async () => {},
+      install: async (provider) => {
+        accounts[provider] = { ...accounts[provider], installed: true };
+        return { ok: true };
+      },
       signOut: async (provider) => {
         accounts[provider] = { ...accounts[provider], loggedIn: false, account: undefined };
         return accounts[provider];

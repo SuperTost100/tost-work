@@ -11,6 +11,7 @@ import type { Engine } from "./engine/engine";
 import { FakeEngine } from "./engine/fake";
 import { TaskRunner } from "./engine/runner";
 import { fileGuard } from "./guard";
+import { findInstalledCodex, Installer } from "./installer";
 import { registerIpc } from "./ipc";
 import { KeyStore } from "./keys";
 import { applyLook } from "./look";
@@ -65,6 +66,8 @@ function createWindow(store: Store): BrowserWindow {
 }
 
 app.whenReady().then(async () => {
+  // Codex's Windows installer puts it where cli-funnel doesn't look, so it's pointed there before anything runs.
+  findInstalledCodex();
   const store = new Store(join(app.getPath("userData"), "tost-work.db"));
   const keys = new KeyStore(join(app.getPath("userData"), "course-key.json"), {
     available: () => safeStorage.isEncryptionAvailable(),
@@ -136,7 +139,7 @@ app.whenReady().then(async () => {
       (url) => shell.openExternal(url),
     );
   const accounts = { codex: accountsFor("codex"), claude: accountsFor("claude") };
-  registerIpc(store, runner, accounts, keys, () => mainWindow);
+  registerIpc(store, runner, accounts, keys, new Installer(), () => mainWindow);
   app.on("before-quit", () => {
     accounts.codex.cancel();
     accounts.claude.cancel();

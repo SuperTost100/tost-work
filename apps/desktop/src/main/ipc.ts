@@ -9,6 +9,7 @@ import type { AgentProvider, Project } from "../shared/model";
 import type { Accounts } from "./accounts";
 import type { TaskRunner } from "./engine/runner";
 import { type Conflict, copyInto, describe, readablePath, savablePaths, saveCopies } from "./files";
+import type { Installer } from "./installer";
 import type { KeyStore } from "./keys";
 import { applyLook } from "./look";
 import type { Store } from "./store/store";
@@ -20,6 +21,7 @@ export function registerIpc(
   runner: TaskRunner,
   accounts: Record<AgentProvider, Accounts>,
   keys: KeyStore,
+  installer: Installer,
   window: () => BrowserWindow | null,
 ): void {
   const account = (provider: unknown): Accounts => {
@@ -55,6 +57,10 @@ export function registerIpc(
   );
   ipcMain.handle(IPC.accountCancel, (_e, provider: unknown) => account(provider).cancel());
   ipcMain.handle(IPC.accountSignOut, (_e, provider: unknown) => account(provider).signOut());
+  ipcMain.handle(IPC.accountInstall, (_e, provider: unknown) => {
+    account(provider);
+    return installer.install(provider as AgentProvider);
+  });
   ipcMain.handle(IPC.keyInfo, () => keys.info());
   ipcMain.handle(IPC.keySave, (_e, key: unknown) => keys.save(text(key, "key", 400).trim()));
   ipcMain.handle(IPC.keyRemove, () => keys.remove());

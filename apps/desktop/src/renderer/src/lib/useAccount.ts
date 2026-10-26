@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AgentAccount, TostWorkApi } from "../../../shared/api";
+import type { InstallResult } from "../../../shared/install";
 import type { AgentProvider } from "../../../shared/model";
 import { errorText } from "./errorText";
 
@@ -21,6 +22,8 @@ export function useAccount(
   const [checking, setChecking] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const [installFailed, setInstallFailed] = useState<Exclude<InstallResult, { ok: true }> | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const [codePrompt, setCodePrompt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -97,5 +100,35 @@ export function useAccount(
     }
   };
 
-  return { account, checking, signingIn, signingOut, link, codePrompt, error, check, signIn, sendCode, signOut };
+  const install = async () => {
+    setError(null);
+    setInstallFailed(null);
+    setInstalling(true);
+    try {
+      const result = await api.account.install(provider);
+      if (result.ok) await check();
+      else setInstallFailed(result);
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setInstalling(false);
+    }
+  };
+
+  return {
+    account,
+    checking,
+    signingIn,
+    signingOut,
+    installing,
+    installFailed,
+    link,
+    codePrompt,
+    error,
+    check,
+    signIn,
+    sendCode,
+    signOut,
+    install,
+  };
 }

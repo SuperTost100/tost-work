@@ -1,3 +1,4 @@
+import type { InstallResult } from "./install";
 import type { AgentProvider, CourseKey, Project, Settings, Task } from "./model";
 
 export interface NewProjectInput {
@@ -59,6 +60,8 @@ export interface TostWorkApi {
     cancel(provider: AgentProvider): Promise<void>;
     /** Signs out in the CLI and resolves with the new state. */
     signOut(provider: AgentProvider): Promise<AgentAccount>;
+    /** Installs the CLI with the vendor's official installer. Resolves when it's done, never rejects. */
+    install(provider: AgentProvider): Promise<InstallResult>;
     onSignIn(listener: (provider: AgentProvider, event: SignInEvent) => void): () => void;
   };
   /** The course API key. The interface never reads it back, only whose it is and how it ends. */
@@ -128,6 +131,7 @@ export const IPC = {
   accountSendCode: "account:send-code",
   accountCancel: "account:cancel",
   accountSignOut: "account:sign-out",
+  accountInstall: "account:install",
   keyInfo: "key:info",
   keySave: "key:save",
   keyRemove: "key:remove",

@@ -76,20 +76,33 @@ describe("first-run setup", () => {
     expect(screen.getByRole("button", { name: "Next" })).toBeTruthy();
   });
 
-  it("shows how to install Codex when it's missing, and checks again", async () => {
+  it("installs a missing CLI with one button, and says what went wrong when it can't", async () => {
     const api = createMemoryApi({ name: "Giulia" });
-    let installed = false;
-    api.account.status = async () => ({ installed, loggedIn: false });
+    const installed = { codex: false, claude: true };
+    api.account.status = async (provider) => ({ installed: installed[provider], loggedIn: false });
+    const tries: string[] = [];
+    api.account.install = async (provider) => {
+      tries.push(provider);
+      if (tries.length === 1)
+        return { ok: false, reason: "offline", detail: "curl: (6) Could not resolve host: chatgpt.com" };
+      installed[provider] = true;
+      return { ok: true };
+    };
     render(<Root api={api} />);
     await click("Next");
     await click("Skip for now");
     await click("Next");
-    expect(await screen.findByText("npm install -g @openai/codex")).toBeTruthy();
+    expect(await screen.findByText("Codex isn't installed yet. Tost Work installs it for you.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Skip for now" })).toBeTruthy();
 
-    installed = true;
-    await click("Check again for Codex");
+    await click("Install Codex");
+    expect(await screen.findByText(/There's no internet connection/)).toBeTruthy();
+    // The terminal command is there as a way out once the button has failed.
+    expect(screen.getByText(/chatgpt\.com\/codex\/install\.sh/)).toBeTruthy();
+
+    await click("Install Codex");
     expect(await screen.findByRole("button", { name: "Sign in to ChatGPT" })).toBeTruthy();
+    expect(tries).toEqual(["codex", "codex"]);
   });
 
   it("switches the language as soon as it's picked", async () => {

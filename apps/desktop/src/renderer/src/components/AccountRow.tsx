@@ -4,12 +4,15 @@ import { useAccount } from "@/lib/useAccount";
 import { useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
+import { installLine } from "../../../shared/install";
 import { PROVIDER_OF, type Subscription } from "../../../shared/model";
 
-/** The agent CLI behind each subscription, and how to install it until setup can do it with a button. */
-const CLI: Record<Subscription, { name: string; install: string }> = {
-  chatgpt: { name: "Codex", install: "npm install -g @openai/codex" },
-  claude: { name: "Claude Code", install: "npm install -g @anthropic-ai/claude-code" },
+/** The agent CLI behind each subscription. */
+const CLI: Record<Subscription, string> = { chatgpt: "Codex", claude: "Claude Code" };
+const INSTALL_FAILED: Record<"offline" | "space" | "failed", MessageKey> = {
+  offline: "ai.install.offline",
+  space: "ai.install.space",
+  failed: "ai.install.failed",
 };
 
 /**
@@ -36,12 +39,27 @@ export function AccountRow({
   const connectedRef = useRef(onConnected);
   connectedRef.current = onConnected;
   const connected = useCallback((c: boolean) => connectedRef.current?.(ai, c), [ai]);
-  const { account, checking, signingIn, signingOut, link, codePrompt, error, check, signIn, sendCode, signOut } =
-    useAccount(api, PROVIDER_OF[ai], {
-      onConnected: connected,
-      onSignedIn: () => onSignedIn?.(ai),
-      onSignedOut: () => onSignedOut?.(ai),
-    });
+  const provider = PROVIDER_OF[ai];
+  const {
+    account,
+    checking,
+    signingIn,
+    signingOut,
+    installing,
+    installFailed,
+    link,
+    codePrompt,
+    error,
+    check,
+    signIn,
+    sendCode,
+    signOut,
+    install,
+  } = useAccount(api, provider, {
+    onConnected: connected,
+    onSignedIn: () => onSignedIn?.(ai),
+    onSignedOut: () => onSignedOut?.(ai),
+  });
   const [code, setCode] = useState("");
   const setup = variant === "setup";
   const cli = CLI[ai];
@@ -50,22 +68,33 @@ export function AccountRow({
   let detail: React.ReactNode = setup ? t(`ai.${ai}.d` as MessageKey) : t("settings.notConnected");
   let action: React.ReactNode = null;
   let ok = false;
-  if (checking) detail = t("ai.checking", { cli: cli.name });
+  if (installing) detail = t("ai.installing", { cli });
+  else if (checking) detail = t("ai.checking", { cli });
   else if (account && !account.installed) {
-    detail = (
+    detail = installFailed ? (
       <>
-        {t("ai.missing", { cli: cli.name })} <code className="cmd">{cli.install}</code>
+        {t(INSTALL_FAILED[installFailed.reason], { detail: installFailed.detail })} {t("ai.install.manual")}{" "}
+        <code className="cmd">{installLine(provider, api.platform)}</code>
       </>
+    ) : (
+      t("ai.missing", { cli })
     );
     action = (
-      <button
-        type="button"
-        className="btn"
-        aria-label={t("ai.checkAgainFor", { cli: cli.name })}
-        onClick={() => void check()}
-      >
-        {t("ai.checkAgain")}
-      </button>
+      <span className="row">
+        {installFailed && (
+          <button
+            type="button"
+            className="btn"
+            aria-label={t("ai.checkAgainFor", { cli })}
+            onClick={() => void check()}
+          >
+            {t("ai.checkAgain")}
+          </button>
+        )}
+        <button type="button" className="btn" onClick={() => void install()}>
+          {t("ai.install", { cli })}
+        </button>
+      </span>
     );
   } else if (account?.loggedIn) {
     ok = true;
@@ -95,12 +124,7 @@ export function AccountRow({
     );
   } else if (account) {
     action = (
-      <button
-        type="button"
-        className={setup ? "btn dark" : "btn"}
-        aria-label={t("ai.signInTo", { name })}
-        onClick={() => void signIn()}
-      >
+      <button type="button" className="btn" aria-label={t("ai.signInTo", { name })} onClick={() => void signIn()}>
         {t("ai.signIn")}
       </button>
     );
