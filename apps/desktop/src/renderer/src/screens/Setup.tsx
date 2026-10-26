@@ -8,7 +8,7 @@ import type { CodexAccount, TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
 import type { Level, Settings } from "../../../shared/model";
 
-const TOTAL = 4;
+const TOTAL = 5;
 const LEVELS: Level[] = ["beginner", "intermediate", "advanced", "expert"];
 const CODEX_INSTALL = "npm install -g @openai/codex";
 const folderName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? "";
@@ -157,7 +157,7 @@ function Connect({ api, onConnected }: { api: TostWorkApi; onConnected: (connect
   );
 }
 
-/** First-run setup: name, level, an AI account and a first project. Each step is saved as soon as it's done. */
+/** First-run setup: name, a few words about the user, level, an AI account and a first project. Each step is saved as soon as it's done. */
 export function Setup({
   api,
   settings,
@@ -170,6 +170,9 @@ export function Setup({
   const t = useT();
   const [step, setStep] = useState(0);
   const [name, setName] = useState(settings.name);
+  const [work, setWork] = useState(settings.work);
+  const [notes, setNotes] = useState(settings.notes);
+  const aboutFilled = Boolean(work.trim() || notes.trim());
   const [connected, setConnected] = useState(false);
   const [folder, setFolder] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
@@ -216,6 +219,7 @@ export function Setup({
 
   const titles: [MessageKey, MessageKey][] = [
     ["setup.name.title", "setup.name.sub"],
+    ["setup.about.title", "setup.about.sub"],
     ["setup.level.title", "setup.level.sub"],
     ["setup.ai.title", "setup.ai.sub"],
     ["setup.project.title", "setup.project.sub"],
@@ -276,6 +280,35 @@ export function Setup({
           )}
 
           {step === 1 && (
+            <>
+              <label className="fld">
+                <span>{t("profile.work")}</span>
+                <input
+                  className="input"
+                  value={work}
+                  maxLength={300}
+                  placeholder={t("profile.workHint")}
+                  onChange={(e) => setWork(e.target.value)}
+                />
+              </label>
+              <label className="fld">
+                <span>{t("profile.notes")}</span>
+                <textarea
+                  className="input area"
+                  value={notes}
+                  maxLength={4000}
+                  rows={5}
+                  placeholder={t("profile.notesHint")}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </label>
+              <p className="t3" style={{ fontSize: 13 }}>
+                {t("setup.about.later")}
+              </p>
+            </>
+          )}
+
+          {step === 2 && (
             <fieldset className="opts">
               <legend className="sr">{t("setup.level.title")}</legend>
               {LEVELS.map((level) => (
@@ -296,14 +329,14 @@ export function Setup({
             </fieldset>
           )}
 
-          {step === 2 && (
+          {step === 3 && (
             <>
               <p className="lede">{t("setup.ai.lede")}</p>
               <Connect api={api} onConnected={setConnected} />
             </>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <>
               <p className="lede">{t("setup.project.lede")}</p>
               <fieldset className="fld">
@@ -348,11 +381,21 @@ export function Setup({
               </button>
             )}
             {step === 1 && (
-              <button type="button" className="btn dark" disabled={busy} onClick={() => void go(2)}>
-                {t("setup.next")}
+              <button
+                type="button"
+                className={aboutFilled ? "btn dark" : "btn"}
+                disabled={busy}
+                onClick={() => void go(2, { work: work.trim(), notes: notes.trim() })}
+              >
+                {aboutFilled ? t("setup.next") : t("setup.skip")}
               </button>
             )}
             {step === 2 && (
+              <button type="button" className="btn dark" disabled={busy} onClick={() => void go(3)}>
+                {t("setup.next")}
+              </button>
+            )}
+            {step === 3 && (
               <>
                 <span className="t3" style={{ fontSize: 13 }}>
                   {t("setup.next.project")}
@@ -361,13 +404,13 @@ export function Setup({
                   type="button"
                   className={connected ? "btn dark" : "btn"}
                   disabled={busy}
-                  onClick={() => void go(3)}
+                  onClick={() => void go(4)}
                 >
                   {connected ? t("setup.next") : t("setup.skip")}
                 </button>
               </>
             )}
-            {step === 3 && (
+            {step === 4 && (
               <>
                 <button type="button" className="btn" disabled={busy} onClick={() => void finish(false)}>
                   {t("setup.skip")}

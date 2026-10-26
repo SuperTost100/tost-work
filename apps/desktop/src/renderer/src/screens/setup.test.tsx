@@ -12,13 +12,21 @@ const click = async (name: string | RegExp) => {
 };
 
 describe("first-run setup", () => {
-  it("goes through name, level, ChatGPT sign-in and a first project, then opens the app", async () => {
+  it("goes through name, about you, level, ChatGPT sign-in and a first project, then opens the app", async () => {
     const api = createMemoryApi({});
     render(<Root api={api} />);
 
     fireEvent.change(await screen.findByLabelText("Your name"), { target: { value: "  Giulia " } });
     await click("Next");
-    expect(screen.getByText("Step 2 of 4")).toBeTruthy();
+    expect(screen.getByText("Step 2 of 5")).toBeTruthy();
+
+    // About you is optional: empty, the button skips.
+    expect(screen.getByRole("button", { name: "Skip for now" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("What you do"), { target: { value: " I sell olive oil " } });
+    fireEvent.change(screen.getByLabelText("What else the AI should know"), {
+      target: { value: "Clients are in Japan" },
+    });
+    await click("Next");
 
     await act(async () => {
       fireEvent.click(screen.getByLabelText(/Advanced/));
@@ -37,7 +45,13 @@ describe("first-run setup", () => {
     await click("Start working");
 
     expect(await screen.findByText(/Giulia\./)).toBeTruthy();
-    expect(await api.settings.get()).toMatchObject({ name: "Giulia", level: "advanced", setupDone: true });
+    expect(await api.settings.get()).toMatchObject({
+      name: "Giulia",
+      work: "I sell olive oil",
+      notes: "Clients are in Japan",
+      level: "advanced",
+      setupDone: true,
+    });
     expect((await api.projects.list()).map((p) => p.name)).toEqual(["Proposals"]);
   });
 
@@ -47,6 +61,7 @@ describe("first-run setup", () => {
     api.account.status = async () => ({ installed, loggedIn: false });
     render(<Root api={api} />);
     await click("Next");
+    await click("Skip for now");
     await click("Next");
     expect(await screen.findByText("npm install -g @openai/codex")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Skip for now" })).toBeTruthy();
@@ -80,6 +95,7 @@ describe("first-run setup", () => {
     api.account.signIn = () => new Promise(() => {});
     render(<Root api={api} />);
     await click("Next");
+    await click("Skip for now");
     await click("Next");
     await click("Sign in");
     expect(await screen.findByText("Finish signing in on the page that opened.")).toBeTruthy();
@@ -113,6 +129,7 @@ describe("first-run setup", () => {
     };
     render(<Root api={api} />);
     await click("Next");
+    await click("Skip for now");
     await click("Next");
     await click("Skip for now");
     await click("Choose folder");
