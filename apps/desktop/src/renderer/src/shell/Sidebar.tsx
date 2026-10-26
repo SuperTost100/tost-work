@@ -1,6 +1,8 @@
+import { type MouseEvent, useEffect, useRef, useState } from "react";
 import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
 import { useT } from "@/lib/useT";
+import type { TaskMenuAction } from "../../../shared/api";
 import type { Task } from "../../../shared/model";
 import { WorkingDots } from "../components/TaskTag";
 
@@ -26,6 +28,10 @@ export function Sidebar({
   tasks,
   openTaskId,
   onOpenTask,
+  onTaskMenu,
+  onRenameTask,
+  onRevealTask,
+  onDeleteTask,
 }: {
   current: Section | null;
   onNavigate: (s: Section) => void;
@@ -34,8 +40,25 @@ export function Sidebar({
   tasks: Task[];
   openTaskId: string | null;
   onOpenTask: (id: string) => void;
+  /** Shows the native task menu and resolves with the pick. */
+  onTaskMenu: (id: string) => Promise<TaskMenuAction | null>;
+  onRenameTask: (id: string, title: string) => void;
+  onRevealTask: (id: string) => void;
+  onDeleteTask: (id: string) => void;
 }) {
   const t = useT();
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const menu = async (id: string) => {
+    const action = await onTaskMenu(id);
+    if (action === "rename") setRenaming(id);
+    else if (action === "reveal") onRevealTask(id);
+    else if (action === "delete") onDeleteTask(id);
+  };
+  // Right-click opens the same menu as the … button, as in Finder.
+  const contextMenu = (id: string) => (e: MouseEvent) => {
+    e.preventDefault();
+    void menu(id);
+  };
   return (
     <aside className="side">
       <div className="chrome">
@@ -75,22 +98,45 @@ export function Sidebar({
         </p>
       )}
       {tasks.slice(0, 8).map((task) => (
-        <button
-          type="button"
-          key={task.id}
-          className={`rec split${openTaskId === task.id ? " on" : ""}`}
-          aria-current={openTaskId === task.id ? "page" : undefined}
-          onClick={() => onOpenTask(task.id)}
-        >
-          <span className="truncate">{task.title}</span>
-          {task.status === "needs-you" && <span className="tag mine">{t("tag.needsYou")}</span>}
-          {task.status === "running" && (
-            <>
-              <WorkingDots />
-              <span className="sr-only">{t("tag.working")}</span>
-            </>
+        <div key={task.id} className={`rec split${openTaskId === task.id ? " on" : ""}`}>
+          {renaming === task.id ? (
+            <RenameField
+              title={task.title}
+              label={t("menu.rename")}
+              onDone={(title) => {
+                setRenaming(null);
+                if (title && title !== task.title) onRenameTask(task.id, title);
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              className="open"
+              aria-current={openTaskId === task.id ? "page" : undefined}
+              onClick={() => onOpenTask(task.id)}
+              onContextMenu={contextMenu(task.id)}
+            >
+              <span className="truncate grow">{task.title}</span>
+              {task.status === "needs-you" && <span className="tag mine">{t("tag.needsYou")}</span>}
+              {task.status === "running" && (
+                <span className="tag">
+                  <WorkingDots />
+                  {t("tag.working")}
+                </span>
+              )}
+            </button>
           )}
-        </button>
+          <button
+            type="button"
+            className="more"
+            aria-label={t("recent.more", { name: task.title })}
+            title={t("recent.more", { name: task.title })}
+            onClick={() => void menu(task.id)}
+            onContextMenu={contextMenu(task.id)}
+          >
+            <Icon name="more-1" />
+          </button>
+        </div>
       ))}
       <span className="spacer" />
       <button
@@ -106,5 +152,42 @@ export function Sidebar({
         <Icon name="settings-3" />
       </button>
     </aside>
+  );
+}
+
+/** The task's name, editable in place. Enter or leaving the field keeps the new name; Escape keeps the old one. */
+function RenameField({
+  title,
+  label,
+  onDone,
+}: {
+  title: string;
+  label: string;
+  onDone: (title: string | null) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const done = useRef(false);
+  useEffect(() => {
+    ref.current?.focus();
+    ref.current?.select();
+  }, []);
+  const finish = (value: string | null) => {
+    if (done.current) return;
+    done.current = true;
+    onDone(value?.trim() || null);
+  };
+  return (
+    <input
+      ref={ref}
+      className="rename"
+      aria-label={label}
+      defaultValue={title}
+      maxLength={200}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") finish(e.currentTarget.value);
+        if (e.key === "Escape") finish(null);
+      }}
+      onBlur={(e) => finish(e.currentTarget.value)}
+    />
   );
 }

@@ -47,5 +47,7 @@ export function useData(api: TostWorkApi | undefined) {
     },
     [api],
   );
-  return { projects, tasks, addProject, loadProject };
+  const removeTask = useCallback((id: string) => setTasks((list) => list.filter((t) => t.id !== id)), []);
+
+  return { projects, tasks, addProject, loadProject, removeTask };
 }

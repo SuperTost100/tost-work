@@ -24,7 +24,7 @@ type Route =
 
 export function App({ userName = "Giulia", api = window.tostWork }: { userName?: string; api?: TostWorkApi }) {
   const t = useT();
-  const { projects, tasks, addProject, loadProject } = useData(api);
+  const { projects, tasks, addProject, loadProject, removeTask } = useData(api);
   const [route, setRoute] = useState<Route>({ name: "home" });
   // The briefs live here so they survive a trip to another section.
   const [brief, setBrief] = useState("");
@@ -38,6 +38,14 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
   const report = useCallback((err: unknown) => setError(err instanceof Error ? err.message : String(err)), []);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const isMac = api?.platform === "darwin";
+  const openTaskMenu = async (id: string) => {
+    try {
+      return (await api?.tasks.menu(id)) ?? null;
+    } catch (err) {
+      report(err);
+      return null;
+    }
+  };
 
   const openProjectId = route.name === "project" ? route.id : null;
   useEffect(() => {
@@ -194,6 +202,16 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
         tasks={tasks}
         openTaskId={route.name === "task" ? route.id : null}
         onOpenTask={(id) => setRoute({ name: "task", id })}
+        onTaskMenu={openTaskMenu}
+        onRenameTask={(id, title) => void api?.tasks.rename(id, title).catch(report)}
+        onRevealTask={(id) => void api?.tasks.reveal(id).catch(report)}
+        onDeleteTask={(id) =>
+          void api?.tasks.remove(id).then((gone) => {
+            if (!gone) return;
+            removeTask(id);
+            setRoute((r) => (r.name === "task" && r.id === id ? { name: "home" } : r));
+          }, report)
+        }
       />
       {screen ?? <div className="main" />}
       {error && (

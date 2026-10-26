@@ -37,6 +37,10 @@ const api: TostWorkApi = {
     decide: (id, allow) => ipcRenderer.invoke(IPC.tasksDecide, id, allow),
     followUp: (id, text) => ipcRenderer.invoke(IPC.tasksFollowUp, id, text),
     saveCopy: (id) => ipcRenderer.invoke(IPC.tasksSaveCopy, id),
+    menu: (id) => ipcRenderer.invoke(IPC.tasksMenu, id),
+    rename: (id, title) => ipcRenderer.invoke(IPC.tasksRename, id, title),
+    reveal: (id) => ipcRenderer.invoke(IPC.tasksReveal, id),
+    remove: (id) => ipcRenderer.invoke(IPC.tasksRemove, id),
     onChange: (listener) => {
       const handler = (_: unknown, task: Task) => listener(task);
       ipcRenderer.on(IPC.taskChanged, handler);

@@ -73,6 +73,10 @@ export class Store {
     return row ? (JSON.parse(row.data) as Task) : undefined;
   }
 
+  deleteTask(id: string): void {
+    this.db.prepare("delete from tasks where id = ?").run(id);
+  }
+
   /** Most recently updated first. */
   listTasks(limit = 50): Task[] {
     const rows = this.db.prepare("select data from tasks order by updated_at desc limit ?").all(limit) as {

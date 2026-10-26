@@ -357,3 +357,58 @@ describe("the account row", () => {
     expect(screen.getByRole("button", { name: "Giulia, Settings" }).getAttribute("aria-current")).toBe("page");
   });
 });
+
+describe("the task menu in Recent", () => {
+  const started = async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    await screen.findByText("Who pays the insurance?");
+    const [task] = await api.tasks.list();
+    act(() => api.emit(task?.id ?? "", { type: "stopped" }));
+    return api;
+  };
+
+  it("renames a task in place", async () => {
+    const api = await started();
+    api.pickInMenu("rename");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "More for Write a proposal" }));
+    });
+    const field = screen.getByRole("textbox", { name: "Rename" });
+    fireEvent.change(field, { target: { value: "Alpi proposal" } });
+    await act(async () => {
+      fireEvent.keyDown(field, { key: "Enter" });
+    });
+    expect(await screen.findByRole("button", { name: "More for Alpi proposal" })).toBeTruthy();
+    expect((await api.tasks.list())[0]?.title).toBe("Alpi proposal");
+  });
+
+  it("keeps the old name on Escape", async () => {
+    const api = await started();
+    api.pickInMenu("rename");
+    await act(async () => {
+      fireEvent.contextMenu(screen.getByRole("button", { name: "More for Write a proposal" }));
+    });
+    const field = screen.getByRole("textbox", { name: "Rename" });
+    fireEvent.change(field, { target: { value: "Something else" } });
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(screen.queryByRole("textbox", { name: "Rename" })).toBeNull();
+    expect((await api.tasks.list())[0]?.title).toBe("Write a proposal");
+  });
+
+  it("deletes a task from a right-click and leaves its screen", async () => {
+    const api = await started();
+    api.pickInMenu("delete");
+    const row = screen.getAllByRole("button", { name: /Write a proposal/ })[0];
+    await act(async () => {
+      if (row) fireEvent.contextMenu(row);
+    });
+    await waitFor(() => expect(screen.queryByRole("button", { name: "More for Write a proposal" })).toBeNull());
+    expect(await api.tasks.list()).toEqual([]);
+    expect(screen.queryByText("Who pays the insurance?")).toBeNull();
+  });
+});

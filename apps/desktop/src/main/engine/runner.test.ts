@@ -271,3 +271,25 @@ describe("TaskRunner when the agent ends its turn to wait", () => {
     expect(prompts).toHaveLength(1);
   });
 });
+
+describe("renaming and deleting tasks", () => {
+  it("renames without moving the task in Recent, and refuses an empty name", async () => {
+    const { store, runner, task } = turnTaking([]);
+    const before = store.getTask(task.id)?.updatedAt;
+    expect(runner.rename(task.id, "  Call notes  ").title).toBe("Call notes");
+    expect(store.getTask(task.id)?.updatedAt).toBe(before);
+    expect(() => runner.rename(task.id, "   ")).toThrow(/name/);
+  });
+
+  it("refuses to delete a running task, and deletes it once it's done", async () => {
+    const { store, runner, task, hold, release } = turnTaking([() => []]);
+    hold();
+    const run = runner.start(task.id);
+    await waitFor(() => runner.isRunning(task.id));
+    expect(() => runner.remove(task.id)).toThrow(/Stop the task/);
+    release();
+    await run;
+    runner.remove(task.id);
+    expect(store.getTask(task.id)).toBeUndefined();
+  });
+});

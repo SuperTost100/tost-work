@@ -244,6 +244,22 @@ export class TaskRunner {
     }
   }
 
+  /** Gives the task a name of the user's choosing. Its place in Recent stays where it was. */
+  rename(taskId: string, title: string): Task {
+    const name = title.trim();
+    if (!name) throw new Error("A task needs a name");
+    return this.save({ ...this.mustGet(taskId), title: name });
+  }
+
+  /** Removes the task from Tost Work. The files it made or used stay where they are. */
+  remove(taskId: string): void {
+    this.mustGet(taskId);
+    if (this.running.has(taskId) || this.deciding.has(taskId) || this.restoring.has(taskId))
+      throw new Error("Stop the task before deleting it");
+    this.queued.delete(taskId);
+    this.store.deleteTask(taskId);
+  }
+
   stop(taskId: string): void {
     this.queued.delete(taskId);
     const run = this.running.get(taskId);
