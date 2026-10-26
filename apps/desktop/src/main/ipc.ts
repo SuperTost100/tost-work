@@ -201,9 +201,16 @@ export function registerIpc(
     if (!task) throw new Error("That task doesn't exist");
     return readablePath(task, absolutePath(path, "path"), limitSize);
   };
+  // A file the task listed may be missing for a moment while the agent rewrites it, or for good if the user moved
+  // it. That's null, which the preview explains, rather than an error.
   ipcMain.handle(IPC.filesRead, async (_e, taskId: unknown, path: unknown) => {
-    const real = await fileOf(taskId, path);
-    return { ...describe(real), bytes: new Uint8Array(await readFile(real)) };
+    try {
+      const real = await fileOf(taskId, path);
+      return { ...describe(real), bytes: new Uint8Array(await readFile(real)) };
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw err;
+    }
   });
   ipcMain.handle(IPC.filesOpen, async (_e, taskId: unknown, path: unknown) => {
     const error = await shell.openPath(await fileOf(taskId, path, false));

@@ -11,7 +11,9 @@ describe("instructionsFor", () => {
     const text = instructionsFor(task, project, "it");
     expect(text).toContain("/Users/giulia/Proposte");
     expect(text).toContain("plain Italian");
-    expect(text).toContain("don't use Markdown");
+    // The work goes in a file, and the chat stays short; questions go through the card.
+    expect(text).toContain("never in a message");
+    expect(text).toContain("simple Markdown");
     expect(text).toContain("request_approval with action overwrite");
     expect(text).toContain("The project's instructions:\nUse our template.");
     // Business users get Word, Excel and PowerPoint files, not plain text.

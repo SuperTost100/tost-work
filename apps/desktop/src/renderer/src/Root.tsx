@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { App } from "@/App";
+import { errorText } from "@/lib/errorText";
 import { LanguageContext } from "@/lib/useT";
 import { Setup } from "@/screens/Setup";
 import type { TostWorkApi } from "../../shared/api";
@@ -13,7 +14,7 @@ export function Root({ api = window.tostWork }: { api?: TostWorkApi }) {
   const lang = settings?.language ?? languageFrom(navigator.language);
 
   useEffect(() => {
-    api?.settings.get().then(setSettings, (err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+    api?.settings.get().then(setSettings, (err: unknown) => setError(errorText(err)));
   }, [api]);
   useEffect(() => {
     document.documentElement.lang = lang;

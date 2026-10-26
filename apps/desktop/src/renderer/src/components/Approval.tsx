@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { errorText } from "@/lib/errorText";
 import type { useT } from "@/lib/useT";
 import type { Approval } from "../../../shared/model";
 
@@ -29,7 +30,7 @@ export function ApprovalCard({
     try {
       await onDecide(allow);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
     } finally {
       setBusy(false);
     }

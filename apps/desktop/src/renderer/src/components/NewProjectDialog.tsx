@@ -1,5 +1,6 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { useRef, useState } from "react";
+import { errorText } from "@/lib/errorText";
 import { useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { Project } from "../../../shared/model";
@@ -47,7 +48,7 @@ export function NewProjectDialog({
       setError(null);
       onOpenChange(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       creating.current = false;
       setBusy(false);

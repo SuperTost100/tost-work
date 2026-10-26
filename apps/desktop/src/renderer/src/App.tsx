@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Attachments } from "@/components/Composer";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
+import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
 import { Home } from "@/screens/Home";
@@ -35,7 +36,7 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const starting = useRef(false);
-  const report = useCallback((err: unknown) => setError(err instanceof Error ? err.message : String(err)), []);
+  const report = useCallback((err: unknown) => setError(errorText(err)), []);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const isMac = api?.platform === "darwin";
   const openTaskMenu = async (id: string) => {

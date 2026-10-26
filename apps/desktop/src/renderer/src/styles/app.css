@@ -1037,6 +1037,16 @@ h3 {
   color: var(--t3);
   margin: 14px 0 8px;
 }
+/* An empty list says so in a box of its own, so it can't be read as another heading. */
+.empty {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--t3);
+}
 .fileline {
   display: flex;
   align-items: center;
@@ -1499,6 +1509,42 @@ h3 {
   font-size: 15px;
   line-height: 1.6;
   margin-top: 22px;
+}
+.agent p,
+.agent ul,
+.agent ol,
+.agent blockquote,
+.agent pre {
+  margin: 0 0 10px;
+}
+.agent > :last-child {
+  margin-bottom: 0;
+}
+.agent ul,
+.agent ol {
+  padding-left: 22px;
+}
+.agent li + li {
+  margin-top: 4px;
+}
+.agent h1,
+.agent h2,
+.agent h3,
+.agent h4 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 16px 0 6px;
+}
+.agent code {
+  font:
+    500 13px / 1 "IBM Plex Mono",
+    ui-monospace,
+    monospace;
+}
+.agent blockquote {
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+  color: var(--t2);
 }
 .wc {
   border-left: 1px solid var(--line-2);

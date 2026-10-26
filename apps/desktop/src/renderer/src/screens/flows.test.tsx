@@ -341,8 +341,9 @@ describe("a running task", () => {
     expect((await screen.findByText("Working on it")).closest(".working")?.textContent).toBe(
       "Working on it · Read the notes",
     );
-    expect(screen.getByText("writing · 1 of 2")).toBeTruthy();
-    // The dots in Recent are decorative; the row says it in words to screen readers.
+    // Two signs while it works: the line above the composer and the tag in Recent. The header shows none.
+    expect(screen.getAllByText("working")).toHaveLength(1);
+    expect(screen.queryByText("writing · 1 of 2")).toBeNull();
     expect(screen.getByRole("button", { name: /Write a proposal.*working/ })).toBeTruthy();
 
     act(() => api.emit(task?.id ?? "", { type: "stopped" }));

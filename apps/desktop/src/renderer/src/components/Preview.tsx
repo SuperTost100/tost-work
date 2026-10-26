@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { errorText } from "@/lib/errorText";
 import { useT } from "@/lib/useT";
 import type { FileContent, TostWorkApi } from "../../../shared/api";
 
@@ -149,32 +150,49 @@ export function Preview({
   taskId,
   path,
   version,
+  writing = false,
 }: {
   api: TostWorkApi;
   taskId: string;
   path: string;
   version: string;
+  /** The agent is at work, so a missing file is one being rewritten, not one that's gone. */
+  writing?: boolean;
 }) {
   const t = useT();
-  const [state, setState] = useState<{ loaded?: Loaded; error?: string }>({});
-  const latest = useRef("");
-
+  // `file` and `version` say what's on screen, so a missing file never keeps another file's preview.
+  const [state, setState] = useState<{
+    loaded?: Loaded;
+    file?: string;
+    version?: string;
+    error?: string;
+    missing?: boolean;
+  }>({});
   // `version` changes whenever the task does, so a file being written is read again. The previous preview stays on
-  // screen until the new one is ready, and a read that comes back after a newer one started is dropped.
+  // screen until the new one is ready. Each run of the effect owns its read: once a newer run replaces it, even one
+  // for the same file and version, its result is dropped.
   useEffect(() => {
-    const request = `${taskId}|${path}|${version}`;
-    latest.current = request;
+    const file = `${taskId}|${path}`;
+    let current = true;
     api.files
       .read(taskId, path)
-      .then(load)
+      .then((content) => (content ? load(content) : null))
       .then((loaded) => {
-        if (latest.current === request) setState({ loaded });
-        // A read that came back after a newer one started is dropped, and so is its image.
-        else if (loaded.kind === "image") URL.revokeObjectURL(loaded.url);
+        if (!current) {
+          if (loaded?.kind === "image") URL.revokeObjectURL(loaded.url);
+          return;
+        }
+        // A missing file keeps the last preview on screen, if it's the same file, until the file is back.
+        if (!loaded)
+          setState((s) =>
+            s.file === file ? { loaded: s.loaded, file, version: s.version, missing: true } : { file, missing: true },
+          );
+        else setState({ loaded, file, version });
       })
-      .catch(
-        (e: unknown) => latest.current === request && setState({ error: e instanceof Error ? e.message : String(e) }),
-      );
+      .catch((e: unknown) => current && setState({ error: errorText(e), file }));
+    return () => {
+      current = false;
+    };
   }, [api, taskId, path, version]);
 
   // An image's URL lives as long as it's on screen: it goes when the next preview replaces it, or on unmount.
@@ -185,13 +203,17 @@ export function Preview({
   }, [shown]);
 
   // A file that loaded but can't be drawn shows the same message as one that couldn't be read.
-  const failed = useCallback(
-    (err: unknown) => setState({ error: err instanceof Error ? err.message : String(err) }),
-    [],
-  );
+  const failed = useCallback((err: unknown) => setState((s) => ({ error: errorText(err), file: s.file })), []);
 
-  const { loaded, error } = state;
+  // Only what belongs to the file on screen: after a switch, the last file's preview, error or message isn't shown
+  // under the new name while the new one loads.
+  const mine = state.file === `${taskId}|${path}`;
+  const loaded = mine ? state.loaded : undefined;
+  const error = mine ? state.error : undefined;
+  const missing = mine ? state.missing : undefined;
   if (error) return <p className="pv-note">{error}</p>;
+  if (missing && (!loaded || !writing))
+    return <p className="pv-note">{t(writing ? "preview.notYet" : "preview.missing")}</p>;
   if (!loaded) return <p className="pv-note">{t("preview.loading")}</p>;
   switch (loaded.kind) {
     case "docx":

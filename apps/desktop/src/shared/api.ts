@@ -95,8 +95,8 @@ export interface TostWorkApi {
   files: {
     /** Opens the system file picker. Resolves to the chosen paths, empty when the user cancels. */
     pick(): Promise<string[]>;
-    /** Reads a file the task made, used or was given, for a preview. */
-    read(taskId: string, path: string): Promise<FileContent>;
+    /** Reads a file the task made, used or was given, for a preview. Null when the file isn't there. */
+    read(taskId: string, path: string): Promise<FileContent | null>;
     /** Opens the file in its usual app, for example Word. */
     open(taskId: string, path: string): Promise<void>;
     /** Shows the file in Finder or Explorer. */

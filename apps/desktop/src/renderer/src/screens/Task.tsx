@@ -3,11 +3,13 @@ import { ApprovalCard } from "@/components/Approval";
 import { Composer } from "@/components/Composer";
 import { Preview } from "@/components/Preview";
 import { TaskTag } from "@/components/TaskTag";
+import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { keyed } from "@/lib/keys";
 import { useT } from "@/lib/useT";
 import type { SaveResult, TostWorkApi } from "../../../shared/api";
 import type { FileChange, Project, ReviewItem, Task as TaskT } from "../../../shared/model";
+import { AgentMessage } from "../components/AgentMessage";
 import { WorkingDots } from "../components/TaskTag";
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
@@ -86,7 +88,7 @@ function KeptRow({
           setError(null);
           setRestoring(true);
           onRestore(path)
-            .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)))
+            .catch((err: unknown) => setError(errorText(err)))
             .finally(() => setRestoring(false));
         }}
       >
@@ -127,7 +129,7 @@ function WhatChanged({
       const result = await onSaveCopy();
       if (result?.saved.length) setSaved(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
     } finally {
       setSaving(false);
     }
@@ -151,7 +153,7 @@ function WhatChanged({
       </div>
       <div className="body">
         {made.length === 0 && (
-          <p className="t3" style={{ fontSize: 13, marginTop: 14 }}>
+          <p className="empty" style={{ marginTop: 14 }}>
             {t("task.noFiles")}
           </p>
         )}
@@ -269,7 +271,13 @@ function Artifact({
         </button>
       </div>
       <div className="page pv">
-        <Preview api={api} taskId={task.id} path={current.path} version={task.updatedAt} />
+        <Preview
+          api={api}
+          taskId={task.id}
+          path={current.path}
+          version={task.updatedAt}
+          writing={task.status === "running"}
+        />
       </div>
     </div>
   );
@@ -333,9 +341,7 @@ export function Task({
         {m.text}
       </div>
     ) : (
-      <p className="agent" key={i}>
-        {m.text}
-      </p>
+      <AgentMessage key={i} text={m.text} />
     );
   };
   const range = (from: number, to: number) => Array.from({ length: Math.max(0, to - from) }, (_, k) => note(from + k));
@@ -364,7 +370,8 @@ export function Task({
           {!quick && <b>{task.title}</b>}
         </span>
         <span className="grow" />
-        <TaskTag task={task} />
+        {/* While it runs, the line above the composer and Recent already say so: a third sign would be noise. */}
+        {task.status !== "running" && <TaskTag task={task} />}
         {live && (
           <button type="button" className="tbtn" onClick={onStop}>
             <Icon name="stop" />
@@ -477,11 +484,7 @@ export function Task({
           <aside className="rp">
             <div className="body">
               <h3>{t("task.made")}</h3>
-              {made.length === 0 && (
-                <p className="t3" style={{ fontSize: 13 }}>
-                  {t("task.noFiles")}
-                </p>
-              )}
+              {made.length === 0 && <p className="empty">{t("task.noFiles")}</p>}
               {made.map((f) => (
                 <Fragment key={f.path}>
                   <FileLine file={f} />

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Sprigs } from "@/components/Sprigs";
+import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
 import { useT } from "@/lib/useT";
@@ -31,7 +32,7 @@ function Connect({ api, onConnected }: { api: TostWorkApi; onConnected: (connect
       setAccount(status);
       onConnected(status.loggedIn);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
     } finally {
       setChecking(false);
     }
@@ -64,7 +65,7 @@ function Connect({ api, onConnected }: { api: TostWorkApi; onConnected: (connect
     try {
       await api.account.signIn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
       setSigningIn(false);
     }
   };
@@ -183,7 +184,7 @@ export function Setup({
       if (patch) await save(patch);
       setStep(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
     } finally {
       setBusy(false);
     }
@@ -202,7 +203,7 @@ export function Setup({
       }
       await save({ setupDone: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
       setBusy(false);
     }
   };
