@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { KeptCopy, Project, Task } from "../../shared/model";
+import type { Approval, KeptCopy, Project, Task } from "../../shared/model";
 import { applyEvent, resume } from "../../shared/reduce";
 import type { Guard } from "../guard";
 import type { Store } from "../store/store";
@@ -29,9 +29,23 @@ const REFUSE: Guard = {
   restore: () => Promise.reject(new Error("No guard is set up to restore copies")),
 };
 
+/** What the agent hears when the user decides on an approval after its turn ended. */
+export function decisionNote(approval: Approval, allow: boolean): string {
+  const files = approval.paths.join(", ");
+  if (approval.action === "delete")
+    return allow
+      ? `The user allowed deleting ${files}, and Tost Work moved them to the Trash. Don't delete them again. Carry on.`
+      : `The user wants to keep ${files}. Leave them as they are and carry on.`;
+  return allow
+    ? `The user allowed replacing ${files}. Tost Work kept a copy of the current version, so go ahead and replace it.`
+    : `The user wants to keep ${files} as it is. Save your version under a new name.`;
+}
+
 /** Starts tasks on an engine, keeps each task's state in the store and reports every change. */
 export class TaskRunner {
   private running = new Map<string, AbortController>();
+  /** A reply that came while the run that asked was still ending its turn. It starts the next run. */
+  private queued = new Map<string, string>();
   /** Tasks whose decision is being carried out, so a double click can't trash or copy twice. */
   private deciding = new Set<string>();
   /** Tasks with a restore under way, so a double click can't record two copies from one snapshot. */
@@ -89,16 +103,22 @@ export class TaskRunner {
     try {
       task = this.save({ ...task, status: "running", error: null, updatedAt: this.now() });
       for await (const event of this.engine.run({ task, project, workdir, followUp, signal: controller.signal })) {
+        // A reply already waits for the next run, so this run's end isn't the task's: it stays running.
+        if (event.type === "done" && this.queued.has(taskId)) continue;
         // Read the stored task each time, so an answer saved meanwhile isn't overwritten.
         task = this.save(applyEvent(this.mustGet(taskId), event, this.now()));
       }
-      if (task.status === "running") task = this.save(applyEvent(task, { type: "done" }, this.now()));
+      if (task.status === "running" && !this.queued.has(taskId))
+        task = this.save(applyEvent(task, { type: "done" }, this.now()));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       task = this.save(applyEvent(this.mustGet(taskId), { type: "failed", error: message }, this.now()));
     } finally {
       this.running.delete(taskId);
     }
+    const next = this.queued.get(taskId);
+    this.queued.delete(taskId);
+    if (next !== undefined && task.status !== "stopped" && task.status !== "failed") this.launch(taskId, next);
     return task;
   }
 
@@ -114,8 +134,15 @@ export class TaskRunner {
     if (!task.question) throw new Error("This task isn't waiting for an answer");
     const at = this.now();
     const next = this.save({ ...resume(task, at), messages: [...task.messages, { from: "user", text: answer, at }] });
-    this.engine.answer(taskId, task.question.id, answer);
+    if (!this.engine.answer(taskId, task.question.id, answer))
+      this.continueWith(taskId, `My answer to your question "${task.question.text}": ${answer}`);
     return next;
+  }
+
+  /** Sends the user's reply to an agent that ended its turn to wait for it, now or once the turn has ended. */
+  private continueWith(taskId: string, prompt: string): void {
+    if (this.running.has(taskId)) this.queued.set(taskId, prompt);
+    else this.launch(taskId, prompt);
   }
 
   /** Adds the user's next instruction to a task that isn't working. Call `launch` with the same text to run it. */
@@ -184,7 +211,7 @@ export class TaskRunner {
       if (current.status !== "needs-you" || current.approval?.id !== approval.id)
         return allow ? this.save({ ...current, updatedAt: this.now() }) : current;
       const next = this.save(resume(current, this.now()));
-      this.engine.decide(taskId, approval.id, allow);
+      if (!this.engine.decide(taskId, approval.id, allow)) this.continueWith(taskId, decisionNote(approval, allow));
       return next;
     } finally {
       this.deciding.delete(taskId);
@@ -218,7 +245,15 @@ export class TaskRunner {
   }
 
   stop(taskId: string): void {
-    this.running.get(taskId)?.abort();
+    this.queued.delete(taskId);
+    const run = this.running.get(taskId);
+    if (run) {
+      run.abort();
+      return;
+    }
+    // A task waiting for the user may have no run left: its agent ended the turn to wait.
+    const task = this.store.getTask(taskId);
+    if (task?.status === "needs-you") this.save(applyEvent(task, { type: "stopped" }, this.now()));
   }
 
   isRunning(taskId: string): boolean {

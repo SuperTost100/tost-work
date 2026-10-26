@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFunnel } from "cli-funnel";
 import { afterAll, describe, expect, it } from "vitest";
+import type { Task } from "../../shared/model";
 import { fileGuard } from "../guard";
 import { ToolServer } from "../mcp/server";
 import { Store } from "../store/store";
@@ -14,6 +15,21 @@ import { TaskRunner } from "./runner";
 const live = process.env.TOST_WORK_LIVE === "1";
 const funnel = createFunnel();
 afterAll(() => funnel.close());
+
+/** Plays the user until the task ends: `reply` handles each question or approval once, across runs. */
+async function settle(runner: TaskRunner, store: Store, id: string, reply: (t: Task) => Promise<void>): Promise<Task> {
+  const handled = new Set<string>();
+  for (;;) {
+    const t = store.getTask(id);
+    if (!t) throw new Error("The task is gone");
+    const open = t.question?.id ?? t.approval?.id;
+    if (open && !handled.has(open)) {
+      handled.add(open);
+      await reply(t);
+    } else if (!runner.isRunning(id) && ["done", "failed", "stopped"].includes(t.status)) return t;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
 
 describe.runIf(live)("CodexEngine against the real Codex", () => {
   it("makes a file, asks before replacing one, and keeps a copy", { timeout: 600_000 }, async () => {
@@ -43,17 +59,11 @@ describe.runIf(live)("CodexEngine against the real Codex", () => {
         "Create hello.md with the single line 'hello'. Then replace the whole content of notes.txt with the single line 'final'.",
     });
 
-    const done = runner.start(task.id);
-    const decided = new Set<string>();
-    while (runner.isRunning(task.id)) {
-      const t = store.getTask(task.id);
-      if (t?.approval && !decided.has(t.approval.id)) {
-        decided.add(t.approval.id);
-        await runner.decide(task.id, true);
-      } else if (t?.question) runner.answer(task.id, t.question.options[0] ?? "Go ahead");
-      await new Promise((r) => setTimeout(r, 200));
-    }
-    const final = await done;
+    runner.launch(task.id);
+    const final = await settle(runner, store, task.id, async (t) => {
+      if (t.approval) await runner.decide(task.id, true);
+      else if (t.question) runner.answer(task.id, t.question.options[0] ?? "Go ahead");
+    });
     await tools.stop();
 
     console.log(
@@ -75,5 +85,37 @@ describe.runIf(live)("CodexEngine against the real Codex", () => {
     expect((await readFile(join(work, "notes.txt"), "utf8")).trim()).toBe("final");
     expect(final.kept?.[0]?.path).toBe(join(work, "notes.txt"));
     expect(await readFile(final.kept?.[0]?.copy ?? "", "utf8")).toBe("draft\n");
+  });
+
+  it("waits for an answer as long as it takes, then carries on with it", { timeout: 600_000 }, async () => {
+    const work = await mkdtemp(join(tmpdir(), "tw-live-q-"));
+    const engine = new CodexEngine(funnel, () => "en");
+    const tools = new ToolServer(engine);
+    await tools.start();
+    engine.attachTools(tools);
+    const store = new Store(":memory:");
+    const runner = new TaskRunner(store, engine, () => {});
+    const { model } = await engine.defaults();
+    store.saveProject({ id: "p", name: "Live", description: "", folder: work, instructions: "", createdAt: "" });
+    const task = runner.create({
+      projectId: "p",
+      workdir: work,
+      model,
+      effort: "low",
+      brief:
+        "Write goal.md with one line saying the goal of tomorrow's client call. Ask me which goal to pick, with ask_user, before writing anything.",
+    });
+    runner.launch(task.id);
+    const final = await settle(runner, store, task.id, async (t) => {
+      // Longer than the 30 seconds after which Codex hands a running tool back to the model.
+      await new Promise((r) => setTimeout(r, 45_000));
+      expect(store.getTask(task.id)?.question?.id).toBe(t.question?.id);
+      expect(store.getTask(task.id)?.files).toEqual([]);
+      runner.answer(task.id, "Agree the course dates");
+    });
+    await tools.stop();
+    console.log(JSON.stringify({ status: final.status, messages: final.messages.map((m) => m.text) }, null, 2));
+    expect(final.status).toBe("done");
+    expect(await readFile(join(work, "goal.md"), "utf8")).toMatch(/dates/i);
   });
 });

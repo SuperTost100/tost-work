@@ -26,6 +26,8 @@ export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
     case "review":
       return { ...next, review: event.review };
     case "done":
+      // A run that ends with a question or approval still open is waiting for the user, not finished.
+      if (task.question || task.approval) return { ...next, status: "needs-you" };
       return {
         ...next,
         status: "done",

@@ -1,12 +1,17 @@
 import { randomUUID } from "node:crypto";
-import type { ApprovalDecision, ApprovalRequest, Funnel, QuestionAnswers, QuestionRequest } from "cli-funnel";
+import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
 import type { EngineEvent, Review } from "../../shared/model";
 import type { ToolHandler } from "../mcp/server";
 import type { Engine, RunContext } from "./engine";
 import { instructionsFor } from "./instructions";
 
-/** How long a Tost Work tool may wait for the user before the agent gives up: an hour. */
-const TOOL_TIMEOUT_SEC = 3600;
+/**
+ * What ask_user and request_approval tell the agent. They return at once: Codex hands a tool that runs longer than
+ * about 30 seconds back to the model, which then guesses or gives up. So the agent ends its turn, and the user's
+ * answer or decision starts the next one.
+ */
+const END_TURN =
+  "It's in front of the user now. End your turn here: don't do anything else and don't repeat it. Their reply arrives as your next message.";
 
 /**
  * Commands that delete files. They are refused, so deletions go through the approval card and the Trash.
@@ -63,6 +68,8 @@ interface Live {
   workdir: string;
   /** Files this task made, which the agent may change again without asking. */
   made: Set<string>;
+  /** Approvals Codex itself is holding a file change for, by id. */
+  pending: Set<string>;
 }
 
 /** The paths and kinds of a Codex file change, from the item cli-funnel passes with the approval. */
@@ -84,7 +91,11 @@ function changesOf(input: unknown): { path: string; kind: string }[] {
  */
 export class CodexEngine implements Engine, ToolHandler {
   private live = new Map<string, Live>();
-  private waiting = new Map<string, (reply: string | boolean | null) => void>();
+  private waiting = new Map<string, (reply: boolean | null) => void>();
+  /** Every approval put on a task, by id, so a decision that comes after the run knows its files. */
+  private approvals = new Map<string, { taskId: string; action: "overwrite" | "delete"; paths: string[] }>();
+  /** Files the user allowed replacing after the run that asked had ended. The next run may change them. */
+  private cleared = new Map<string, Set<string>>();
   private tools: ToolSessions | null = null;
 
   constructor(
@@ -113,7 +124,10 @@ export class CodexEngine implements Engine, ToolHandler {
     const made = new Set(
       task.files.filter((f) => f.role === "made" && f.kind !== "delete" && !kept.has(f.path)).map((f) => f.path),
     );
-    this.live.set(task.id, { channel, signal, workdir, made });
+    for (const path of this.cleared.get(task.id) ?? []) made.add(path);
+    this.cleared.delete(task.id);
+    const live: Live = { channel, signal, workdir, made, pending: new Set() };
+    this.live.set(task.id, live);
     const session = this.tools.open(task.id);
     const tools = this.tools;
 
@@ -129,12 +143,10 @@ export class CodexEngine implements Engine, ToolHandler {
           type: "http",
           url: session.url,
           headers: { Authorization: `Bearer ${session.token}` },
-          toolTimeoutSec: TOOL_TIMEOUT_SEC,
           autoApprove: true,
         },
       },
       onApproval: (request) => this.policy(task.id, request),
-      onQuestion: (request) => this.questions(task.id, request),
     });
 
     const pump = (async () => {
@@ -159,6 +171,11 @@ export class CodexEngine implements Engine, ToolHandler {
         if (signal.aborted) channel.push({ type: "stopped" });
         else channel.push({ type: "failed", error: err instanceof Error ? err.message : String(err) });
       } finally {
+        // A file change Codex still holds ends with the turn. Its card stays, and the decision starts the next run.
+        for (const id of [...live.pending]) this.waiting.get(id)?.(null);
+        // Stop takes the cards off the task, so no decision will come for them.
+        if (signal.aborted)
+          for (const [id, asked] of this.approvals) if (asked.taskId === task.id) this.approvals.delete(id);
         tools.close(session.token);
         this.live.delete(task.id);
         channel.close();
@@ -169,36 +186,56 @@ export class CodexEngine implements Engine, ToolHandler {
     await pump;
   }
 
-  answer(_taskId: string, questionId: string, answer: string): void {
-    this.waiting.get(questionId)?.(answer);
+  /** Questions never hold a run: the agent ended its turn, so the runner sends the answer as the next message. */
+  answer(_taskId: string, _questionId: string, _answer: string): boolean {
+    return false;
   }
 
-  decide(_taskId: string, approvalId: string, allow: boolean): void {
-    this.waiting.get(approvalId)?.(allow);
+  decide(taskId: string, approvalId: string, allow: boolean): boolean {
+    const asked = this.approvals.get(approvalId);
+    this.approvals.delete(approvalId);
+    const waiter = this.waiting.get(approvalId);
+    if (waiter) {
+      waiter(allow);
+      return true;
+    }
+    // The run that asked is over, and the next one makes the change: it may, without asking a second time.
+    if (allow && asked?.action === "overwrite") {
+      const cleared = this.cleared.get(taskId) ?? new Set<string>();
+      for (const path of asked.paths) cleared.add(path);
+      this.cleared.set(taskId, cleared);
+    }
+    return false;
   }
 
   // Tost Work's tools, called by the agent through the MCP server.
 
-  async ask(taskId: string, question: { text: string; options: string[] }, signal?: AbortSignal): Promise<string> {
-    const reply = await this.wait(taskId, (id) => ({ type: "question", question: { id, ...question } }), signal);
-    if (typeof reply !== "string") throw new Error("The task was stopped before the user answered");
-    return reply;
+  async ask(taskId: string, question: { text: string; options: string[] }): Promise<string> {
+    this.mustLive(taskId).channel.push({ type: "question", question: { id: randomUUID(), ...question } });
+    return END_TURN;
   }
 
-  approve(taskId: string, action: "overwrite" | "delete", paths: string[], signal?: AbortSignal): Promise<boolean> {
-    return this.askApproval(taskId, action, paths, signal);
+  async approve(taskId: string, action: "overwrite" | "delete", paths: string[]): Promise<string> {
+    const live = this.mustLive(taskId);
+    const id = randomUUID();
+    this.approvals.set(id, { taskId, action, paths });
+    live.channel.push({ type: "approval", approval: { id, action, paths } });
+    return END_TURN;
   }
 
   async reportFile(taskId: string, change: { path: string; kind: "add" | "update" | "delete" }): Promise<void> {
-    const live = this.live.get(taskId);
-    if (!live) throw new Error("That task isn't running");
-    live.channel.push({ type: "file", change: { ...change, role: "made" } });
+    this.mustLive(taskId).channel.push({ type: "file", change: { ...change, role: "made" } });
   }
 
   async review(taskId: string, review: Review): Promise<void> {
+    this.mustLive(taskId).channel.push({ type: "review", review });
+  }
+
+  /** The task's run, unless it ended or was stopped: after Stop nothing new goes on the task. */
+  private mustLive(taskId: string): Live {
     const live = this.live.get(taskId);
-    if (!live) throw new Error("That task isn't running");
-    live.channel.push({ type: "review", review });
+    if (!live || live.signal.aborted) throw new Error("That task isn't running");
+    return live;
   }
 
   /**
@@ -244,61 +281,25 @@ export class CodexEngine implements Engine, ToolHandler {
     return "allow";
   }
 
-  private async askApproval(
-    taskId: string,
-    action: "overwrite" | "delete",
-    paths: string[],
-    signal?: AbortSignal,
-  ): Promise<boolean> {
-    const reply = await this.wait(taskId, (id) => ({ type: "approval", approval: { id, action, paths } }), signal);
-    return reply === true;
-  }
-
-  private async questions(taskId: string, request: QuestionRequest): Promise<QuestionAnswers | null> {
-    const answers: QuestionAnswers = {};
-    for (const q of request.questions) {
-      // A secret, such as a password, is never shown or stored in a task.
-      if (q.secret) return null;
-      const reply = await this.wait(taskId, (id) => ({
-        type: "question",
-        question: { id, text: q.question, options: q.options.map((o) => o.label) },
-      }));
-      if (typeof reply !== "string") return null;
-      answers[q.id] = [reply];
-    }
-    return answers;
-  }
-
-  /** Shows a question or approval on the task and waits for the user, or for the task to stop. */
-  /**
-   * Shows a question or approval on the task and waits for the user, for the task to stop, or for the agent to stop
-   * waiting (`gaveUp`), in which case it comes off the task.
-   */
-  private wait(
-    taskId: string,
-    event: (id: string) => EngineEvent,
-    gaveUp?: AbortSignal,
-  ): Promise<string | boolean | null> {
+  /** Shows an approval for a file change Codex is holding, and waits for the user or for the run to end. */
+  private askApproval(taskId: string, action: "overwrite" | "delete", paths: string[]): Promise<boolean> {
     const live = this.live.get(taskId);
     // After Stop nothing new goes on the task: an abort that already happened never fires its listener.
-    if (!live || live.signal.aborted || gaveUp?.aborted) return Promise.resolve(null);
+    if (!live || live.signal.aborted) return Promise.resolve(false);
     const id = randomUUID();
+    this.approvals.set(id, { taskId, action, paths });
     return new Promise((resolve) => {
-      const done = (reply: string | boolean | null) => {
+      const done = (reply: boolean | null) => {
         this.waiting.delete(id);
+        live.pending.delete(id);
         live.signal.removeEventListener("abort", stop);
-        gaveUp?.removeEventListener("abort", withdraw);
-        resolve(reply);
+        resolve(reply === true);
       };
       const stop = () => done(null);
-      const withdraw = () => {
-        live.channel.push({ type: "withdrawn", id });
-        done(null);
-      };
       this.waiting.set(id, done);
+      live.pending.add(id);
       live.signal.addEventListener("abort", stop, { once: true });
-      gaveUp?.addEventListener("abort", withdraw, { once: true });
-      live.channel.push(event(id));
+      live.channel.push({ type: "approval", approval: { id, action, paths } });
     });
   }
 }
