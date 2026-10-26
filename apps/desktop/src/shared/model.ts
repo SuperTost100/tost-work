@@ -104,6 +104,8 @@ export type EngineEvent =
   | { type: "message"; text: string }
   | { type: "file"; change: FileChange }
   | { type: "question"; question: Question }
+  /** The agent stopped waiting for this question or approval, so it comes off the task. */
+  | { type: "withdrawn"; id: string }
   | { type: "approval"; approval: Approval }
   | { type: "review"; review: Review }
   | { type: "done" }

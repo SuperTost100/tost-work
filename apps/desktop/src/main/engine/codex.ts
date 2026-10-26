@@ -174,14 +174,14 @@ export class CodexEngine implements Engine, ToolHandler {
 
   // Tost Work's tools, called by the agent through the MCP server.
 
-  async ask(taskId: string, question: { text: string; options: string[] }): Promise<string> {
-    const reply = await this.wait(taskId, (id) => ({ type: "question", question: { id, ...question } }));
+  async ask(taskId: string, question: { text: string; options: string[] }, signal?: AbortSignal): Promise<string> {
+    const reply = await this.wait(taskId, (id) => ({ type: "question", question: { id, ...question } }), signal);
     if (typeof reply !== "string") throw new Error("The task was stopped before the user answered");
     return reply;
   }
 
-  approve(taskId: string, action: "overwrite" | "delete", paths: string[]): Promise<boolean> {
-    return this.askApproval(taskId, action, paths);
+  approve(taskId: string, action: "overwrite" | "delete", paths: string[], signal?: AbortSignal): Promise<boolean> {
+    return this.askApproval(taskId, action, paths, signal);
   }
 
   async reportFile(taskId: string, change: { path: string; kind: "add" | "update" | "delete" }): Promise<void> {
@@ -239,8 +239,13 @@ export class CodexEngine implements Engine, ToolHandler {
     return "allow";
   }
 
-  private async askApproval(taskId: string, action: "overwrite" | "delete", paths: string[]): Promise<boolean> {
-    const reply = await this.wait(taskId, (id) => ({ type: "approval", approval: { id, action, paths } }));
+  private async askApproval(
+    taskId: string,
+    action: "overwrite" | "delete",
+    paths: string[],
+    signal?: AbortSignal,
+  ): Promise<boolean> {
+    const reply = await this.wait(taskId, (id) => ({ type: "approval", approval: { id, action, paths } }), signal);
     return reply === true;
   }
 
@@ -260,19 +265,33 @@ export class CodexEngine implements Engine, ToolHandler {
   }
 
   /** Shows a question or approval on the task and waits for the user, or for the task to stop. */
-  private wait(taskId: string, event: (id: string) => EngineEvent): Promise<string | boolean | null> {
+  /**
+   * Shows a question or approval on the task and waits for the user, for the task to stop, or for the agent to stop
+   * waiting (`gaveUp`), in which case it comes off the task.
+   */
+  private wait(
+    taskId: string,
+    event: (id: string) => EngineEvent,
+    gaveUp?: AbortSignal,
+  ): Promise<string | boolean | null> {
     const live = this.live.get(taskId);
-    if (!live) return Promise.resolve(null);
+    if (!live || gaveUp?.aborted) return Promise.resolve(null);
     const id = randomUUID();
     return new Promise((resolve) => {
       const done = (reply: string | boolean | null) => {
         this.waiting.delete(id);
         live.signal.removeEventListener("abort", stop);
+        gaveUp?.removeEventListener("abort", withdraw);
         resolve(reply);
       };
       const stop = () => done(null);
+      const withdraw = () => {
+        live.channel.push({ type: "withdrawn", id });
+        done(null);
+      };
       this.waiting.set(id, done);
       live.signal.addEventListener("abort", stop, { once: true });
+      gaveUp?.addEventListener("abort", withdraw, { once: true });
       live.channel.push(event(id));
     });
   }

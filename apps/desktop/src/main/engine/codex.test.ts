@@ -219,6 +219,26 @@ describe("CodexEngine", () => {
     ]);
   });
 
+  it("takes a question off the task when the agent stops waiting for it", async () => {
+    const holder: { engine?: CodexEngine } = {};
+    const gaveUp = new AbortController();
+    let toolError = "";
+    const { engine, seen, run } = setup(async () => {
+      await holder.engine?.ask("t1", { text: "Which one?", options: ["a", "b"] }, gaveUp.signal).catch((e: Error) => {
+        toolError = e.message;
+      });
+      return { text: "" };
+    });
+    holder.engine = engine;
+    // Nobody answers; the agent gives up instead.
+    engine.answer = () => gaveUp.abort();
+    await run();
+    const question = seen.find((e) => e.type === "question");
+    expect(question).toBeTruthy();
+    expect(seen).toContainEqual({ type: "withdrawn", id: question?.type === "question" ? question.question.id : "" });
+    expect(toolError).toMatch(/stopped/);
+  });
+
   it("ends a stopped run as stopped, and a waiting tool hears that nobody answered", async () => {
     const holder: { engine?: CodexEngine } = {};
     let toolError = "";
