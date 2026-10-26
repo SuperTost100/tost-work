@@ -6,7 +6,7 @@ import type { TaskMenuAction } from "../../../shared/api";
 import type { Task } from "../../../shared/model";
 import { WorkingDots } from "../components/TaskTag";
 
-export type Section = "home" | "projects" | "skills" | "jobs" | "board" | "settings";
+export type Section = "home" | "projects" | "skills" | "jobs" | "board" | "settings" | "profile";
 
 const NAV: {
   id: Section;
@@ -139,18 +139,29 @@ export function Sidebar({
         </div>
       ))}
       <span className="spacer" />
-      <button
-        type="button"
-        className={`me${current === "settings" ? " on" : ""}`}
-        aria-current={current === "settings" ? "page" : undefined}
-        title={t("nav.settings")}
-        aria-label={`${userName}, ${t("nav.settings")}`}
-        onClick={() => onNavigate("settings")}
-      >
-        <span className="avatar">{userName.slice(0, 1).toUpperCase()}</span>
-        <span className="who grow truncate">{userName}</span>
-        <Icon name="settings-3" />
-      </button>
+      <div className="me">
+        <button
+          type="button"
+          className={`who-btn${current === "profile" ? " on" : ""}`}
+          aria-current={current === "profile" ? "page" : undefined}
+          title={t("nav.profile")}
+          aria-label={`${userName}, ${t("nav.profile")}`}
+          onClick={() => onNavigate("profile")}
+        >
+          <span className="avatar">{userName.slice(0, 1).toUpperCase()}</span>
+          <span className="who grow truncate">{userName}</span>
+        </button>
+        <button
+          type="button"
+          className={`iconbtn${current === "settings" ? " on" : ""}`}
+          aria-current={current === "settings" ? "page" : undefined}
+          title={t("nav.settings")}
+          aria-label={t("nav.settings")}
+          onClick={() => onNavigate("settings")}
+        >
+          <Icon name="settings-3" />
+        </button>
+      </div>
     </aside>
   );
 }

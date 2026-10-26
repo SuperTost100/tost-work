@@ -373,7 +373,7 @@ describe("CodexEngine with the document tools", () => {
       funnel,
       () => "it",
       documents,
-      () => "Giulia",
+      () => ({ name: "Giulia", work: "", notes: "" }),
     );
     engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
     const seen: EngineEvent[] = [];

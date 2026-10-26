@@ -30,11 +30,30 @@ describe("instructionsFor", () => {
   });
 
   it("points to the document guides and names the author when OfficeCLI is there", () => {
-    const text = instructionsFor(task, project, "it", { skills: "/app/skills", author: "Giulia Rossi" });
+    const text = instructionsFor(
+      task,
+      project,
+      "it",
+      { skills: "/app/skills" },
+      { name: "Giulia Rossi", work: "", notes: "" },
+    );
     expect(text).toContain("officecli command");
     expect(text).toContain("/app/skills/word/SKILL.md");
     expect(text).toContain("/app/skills/pdf/SKILL.md");
     expect(text).toContain('"Giulia Rossi" as their author');
     expect(instructionsFor(task, project, "it")).not.toContain("officecli");
+  });
+
+  it("passes on the user's profile, leaving out empty parts", () => {
+    const text = instructionsFor(task, project, "it", null, {
+      name: "Giulia Rossi",
+      work: "Formatrice AI per aziende",
+      notes: "Preferisco documenti brevi.",
+    });
+    expect(text).toContain("About the user, from their profile in Tost Work:");
+    expect(text).toContain("What they do: Formatrice AI per aziende");
+    expect(text).toContain("What else to know:\nPreferisco documenti brevi.");
+    const bare = instructionsFor(task, project, "it", null, { name: "Giulia", work: "", notes: "" });
+    expect(bare).not.toContain("What they do");
   });
 });

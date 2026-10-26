@@ -11,7 +11,8 @@ export function instructionsFor(
   task: Task,
   project: Project | null,
   language: "en" | "it",
-  documents: { skills: string; author: string } | null = null,
+  documents: { skills: string } | null = null,
+  user: { name: string; work: string; notes: string } = { name: "", work: "", notes: "" },
 ): string {
   const where = project
     ? `You work in the project "${project.name}". Its folder is ${task.workdir}.`
@@ -39,12 +40,18 @@ export function instructionsFor(
       [
         "Word, Excel and PowerPoint files: make and change them with the officecli command, which Tost Work installed for you. Never write their XML yourself.",
         `Before you start on one, read the guide for its kind: ${guide("word")}, ${guide("excel")} or ${guide("powerpoint")}. For a PDF, read ${guide("pdf")}, then use the make_pdf tool.`,
-        documents.author.trim() ? `Files you create carry "${documents.author.trim()}" as their author.` : "",
+        user.name.trim() ? `Files you create carry "${user.name.trim()}" as their author.` : "",
       ]
         .filter(Boolean)
         .join("\n"),
     );
   }
+  const about = [
+    user.name.trim() && `Name: ${user.name.trim()}`,
+    user.work.trim() && `What they do: ${user.work.trim()}`,
+    user.notes.trim() && `What else to know:\n${user.notes.trim()}`,
+  ].filter(Boolean);
+  if (about.length) parts.push(`About the user, from their profile in Tost Work:\n${about.join("\n")}`);
   if (project?.instructions.trim()) parts.push(`The project's instructions:\n${project.instructions.trim()}`);
   if (task.attachments.length)
     parts.push(`Files the user attached:\n${task.attachments.map((p) => `- ${p}`).join("\n")}`);

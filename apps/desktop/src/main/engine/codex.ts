@@ -163,8 +163,8 @@ export class CodexEngine implements Engine, ToolHandler {
     private funnel: CodexFunnel,
     private language: () => "en" | "it",
     private documents: DocumentTools | null = null,
-    /** The user's name, which new Office files carry as their author. */
-    private author: () => string = () => "",
+    /** The user's profile: their name, which new Office files carry as author, what they do, and notes. */
+    private user: () => { name: string; work: string; notes: string } = () => ({ name: "", work: "", notes: "" }),
   ) {}
 
   /** The tool server takes this engine as its handler, so it's attached after both exist. */
@@ -202,7 +202,8 @@ export class CodexEngine implements Engine, ToolHandler {
         task,
         project,
         this.language(),
-        this.documents && { skills: this.documents.skills, author: this.author() },
+        this.documents && { skills: this.documents.skills },
+        this.user(),
       ),
       ...(this.documents ? { env: this.documents.env } : {}),
       sessionId: task.sessionId,

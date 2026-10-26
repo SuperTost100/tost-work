@@ -5,6 +5,7 @@ import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
 import { Home } from "@/screens/Home";
+import { Profile } from "@/screens/Profile";
 import { Project } from "@/screens/Project";
 import { Projects } from "@/screens/Projects";
 import { Soon } from "@/screens/Soon";
@@ -12,6 +13,7 @@ import { Task } from "@/screens/Task";
 import { type Section, Sidebar } from "@/shell/Sidebar";
 import { useData } from "@/state/useData";
 import type { TostWorkApi } from "../../shared/api";
+import { DEFAULT_SETTINGS, type Settings } from "../../shared/model";
 
 /** The main process accepts up to 20 attachments per task. */
 const MAX_FILES = 20;
@@ -21,9 +23,21 @@ type Route =
   | { name: "projects" }
   | { name: "project"; id: string }
   | { name: "task"; id: string }
+  | { name: "profile" }
   | { name: "soon"; section: "skills" | "jobs" | "board" | "settings" };
 
-export function App({ userName = "Giulia", api = window.tostWork }: { userName?: string; api?: TostWorkApi }) {
+export function App({
+  userName = "Giulia",
+  api = window.tostWork,
+  settings,
+  onSettings,
+}: {
+  userName?: string;
+  api?: TostWorkApi;
+  /** The saved settings, for the profile. Without them the profile shows the name only. */
+  settings?: Settings;
+  onSettings?: (settings: Settings) => void;
+}) {
   const t = useT();
   const { projects, tasks, addProject, loadProject, removeTask } = useData(api);
   const [route, setRoute] = useState<Route>({ name: "home" });
@@ -66,6 +80,8 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
         return "projects";
       case "soon":
         return route.section;
+      case "profile":
+        return "profile";
       default:
         return null;
     }
@@ -74,6 +90,7 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
   const navigate = (s: Section) => {
     if (s === "home") setRoute({ name: "home" });
     else if (s === "projects") setRoute({ name: "projects" });
+    else if (s === "profile") setRoute({ name: "profile" });
     else setRoute({ name: "soon", section: s });
   };
 
@@ -189,6 +206,14 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
           onError={report}
         />
       ) : null;
+  } else if (route.name === "profile") {
+    screen = (
+      <Profile
+        api={api}
+        settings={settings ?? { ...DEFAULT_SETTINGS, name: userName, setupDone: true }}
+        onSaved={(next) => onSettings?.(next)}
+      />
+    );
   } else {
     screen = <Soon section={sectionTitle[route.section]} showVersion={route.section === "settings"} />;
   }

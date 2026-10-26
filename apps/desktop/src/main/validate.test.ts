@@ -38,6 +38,14 @@ describe("settingsPatch", () => {
     });
   });
 
+  it("takes the profile's work and notes, trimmed", () => {
+    expect(settingsPatch({ work: " Formatrice ", notes: " Documenti brevi. " })).toEqual({
+      work: "Formatrice",
+      notes: "Documenti brevi.",
+    });
+    expect(() => settingsPatch({ notes: "x".repeat(4001) })).toThrow();
+  });
+
   it("refuses unknown keys and wrong values", () => {
     expect(() => settingsPatch({ admin: true })).toThrow(/Unknown setting/);
     expect(() => settingsPatch({ level: "guru" })).toThrow(/four levels/);

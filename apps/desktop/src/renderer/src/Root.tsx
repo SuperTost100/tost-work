@@ -32,7 +32,7 @@ export function Root({ api = window.tostWork }: { api?: TostWorkApi }) {
     );
   else if (!settings) screen = <div className="main" />;
   else if (!settings.setupDone) screen = <Setup api={api} settings={settings} onChange={setSettings} />;
-  else screen = <App api={api} userName={settings.name} />;
+  else screen = <App api={api} userName={settings.name} settings={settings} onSettings={setSettings} />;
 
   return (
     <LanguageContext.Provider value={lang}>

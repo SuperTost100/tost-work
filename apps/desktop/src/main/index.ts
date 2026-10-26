@@ -70,7 +70,10 @@ app.whenReady().then(async () => {
   if (process.env.TOST_WORK_ENGINE === "fake") {
     engine = new FakeEngine(undefined, undefined, join(app.getAppPath(), "resources", "fake"));
   } else {
-    const codex = new CodexEngine(funnel, language, documentTools(), () => store.getSettings().name);
+    const codex = new CodexEngine(funnel, language, documentTools(), () => {
+      const { name, work, notes } = store.getSettings();
+      return { name, work, notes };
+    });
     tools = new ToolServer(codex);
     await tools.start();
     codex.attachTools(tools);

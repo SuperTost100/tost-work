@@ -82,8 +82,15 @@ describe("Store", () => {
 
   it("returns default settings until some are saved, and keeps defaults for new fields", () => {
     const store = new Store(":memory:");
-    expect(store.getSettings()).toEqual({ name: "", level: "beginner", language: null, setupDone: false });
-    store.saveSettings({ name: "Giulia", level: "advanced", language: "it", setupDone: true });
+    expect(store.getSettings()).toEqual({
+      name: "",
+      work: "",
+      notes: "",
+      level: "beginner",
+      language: null,
+      setupDone: false,
+    });
+    store.saveSettings({ name: "Giulia", work: "", notes: "", level: "advanced", language: "it", setupDone: true });
     expect(store.getSettings().name).toBe("Giulia");
     expect(store.getSettings().level).toBe("advanced");
   });

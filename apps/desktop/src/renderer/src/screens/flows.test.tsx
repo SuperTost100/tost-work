@@ -313,7 +313,7 @@ describe("projects", () => {
 
   it("shows the version and build on the Settings placeholder", () => {
     render(<App userName="Giulia" api={createMemoryApi()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Giulia, Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     expect(screen.getByText(`Tost Work ${__APP_VERSION__} · build ${__APP_BUILD__}`)).toBeTruthy();
   });
 
@@ -352,10 +352,63 @@ describe("a running task", () => {
 });
 
 describe("the account row", () => {
-  it("opens Settings", () => {
+  it("opens Settings from the gear", () => {
     render(<App userName="Giulia" api={createMemoryApi()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Giulia, Settings" }));
-    expect(screen.getByRole("button", { name: "Giulia, Settings" }).getAttribute("aria-current")).toBe("page");
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("button", { name: "Settings" }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("opens the profile from the name, and saves what the AI should know", async () => {
+    const api = createMemoryApi({ name: "Giulia", setupDone: true });
+    const saved: unknown[] = [];
+    const settings = await api.settings.get();
+    render(<App userName="Giulia" api={api} settings={settings} onSettings={(s) => saved.push(s)} />);
+    fireEvent.click(screen.getByRole("button", { name: "Giulia, About you" }));
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("About you");
+    fireEvent.change(screen.getByRole("textbox", { name: "What you do" }), {
+      target: { value: "I run AI courses for companies" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "What else the AI should know" }), {
+      target: { value: "Short documents, please." },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    });
+    expect(await api.settings.get()).toMatchObject({
+      work: "I run AI courses for companies",
+      notes: "Short documents, please.",
+    });
+    expect(saved).toHaveLength(1);
+  });
+
+  it("reads as saved after saving text with spaces around it", async () => {
+    const api = createMemoryApi({ name: "Giulia", setupDone: true });
+    const initial = await api.settings.get();
+    const { rerender } = render(<App userName="Giulia" api={api} settings={initial} />);
+    fireEvent.click(screen.getByRole("button", { name: "Giulia, About you" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "What you do" }), { target: { value: "  Writer  " } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    });
+    rerender(<App userName="Giulia" api={api} settings={await api.settings.get()} />);
+    expect((screen.getByRole("textbox", { name: "What you do" }) as HTMLInputElement).value).toBe("Writer");
+    expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Saved. The next tasks will use it.")).toBeTruthy();
+  });
+
+  it("keeps what the user typed while the profile was saving", async () => {
+    const api = createMemoryApi({ name: "Giulia", setupDone: true });
+    const update = api.settings.update;
+    let finish: () => void = () => {};
+    api.settings.update = (patch) => new Promise((resolve) => (finish = () => resolve(update(patch))));
+    render(<App userName="Giulia" api={api} settings={await api.settings.get()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Giulia, About you" }));
+    const work = screen.getByRole("textbox", { name: "What you do" }) as HTMLInputElement;
+    fireEvent.change(work, { target: { value: "Writer" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.change(work, { target: { value: "Writer and trainer" } });
+    await act(async () => finish());
+    expect(work.value).toBe("Writer and trainer");
   });
 });
 

@@ -118,10 +118,21 @@ export type Level = "beginner" | "intermediate" | "advanced" | "expert";
 export interface Settings {
   /** Shown in the greeting and on the avatar. Empty until setup asks for it. */
   name: string;
+  /** What the user does, in their words, from the profile. The agent reads it with every task. */
+  work: string;
+  /** Anything else the agent should know about them, from the profile. */
+  notes: string;
   level: Level;
   /** null follows the system language. */
   language: "en" | "it" | null;
   setupDone: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { name: "", level: "beginner", language: null, setupDone: false };
+export const DEFAULT_SETTINGS: Settings = {
+  name: "",
+  work: "",
+  notes: "",
+  level: "beginner",
+  language: null,
+  setupDone: false,
+};
