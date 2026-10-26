@@ -45,6 +45,10 @@ export class TaskRunner {
     private guard: Guard = REFUSE,
   ) {}
 
+  defaults(): Promise<{ model: string; effort: string }> {
+    return this.engine.defaults();
+  }
+
   create(input: NewTask): Task {
     const at = this.now();
     const task: Task = {
