@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFunnel } from "cli-funnel";
 import { afterAll, describe, expect, it } from "vitest";
-import { AIS, type AiId, type Task } from "../../shared/model";
+import { type AiId, SUBSCRIPTIONS, type Task } from "../../shared/model";
 import { fileGuard } from "../guard";
 import { ToolServer } from "../mcp/server";
 import { Store } from "../store/store";
@@ -33,7 +33,7 @@ async function settle(runner: TaskRunner, store: Store, id: string, reply: (t: T
   }
 }
 
-for (const ai of AIS) {
+for (const ai of SUBSCRIPTIONS) {
   describe.runIf(runs(ai))(`AgentEngine against the real ${ai}`, () => {
     it("makes a file, asks before replacing one, and keeps a copy", { timeout: 600_000 }, async () => {
       const work = await mkdtemp(join(tmpdir(), "tw-live-"));
@@ -122,6 +122,42 @@ for (const ai of AIS) {
       console.log(JSON.stringify({ status: final.status, messages: final.messages.map((m) => m.text) }, null, 2));
       expect(final.status).toBe("done");
       expect(await readFile(join(work, "goal.md"), "utf8")).toMatch(/dates/i);
+    });
+
+    it("searches the web and says where the facts came from", { timeout: 600_000 }, async () => {
+      const work = await mkdtemp(join(tmpdir(), "tw-live-web-"));
+      const engine = new AgentEngine(funnel, () => "en", { ai: async () => ai });
+      const tools = new ToolServer(engine);
+      await tools.start();
+      engine.attachTools(tools);
+      const store = new Store(":memory:");
+      const runner = new TaskRunner(store, engine, () => {});
+      // The tool server stops even when the run fails, so a failed live test leaves no listener behind.
+      try {
+        const { provider, model } = await engine.defaults();
+        store.saveProject({ id: "p", name: "Live", description: "", folder: work, instructions: "", createdAt: "" });
+        const task = runner.create({
+          projectId: "p",
+          workdir: work,
+          provider,
+          model,
+          effort: "low",
+          brief:
+            "Search the web for the latest stable release of Node.js. Write node.md with one line: the version number and the link to the page you read. Don't ask me anything.",
+        });
+        runner.launch(task.id);
+        const final = await settle(runner, store, task.id, async (t) => {
+          if (t.approval) await runner.decide(task.id, true);
+          else if (t.question) runner.answer(task.id, t.question.options[0] ?? "Go ahead");
+        });
+        const note = await readFile(join(work, "node.md"), "utf8");
+        console.log(JSON.stringify({ status: final.status, error: final.error, note }, null, 2));
+        expect(final.status).toBe("done");
+        expect(note).toMatch(/\d+\.\d+/);
+        expect(note).toMatch(/https?:\/\//);
+      } finally {
+        await tools.stop();
+      }
     });
   });
 }

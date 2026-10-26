@@ -127,6 +127,8 @@ describe("AgentEngine", () => {
     expect(input?.selection).toMatchObject({ provider: "codex", access: "supervised", cwd: "/w", model: "gpt-6-sol" });
     expect(input?.system).toContain("plain Italian");
     expect(input?.mcpServers?.tost_work).toMatchObject({ type: "http", autoApprove: true });
+    // Codex searches the web without asking before each site.
+    expect(input?.providerOptions).toEqual({ codex: { webSearch: "cached" } });
     // Codex's own question tool would hold the turn open, which Codex gives up on after about 30 seconds.
     expect(input?.onQuestion).toBeUndefined();
     expect(seen).toEqual([
@@ -440,6 +442,8 @@ describe("AgentEngine", () => {
       if (e.type === "approval") engine.decide(t.id, e.approval.id, false);
     }
     expect(inputs[0]?.selection).toMatchObject({ provider: "claude", model: "claude-sonnet-5-5", cwd: workdir });
+    // Claude Code has its own search tool, so it gets no Codex options.
+    expect(inputs[0]?.providerOptions).toBeUndefined();
     expect(decisions).toEqual([
       "allow",
       { decision: "deny", message: "Work only inside the task's folder." },

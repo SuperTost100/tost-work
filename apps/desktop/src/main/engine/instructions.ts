@@ -32,6 +32,7 @@ export function instructionsFor(
         "7. When you finish, call submit_review: what the user asked and whether it's done, what you decided on your own, and what they should check themselves.",
         "8. Make files in the formats people use at work, unless the user asks for another: documents as Word (.docx), tables and budgets as Excel (.xlsx), slides as PowerPoint (.pptx). Make a PDF only when they ask for a final copy to send. Never deliver .txt or .md files unless they ask for them.",
         "9. A Word file must open in Word without any prompt: don't turn on updateFields in its settings, and don't add fields that point to other files.",
+        "10. You can search the web when the work needs facts you don't have, such as prices, recent news, laws or a company's details. Prefer official and primary sources, check how recent each one is, and say in the file or in your message which sites the facts came from, with their links. When you can't confirm that a fact is current, say so.",
       ].join("\n"),
   ];
   if (documents) {

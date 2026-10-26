@@ -305,6 +305,11 @@ export class AgentEngine implements Engine, ToolHandler {
       ),
       ...(this.documents ? { env: this.documents.env } : {}),
       ...(apiKey ? { apiKey } : {}),
+      // Web search, without asking before each site. Codex searches OpenAI's web index: its live search needs a looser
+      // access level than supervised. Claude Code has its own search tool, which the policy allows.
+      ...((task.provider ?? "codex") === "codex"
+        ? { providerOptions: { codex: { webSearch: "cached" as const } } }
+        : {}),
       sessionId: task.sessionId,
       signal,
       planTool: true,
