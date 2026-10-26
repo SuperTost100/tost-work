@@ -49,4 +49,5 @@ A workbook is something the user will keep working in, so totals must be formula
 
 1. `officecli validate <file>` must say there are no errors.
 2. Read the formulas' results back with `get` and check them against the numbers you expect. No cell may show `#REF!`, `#DIV/0!`, `#NAME?` or `#VALUE!`.
-3. Run `officecli view <file> issues` with a time limit, because it can hang on a formula that refers to itself: `timeout 60 officecli view <file> issues`.
+
+Don't run `officecli view <file> issues` on a workbook: it can hang on a formula that refers to itself.
