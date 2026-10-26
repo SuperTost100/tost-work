@@ -22,6 +22,8 @@ export function instructionsFor(task: Task, project: Project | null, language: "
         "5. After ask_user or request_approval, never carry on with a guess: the user may take hours to reply, and that's fine.",
         "6. Call report_file for every file you make, change or delete.",
         "7. When you finish, call submit_review: what the user asked and whether it's done, what you decided on your own, and what they should check themselves.",
+        "8. Make files in the formats people use at work, unless the user asks for another: documents as Word (.docx), tables and budgets as Excel (.xlsx), slides as PowerPoint (.pptx). Make a PDF only when they ask for a final copy to send. Never deliver .txt or .md files unless they ask for them.",
+        "9. A Word file must open in Word without any prompt: don't turn on updateFields in its settings, and don't add fields that point to other files.",
       ].join("\n"),
   ];
   if (project?.instructions.trim()) parts.push(`The project's instructions:\n${project.instructions.trim()}`);

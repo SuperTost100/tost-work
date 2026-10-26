@@ -13,12 +13,24 @@ import { instructionsFor } from "./instructions";
 const END_TURN =
   "It's in front of the user now. End your turn here: don't do anything else and don't repeat it. Their reply arrives as your next message.";
 
+/** Shell commands that delete, where a command starts: the line, after ; & | ( or $(, or run by xargs or find -exec. */
+const SHELL_DELETES =
+  /(^|[\n;&|(`]|\$\(|\bxargs(\s+-\S+)*\s|-exec\s)\s*(sudo\s+)?(rm|rmdir|del|erase|rd|unlink|shred|trash)(\s|$)|(^|\s)find\s[^\n]*\s-delete\b|Remove-Item/im;
+/** Deletions from code a command runs, such as a Python or Node script. */
+const CODE_DELETES = /os\.(remove|unlink|rmdir)\(|shutil\.rmtree\(|\.(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync)\(/;
+
 /**
- * Commands that delete files. They are refused, so deletions go through the approval card and the Trash.
+ * Whether a command deletes files. Those are refused, so deletions go through the approval card and the Trash.
+ * Quoted text and heredoc bodies are what a command writes, not what it runs, so the shell words are looked for
+ * without them: an Italian document saying "del corso" is not a `del` command.
  * shortcut: a script that deletes in another way still deletes; snapshot the folder before each run to close the gap.
  */
-const DELETES =
-  /(^|[\s;&|(`])(rm|rmdir|del|erase|rd|unlink|shred|trash)(\s|$)|os\.(remove|unlink|rmdir)|shutil\.rmtree|Remove-Item|\.unlink\(|fs\.rm/i;
+export function deletesFiles(command: string): boolean {
+  const shell = command
+    .replace(/<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2[ \t]*(?=\n|$)/g, "")
+    .replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, '""');
+  return SHELL_DELETES.test(shell) || CODE_DELETES.test(command);
+}
 
 /** The parts of cli-funnel the engine uses, so tests can stand in for Codex. */
 export type CodexFunnel = Pick<Funnel, "stream" | "models">;
@@ -249,7 +261,7 @@ export class CodexEngine implements Engine, ToolHandler {
     if (request.tool.startsWith("mcp:")) return "allow";
     if (request.tool === "command") {
       const command = String((request.input as { command?: unknown } | undefined)?.command ?? "");
-      if (DELETES.test(command))
+      if (deletesFiles(command))
         return {
           decision: "deny",
           message:

@@ -2,7 +2,7 @@
 import type { FunnelEvent, RunRequest } from "cli-funnel";
 import { describe, expect, it } from "vitest";
 import type { EngineEvent, Task } from "../../shared/model";
-import { CodexEngine, type CodexFunnel } from "./codex";
+import { CodexEngine, type CodexFunnel, deletesFiles } from "./codex";
 
 type Emit = (event: FunnelEvent) => void;
 type Script = (input: RunRequest, emit: Emit) => Promise<{ text: string; finishReason?: string }>;
@@ -344,5 +344,36 @@ describe("CodexEngine", () => {
   it("starts tasks on the model Codex lists first", async () => {
     const { engine } = setup(async () => ({ text: "" }));
     expect(await engine.defaults()).toEqual({ model: "gpt-6-sol", effort: "medium" });
+  });
+});
+
+describe("deletesFiles", () => {
+  it("finds commands that delete, wherever a command starts", () => {
+    for (const command of [
+      "rm -rf drafts",
+      "cd out && rm old.docx",
+      "ls; rmdir empty",
+      "find . -name '*.tmp' -delete",
+      "find . -name '*.tmp' | xargs rm",
+      "find . -exec rm {} +",
+      "sudo rm x",
+      "del report.docx",
+      "Remove-Item old.xlsx",
+      "python3 -c 'import os; os.remove(\"a\")'",
+      "python3 - <<'PY'\nimport shutil\nshutil.rmtree('drafts')\nPY",
+      "node -e \"require('fs').rmSync('x')\"",
+    ])
+      expect(deletesFiles(command), command).toBe(true);
+  });
+
+  it("leaves alone words inside the text a command writes", () => {
+    for (const command of [
+      "python3 - <<'PY'\nparas = ['Scaletta del corso', 'rd round']\ndel paras[0]\nPY",
+      "echo 'Obiettivi del corso' > note.txt",
+      'printf "Programma del primo incontro\\n" >> scaletta.txt',
+      "python3 make_docx.py --title 'Corso del 27 ottobre'",
+      "cat <<EOF > plan.md\nrm is not run here\nEOF",
+    ])
+      expect(deletesFiles(command), command).toBe(false);
   });
 });
