@@ -38,4 +38,6 @@ jobs:
         with:
           name: tost-work-mac
           path: apps/desktop/release/*.dmg
+          # A packaging change that stops producing DMGs must fail the check, not pass with a warning.
+          if-no-files-found: error
           retention-days: 14
