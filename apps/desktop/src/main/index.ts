@@ -14,6 +14,9 @@ import { ToolServer } from "./mcp/server";
 import { Store } from "./store/store";
 
 const isMac = process.platform === "darwin";
+
+// macOS shows these in Tost Work > About, so a build can be told apart from another of the same version.
+app.setAboutPanelOptions({ applicationVersion: __APP_VERSION__, version: __APP_BUILD__ });
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): BrowserWindow {

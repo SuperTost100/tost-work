@@ -311,6 +311,12 @@ describe("projects", () => {
     expect((await screen.findByRole("alert")).textContent).toMatch(/Couldn't read the tasks/);
   });
 
+  it("shows the version and build on the Settings placeholder", () => {
+    render(<App userName="Giulia" api={createMemoryApi()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Giulia, Settings" }));
+    expect(screen.getByText(`Tost Work ${__APP_VERSION__} · build ${__APP_BUILD__}`)).toBeTruthy();
+  });
+
   it("shows a placeholder for sections that aren't built yet", () => {
     render(<App userName="Giulia" api={createMemoryApi()} />);
     fireEvent.click(screen.getByRole("button", { name: "Jobs" }));

@@ -181,7 +181,7 @@ export function App({ userName = "Giulia", api = window.tostWork }: { userName?:
         />
       ) : null;
   } else {
-    screen = <Soon section={sectionTitle[route.section]} />;
+    screen = <Soon section={sectionTitle[route.section]} showVersion={route.section === "settings"} />;
   }
 
   return (
