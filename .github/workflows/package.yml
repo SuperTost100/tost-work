@@ -44,9 +44,13 @@ jobs:
           for app in "mac-arm64/Tost Work.app" "mac/Tost Work.app"; do
             codesign --verify --deep --strict --verbose=2 "$app"
           done
+      # The artifact's name says which build it is, as the app's About panel and Settings do.
+      - name: Name the artifact
+        id: name
+        run: echo "name=tost-work-mac-$(node -p "require('./apps/desktop/package.json').version")-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v7
         with:
-          name: tost-work-mac
+          name: ${{ steps.name.outputs.name }}
           path: apps/desktop/release/*.dmg
           # A packaging change that stops producing DMGs must fail the check, not pass with a warning.
           if-no-files-found: error
