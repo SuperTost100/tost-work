@@ -188,13 +188,16 @@ function turnTaking(steps: ((ctx: RunContext) => EngineEvent[])[]) {
       const step = steps.shift();
       for (const e of step?.(ctx) ?? []) yield e;
       if (holding) await new Promise<void>((r) => (release = r));
+      // Codex ends every run with done, even one whose agent ended its turn to wait.
+      yield { type: "done" };
     },
     answer: () => false,
     decide: () => false,
   };
   let holding = false;
   const store = new Store(":memory:");
-  const runner = new TaskRunner(store, engine, () => {}, undefined, {
+  const statuses: string[] = [];
+  const runner = new TaskRunner(store, engine, (t) => statuses.push(t.status), undefined, {
     keep: async (_t, path) => ({ path, copy: `/k${path}`, at: "", reason: "overwrite" }),
     trash: async () => {},
     restore: async () => {},
@@ -205,6 +208,7 @@ function turnTaking(steps: ((ctx: RunContext) => EngineEvent[])[]) {
     runner,
     task,
     prompts,
+    statuses,
     hold: () => {
       holding = true;
     },
@@ -243,16 +247,20 @@ describe("TaskRunner when the agent ends its turn to wait", () => {
   });
 
   it("holds an answer that comes while the turn is still ending, then sends it", async () => {
-    const { store, runner, task, prompts, hold, release } = turnTaking([asks, () => []]);
+    const { store, runner, task, prompts, statuses, hold, release } = turnTaking([asks, () => []]);
     hold();
     const first = runner.start(task.id);
     await waitFor(() => store.getTask(task.id)?.status === "needs-you");
     runner.answer(task.id, "A");
     expect(prompts).toHaveLength(1);
+    const answered = statuses.length;
     release();
     await first;
     await waitFor(() => store.getTask(task.id)?.status === "done");
     expect(prompts).toEqual([null, 'My answer to your question "Which goal?": A']);
+    // The first run's end doesn't show the task as done while the answer waits for the next run.
+    const between = statuses.slice(answered, statuses.lastIndexOf("done"));
+    expect(between).not.toContain("done");
   });
 
   it("stops a task that waits with no run left", async () => {

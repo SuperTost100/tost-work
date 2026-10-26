@@ -103,6 +103,8 @@ export class TaskRunner {
     try {
       task = this.save({ ...task, status: "running", error: null, updatedAt: this.now() });
       for await (const event of this.engine.run({ task, project, workdir, followUp, signal: controller.signal })) {
+        // A reply already waits for the next run, so this run's end isn't the task's: it stays running.
+        if (event.type === "done" && this.queued.has(taskId)) continue;
         // Read the stored task each time, so an answer saved meanwhile isn't overwritten.
         task = this.save(applyEvent(this.mustGet(taskId), event, this.now()));
       }
@@ -245,7 +247,10 @@ export class TaskRunner {
   stop(taskId: string): void {
     this.queued.delete(taskId);
     const run = this.running.get(taskId);
-    if (run) return run.abort();
+    if (run) {
+      run.abort();
+      return;
+    }
     // A task waiting for the user may have no run left: its agent ended the turn to wait.
     const task = this.store.getTask(taskId);
     if (task?.status === "needs-you") this.save(applyEvent(task, { type: "stopped" }, this.now()));
