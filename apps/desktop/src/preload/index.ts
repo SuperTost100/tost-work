@@ -5,7 +5,7 @@ import type { Task } from "../shared/model";
 
 const api: TostWorkApi = {
   platform: process.platform as TostWorkApi["platform"],
-  versions: { app: process.env.npm_package_version ?? "0.0.1", electron: process.versions.electron ?? "" },
+  versions: { app: __APP_VERSION__, electron: process.versions.electron ?? "" },
   settings: {
     get: () => ipcRenderer.invoke(IPC.settingsGet),
     update: (patch) => ipcRenderer.invoke(IPC.settingsUpdate, patch),

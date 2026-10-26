@@ -18,6 +18,7 @@ const cspInBuild = (): Plugin => ({
 export default defineConfig({
   main: { define: buildInfo },
   preload: {
+    define: buildInfo,
     // Sandboxed preloads must be CommonJS.
     build: { rollupOptions: { output: { format: "cjs", entryFileNames: "[name].cjs" } } },
   },
