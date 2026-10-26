@@ -348,7 +348,7 @@ describe("CodexEngine", () => {
 });
 
 describe("deletesFiles", () => {
-  it("finds commands that delete, wherever a command starts", () => {
+  it("finds commands that delete, whatever comes before them", () => {
     for (const command of [
       "rm -rf drafts",
       "cd out && rm old.docx",
@@ -379,6 +379,8 @@ describe("deletesFiles", () => {
       "FOO=1 rm old.docx",
       "env FOO=1 rm x",
       "sudo -u bob rm x",
+      "sudo -u www-data rm old.docx",
+      "env -C /tmp rm old.docx",
     ])
       expect(deletesFiles(command), command).toBe(true);
   });

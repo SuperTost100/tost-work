@@ -14,11 +14,10 @@ const END_TURN =
   "It's in front of the user now. End your turn here: don't do anything else and don't repeat it. Their reply arrives as your next message.";
 
 /**
- * Shell commands that delete, where a command starts: the line, after ; & | ( { or $(, after a keyword such as then
- * or do, or run by xargs or find -exec. env and sudo with their options, and NAME=value settings, may come first.
+ * Shell words that delete. Any standalone one counts, whatever comes before it (sudo, env, options, then, xargs), so
+ * the check runs only on what the shell runs: shellText takes out the text a command writes.
  */
-const SHELL_DELETES =
-  /(^|[\n;&|(`{!]|\$\(|\b(then|do|else|elif|exec|command|nohup|time|xargs(\s+-\S+)*)\s|-exec\s)\s*((env|sudo)(\s+-\S+(\s+\w+)?)*\s+)?(\w+=\S*\s+)*(sudo(\s+-\S+(\s+\w+)?)*\s+)?(rm|rmdir|del|erase|rd|unlink|shred|trash)(\s|$)|(^|\s)find\s[^\n]*\s-delete\b/im;
+const SHELL_DELETES = /(^|[\s;&|(`{!])(rm|rmdir|del|erase|rd|unlink|shred|trash)(\s|$)|(^|\s)find\s[^\n]*\s-delete\b/im;
 /** Deletions in code a command runs, such as a Python, Node or PowerShell script. Looked for in the whole command. */
 const CODE_DELETES =
   /os\.(remove|unlink|rmdir)\(|shutil\.rmtree\(|\.(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync)\(|Remove-Item/i;
