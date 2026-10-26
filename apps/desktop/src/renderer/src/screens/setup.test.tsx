@@ -69,4 +69,31 @@ describe("first-run setup", () => {
     render(<Root api={createMemoryApi()} />);
     expect(await screen.findByRole("button", { name: "Start task" })).toBeTruthy();
   });
+
+  it("ends an open sign-in when the user leaves the step", async () => {
+    const api = createMemoryApi({ name: "Giulia" });
+    let cancelled = 0;
+    api.account.cancel = async () => {
+      cancelled++;
+    };
+    render(<Root api={api} />);
+    await click("Next");
+    await click("Next");
+    await screen.findByRole("button", { name: "Sign in" });
+    await click("Back");
+    expect(cancelled).toBe(1);
+  });
+
+  it("shows a language that couldn't be saved", async () => {
+    const api = createMemoryApi({});
+    api.settings.update = async () => {
+      throw new Error("The settings file is read-only");
+    };
+    render(<Root api={api} />);
+    const language = await screen.findByLabelText("Language");
+    await act(async () => {
+      fireEvent.change(language, { target: { value: "it" } });
+    });
+    expect(screen.getByRole("alert").textContent).toMatch(/read-only/);
+  });
 });

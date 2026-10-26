@@ -37,6 +37,9 @@ function Connect({ api, onConnected }: { api: TostWorkApi; onConnected: (connect
     }
   }, [api, onConnected]);
 
+  // Leaving the step (Back, Skip) ends a sign-in still open, so the next one can start.
+  useEffect(() => () => void api.account.cancel(), [api]);
+
   useEffect(() => {
     void check();
     return api.account.onSignIn((event) => {
@@ -250,7 +253,11 @@ export function Setup({
                 <select
                   className="input"
                   value={settings.language ?? ""}
-                  onChange={(e) => void save({ language: (e.target.value || null) as Settings["language"] })}
+                  onChange={(e) =>
+                    void save({ language: (e.target.value || null) as Settings["language"] }).catch((err: Error) =>
+                      setError(err.message),
+                    )
+                  }
                 >
                   <option value="">{t("setup.languageSystem")}</option>
                   <option value="en">English</option>
