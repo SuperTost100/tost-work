@@ -8,6 +8,7 @@ import { keyed } from "@/lib/keys";
 import { useT } from "@/lib/useT";
 import type { SaveResult, TostWorkApi } from "../../../shared/api";
 import type { FileChange, Project, ReviewItem, Task as TaskT } from "../../../shared/model";
+import { WorkingDots } from "../components/TaskTag";
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 const isSheet = (path: string) => /\.(xlsx|xls|csv)$/i.test(path);
@@ -172,6 +173,20 @@ function WhatChanged({
         </button>
       </div>
     </aside>
+  );
+}
+
+/** Shows that the agent is still at work, above the composer, where it stays in view however far the user scrolled. */
+function Working({ step }: { step?: string }) {
+  const t = useT();
+  return (
+    <div className="working" role="status">
+      <WorkingDots />
+      <span className="truncate">
+        {t("task.working")}
+        {step && <span className="t3"> · {step}</span>}
+      </span>
+    </div>
   );
 }
 
@@ -408,6 +423,7 @@ export function Task({
           </div>
           <div className="foot">
             <div className="col">
+              {task.status === "running" && <Working step={task.steps[current]?.text} />}
               {task.question ? (
                 <Composer
                   className="asking"

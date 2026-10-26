@@ -282,6 +282,10 @@ h3 {
   background: var(--sel);
   color: var(--ink);
 }
+.rec .pulse {
+  color: var(--t3);
+  margin-right: 4px;
+}
 .rec .wait {
   color: var(--need);
   font-size: 12px;
@@ -296,13 +300,42 @@ h3 {
 .spacer {
   flex: 1;
 }
+/* Read by screen readers, not shown. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* The whole row opens Settings, as the account row does in most apps. */
 .me {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 6px 2px;
+  width: 100%;
+  padding: 8px 6px;
+  border: 0;
   border-top: 1px solid var(--line-2);
+  border-radius: 0 0 8px 8px;
   margin-top: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.me .ic {
+  color: var(--t3);
+}
+.me:hover,
+.me.on {
+  background: var(--hover);
+}
+.me:hover .ic,
+.me.on .ic {
+  color: var(--ink);
 }
 .avatar {
   width: 26px;
@@ -667,6 +700,53 @@ h3 {
 .tag.mine {
   background: var(--ink);
   color: var(--canvas);
+}
+.tag .pulse {
+  margin-right: 6px;
+}
+
+/* Three dots that pulse one after the other while a task runs. */
+.pulse {
+  display: inline-flex;
+  gap: 3px;
+  flex: none;
+}
+.pulse i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.pulse i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.pulse i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes pulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse i {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+.working {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 4px 10px;
+  font-size: 14px;
+  color: var(--ink);
 }
 /* Plain rows separated by hairlines */
 .sec {
@@ -2477,6 +2557,113 @@ fieldset.fld > legend {
   margin: 0 auto 16px;
   box-shadow: var(--page-shadow);
   max-width: 100%;
+  /* Word's page is white unless the document sets a color, which docx-preview writes inline and so wins. */
+  background-color: #fff;
+  color: #000;
+}
+
+/* Word's default fonts ship with Office, not with macOS or Linux, so a document in Calibri or Cambria would preview in
+   Times. Carlito and Caladea have the same letter widths, so lines and pages break where Word breaks them. The
+   installed font wins when there is one. */
+@font-face {
+  font-family: "Calibri";
+  src:
+    local("Calibri"),
+    url("../assets/fonts/Carlito-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Calibri";
+  src:
+    local("Calibri Bold"),
+    url("../assets/fonts/Carlito-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Calibri";
+  src:
+    local("Calibri Italic"),
+    url("../assets/fonts/Carlito-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Calibri";
+  src:
+    local("Calibri Bold Italic"),
+    url("../assets/fonts/Carlito-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Calibri Light";
+  src:
+    local("Calibri Light"),
+    local("Calibri"),
+    url("../assets/fonts/Carlito-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Calibri Light";
+  src:
+    local("Calibri Light Bold"),
+    local("Calibri Bold"),
+    url("../assets/fonts/Carlito-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Calibri Light";
+  src:
+    local("Calibri Light Italic"),
+    local("Calibri Italic"),
+    url("../assets/fonts/Carlito-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Calibri Light";
+  src:
+    local("Calibri Light Bold Italic"),
+    local("Calibri Bold Italic"),
+    url("../assets/fonts/Carlito-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Cambria";
+  src:
+    local("Cambria"),
+    url("../assets/fonts/Caladea-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Cambria";
+  src:
+    local("Cambria Bold"),
+    url("../assets/fonts/Caladea-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Cambria";
+  src:
+    local("Cambria Italic"),
+    url("../assets/fonts/Caladea-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: "Cambria";
+  src:
+    local("Cambria Bold Italic"),
+    url("../assets/fonts/Caladea-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
 }
 
 /* Setup steps built from the mockup's option cards */
