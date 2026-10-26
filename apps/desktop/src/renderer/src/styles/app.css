@@ -282,10 +282,6 @@ h3 {
   background: var(--sel);
   color: var(--ink);
 }
-.rec .pulse {
-  color: var(--t3);
-  margin-right: 4px;
-}
 .rec .wait {
   color: var(--need);
   font-size: 12px;
@@ -294,20 +290,63 @@ h3 {
 .rec.split {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   justify-content: space-between;
+  padding-right: 2px;
+}
+/* The row is a div holding the open button and the … button, which can't nest. */
+.rec .open {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.rec .more {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--t3);
+  cursor: pointer;
+  opacity: 0;
+}
+.rec:hover .more,
+.rec.on .more,
+.rec .more:focus-visible {
+  opacity: 1;
+}
+.rec .more:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.rec .rename {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  padding: 0 6px;
+  margin-left: -6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--canvas);
+  font: inherit;
+  color: var(--ink);
 }
 .spacer {
   flex: 1;
-}
-/* Read by screen readers, not shown. */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 /* The whole row opens Settings, as the account row does in most apps. */
 .me {

@@ -108,8 +108,12 @@ export class TaskRunner {
         // Read the stored task each time, so an answer saved meanwhile isn't overwritten.
         task = this.save(applyEvent(this.mustGet(taskId), event, this.now()));
       }
-      if (task.status === "running" && !this.queued.has(taskId))
-        task = this.save(applyEvent(task, { type: "done" }, this.now()));
+      // The stored task, not the last snapshot: a rename may have landed while the engine finished.
+      const latest = this.mustGet(taskId);
+      task =
+        latest.status === "running" && !this.queued.has(taskId)
+          ? this.save(applyEvent(latest, { type: "done" }, this.now()))
+          : latest;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       task = this.save(applyEvent(this.mustGet(taskId), { type: "failed", error: message }, this.now()));
@@ -242,6 +246,22 @@ export class TaskRunner {
     } finally {
       this.restoring.delete(taskId);
     }
+  }
+
+  /** Gives the task a name of the user's choosing. Its place in Recent stays where it was. */
+  rename(taskId: string, title: string): Task {
+    const name = title.trim();
+    if (!name) throw new Error("A task needs a name");
+    return this.save({ ...this.mustGet(taskId), title: name });
+  }
+
+  /** Removes the task from Tost Work. The files it made or used stay where they are. */
+  remove(taskId: string): void {
+    this.mustGet(taskId);
+    if (this.running.has(taskId) || this.deciding.has(taskId) || this.restoring.has(taskId))
+      throw new Error("Stop the task before deleting it");
+    this.queued.delete(taskId);
+    this.store.deleteTask(taskId);
   }
 
   stop(taskId: string): void {

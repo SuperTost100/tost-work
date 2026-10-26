@@ -35,6 +35,23 @@ describe("useData", () => {
     expect(result.current.tasks.map((t) => t.status)).toEqual(["needs-you"]);
   });
 
+  it("doesn't bring back a deleted task from a project list read before the deletion", async () => {
+    const api = createMemoryApi();
+    let deliver: (tasks: Task[]) => void = () => {};
+    api.tasks.listForProject = () => new Promise((resolve) => (deliver = resolve));
+    const { result } = renderHook(() => useData(api));
+    let loading: Promise<void> = Promise.resolve();
+    act(() => {
+      loading = result.current.loadProject("p1");
+    });
+    act(() => result.current.removeTask("gone"));
+    await act(async () => {
+      deliver([task("gone", "2026-10-26T09:00:00Z"), task("kept", "2026-10-26T09:00:01Z")]);
+      await loading;
+    });
+    expect(result.current.tasks.map((t) => t.id)).toEqual(["kept"]);
+  });
+
   it("merges by id and keeps the newer copy", () => {
     const merged = mergeTasks(
       [task("a", "2026-10-26T09:00:02Z", "new")],

@@ -271,3 +271,50 @@ describe("TaskRunner when the agent ends its turn to wait", () => {
     expect(prompts).toHaveLength(1);
   });
 });
+
+describe("renaming and deleting tasks", () => {
+  it("renames without moving the task in Recent, and refuses an empty name", async () => {
+    const { store, runner, task } = turnTaking([]);
+    const before = store.getTask(task.id)?.updatedAt;
+    expect(runner.rename(task.id, "  Call notes  ").title).toBe("Call notes");
+    expect(store.getTask(task.id)?.updatedAt).toBe(before);
+    expect(() => runner.rename(task.id, "   ")).toThrow(/name/);
+  });
+
+  it("refuses to delete a running task, and deletes it once it's done", async () => {
+    const { store, runner, task, hold, release } = turnTaking([() => []]);
+    hold();
+    const run = runner.start(task.id);
+    await waitFor(() => runner.isRunning(task.id));
+    expect(() => runner.remove(task.id)).toThrow(/Stop the task/);
+    release();
+    await run;
+    runner.remove(task.id);
+    expect(store.getTask(task.id)).toBeUndefined();
+  });
+});
+
+describe("a rename while the run ends", () => {
+  it("keeps the new name when the engine ends without a last event", async () => {
+    let release: () => void = () => {};
+    const engine: Engine = {
+      defaults: async () => ({ model: "m", effort: "low" }),
+      // Ends without yielding anything, as an engine may.
+      async *run() {
+        await new Promise<void>((r) => (release = r));
+      },
+      answer: () => false,
+      decide: () => false,
+    };
+    const store = new Store(":memory:");
+    const runner = new TaskRunner(store, engine, () => {});
+    const task = runner.create({ projectId: null, brief: "Prepare the call", workdir: "/w" });
+    const run = runner.start(task.id);
+    await waitFor(() => runner.isRunning(task.id));
+    runner.rename(task.id, "Call notes");
+    release();
+    const final = await run;
+    expect(final).toMatchObject({ status: "done", title: "Call notes" });
+    expect(store.getTask(task.id)?.title).toBe("Call notes");
+  });
+});

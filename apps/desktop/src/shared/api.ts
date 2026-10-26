@@ -82,6 +82,13 @@ export interface TostWorkApi {
     /** Asks for a folder, every time, and copies the files the task made into it. Null when the user cancels. */
     saveCopy(id: string): Promise<SaveResult | null>;
     stop(id: string): Promise<void>;
+    /** Shows the task's menu where the pointer is, and resolves with what the user picked, or null. */
+    menu(id: string): Promise<TaskMenuAction | null>;
+    rename(id: string, title: string): Promise<Task>;
+    /** Opens the folder the task works in. */
+    reveal(id: string): Promise<void>;
+    /** Asks first, then removes the task. The files stay. Resolves false when the user changes their mind. */
+    remove(id: string): Promise<boolean>;
     /** Called with the full task every time it changes. Returns a function that stops listening. */
     onChange(listener: (task: Task) => void): () => void;
   };
@@ -98,6 +105,9 @@ export interface TostWorkApi {
     restore(taskId: string, path: string): Promise<Task>;
   };
 }
+
+/** What the task menu offers. */
+export type TaskMenuAction = "rename" | "reveal" | "delete";
 
 /** IPC channel names, kept in one place so main and preload can't drift apart. */
 export const IPC = {
@@ -121,6 +131,10 @@ export const IPC = {
   tasksDecide: "tasks:decide",
   tasksFollowUp: "tasks:follow-up",
   tasksSaveCopy: "tasks:save-copy",
+  tasksMenu: "tasks:menu",
+  tasksRename: "tasks:rename",
+  tasksReveal: "tasks:reveal",
+  tasksRemove: "tasks:remove",
   taskChanged: "tasks:changed",
   filesPick: "files:pick",
   filesRead: "files:read",

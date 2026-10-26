@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { app, type BrowserWindow, dialog, ipcMain, type OpenDialogOptions, shell } from "electron";
-import { IPC, type NewProjectInput, type NewTaskInput, type SaveResult } from "../shared/api";
+import { app, type BrowserWindow, dialog, ipcMain, Menu, type OpenDialogOptions, shell } from "electron";
+import { IPC, type NewProjectInput, type NewTaskInput, type SaveResult, type TaskMenuAction } from "../shared/api";
 import { languageFrom, type MessageKey, translate } from "../shared/i18n";
 import type { Project } from "../shared/model";
 import type { Accounts } from "./accounts";
@@ -139,6 +139,56 @@ export function registerIpc(
     };
     const { saved } = await saveCopies(sources, folder, ask, (path) => shell.trashItem(path));
     return { folder, saved };
+  });
+
+  const taskOf = (id: unknown) => {
+    const task = store.getTask(text(id, "id", 100));
+    if (!task) throw new Error("That task doesn't exist");
+    return task;
+  };
+  // A native menu, as Finder's and Mail's are. It only says what was picked; the window carries it out.
+  ipcMain.handle(IPC.tasksMenu, (_e, id: unknown) => {
+    const task = taskOf(id);
+    return new Promise<TaskMenuAction | null>((resolve) => {
+      let picked = false;
+      const pick = (action: TaskMenuAction) => () => {
+        picked = true;
+        resolve(action);
+      };
+      const menu = Menu.buildFromTemplate([
+        { label: t("menu.rename"), click: pick("rename") },
+        { label: t("menu.reveal"), click: pick("reveal") },
+        { type: "separator" },
+        { label: t("menu.delete"), enabled: !runner.isRunning(task.id), click: pick("delete") },
+      ]);
+      // The menu closes before its click arrives on some systems, so a close with no pick waits a moment.
+      const closed = () => setTimeout(() => picked || resolve(null), 100);
+      const win = window();
+      menu.popup(win ? { window: win, callback: closed } : { callback: closed });
+    });
+  });
+  ipcMain.handle(IPC.tasksRename, (_e, id: unknown, title: unknown) =>
+    runner.rename(text(id, "id", 100), text(title, "title", 200)),
+  );
+  ipcMain.handle(IPC.tasksReveal, async (_e, id: unknown) => {
+    const error = await shell.openPath(taskOf(id).workdir);
+    if (error) throw new Error(error);
+  });
+  ipcMain.handle(IPC.tasksRemove, async (_e, id: unknown) => {
+    const task = taskOf(id);
+    const options = {
+      type: "warning" as const,
+      message: t("delete.confirm", { name: task.title }),
+      detail: t("delete.detail"),
+      buttons: [t("delete.yes"), t("save.cancel")],
+      defaultId: 1,
+      cancelId: 1,
+    };
+    const win = window();
+    const { response } = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options);
+    if (response !== 0) return false;
+    runner.remove(task.id);
+    return true;
   });
 
   ipcMain.handle(IPC.filesPick, async () => {

@@ -1,4 +1,11 @@
-import type { CodexAccount, NewProjectInput, NewTaskInput, SignInEvent, TostWorkApi } from "../../../shared/api";
+import type {
+  CodexAccount,
+  NewProjectInput,
+  NewTaskInput,
+  SignInEvent,
+  TaskMenuAction,
+  TostWorkApi,
+} from "../../../shared/api";
 import { DEFAULT_SETTINGS, type EngineEvent, type Project, type Settings, type Task } from "../../../shared/model";
 import { applyEvent, resume } from "../../../shared/reduce";
 
@@ -8,7 +15,7 @@ import { applyEvent, resume } from "../../../shared/reduce";
  */
 export function createMemoryApi(
   initial: Partial<Settings> = { name: "Giulia", setupDone: true },
-): TostWorkApi & { emit(id: string, e: EngineEvent): void } {
+): TostWorkApi & { emit(id: string, e: EngineEvent): void; pickInMenu(action: TaskMenuAction | null): void } {
   const projects: Project[] = [];
   const tasks = new Map<string, Task>();
   const listeners = new Set<(t: Task) => void>();
@@ -27,8 +34,14 @@ export function createMemoryApi(
     if (t) save(applyEvent(t, e, now()));
   };
 
+  // What the next task menu returns, as if the user had picked it.
+  let menuPick: TaskMenuAction | null = null;
+
   return {
     platform: "linux",
+    pickInMenu: (action) => {
+      menuPick = action;
+    },
     versions: { app: "0.0.1", electron: "test" },
     emit,
     settings: {
@@ -149,6 +162,14 @@ export function createMemoryApi(
         return { folder, saved: made.map((f) => `${folder}/${f.path.split("/").pop()}`) };
       },
       stop: async (id) => emit(id, { type: "stopped" }),
+      menu: async () => menuPick,
+      rename: async (id, title) => {
+        const t = tasks.get(id);
+        if (!t) throw new Error("That task doesn't exist");
+        return save({ ...t, title: title.trim() });
+      },
+      reveal: async () => {},
+      remove: async (id) => tasks.delete(id),
       onChange: (l) => {
         listeners.add(l);
         return () => listeners.delete(l);

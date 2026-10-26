@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { TostWorkApi } from "../../../shared/api";
 import type { Project, Task } from "../../../shared/model";
 
@@ -19,20 +19,32 @@ export function mergeTasks(current: Task[], incoming: Task[]): Task[] {
 export function useData(api: TostWorkApi | undefined) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  // Deleted tasks, so a list that was read before the deletion can't bring one back.
+  const removed = useRef(new Set<string>());
+  const merge = useCallback(
+    (incoming: Task[]) =>
+      setTasks((list) =>
+        mergeTasks(
+          list,
+          incoming.filter((t) => !removed.current.has(t.id)),
+        ),
+      ),
+    [],
+  );
 
   useEffect(() => {
     if (!api) return;
     let alive = true;
-    const off = api.tasks.onChange((task) => setTasks((list) => mergeTasks(list, [task])));
+    const off = api.tasks.onChange((task) => merge([task]));
     void api.projects
       .list()
       .then((p) => alive && setProjects((list) => [...p, ...list.filter((x) => !p.some((y) => y.id === x.id))]));
-    void api.tasks.list().then((t) => alive && setTasks((list) => mergeTasks(list, t)));
+    void api.tasks.list().then((t) => alive && merge(t));
     return () => {
       alive = false;
       off();
     };
-  }, [api]);
+  }, [api, merge]);
 
   const addProject = useCallback(
     (p: Project) => setProjects((list) => (list.some((x) => x.id === p.id) ? list : [...list, p])),
@@ -42,10 +54,14 @@ export function useData(api: TostWorkApi | undefined) {
   const loadProject = useCallback(
     async (projectId: string): Promise<void> => {
       if (!api) return;
-      const t = await api.tasks.listForProject(projectId);
-      setTasks((list) => mergeTasks(list, t));
+      merge(await api.tasks.listForProject(projectId));
     },
-    [api],
+    [api, merge],
   );
-  return { projects, tasks, addProject, loadProject };
+  const removeTask = useCallback((id: string) => {
+    removed.current.add(id);
+    setTasks((list) => list.filter((t) => t.id !== id));
+  }, []);
+
+  return { projects, tasks, addProject, loadProject, removeTask };
 }
