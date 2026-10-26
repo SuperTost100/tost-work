@@ -93,6 +93,8 @@ export class ToolServer {
   constructor(private handler: ToolHandler) {}
 
   async start(): Promise<void> {
+    // A second listener would be left open when stop() closes the one it knows about.
+    if (this.http) throw new Error("The tool server is already running");
     const http = createServer((req, res) => void this.serve(req, res));
     await new Promise<void>((resolve, reject) => {
       http.once("error", reject);
@@ -131,7 +133,14 @@ export class ToolServer {
     const host = req.headers.host ?? "";
     if (req.headers.origin || (host !== `127.0.0.1:${this.port}` && host !== `localhost:${this.port}`))
       return deny(403, "Forbidden");
-    if (new URL(req.url ?? "/", "http://127.0.0.1").pathname !== "/mcp") return deny(404, "Not found");
+    // Node accepts targets such as "//", which URL can't parse; those get a 404 rather than an unhandled error.
+    let pathname = "";
+    try {
+      pathname = new URL(req.url ?? "/", "http://127.0.0.1").pathname;
+    } catch {
+      return deny(404, "Not found");
+    }
+    if (pathname !== "/mcp") return deny(404, "Not found");
     const auth = req.headers.authorization ?? "";
     const taskId = auth.startsWith("Bearer ") ? this.sessions.get(auth.slice(7)) : undefined;
     if (!taskId) return deny(401, "Unauthorized");

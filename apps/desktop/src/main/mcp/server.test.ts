@@ -108,4 +108,25 @@ describe("ToolServer", () => {
     expect(await raw(session.url, { ...auth, origin: "https://evil.example" })).toBe(403);
     expect(await raw(session.url, { ...auth, host: `evil.example:${port}` })).toBe(403);
   });
+
+  it("answers a request target URL can't parse, instead of failing", async () => {
+    const session = server.open("task-1");
+    const port = new URL(session.url).port;
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = request(
+        { host: "127.0.0.1", port, path: "//", method: "POST", headers: { host: `127.0.0.1:${port}` } },
+        (res) => {
+          res.resume();
+          resolve(res.statusCode ?? 0);
+        },
+      );
+      req.on("error", reject);
+      req.end("{}");
+    });
+    expect(status).toBe(404);
+  });
+
+  it("refuses to start twice", async () => {
+    await expect(server.start()).rejects.toThrow(/already running/);
+  });
 });
