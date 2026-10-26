@@ -1,6 +1,6 @@
 name: Package
 
-# Builds the unsigned Mac app. It runs by hand, and on pull requests that change the packaging, so a broken build
+# Builds the Mac app, ad-hoc signed. It runs by hand, and on pull requests that change the packaging, so a broken build
 # shows up before a release needs it. It publishes nothing: the DMGs are workflow artifacts.
 on:
   workflow_dispatch:
@@ -15,12 +15,15 @@ permissions:
 
 jobs:
   mac:
-    name: Mac app (unsigned)
+    name: Mac app (ad-hoc signed)
     runs-on: macos-latest
     env:
       # electron-builder downloads its own Electron for the target, so the dev binary isn't needed.
       ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      # electron-builder skips signing on pull requests unless told otherwise. The signature is ad-hoc, so no
+      # certificate or secret is involved.
+      CSC_FOR_PULL_REQUEST: "true"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -34,6 +37,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tost-work/desktop build
       - run: pnpm --filter @tost-work/desktop exec electron-builder --mac --publish never
+      # An app whose signature doesn't match its contents opens on no Mac: macOS calls it "damaged".
+      - name: Check the apps' signatures
+        working-directory: apps/desktop/release
+        run: |
+          for app in "mac-arm64/Tost Work.app" "mac/Tost Work.app"; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+          done
       - uses: actions/upload-artifact@v7
         with:
           name: tost-work-mac
