@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "cli-funnel": "0.5.1",
     "docx-preview": "0.4.1",
     "dompurify": "3.4.17",
@@ -21,7 +22,8 @@
     "pdfjs-dist": "6.4.299",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@testing-library/react": "16.3.3",
