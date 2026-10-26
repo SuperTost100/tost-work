@@ -76,10 +76,13 @@ describe("first-run setup", () => {
     api.account.cancel = async () => {
       cancelled++;
     };
+    // A sign-in that stays open until it's cancelled.
+    api.account.signIn = () => new Promise(() => {});
     render(<Root api={api} />);
     await click("Next");
     await click("Next");
-    await screen.findByRole("button", { name: "Sign in" });
+    await click("Sign in");
+    expect(await screen.findByText("Finish signing in on the page that opened.")).toBeTruthy();
     await click("Back");
     expect(cancelled).toBe(1);
   });
@@ -95,5 +98,28 @@ describe("first-run setup", () => {
       fireEvent.change(language, { target: { value: "it" } });
     });
     expect(screen.getByRole("alert").textContent).toMatch(/read-only/);
+  });
+
+  it("makes the first project once when Start working is retried", async () => {
+    const api = createMemoryApi({ name: "Giulia" });
+    const update = api.settings.update;
+    let failOnce = true;
+    api.settings.update = async (patch) => {
+      if (patch.setupDone && failOnce) {
+        failOnce = false;
+        throw new Error("Couldn't save");
+      }
+      return update(patch);
+    };
+    render(<Root api={api} />);
+    await click("Next");
+    await click("Next");
+    await click("Skip for now");
+    await click("Choose folder");
+    await click("Start working");
+    expect(await screen.findByText("Couldn't save")).toBeTruthy();
+    await click("Start working");
+    await screen.findByRole("button", { name: "Start task" });
+    expect(await api.projects.list()).toHaveLength(1);
   });
 });

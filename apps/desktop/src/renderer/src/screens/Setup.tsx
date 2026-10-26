@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Sprigs } from "@/components/Sprigs";
 import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
@@ -188,11 +188,18 @@ export function Setup({
       setBusy(false);
     }
   };
+  // The project made by an earlier try, so a retry after a failed save doesn't make it again.
+  const created = useRef<{ name: string; folder: string } | null>(null);
   const finish = async (withProject: boolean) => {
     setError(null);
     setBusy(true);
     try {
-      if (withProject && folder) await api.projects.create({ name: projectName.trim(), folder });
+      const name = projectName.trim();
+      const already = created.current?.folder === folder && created.current?.name === name;
+      if (withProject && folder && !already) {
+        await api.projects.create({ name, folder });
+        created.current = { name, folder };
+      }
       await save({ setupDone: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
