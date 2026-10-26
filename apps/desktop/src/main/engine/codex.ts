@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { realpath } from "node:fs/promises";
+import { basename, dirname, extname } from "node:path";
 import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
 import type { EngineEvent, Review } from "../../shared/model";
+import { freeName, inside } from "../files";
 import type { ToolHandler } from "../mcp/server";
 import type { Engine, RunContext } from "./engine";
 import { instructionsFor } from "./instructions";
@@ -67,6 +70,15 @@ function shellText(command: string): string {
  */
 export function deletesFiles(command: string): boolean {
   return CODE_DELETES.test(command) || SHELL_DELETES.test(shellText(command));
+}
+
+/** OfficeCLI and the document skills, which the agent uses for Word, Excel, PowerPoint and PDF files. */
+export interface DocumentTools {
+  /** The folder with the skills, one folder per kind of file, each with a SKILL.md. */
+  skills: string;
+  /** What the agent's commands need: OfficeCLI on the PATH, and its update check and background process off. */
+  env: Record<string, string>;
+  makePdf(source: string, target: string): Promise<void>;
 }
 
 /** The parts of cli-funnel the engine uses, so tests can stand in for Codex. */
@@ -150,6 +162,9 @@ export class CodexEngine implements Engine, ToolHandler {
   constructor(
     private funnel: CodexFunnel,
     private language: () => "en" | "it",
+    private documents: DocumentTools | null = null,
+    /** The user's name, which new Office files carry as their author. */
+    private author: () => string = () => "",
   ) {}
 
   /** The tool server takes this engine as its handler, so it's attached after both exist. */
@@ -183,7 +198,13 @@ export class CodexEngine implements Engine, ToolHandler {
     const stream = this.funnel.stream({
       selection: { provider: "codex", model: task.model, effort: task.effort, cwd: workdir, access: "supervised" },
       prompt: followUp ?? task.brief,
-      system: instructionsFor(task, project, this.language()),
+      system: instructionsFor(
+        task,
+        project,
+        this.language(),
+        this.documents && { skills: this.documents.skills, author: this.author() },
+      ),
+      ...(this.documents ? { env: this.documents.env } : {}),
       sessionId: task.sessionId,
       signal,
       planTool: true,
@@ -274,6 +295,19 @@ export class CodexEngine implements Engine, ToolHandler {
 
   async reportFile(taskId: string, change: { path: string; kind: "add" | "update" | "delete" }): Promise<void> {
     this.mustLive(taskId).channel.push({ type: "file", change: { ...change, role: "made" } });
+  }
+
+  /** Makes a PDF next to an Office file in the task's folder, under a free name, and adds it to the task. */
+  async makePdf(taskId: string, path: string): Promise<string> {
+    const live = this.mustLive(taskId);
+    if (!this.documents) throw new Error("This build of Tost Work can't make PDFs");
+    const source = await realpath(path);
+    if (!inside(await realpath(live.workdir), source)) throw new Error("That file is outside the task's folder");
+    const target = await freeName(dirname(source), `${basename(source, extname(source))}.pdf`);
+    await this.documents.makePdf(source, target);
+    live.made.add(target);
+    live.channel.push({ type: "file", change: { path: target, kind: "add", role: "made" } });
+    return `Made ${target}. Tell the user where it is.`;
   }
 
   async review(taskId: string, review: Review): Promise<void> {
