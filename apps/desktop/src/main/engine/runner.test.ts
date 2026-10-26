@@ -1,7 +1,8 @@
 /** @vitest-environment node */
 import { describe, expect, it, vi } from "vitest";
-import type { Task } from "../../shared/model";
+import type { EngineEvent, Task } from "../../shared/model";
 import { Store } from "../store/store";
+import type { Engine, RunContext } from "./engine";
 import { FakeEngine, PROPOSAL_SCRIPT } from "./fake";
 import { TaskRunner, titleFrom } from "./runner";
 
@@ -170,5 +171,95 @@ describe("TaskRunner when saving fails", () => {
     expect(String(log.mock.calls[0]?.[1])).toMatch(/disk gone/);
     expect(runner.isRunning(task.id)).toBe(false);
     log.mockRestore();
+  });
+});
+
+/**
+ * An engine like Codex: the agent asks, ends its turn, and the user's reply starts the next run. Each run plays the
+ * next step of the script; `hold` keeps a run open until released, as when the agent is still ending its turn.
+ */
+function turnTaking(steps: ((ctx: RunContext) => EngineEvent[])[]) {
+  const prompts: (string | null)[] = [];
+  let release: (() => void) | null = null;
+  const engine: Engine = {
+    defaults: async () => ({ model: "m", effort: "low" }),
+    async *run(ctx) {
+      prompts.push(ctx.followUp);
+      const step = steps.shift();
+      for (const e of step?.(ctx) ?? []) yield e;
+      if (holding) await new Promise<void>((r) => (release = r));
+    },
+    answer: () => false,
+    decide: () => false,
+  };
+  let holding = false;
+  const store = new Store(":memory:");
+  const runner = new TaskRunner(store, engine, () => {}, undefined, {
+    keep: async (_t, path) => ({ path, copy: `/k${path}`, at: "", reason: "overwrite" }),
+    trash: async () => {},
+    restore: async () => {},
+  });
+  const task = runner.create({ projectId: null, brief: "Prepare the call", workdir: "/w" });
+  return {
+    store,
+    runner,
+    task,
+    prompts,
+    hold: () => {
+      holding = true;
+    },
+    release: () => {
+      holding = false;
+      release?.();
+    },
+  };
+}
+
+const asks = (): EngineEvent[] => [
+  { type: "question", question: { id: "q1", text: "Which goal?", options: ["A", "B"] } },
+];
+
+describe("TaskRunner when the agent ends its turn to wait", () => {
+  it("keeps the task waiting, and the answer starts the next run as a message", async () => {
+    const { store, runner, task, prompts } = turnTaking([asks, () => [{ type: "message", text: "Done." }]]);
+    const first = await runner.start(task.id);
+    expect(first.status).toBe("needs-you");
+    expect(first.question?.text).toBe("Which goal?");
+
+    runner.answer(task.id, "B");
+    await waitFor(() => store.getTask(task.id)?.status === "done");
+    expect(prompts).toEqual([null, 'My answer to your question "Which goal?": B']);
+    expect(store.getTask(task.id)?.messages.map((m) => m.text)).toEqual(["Prepare the call", "B", "Done."]);
+  });
+
+  it("sends a late decision to the next run, after keeping the copy", async () => {
+    const approval = { id: "a1", action: "overwrite" as const, paths: ["/w/plan.xlsx"] };
+    const { store, runner, task, prompts } = turnTaking([() => [{ type: "approval", approval }], () => []]);
+    expect((await runner.start(task.id)).status).toBe("needs-you");
+    await runner.decide(task.id, true);
+    await waitFor(() => store.getTask(task.id)?.status === "done");
+    expect(prompts[1]).toMatch(/allowed replacing \/w\/plan\.xlsx.*kept a copy/);
+    expect(store.getTask(task.id)?.kept?.[0]?.path).toBe("/w/plan.xlsx");
+  });
+
+  it("holds an answer that comes while the turn is still ending, then sends it", async () => {
+    const { store, runner, task, prompts, hold, release } = turnTaking([asks, () => []]);
+    hold();
+    const first = runner.start(task.id);
+    await waitFor(() => store.getTask(task.id)?.status === "needs-you");
+    runner.answer(task.id, "A");
+    expect(prompts).toHaveLength(1);
+    release();
+    await first;
+    await waitFor(() => store.getTask(task.id)?.status === "done");
+    expect(prompts).toEqual([null, 'My answer to your question "Which goal?": A']);
+  });
+
+  it("stops a task that waits with no run left", async () => {
+    const { store, runner, task, prompts } = turnTaking([asks]);
+    await runner.start(task.id);
+    runner.stop(task.id);
+    expect(store.getTask(task.id)).toMatchObject({ status: "stopped", question: null });
+    expect(prompts).toHaveLength(1);
   });
 });

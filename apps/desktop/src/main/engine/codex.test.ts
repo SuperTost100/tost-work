@@ -90,6 +90,26 @@ function setup(script: Script) {
   return { engine, inputs, seen, run, closed, controller, decisions };
 }
 
+/** An engine whose runs nobody answers: the test decides by hand, after the run has ended. */
+function bare(script: Script) {
+  const { funnel } = fakeFunnel(script);
+  const engine = new CodexEngine(funnel, () => "it");
+  engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+  const drain = async (followUp: string | null) => {
+    const seen: EngineEvent[] = [];
+    const signal = new AbortController().signal;
+    for await (const e of engine.run({ task: task(), project: null, workdir: "/w", followUp, signal })) seen.push(e);
+    return seen;
+  };
+  return { engine, drain };
+}
+
+const update = (path: string) => ({
+  id: path,
+  tool: "file_change",
+  input: { changes: { changes: [{ path, kind: { type: "update" } }] } },
+});
+
 describe("CodexEngine", () => {
   it("runs Codex at supervised with the instructions and the tool server, and maps its events", async () => {
     const { inputs, seen, run, closed } = setup(async (_input, emit) => {
@@ -103,7 +123,9 @@ describe("CodexEngine", () => {
     const input = inputs[0];
     expect(input?.selection).toMatchObject({ provider: "codex", access: "supervised", cwd: "/w", model: "gpt-6-sol" });
     expect(input?.system).toContain("plain Italian");
-    expect(input?.mcpServers?.tost_work).toMatchObject({ type: "http", autoApprove: true, toolTimeoutSec: 3600 });
+    expect(input?.mcpServers?.tost_work).toMatchObject({ type: "http", autoApprove: true });
+    // Codex's own question tool would hold the turn open, which Codex gives up on after about 30 seconds.
+    expect(input?.onQuestion).toBeUndefined();
     expect(seen).toEqual([
       { type: "session", sessionId: "s1" },
       { type: "plan", steps: [{ text: "Draft", status: "in_progress" }] },
@@ -120,18 +142,55 @@ describe("CodexEngine", () => {
     expect(inputs[0]).toMatchObject({ prompt: "Make it shorter", sessionId: "s1" });
   });
 
-  it("asks Codex's own questions on the task and returns the answer", async () => {
-    let answers: unknown;
-    const { seen, run } = setup(async (input) => {
-      answers = await input.onQuestion?.({
-        id: "r1",
-        questions: [{ id: "q", question: "Who pays?", options: [{ label: "Us" }, { label: "Them" }] }],
-      });
+  it("puts ask_user's question on the task and tells the agent to end its turn", async () => {
+    const holder: { engine?: CodexEngine } = {};
+    let reply = "";
+    const { engine, seen, run } = setup(async () => {
+      reply = (await holder.engine?.ask("t1", { text: "Who pays?", options: ["Us", "Them"] })) ?? "";
       return { text: "" };
     });
+    holder.engine = engine;
     await run();
     expect(seen[0]).toMatchObject({ type: "question", question: { text: "Who pays?", options: ["Us", "Them"] } });
-    expect(answers).toEqual({ q: ["Us"] });
+    expect(reply).toMatch(/End your turn/);
+    // No run waits for the answer: the runner sends it as the next message.
+    expect(engine.answer("t1", "any", "Us")).toBe(false);
+  });
+
+  it("lets the next run replace a file the user allowed after the turn that asked had ended", async () => {
+    const decisions: unknown[] = [];
+    const { engine, drain } = bare(async (input) => {
+      if (input.prompt === "Write the proposal") await engine.approve("t1", "overwrite", ["/w/theirs.xlsx"]);
+      else decisions.push(await input.onApproval?.(update("/w/theirs.xlsx")));
+      return { text: "" };
+    });
+    const seen = await drain(null);
+    const approval = seen.find((e) => e.type === "approval");
+    expect(approval).toMatchObject({ approval: { action: "overwrite", paths: ["/w/theirs.xlsx"] } });
+    // The run is over, so the decision goes to the next one, which may make the change without asking again.
+    expect(engine.decide("t1", approval?.type === "approval" ? approval.approval.id : "", true)).toBe(false);
+    const next = await drain("go ahead");
+    expect(decisions).toEqual(["allow"]);
+    expect(next.some((e) => e.type === "approval")).toBe(false);
+  });
+
+  it("keeps the card when a held file change ends with the turn, and asks again after a refusal", async () => {
+    const decisions: unknown[] = [];
+    const { engine, drain } = bare(async (input) => {
+      const held = input.onApproval?.(update("/w/theirs.xlsx"));
+      void Promise.resolve(held).then((d) => decisions.push(d));
+      await new Promise((r) => setTimeout(r, 5));
+      return { text: "" };
+    });
+    const seen = await drain(null);
+    const ids = seen.flatMap((e) => (e.type === "approval" ? [e.approval.id] : []));
+    expect(ids).toHaveLength(1);
+    // The turn ended: Codex hears no, and the task keeps the card until the user decides.
+    expect(seen.at(-1)).toEqual({ type: "done" });
+    expect(decisions).toEqual([expect.objectContaining({ decision: "deny" })]);
+    expect(engine.decide("t1", ids[0] ?? "", false)).toBe(false);
+    const again = await drain("try again");
+    expect(again.filter((e) => e.type === "approval")).toHaveLength(1);
   });
 
   it("asks before changing a file that was already there, and not for one the task made", async () => {
@@ -198,7 +257,7 @@ describe("CodexEngine", () => {
       const reply = await holder.engine
         ?.ask("t1", { text: "Late?", options: ["a", "b"] })
         .catch((e: Error) => e.message);
-      expect(reply).toMatch(/stopped/);
+      expect(reply).toMatch(/isn't running/);
       return { text: "", finishReason: "cancelled" };
     });
     holder.engine = engine;
@@ -248,9 +307,9 @@ describe("CodexEngine", () => {
   it("carries the Tost Work tools' questions, files and review into the task", async () => {
     const holder: { engine?: CodexEngine } = {};
     const { engine, seen, run } = setup(async () => {
-      const reply = await holder.engine?.ask("t1", { text: "Which template?", options: ["A", "B"] });
+      await holder.engine?.ask("t1", { text: "Which template?", options: ["A", "B"] });
       await holder.engine?.reportFile("t1", { path: "/w/a.docx", kind: "add" });
-      await holder.engine?.review("t1", { asked: [{ text: reply ?? "" }], decided: [], checkYourself: [] });
+      await holder.engine?.review("t1", { asked: [{ text: "A proposal" }], decided: [], checkYourself: [] });
       return { text: "" };
     });
     holder.engine = engine;
@@ -258,44 +317,27 @@ describe("CodexEngine", () => {
     expect(seen.slice(0, 3)).toMatchObject([
       { type: "question", question: { text: "Which template?" } },
       { type: "file", change: { path: "/w/a.docx", role: "made" } },
-      { type: "review", review: { asked: [{ text: "A" }] } },
+      { type: "review", review: { asked: [{ text: "A proposal" }] } },
     ]);
   });
 
-  it("takes a question off the task when the agent stops waiting for it", async () => {
-    const holder: { engine?: CodexEngine } = {};
-    const gaveUp = new AbortController();
-    let toolError = "";
-    const { engine, seen, run } = setup(async () => {
-      await holder.engine?.ask("t1", { text: "Which one?", options: ["a", "b"] }, gaveUp.signal).catch((e: Error) => {
-        toolError = e.message;
-      });
-      return { text: "" };
-    });
-    holder.engine = engine;
-    // Nobody answers; the agent gives up instead.
-    engine.answer = () => gaveUp.abort();
-    await run();
-    const question = seen.find((e) => e.type === "question");
-    expect(question).toBeTruthy();
-    expect(seen).toContainEqual({ type: "withdrawn", id: question?.type === "question" ? question.question.id : "" });
-    expect(toolError).toMatch(/stopped/);
-  });
-
-  it("ends a stopped run as stopped, and a waiting tool hears that nobody answered", async () => {
-    const holder: { engine?: CodexEngine } = {};
-    let toolError = "";
-    const { engine, seen, controller, run } = setup(async () => {
-      await holder.engine?.ask("t1", { text: "?", options: ["a", "b"] }).catch((e: Error) => {
-        toolError = e.message;
+  it("ends a stopped run as stopped, and a held file change hears that nobody allowed it", async () => {
+    let decision: unknown;
+    const { engine, seen, controller, run } = setup(async (input) => {
+      decision = await input.onApproval?.({
+        id: "c",
+        tool: "file_change",
+        input: { changes: { changes: [{ path: "/w/theirs.xlsx", kind: { type: "update" } }] } },
       });
       return { text: "", finishReason: "cancelled" };
     });
-    holder.engine = engine;
-    // Stop as soon as the question shows, without answering it.
-    engine.answer = () => controller.abort();
+    // Stop as soon as the card shows, without deciding.
+    engine.decide = () => {
+      controller.abort();
+      return true;
+    };
     await run();
-    expect(toolError).toMatch(/stopped/);
+    expect(decision).toMatchObject({ decision: "deny" });
     expect(seen.at(-1)).toEqual({ type: "stopped" });
   });
 

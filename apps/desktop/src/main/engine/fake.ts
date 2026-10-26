@@ -168,11 +168,15 @@ export class FakeEngine implements Engine {
     yield { type: "done" };
   }
 
-  answer(_taskId: string, questionId: string, answer: string): void {
-    this.waiting.get(questionId)?.(answer);
+  answer(_taskId: string, questionId: string, answer: string): boolean {
+    const waiter = this.waiting.get(questionId);
+    waiter?.(answer);
+    return waiter !== undefined;
   }
 
-  decide(_taskId: string, approvalId: string, allow: boolean): void {
-    this.waiting.get(approvalId)?.(allow);
+  decide(_taskId: string, approvalId: string, allow: boolean): boolean {
+    const waiter = this.waiting.get(approvalId);
+    waiter?.(allow);
+    return waiter !== undefined;
   }
 }
