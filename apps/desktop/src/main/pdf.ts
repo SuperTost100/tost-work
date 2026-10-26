@@ -76,7 +76,9 @@ export async function makePdf(officecli: string, env: NodeJS.ProcessEnv, source:
           kind === "xlsx" ? { top: 0.5, bottom: 0.5, left: 0.5, right: 0.5 } : { top: 0, bottom: 0, left: 0, right: 0 },
         printBackground: true,
       });
-      await writeFile(target, pdf);
+      // Exclusive: if the free name was taken or turned into a link since it was picked, this fails instead of
+      // writing through it.
+      await writeFile(target, pdf, { flag: "wx" });
     } finally {
       win.destroy();
     }
