@@ -9,11 +9,11 @@ const calls: { taskId: string; tool: string; args: unknown }[] = [];
 const handler: ToolHandler = {
   ask: async (taskId, q) => {
     calls.push({ taskId, tool: "ask", args: q });
-    return q.options[1] ?? "";
+    return `asked: ${q.text}`;
   },
   approve: async (taskId, action, paths) => {
     calls.push({ taskId, tool: "approve", args: { action, paths } });
-    return action === "overwrite";
+    return `requested: ${action}`;
   },
   reportFile: async (taskId, change) => {
     calls.push({ taskId, tool: "file", args: change });
@@ -67,12 +67,12 @@ describe("ToolServer", () => {
       name: "ask_user",
       arguments: { question: "Who pays?", options: ["Us", "Them"] },
     });
-    expect(textOf(answer)).toBe("Them");
+    expect(textOf(answer)).toBe("asked: Who pays?");
     const decision = await b.callTool({
       name: "request_approval",
       arguments: { action: "delete", paths: ["/w/a.txt"] },
     });
-    expect(textOf(decision)).toBe("refused");
+    expect(textOf(decision)).toBe("requested: delete");
     await b.callTool({
       name: "submit_review",
       arguments: { asked: [{ text: "A proposal" }], decided: [], check_yourself: [] },
@@ -128,104 +128,5 @@ describe("ToolServer", () => {
 
   it("refuses to start twice", async () => {
     await expect(server.start()).rejects.toThrow(/already running/);
-  });
-
-  it("tells the handler when the agent's connection drops while it waits", async () => {
-    let seen: AbortSignal | undefined;
-    const waiting = new ToolServer({
-      ...handler,
-      ask: (_taskId, _q, signal) => {
-        seen = signal;
-        return new Promise((_resolve, reject) => signal?.addEventListener("abort", () => reject(new Error("gone"))));
-      },
-    });
-    await waiting.start();
-    const client = await connect(waiting.open("task-1"));
-    const call = client
-      .callTool({ name: "ask_user", arguments: { question: "?", options: ["a", "b"] } })
-      .catch(() => "dropped");
-    for (let i = 0; i < 100 && !seen; i++) await new Promise((r) => setTimeout(r, 5));
-    expect(seen?.aborted).toBe(false);
-    // As when the agent's process exits: its connection closes.
-    await client.close();
-    expect(await call).toBe("dropped");
-    for (let i = 0; i < 100 && !seen?.aborted; i++) await new Promise((r) => setTimeout(r, 5));
-    expect(seen?.aborted).toBe(true);
-    await waiting.stop();
-  });
-
-  it("passes a cancel sent on another request to the call it cancels, with the connection still open", async () => {
-    let seen: AbortSignal | undefined;
-    const waiting = new ToolServer({
-      ...handler,
-      ask: (_taskId, _q, signal) => {
-        seen = signal;
-        return new Promise((_resolve, reject) => signal?.addEventListener("abort", () => reject(new Error("gone"))));
-      },
-    });
-    await waiting.start();
-    const client = await connect(waiting.open("task-1"));
-    const controller = new AbortController();
-    // Aborting the call makes the SDK client send notifications/cancelled; it doesn't close this request.
-    const call = client
-      .callTool({ name: "ask_user", arguments: { question: "?", options: ["a", "b"] } }, undefined, {
-        signal: controller.signal,
-      })
-      .catch(() => "cancelled");
-    for (let i = 0; i < 100 && !seen; i++) await new Promise((r) => setTimeout(r, 5));
-    controller.abort();
-    expect(await call).toBe("cancelled");
-    for (let i = 0; i < 100 && !seen?.aborted; i++) await new Promise((r) => setTimeout(r, 5));
-    expect(seen?.aborted).toBe(true);
-    await client.close();
-    await waiting.stop();
-  });
-
-  it('keeps calls with ids 1 and "1" apart when one connection drops', async () => {
-    const signals = new Map<string, AbortSignal>();
-    const waiting = new ToolServer({
-      ...handler,
-      ask: (_taskId, q, signal) => {
-        if (signal) signals.set(q.text, signal);
-        return new Promise(() => {});
-      },
-    });
-    await waiting.start();
-    const { url, token } = waiting.open("task-1");
-    const headers: Record<string, string> = {
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-      accept: "application/json, text/event-stream",
-    };
-    const post = (body: unknown, signal?: AbortSignal) =>
-      fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal });
-    const init = await post({
-      jsonrpc: "2.0",
-      id: 0,
-      method: "initialize",
-      params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "raw", version: "1" } },
-    });
-    headers["mcp-session-id"] = init.headers.get("mcp-session-id") ?? "";
-    await init.text();
-    await (await post({ jsonrpc: "2.0", method: "notifications/initialized" })).text();
-    const call = (id: number | string, question: string, signal?: AbortSignal) =>
-      post(
-        {
-          jsonrpc: "2.0",
-          id,
-          method: "tools/call",
-          params: { name: "ask_user", arguments: { question, options: ["a", "b"] } },
-        },
-        signal,
-      ).catch(() => null);
-    const first = new AbortController();
-    void call(1, "number", first.signal);
-    void call("1", "string");
-    for (let i = 0; i < 200 && signals.size < 2; i++) await new Promise((r) => setTimeout(r, 5));
-    first.abort();
-    for (let i = 0; i < 100 && !signals.get("number")?.aborted; i++) await new Promise((r) => setTimeout(r, 5));
-    expect(signals.get("number")?.aborted).toBe(true);
-    expect(signals.get("string")?.aborted).toBe(false);
-    await waiting.stop();
   });
 });

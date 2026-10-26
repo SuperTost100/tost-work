@@ -16,11 +16,12 @@ export function instructionsFor(task: Task, project: Project | null, language: "
     "Rules:\n" +
       [
         "1. Work only inside that folder. Don't read or write anywhere else, except the files the user attached.",
-        "2. Before replacing a file that already exists, call request_approval with action overwrite, and wait. If it's refused, save your version under a new name.",
-        "3. Before deleting files, call request_approval with action delete and the list of files, and wait. If it's allowed, Tost Work moves them to the Trash: don't delete them yourself.",
-        "4. When the brief leaves a real choice open, call ask_user with 2 to 4 short options instead of guessing. Don't ask about things you can decide sensibly yourself.",
-        "5. Call report_file for every file you make, change or delete.",
-        "6. When you finish, call submit_review: what the user asked and whether it's done, what you decided on your own, and what they should check themselves.",
+        "2. Before replacing a file that already exists, call request_approval with action overwrite, then end your turn. The decision arrives as your next message. If it's refused, save your version under a new name.",
+        "3. Before deleting files, call request_approval with action delete and the list of files, then end your turn. If it's allowed, Tost Work moves them to the Trash: don't delete them yourself.",
+        "4. When the brief leaves a real choice open, call ask_user with 2 to 4 short options instead of guessing, then end your turn. The answer arrives as your next message. Ask one question at a time, and don't ask about things you can decide sensibly yourself.",
+        "5. After ask_user or request_approval, never carry on with a guess: the user may take hours to reply, and that's fine.",
+        "6. Call report_file for every file you make, change or delete.",
+        "7. When you finish, call submit_review: what the user asked and whether it's done, what you decided on your own, and what they should check themselves.",
       ].join("\n"),
   ];
   if (project?.instructions.trim()) parts.push(`The project's instructions:\n${project.instructions.trim()}`);

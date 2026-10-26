@@ -15,8 +15,11 @@ export interface Engine {
   /** The model and effort a new task starts with. */
   defaults(): Promise<{ model: string; effort: string }>;
   run(ctx: RunContext): AsyncIterable<EngineEvent>;
-  /** The user picked an answer, or wrote one, for the question the engine asked. */
-  answer(taskId: string, questionId: string, answer: string): void;
-  /** The user allowed or refused an overwrite or delete. */
-  decide(taskId: string, approvalId: string, allow: boolean): void;
+  /**
+   * The user picked an answer, or wrote one, for the question the engine asked. Returns false when no run is waiting
+   * for it, because the agent ended its turn to wait: then the runner sends the answer as the next message.
+   */
+  answer(taskId: string, questionId: string, answer: string): boolean;
+  /** The user allowed or refused an overwrite or delete. Returns false, like `answer`, when no run is waiting. */
+  decide(taskId: string, approvalId: string, allow: boolean): boolean;
 }

@@ -8,13 +8,10 @@ import type { Review } from "../../shared/model";
 
 /** What the tools do for a task. The engine that runs the task implements it. */
 export interface ToolHandler {
-  /**
-   * Resolves with the user's answer, one of the options or their own words. `signal` aborts when the agent gives up
-   * on the call, for example on disconnect; the handler should then take the question off the task.
-   */
-  ask(taskId: string, question: { text: string; options: string[] }, signal?: AbortSignal): Promise<string>;
-  /** Resolves once the user decided, and after Tost Work kept copies or moved files to the Trash. */
-  approve(taskId: string, action: "overwrite" | "delete", paths: string[], signal?: AbortSignal): Promise<boolean>;
+  /** Puts the question on the task and resolves at once with what the agent does next: end its turn and wait. */
+  ask(taskId: string, question: { text: string; options: string[] }): Promise<string>;
+  /** Puts the approval on the task and resolves at once, like `ask`. */
+  approve(taskId: string, action: "overwrite" | "delete", paths: string[]): Promise<string>;
   reportFile(taskId: string, change: { path: string; kind: "add" | "update" | "delete" }): Promise<void>;
   review(taskId: string, review: Review): Promise<void>;
 }
@@ -29,43 +26,35 @@ const absolute = z
 const item = z.object({ text: z.string().min(1).max(300), detail: z.string().max(300).optional() });
 const text = (value: string) => ({ content: [{ type: "text" as const, text: value }] });
 
-/** One agent session: its task, the MCP server and transport that live as long as it, and its open tool calls. */
+/** One agent session: its task, and the MCP server and transport that live as long as it. */
 interface Session {
   taskId: string;
   mcp?: { server: McpServer; transport: StreamableHTTPServerTransport };
-  /** A controller for each tool call whose HTTP request is still open, by JSON-RPC id, keeping 1 and "1" apart. */
-  open: Map<string | number, AbortController>;
 }
 
 function toolsFor(session: Session, handler: ToolHandler): McpServer {
   const { taskId } = session;
-  // Aborts when the agent gives up: it cancels the call, or the connection carrying the call closes.
-  const giveUp = (extra: { signal: AbortSignal; requestId: string | number }) => {
-    const dropped = session.open.get(extra.requestId)?.signal;
-    return dropped ? AbortSignal.any([extra.signal, dropped]) : extra.signal;
-  };
   const server = new McpServer({ name: "tost-work", version: "0.0.1" });
   server.registerTool(
     "ask_user",
     {
       description:
-        "Ask the user a question when the brief leaves a choice open. Give 2 to 4 short answer options; the user can also write their own. Waits for the answer.",
+        "Ask the user a question when the brief leaves a choice open. Give 2 to 4 short answer options; the user can also write their own. Then end your turn: the answer arrives as your next message.",
       inputSchema: {
         question: z.string().min(1).max(500),
         options: z.array(z.string().min(1).max(120)).min(2).max(4),
       },
     },
-    async ({ question, options }, extra) => text(await handler.ask(taskId, { text: question, options }, giveUp(extra))),
+    async ({ question, options }) => text(await handler.ask(taskId, { text: question, options })),
   );
   server.registerTool(
     "request_approval",
     {
       description:
-        "Ask before replacing or deleting existing files. Never overwrite or delete without it. If allowed, Tost Work keeps a copy of replaced files and moves deleted files to the Trash itself: don't delete them yourself.",
+        "Ask before replacing or deleting existing files. Never overwrite or delete without it. Then end your turn: the decision arrives as your next message. If allowed, Tost Work keeps a copy of replaced files and moves deleted files to the Trash itself: don't delete them yourself.",
       inputSchema: { action: z.enum(["overwrite", "delete"]), paths: z.array(absolute).min(1).max(50) },
     },
-    async ({ action, paths }, extra) =>
-      text((await handler.approve(taskId, action, paths, giveUp(extra))) ? "allowed" : "refused"),
+    async ({ action, paths }) => text(await handler.approve(taskId, action, paths)),
   );
   server.registerTool(
     "report_file",
@@ -119,9 +108,7 @@ function readBody(req: IncomingMessage): Promise<string> {
 /**
  * Tost Work's tools for agents, as an MCP server over HTTP on 127.0.0.1. Each agent session gets its own bearer token,
  * which says which task a call belongs to, so no environment variables are needed. A session keeps one MCP server and
- * transport for its whole life, so a cancel sent on a later request reaches the call it cancels.
- * shortcut: ask_user and request_approval hold the HTTP request until the user answers, so the agent's MCP tool
- * timeout must be long; the engine sets it when it attaches the server.
+ * transport for its whole life. Every tool returns at once: nothing holds a request open waiting for the user.
  */
 export class ToolServer {
   private http: Server | null = null;
@@ -146,7 +133,7 @@ export class ToolServer {
   open(taskId: string): { url: string; token: string } {
     if (!this.http) throw new Error("The tool server isn't running");
     const token = randomBytes(32).toString("base64url");
-    this.sessions.set(token, { taskId, open: new Map() });
+    this.sessions.set(token, { taskId });
     return { url: `http://127.0.0.1:${this.port}/mcp`, token };
   }
 
@@ -154,7 +141,6 @@ export class ToolServer {
     const session = this.sessions.get(token);
     this.sessions.delete(token);
     if (!session) return;
-    for (const controller of session.open.values()) controller.abort();
     void session.mcp?.transport.close();
     void session.mcp?.server.close();
   }
@@ -190,30 +176,13 @@ export class ToolServer {
 
     try {
       let body: unknown;
-      const calls: [string | number, AbortController][] = [];
       if (req.method === "POST") {
         try {
           body = JSON.parse(await readBody(req));
         } catch {
           return deny(400, "Bad request");
         }
-        // The tool calls this request carries: if its connection closes before they're answered, the agent is gone.
-        for (const message of Array.isArray(body) ? body : [body]) {
-          const m = message as { method?: unknown; id?: unknown };
-          if (m?.method === "tools/call" && (typeof m.id === "string" || typeof m.id === "number")) {
-            const controller = new AbortController();
-            session.open.set(m.id, controller);
-            calls.push([m.id, controller]);
-          }
-        }
       }
-      res.on("close", () => {
-        for (const [id, controller] of calls) {
-          controller.abort();
-          // Only this request's controller: a later call may reuse the id.
-          if (session.open.get(id) === controller) session.open.delete(id);
-        }
-      });
       if (!session.mcp) {
         const server = toolsFor(session, this.handler);
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID() });
