@@ -9,6 +9,7 @@ import type { AgentProvider, Project } from "../shared/model";
 import type { Accounts } from "./accounts";
 import type { TaskRunner } from "./engine/runner";
 import { type Conflict, copyInto, describe, readablePath, savablePaths, saveCopies } from "./files";
+import type { KeyStore } from "./keys";
 import { applyLook } from "./look";
 import type { Store } from "./store/store";
 import { absolutePath, paths, settingsPatch, text } from "./validate";
@@ -18,6 +19,7 @@ export function registerIpc(
   store: Store,
   runner: TaskRunner,
   accounts: Record<AgentProvider, Accounts>,
+  keys: KeyStore,
   window: () => BrowserWindow | null,
 ): void {
   const account = (provider: unknown): Accounts => {
@@ -53,6 +55,9 @@ export function registerIpc(
   );
   ipcMain.handle(IPC.accountCancel, (_e, provider: unknown) => account(provider).cancel());
   ipcMain.handle(IPC.accountSignOut, (_e, provider: unknown) => account(provider).signOut());
+  ipcMain.handle(IPC.keyInfo, () => keys.info());
+  ipcMain.handle(IPC.keySave, (_e, key: unknown) => keys.save(text(key, "key", 400).trim()));
+  ipcMain.handle(IPC.keyRemove, () => keys.remove());
 
   ipcMain.handle(IPC.projectsList, () => store.listProjects());
 
@@ -94,14 +99,14 @@ export function registerIpc(
     const workdir = project?.folder ?? join(tmpdir(), "tost-work", "quick", randomUUID());
     const given = paths(input?.attachments, "attachments");
     // Before any copying: if the engine can't start a task, no folder or copies are left behind.
-    const { provider, model, effort } = await runner.defaults();
+    const { provider, auth, model, effort } = await runner.defaults();
     let attachments = given;
     if (!project) {
       await mkdir(workdir, { recursive: true });
       // The agent edits copies, so the user's originals stay as they are until they save a copy.
       attachments = await copyInto(given, workdir);
     }
-    const task = runner.create({ projectId, brief, workdir, attachments, provider, model, effort });
+    const task = runner.create({ projectId, brief, workdir, attachments, provider, auth, model, effort });
     runner.launch(task.id);
     return task;
   });

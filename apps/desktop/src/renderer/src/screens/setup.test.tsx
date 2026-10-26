@@ -34,9 +34,9 @@ describe("first-run setup", () => {
     expect((screen.getByLabelText(/Advanced/) as HTMLInputElement).checked).toBe(true);
     await click("Next");
 
-    // Claude can sign in too; the course key is there, greyed out.
+    // Claude can sign in too, and the course key can be pasted.
     expect(screen.getByRole("button", { name: "Sign in to Claude" })).toBeTruthy();
-    expect(screen.getAllByText("Arrives in a later version")).toHaveLength(1);
+    expect(screen.getByLabelText("API key")).toBeTruthy();
     await click("Sign in to ChatGPT");
     expect(await screen.findByText("Connected as giulia@example.com")).toBeTruthy();
     await click("Next");
@@ -55,6 +55,25 @@ describe("first-run setup", () => {
       setupDone: true,
     });
     expect((await api.projects.list()).map((p) => p.name)).toEqual(["Proposals"]);
+  });
+
+  it("takes the course key, refusing what isn't one, and makes it the default", async () => {
+    const api = createMemoryApi({ name: "Giulia" });
+    render(<Root api={api} />);
+    await click("Next");
+    await click("Skip for now");
+    await click("Next");
+    fireEvent.change(await screen.findByLabelText("API key"), { target: { value: "hello" } });
+    await click("Use key");
+    expect(screen.getByRole("alert").textContent).toMatch(/isn't an OpenAI or Anthropic API key/);
+
+    fireEvent.change(screen.getByLabelText("API key"), { target: { value: " sk-ant-api03-abcdefghijklmnopWXYZ " } });
+    await click("Use key");
+    expect(await screen.findByText("Anthropic key ending in WXYZ")).toBeTruthy();
+    expect(screen.queryByLabelText("API key")).toBeNull();
+    expect(await api.settings.get()).toMatchObject({ defaultAi: "key" });
+    // A key counts as a connected AI.
+    expect(screen.getByRole("button", { name: "Next" })).toBeTruthy();
   });
 
   it("shows how to install Codex when it's missing, and checks again", async () => {

@@ -11,6 +11,7 @@ export interface NewTask {
   workdir: string;
   attachments?: string[];
   provider?: AgentProvider;
+  auth?: "account" | "key";
   model?: string;
   effort?: string;
 }
@@ -60,7 +61,7 @@ export class TaskRunner {
     private guard: Guard = REFUSE,
   ) {}
 
-  defaults(): Promise<{ provider: AgentProvider; model: string; effort: string }> {
+  defaults(): Promise<{ provider: AgentProvider; auth?: "account" | "key"; model: string; effort: string }> {
     return this.engine.defaults();
   }
 
@@ -74,6 +75,7 @@ export class TaskRunner {
       attachments: input.attachments ?? [],
       workdir: input.workdir,
       provider: input.provider ?? "codex",
+      ...(input.auth === "key" ? { auth: "key" as const } : {}),
       model: input.model ?? "gpt-5.5",
       effort: input.effort ?? "medium",
       status: "draft",

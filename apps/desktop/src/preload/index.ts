@@ -22,6 +22,11 @@ const api: TostWorkApi = {
       return () => ipcRenderer.removeListener(IPC.accountSignInEvent, handler);
     },
   },
+  key: {
+    info: () => ipcRenderer.invoke(IPC.keyInfo),
+    save: (key) => ipcRenderer.invoke(IPC.keySave, key),
+    remove: () => ipcRenderer.invoke(IPC.keyRemove),
+  },
   projects: {
     list: () => ipcRenderer.invoke(IPC.projectsList),
     create: (input) => ipcRenderer.invoke(IPC.projectsCreate, input),

@@ -1,4 +1,4 @@
-import type { AgentProvider, Project, Settings, Task } from "./model";
+import type { AgentProvider, CourseKey, Project, Settings, Task } from "./model";
 
 export interface NewProjectInput {
   name: string;
@@ -61,6 +61,13 @@ export interface TostWorkApi {
     signOut(provider: AgentProvider): Promise<AgentAccount>;
     onSignIn(listener: (provider: AgentProvider, event: SignInEvent) => void): () => void;
   };
+  /** The course API key. The interface never reads it back, only whose it is and how it ends. */
+  key: {
+    info(): Promise<CourseKey | null>;
+    /** Encrypts and saves the key. Rejects what isn't an OpenAI or Anthropic key. */
+    save(key: string): Promise<CourseKey>;
+    remove(): Promise<void>;
+  };
   projects: {
     list(): Promise<Project[]>;
     create(input: NewProjectInput): Promise<Project>;
@@ -121,6 +128,9 @@ export const IPC = {
   accountSendCode: "account:send-code",
   accountCancel: "account:cancel",
   accountSignOut: "account:sign-out",
+  keyInfo: "key:info",
+  keySave: "key:save",
+  keyRemove: "key:remove",
   accountSignInEvent: "account:sign-in-event",
   projectsList: "projects:list",
   projectsCreate: "projects:create",

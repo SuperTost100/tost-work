@@ -25,6 +25,14 @@ describe("pickAi", () => {
     expect(await pickAi(null, async (p) => (p === "codex" ? null : true))).toBe("claude");
   });
 
+  it("uses the course key while it's there, and falls back when a key kept until closing is gone", async () => {
+    expect(await pickAi("key", signedIn("codex"), true)).toBe("key");
+    expect(await pickAi("key", signedIn("claude"), false)).toBe("claude");
+    expect(await pickAi(null, signedIn(), true)).toBe("key");
+    // Nothing else to run on: the task says to paste the key again.
+    expect(await pickAi("key", signedIn(), false)).toBe("key");
+  });
+
   it("keeps the choice when nothing is signed in, so the error names that agent", async () => {
     expect(await pickAi("claude", signedIn())).toBe("claude");
     expect(await pickAi(null, signedIn())).toBe("chatgpt");

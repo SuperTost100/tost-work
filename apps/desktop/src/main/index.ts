@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { createFunnel } from "cli-funnel";
-import { app, BrowserWindow, nativeTheme, shell } from "electron";
+import { app, BrowserWindow, nativeTheme, safeStorage, shell } from "electron";
 import { IPC } from "../shared/api";
 import { languageFrom } from "../shared/i18n";
 import type { AgentProvider } from "../shared/model";
@@ -12,6 +12,7 @@ import { FakeEngine } from "./engine/fake";
 import { TaskRunner } from "./engine/runner";
 import { fileGuard } from "./guard";
 import { registerIpc } from "./ipc";
+import { KeyStore } from "./keys";
 import { applyLook } from "./look";
 import { ToolServer } from "./mcp/server";
 import { pickAi } from "./pickAi";
@@ -65,6 +66,11 @@ function createWindow(store: Store): BrowserWindow {
 
 app.whenReady().then(async () => {
   const store = new Store(join(app.getPath("userData"), "tost-work.db"));
+  const keys = new KeyStore(join(app.getPath("userData"), "course-key.json"), {
+    available: () => safeStorage.isEncryptionAvailable(),
+    encrypt: (text) => safeStorage.encryptString(text),
+    decrypt: (data) => safeStorage.decryptString(data),
+  });
   store.stopInterrupted(new Date().toISOString());
   // Before the window, so its background colour already follows the chosen theme.
   applyLook(null, store.getSettings());
@@ -77,15 +83,13 @@ app.whenReady().then(async () => {
   if (process.env.TOST_WORK_ENGINE === "fake") {
     engine = new FakeEngine(undefined, undefined, join(app.getAppPath(), "resources", "fake"));
   } else {
-    const agent = new AgentEngine(
-      funnel,
-      language,
-      documentTools(),
-      () => {
+    const agent = new AgentEngine(funnel, language, {
+      documents: documentTools(),
+      user: () => {
         const { name, work, notes } = store.getSettings();
         return { name, work, notes };
       },
-      () =>
+      ai: () =>
         pickAi(
           store.getSettings().defaultAi,
           // A failed check is unknown (null), not signed out.
@@ -94,8 +98,10 @@ app.whenReady().then(async () => {
               (status) => status.loggedIn,
               () => null,
             ),
+          keys.info() !== null,
         ),
-    );
+      courseKey: () => keys.get(),
+    });
     tools = new ToolServer(agent);
     await tools.start();
     agent.attachTools(tools);
@@ -130,7 +136,7 @@ app.whenReady().then(async () => {
       (url) => shell.openExternal(url),
     );
   const accounts = { codex: accountsFor("codex"), claude: accountsFor("claude") };
-  registerIpc(store, runner, accounts, () => mainWindow);
+  registerIpc(store, runner, accounts, keys, () => mainWindow);
   app.on("before-quit", () => {
     accounts.codex.cancel();
     accounts.claude.cancel();

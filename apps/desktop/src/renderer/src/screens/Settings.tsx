@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { AccountRow } from "@/components/AccountRow";
+import { KeyRow } from "@/components/KeyRow";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
@@ -12,6 +13,7 @@ import {
   SECTION_LEVEL,
   type SectionKey,
   type Settings as SettingsData,
+  SUBSCRIPTIONS,
   sectionOn,
   TEXT_SIZES,
   THEMES,
@@ -189,24 +191,25 @@ export function Settings({
             {active === "accounts" && (
               <section aria-labelledby="settings-accounts">
                 <h1 id="settings-accounts">{t("settings.accounts")}</h1>
-                {AIS.map((ai) => (
+                {SUBSCRIPTIONS.map((ai) => (
                   <AccountRow
                     key={ai}
                     api={api}
                     ai={ai}
                     variant="settings"
                     onConnected={onConnected}
-                    // The account signed in last runs new tasks; signing out of it leaves the choice to the others.
+                    // The account connected last runs new tasks; signing out of it leaves the choice to the others.
                     onSignedIn={(signedIn) => save({ defaultAi: signedIn })}
                     onSignedOut={(out) => settings.defaultAi === out && save({ defaultAi: null })}
                   />
                 ))}
-                <div className="acct">
-                  <span>
-                    <b>{t("ai.key")}</b>
-                    <span>{t("ai.later")}</span>
-                  </span>
-                </div>
+                <KeyRow
+                  api={api}
+                  variant="settings"
+                  onConnected={onConnected}
+                  onSaved={() => save({ defaultAi: "key" })}
+                  onRemoved={() => settings.defaultAi === "key" && save({ defaultAi: null })}
+                />
                 {signedIn.length > 1 && (
                   <div className="srow">
                     <div className="lbl">

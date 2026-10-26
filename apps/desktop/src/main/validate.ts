@@ -67,7 +67,8 @@ export const settingsPatch = (v: unknown): Partial<Settings> => {
       if (!THEMES.includes(value as Theme)) throw new Error("theme must be light, dark or system");
       patch.theme = value as Theme;
     } else if (key === "defaultAi") {
-      if (value !== null && !AIS.includes(value as AiId)) throw new Error("defaultAi must be chatgpt, claude or null");
+      if (value !== null && !AIS.includes(value as AiId))
+        throw new Error("defaultAi must be chatgpt, claude, key or null");
       patch.defaultAi = value as AiId | null;
     } else if (key === "setupDone") {
       if (typeof value !== "boolean") throw new Error("setupDone must be true or false");

@@ -81,6 +81,8 @@ export interface Task {
   workdir: string;
   /** The agent the task runs on. Missing on tasks from before Claude, which all ran on Codex. */
   provider?: AgentProvider;
+  /** "key" when the task runs on the course key rather than the subscription signed in to the agent. */
+  auth?: "account" | "key";
   model: string;
   effort: string;
   status: TaskStatus;
@@ -136,12 +138,31 @@ export interface Settings {
   setupDone: boolean;
 }
 
-/** The ways to connect an AI: a ChatGPT subscription or a Claude subscription. */
-export type AiId = "chatgpt" | "claude";
-export const AIS: AiId[] = ["chatgpt", "claude"];
+/** The subscriptions, each signed in through its agent CLI. */
+export type Subscription = "chatgpt" | "claude";
+export const SUBSCRIPTIONS: Subscription[] = ["chatgpt", "claude"];
+/** The ways to connect an AI: a subscription, or the API key from a course. */
+export type AiId = Subscription | "key";
+export const AIS: AiId[] = ["chatgpt", "claude", "key"];
 /** The agent CLI each subscription runs through. */
 export type AgentProvider = "codex" | "claude";
-export const PROVIDER_OF: Record<AiId, AgentProvider> = { chatgpt: "codex", claude: "claude" };
+export const PROVIDER_OF: Record<Subscription, AgentProvider> = { chatgpt: "codex", claude: "claude" };
+
+/** Whose API key it is: OpenAI's runs through Codex, Anthropic's through Claude Code. */
+export type KeyVendor = "openai" | "anthropic";
+export const KEY_PROVIDER: Record<KeyVendor, AgentProvider> = { openai: "codex", anthropic: "claude" };
+/** The saved course key as the interface sees it: never the key, only whose it is and how it ends. */
+export interface CourseKey {
+  vendor: KeyVendor;
+  last4: string;
+  /** Kept in memory only, until the app closes, because this computer has no secure storage. */
+  untilClosed?: boolean;
+}
+/** Whose key this is, from how it starts, or null for something that isn't an API key. */
+export const keyVendor = (key: string): KeyVendor | null => {
+  if (!/^sk-[\w-]{16,}$/.test(key)) return null;
+  return key.startsWith("sk-ant-") ? "anthropic" : "openai";
+};
 
 export const LEVELS: Level[] = ["beginner", "intermediate", "advanced", "expert"];
 export type TextSize = "small" | "normal" | "large";

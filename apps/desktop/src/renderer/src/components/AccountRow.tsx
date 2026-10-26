@@ -4,10 +4,10 @@ import { useAccount } from "@/lib/useAccount";
 import { useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
-import { type AiId, PROVIDER_OF } from "../../../shared/model";
+import { PROVIDER_OF, type Subscription } from "../../../shared/model";
 
 /** The agent CLI behind each subscription, and how to install it until setup can do it with a button. */
-const CLI: Record<AiId, { name: string; install: string }> = {
+const CLI: Record<Subscription, { name: string; install: string }> = {
   chatgpt: { name: "Codex", install: "npm install -g @openai/codex" },
   claude: { name: "Claude Code", install: "npm install -g @anthropic-ai/claude-code" },
 };
@@ -25,11 +25,11 @@ export function AccountRow({
   onSignedOut,
 }: {
   api: TostWorkApi;
-  ai: AiId;
+  ai: Subscription;
   variant: "setup" | "settings";
-  onConnected?: (ai: AiId, connected: boolean) => void;
-  onSignedIn?: (ai: AiId) => void;
-  onSignedOut?: (ai: AiId) => void;
+  onConnected?: (ai: Subscription, connected: boolean) => void;
+  onSignedIn?: (ai: Subscription) => void;
+  onSignedOut?: (ai: Subscription) => void;
 }) {
   const t = useT();
   // The hook re-checks when its callback changes, so it gets a stable one that reads the latest prop.

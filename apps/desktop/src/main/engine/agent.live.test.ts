@@ -39,13 +39,7 @@ for (const ai of AIS) {
       const work = await mkdtemp(join(tmpdir(), "tw-live-"));
       const kept = await mkdtemp(join(tmpdir(), "tw-live-kept-"));
       await writeFile(join(work, "notes.txt"), "draft\n");
-      const engine = new AgentEngine(
-        funnel,
-        () => "en",
-        null,
-        undefined,
-        async () => ai,
-      );
+      const engine = new AgentEngine(funnel, () => "en", { ai: async () => ai });
       const tools = new ToolServer(engine);
       await tools.start();
       engine.attachTools(tools);
@@ -99,13 +93,7 @@ for (const ai of AIS) {
 
     it("waits for an answer as long as it takes, then carries on with it", { timeout: 600_000 }, async () => {
       const work = await mkdtemp(join(tmpdir(), "tw-live-q-"));
-      const engine = new AgentEngine(
-        funnel,
-        () => "en",
-        null,
-        undefined,
-        async () => ai,
-      );
+      const engine = new AgentEngine(funnel, () => "en", { ai: async () => ai });
       const tools = new ToolServer(engine);
       await tools.start();
       engine.attachTools(tools);

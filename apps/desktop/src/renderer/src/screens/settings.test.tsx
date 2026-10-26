@@ -80,6 +80,24 @@ describe("settings", () => {
     expect(screen.queryByRole("radiogroup", { name: "Default AI" })).toBeNull();
   });
 
+  it("saves and removes the course key, which joins the default AI choice", async () => {
+    const api = createMemoryApi();
+    render(<Root api={api} />);
+    await click("Settings");
+    await click("AI accounts");
+    await click("Sign in to ChatGPT");
+    fireEvent.change(await screen.findByLabelText("API key"), { target: { value: "sk-proj-abcdefghijklmnop1234" } });
+    await click("Use key");
+    expect(await screen.findByText("OpenAI key ending in 1234")).toBeTruthy();
+    expect((await api.settings.get()).defaultAi).toBe("key");
+    expect((screen.getByRole("radio", { name: "Course key" }) as HTMLInputElement).checked).toBe(true);
+
+    await click("Remove the course key");
+    expect(await api.key.info()).toBeNull();
+    expect((await api.settings.get()).defaultAi).toBeNull();
+    expect(screen.getByLabelText("API key")).toBeTruthy();
+  });
+
   it("starts tasks in a project when quick edit is off", async () => {
     const api = createMemoryApi({ name: "Giulia", setupDone: true, sections: { quickEdit: false } });
     await api.projects.create({ name: "Proposals", folder: "/home/giulia/Proposals" });

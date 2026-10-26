@@ -2211,6 +2211,13 @@ ol.editable li::before {
   font-size: 13px;
 }
 
+.opt.wide {
+  grid-template-columns: 1fr;
+}
+.acct .keybox {
+  max-width: 420px;
+}
+
 /* First-run setup, About and empty states */
 .solo {
   flex: 1;

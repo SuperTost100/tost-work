@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { realpath, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
-import type { AgentProvider, AiId, EngineEvent, Review } from "../../shared/model";
-import { PROVIDER_OF } from "../../shared/model";
+import type { AgentProvider, AiId, EngineEvent, KeyVendor, Review } from "../../shared/model";
+import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
 import { freeName, inside } from "../files";
 import type { ToolHandler } from "../mcp/server";
 import type { Engine, RunContext } from "./engine";
@@ -211,30 +211,52 @@ export class AgentEngine implements Engine, ToolHandler {
   private cleared = new Map<string, Set<string>>();
   private tools: ToolSessions | null = null;
 
+  private documents: DocumentTools | null;
+  private user: () => { name: string; work: string; notes: string };
+  private ai: () => Promise<AiId>;
+  private courseKey: () => { key: string; vendor: KeyVendor } | null;
+
   constructor(
     private funnel: AgentFunnel,
     private language: () => "en" | "it",
-    private documents: DocumentTools | null = null,
-    /** The user's profile: their name, which new Office files carry as author, what they do, and notes. */
-    private user: () => { name: string; work: string; notes: string } = () => ({ name: "", work: "", notes: "" }),
-    /** The account new tasks run on. */
-    private ai: () => Promise<AiId> = async () => "chatgpt",
-  ) {}
+    options: {
+      documents?: DocumentTools | null;
+      /** The user's profile: their name, which new Office files carry as author, what they do, and notes. */
+      user?: () => { name: string; work: string; notes: string };
+      /** The account new tasks run on. */
+      ai?: () => Promise<AiId>;
+      /** The course API key, read for each run so a removed key stops being used. */
+      courseKey?: () => { key: string; vendor: KeyVendor } | null;
+    } = {},
+  ) {
+    this.documents = options.documents ?? null;
+    this.user = options.user ?? (() => ({ name: "", work: "", notes: "" }));
+    this.ai = options.ai ?? (async () => "chatgpt");
+    this.courseKey = options.courseKey ?? (() => null);
+  }
 
   /** The tool server takes this engine as its handler, so it's attached after both exist. */
   attachTools(tools: ToolSessions): void {
     this.tools = tools;
   }
 
-  async defaults(): Promise<{ provider: AgentProvider; model: string; effort: string }> {
-    const provider = PROVIDER_OF[await this.ai()];
+  async defaults(): Promise<{ provider: AgentProvider; auth: "account" | "key"; model: string; effort: string }> {
+    const ai = await this.ai();
+    let provider: AgentProvider;
+    if (ai === "key") {
+      const key = this.courseKey();
+      if (!key) throw new Error("The course key isn't there any more. Paste it again in Settings, AI accounts.");
+      provider = KEY_PROVIDER[key.vendor];
+    } else provider = PROVIDER_OF[ai];
+    const auth = ai === "key" ? ("key" as const) : ("account" as const);
     const models = await this.funnel.models(provider);
     // Codex lists its recommended model first. Claude's list starts with the largest model, so it's picked by name.
     const model = (provider === "claude" && models.find((m) => m.id === CLAUDE_MODEL)) || models[0];
     if (!model)
       throw new Error(`${provider === "claude" ? "Claude Code" : "Codex"} lists no models. Check that it's installed.`);
     const medium = model.efforts.some((e) => e.id === "medium") ? "medium" : undefined;
-    return { provider, model: model.id, effort: model.defaultEffort ?? medium ?? model.efforts[0]?.id ?? "medium" };
+    const effort = model.defaultEffort ?? medium ?? model.efforts[0]?.id ?? "medium";
+    return { provider, auth, model: model.id, effort };
   }
 
   async *run({ task, project, workdir, followUp, signal }: RunContext): AsyncIterable<EngineEvent> {
@@ -253,6 +275,18 @@ export class AgentEngine implements Engine, ToolHandler {
     const session = this.tools.open(task.id);
     const tools = this.tools;
 
+    // A task started on the course key keeps running on it. Removed or replaced with another vendor's, it can't.
+    let apiKey: string | undefined;
+    if (task.auth === "key") {
+      const key = this.courseKey();
+      if (!key || KEY_PROVIDER[key.vendor] !== (task.provider ?? "codex")) {
+        this.live.delete(task.id);
+        this.tools.close(session.token);
+        throw new Error("This task ran on the course key, which isn't there any more. Paste it again in Settings.");
+      }
+      apiKey = key.key;
+    }
+
     const stream = this.funnel.stream({
       selection: {
         provider: task.provider ?? "codex",
@@ -270,6 +304,7 @@ export class AgentEngine implements Engine, ToolHandler {
         this.user(),
       ),
       ...(this.documents ? { env: this.documents.env } : {}),
+      ...(apiKey ? { apiKey } : {}),
       sessionId: task.sessionId,
       signal,
       planTool: true,

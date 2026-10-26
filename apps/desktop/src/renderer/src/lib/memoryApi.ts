@@ -8,8 +8,10 @@ import type {
 } from "../../../shared/api";
 import {
   type AgentProvider,
+  type CourseKey,
   DEFAULT_SETTINGS,
   type EngineEvent,
+  keyVendor,
   type Project,
   type Settings,
   type Task,
@@ -31,6 +33,7 @@ export function createMemoryApi(
     codex: { installed: true, version: "0.164.0", loggedIn: false },
     claude: { installed: true, version: "2.1.310", loggedIn: false },
   };
+  let courseKey: CourseKey | null = null;
   const signInListeners = new Set<(provider: AgentProvider, e: SignInEvent) => void>();
   let n = 0;
   const now = () => new Date(Date.UTC(2026, 9, 26, 9, 0, n++)).toISOString();
@@ -78,6 +81,18 @@ export function createMemoryApi(
       onSignIn: (l) => {
         signInListeners.add(l);
         return () => signInListeners.delete(l);
+      },
+    },
+    key: {
+      info: async () => courseKey,
+      save: async (key) => {
+        const vendor = keyVendor(key);
+        if (!vendor) throw new Error("This isn't an OpenAI or Anthropic API key");
+        courseKey = { vendor, last4: key.slice(-4) };
+        return courseKey;
+      },
+      remove: async () => {
+        courseKey = null;
       },
     },
     projects: {

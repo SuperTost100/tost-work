@@ -13,7 +13,7 @@ export interface RunContext {
 /** Something that does the work of a task: the real one wraps cli-funnel, the fake one replays a script. */
 export interface Engine {
   /** The agent, model and effort a new task starts with. */
-  defaults(): Promise<{ provider: AgentProvider; model: string; effort: string }>;
+  defaults(): Promise<{ provider: AgentProvider; auth?: "account" | "key"; model: string; effort: string }>;
   run(ctx: RunContext): AsyncIterable<EngineEvent>;
   /**
    * The user picked an answer, or wrote one, for the question the engine asked. Returns false when no run is waiting

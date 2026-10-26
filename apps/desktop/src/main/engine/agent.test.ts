@@ -346,7 +346,12 @@ describe("AgentEngine", () => {
 
   it("starts tasks on the model Codex lists first", async () => {
     const { engine } = setup(async () => ({ text: "" }));
-    expect(await engine.defaults()).toEqual({ provider: "codex", model: "gpt-6-sol", effort: "medium" });
+    expect(await engine.defaults()).toEqual({
+      provider: "codex",
+      auth: "account",
+      model: "gpt-6-sol",
+      effort: "medium",
+    });
   });
 
   it("starts tasks on Claude Sonnet at medium when Claude is the default", async () => {
@@ -359,14 +364,49 @@ describe("AgentEngine", () => {
             { id: "claude-sonnet-5-5", efforts },
           ]
         : [];
-    const engine = new AgentEngine(
-      funnel,
-      () => "it",
-      null,
-      undefined,
-      async () => "claude",
-    );
-    expect(await engine.defaults()).toEqual({ provider: "claude", model: "claude-sonnet-5-5", effort: "medium" });
+    const engine = new AgentEngine(funnel, () => "it", { ai: async () => "claude" });
+    expect(await engine.defaults()).toEqual({
+      provider: "claude",
+      auth: "account",
+      model: "claude-sonnet-5-5",
+      effort: "medium",
+    });
+  });
+
+  it("runs on the course key through the agent its vendor needs, and stops when the key is gone", async () => {
+    const { funnel, inputs } = fakeFunnel(async () => ({ text: "Done." }));
+    const efforts = [{ id: "medium" }];
+    (funnel as { models: unknown }).models = async (provider: string) =>
+      provider === "claude" ? [{ id: "claude-sonnet-5-5", efforts }] : [{ id: "gpt-6-sol", efforts }];
+    let key: { key: string; vendor: "openai" | "anthropic" } | null = {
+      key: "sk-ant-api03-secret",
+      vendor: "anthropic",
+    };
+    const engine = new AgentEngine(funnel, () => "it", { ai: async () => "key", courseKey: () => key });
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const defaults = await engine.defaults();
+    expect(defaults).toEqual({ provider: "claude", auth: "key", model: "claude-sonnet-5-5", effort: "medium" });
+
+    const drain = async (t: Task) => {
+      const seen: EngineEvent[] = [];
+      const signal = new AbortController().signal;
+      for await (const e of engine.run({ task: t, project: null, workdir: "/w", followUp: null, signal })) seen.push(e);
+      return seen;
+    };
+    const keyTask = task({ provider: "claude", auth: "key", model: "claude-sonnet-5-5" });
+    await drain(keyTask);
+    expect(inputs[0]?.apiKey).toBe("sk-ant-api03-secret");
+    // A task on the subscription never gets the key.
+    await drain(task({ provider: "claude", model: "claude-sonnet-5-5" }));
+    expect(inputs[1]?.apiKey).toBeUndefined();
+
+    // Replaced with an OpenAI key, Claude can't use it; removed, nothing can.
+    key = { key: "sk-proj-other", vendor: "openai" };
+    await expect(drain(keyTask)).rejects.toThrow(/course key/);
+    key = null;
+    await expect(drain(keyTask)).rejects.toThrow(/course key/);
+    await expect(engine.defaults()).rejects.toThrow(/course key/);
+    expect(inputs).toHaveLength(2);
   });
 
   it("runs a Claude task on Claude Code, with its tools held to the same rules", async () => {
@@ -437,12 +477,10 @@ describe("AgentEngine with the document tools", () => {
       return { text: "" };
     });
     let reply = "";
-    const engine = new AgentEngine(
-      funnel,
-      () => "it",
+    const engine = new AgentEngine(funnel, () => "it", {
       documents,
-      () => ({ name: "Giulia", work: "", notes: "" }),
-    );
+      user: () => ({ name: "Giulia", work: "", notes: "" }),
+    });
     engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
     const seen: EngineEvent[] = [];
     const signal = new AbortController().signal;
@@ -475,7 +513,7 @@ describe("AgentEngine with the document tools", () => {
       );
       return { text: "" };
     });
-    const engine = new AgentEngine(funnel, () => "it", documents);
+    const engine = new AgentEngine(funnel, () => "it", { documents });
     engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
     const signal = new AbortController().signal;
     for await (const _ of engine.run({

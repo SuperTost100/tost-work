@@ -1,18 +1,19 @@
 import { useCallback, useRef, useState } from "react";
 import { AccountRow } from "@/components/AccountRow";
+import { KeyRow } from "@/components/KeyRow";
 import { Sprigs } from "@/components/Sprigs";
 import { errorText } from "@/lib/errorText";
 import { Logo } from "@/lib/Logo";
 import { useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
-import { AIS, type AiId, type Level, type Settings } from "../../../shared/model";
+import { type AiId, type Level, type Settings, SUBSCRIPTIONS } from "../../../shared/model";
 
 const TOTAL = 5;
 const LEVELS: Level[] = ["beginner", "intermediate", "advanced", "expert"];
 const folderName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? "";
 
-/** The ways to connect an AI: the two subscriptions, and the course key, which comes later. */
+/** The ways to connect an AI: the two subscriptions and the course key. */
 function Connect({
   api,
   onConnected,
@@ -22,19 +23,12 @@ function Connect({
   onConnected: (ai: AiId, connected: boolean) => void;
   onSignedIn: (ai: AiId) => void;
 }) {
-  const t = useT();
   return (
     <div className="opts">
-      {AIS.map((ai) => (
+      {SUBSCRIPTIONS.map((ai) => (
         <AccountRow key={ai} api={api} ai={ai} variant="setup" onConnected={onConnected} onSignedIn={onSignedIn} />
       ))}
-      <div className="opt off" aria-disabled="true">
-        <span>
-          <b>{t("ai.key")}</b>
-          <span className="d">{t("ai.key.d")}</span>
-        </span>
-        <span className="t3 soon">{t("ai.later")}</span>
-      </div>
+      <KeyRow api={api} variant="setup" onConnected={onConnected} onSaved={() => onSignedIn("key")} />
     </div>
   );
 }
