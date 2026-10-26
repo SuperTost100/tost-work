@@ -12,7 +12,22 @@ What 0.0.1 and 0.1.0 contain, agreed with Tost on 2026-10-25. The screens are in
 | 0.2.0 (V2) | Everyone | Everything works, with Advanced unlocked at the Expert level. |
 | 0.3.0 (V3) | Everyone | Advanced is finished. |
 
-After the private alpha comes a public beta, and only then a real release. Going public means making this repository public, after Tost has seen a preview.
+The public beta starts at 0.1.0, when this repository goes public after Tost has seen a preview, and a real release comes only after the beta. There's no deadline for any version, 0.1.0 included, because no course is waiting on it.
+
+## Order of work
+
+Agreed with Tost on 2026-10-26, after 0.0.3:
+
+1. The Settings screen: level and sections, AI accounts, language, text size and theme.
+2. Claude and an API key, so a trainer can hand out the key for the day.
+3. Installing Codex and Claude Code with one button ([#16](https://github.com/SuperTost100/tost-work/issues/16)).
+4. The menu bar and keyboard shortcuts ([#45](https://github.com/SuperTost100/tost-work/issues/45)).
+5. Internet for tasks ([#44](https://github.com/SuperTost100/tost-work/issues/44)): web search first, without asking before each site. A browser comes next, and computer use later at the Expert level.
+6. The Skills section.
+7. Jobs, with the app staying in the menu bar.
+8. The board.
+9. The PowerPoint preview, then the Linux and Windows builds.
+10. The working animation ([#46](https://github.com/SuperTost100/tost-work/issues/46)), folder snapshots ([#31](https://github.com/SuperTost100/tost-work/issues/31)) and the cleanup of old copies ([#32](https://github.com/SuperTost100/tost-work/issues/32)).
 
 ## What works in 0.1.0
 
@@ -93,4 +108,4 @@ The interface ships in Italian and English. Setup takes the language from the sy
 
 ## Releases
 
-Alpha builds are GitHub releases on this private repository. From 0.0.2, the app updates itself.
+Alpha builds are GitHub pre-releases on this private repository, downloaded by hand. The app starts updating itself at 0.1.0, when the repository goes public, because an app can't fetch updates from a private repository without carrying a GitHub token inside it.
