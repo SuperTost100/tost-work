@@ -362,6 +362,15 @@ describe("deletesFiles", () => {
       "python3 -c 'import os; os.remove(\"a\")'",
       "python3 - <<'PY'\nimport shutil\nshutil.rmtree('drafts')\nPY",
       "node -e \"require('fs').rmSync('x')\"",
+      // A quoted command given to a shell runs, and so does a substitution inside double quotes.
+      'powershell -Command "Remove-Item x"',
+      'echo "$(rm x)"',
+      'bash -c "$(rm x)"',
+      "bash -c 'rm -rf drafts'",
+      'sh -c "cd out && rm old.docx"',
+      'cmd /c "del report.docx"',
+      "echo `rm x`",
+      "bash <<EOF\nrm -rf drafts\nEOF",
     ])
       expect(deletesFiles(command), command).toBe(true);
   });

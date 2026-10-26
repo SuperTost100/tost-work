@@ -15,21 +15,46 @@ const END_TURN =
 
 /** Shell commands that delete, where a command starts: the line, after ; & | ( or $(, or run by xargs or find -exec. */
 const SHELL_DELETES =
-  /(^|[\n;&|(`]|\$\(|\bxargs(\s+-\S+)*\s|-exec\s)\s*(sudo\s+)?(rm|rmdir|del|erase|rd|unlink|shred|trash)(\s|$)|(^|\s)find\s[^\n]*\s-delete\b|Remove-Item/im;
-/** Deletions from code a command runs, such as a Python or Node script. */
-const CODE_DELETES = /os\.(remove|unlink|rmdir)\(|shutil\.rmtree\(|\.(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync)\(/;
+  /(^|[\n;&|(`]|\$\(|\bxargs(\s+-\S+)*\s|-exec\s)\s*(sudo\s+)?(rm|rmdir|del|erase|rd|unlink|shred|trash)(\s|$)|(^|\s)find\s[^\n]*\s-delete\b/im;
+/** Deletions in code a command runs, such as a Python, Node or PowerShell script. Looked for in the whole command. */
+const CODE_DELETES =
+  /os\.(remove|unlink|rmdir)\(|shutil\.rmtree\(|\.(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync)\(|Remove-Item/i;
+/** A shell's flag for running the string that follows: that string is a command, not text. */
+const PAYLOAD =
+  /(\b(ba|z|da|k)?sh|\bfish)\s+(-\w+\s+)*-c\s*$|\bcmd(\.exe)?\s+\/[ck]\s*$|\b(powershell|pwsh)(\.exe)?\s+(-\w+\s+)*-c(ommand)?\s*$/i;
+/** A line that hands a heredoc to a shell, whose body is then commands. */
+const SHELL_READS = /\b((ba|z|da|k)?sh|fish)\b/;
+const HEREDOC = /<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2[ \t]*(?=\n|$)/g;
+const QUOTED = /'[^']*'|"(?:[^"\\]|\\.)*"/g;
+const SUBSTITUTION = /\$\(([^()]*)\)|`([^`]*)`/g;
+
+/** The text before `offset` on its line. */
+const lineBefore = (text: string, offset: number) => text.slice(text.lastIndexOf("\n", offset - 1) + 1, offset);
+
+/**
+ * A command with the text it only writes taken out: heredoc bodies and quoted strings. What still runs stays: a
+ * quoted command given to a shell with -c, a heredoc a shell reads, and $(…) or `…` inside double quotes.
+ */
+function shellText(command: string): string {
+  return command
+    .replace(HEREDOC, (body: string, _q: string, _tag: string, offset: number) =>
+      SHELL_READS.test(lineBefore(command, offset)) ? body : "",
+    )
+    .replace(QUOTED, (quoted: string, offset: number, whole: string) => {
+      const inner = quoted.slice(1, -1);
+      if (PAYLOAD.test(lineBefore(whole, offset))) return `; ${shellText(inner)} ;`;
+      if (quoted.startsWith("'")) return "''";
+      return [...inner.matchAll(SUBSTITUTION)].map((m) => `; ${shellText(m[1] ?? m[2] ?? "")} ;`).join(" ") || '""';
+    });
+}
 
 /**
  * Whether a command deletes files. Those are refused, so deletions go through the approval card and the Trash.
- * Quoted text and heredoc bodies are what a command writes, not what it runs, so the shell words are looked for
- * without them: an Italian document saying "del corso" is not a `del` command.
+ * Shell words are looked for only in what runs, so an Italian document saying "del corso" is not a `del` command.
  * shortcut: a script that deletes in another way still deletes; snapshot the folder before each run to close the gap.
  */
 export function deletesFiles(command: string): boolean {
-  const shell = command
-    .replace(/<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2[ \t]*(?=\n|$)/g, "")
-    .replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, '""');
-  return SHELL_DELETES.test(shell) || CODE_DELETES.test(command);
+  return CODE_DELETES.test(command) || SHELL_DELETES.test(shellText(command));
 }
 
 /** The parts of cli-funnel the engine uses, so tests can stand in for Codex. */
