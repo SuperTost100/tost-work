@@ -4,6 +4,7 @@ import { app, BrowserWindow, nativeTheme, shell } from "electron";
 import { IPC } from "../shared/api";
 import { languageFrom } from "../shared/i18n";
 import { Accounts } from "./accounts";
+import { documentTools } from "./documents";
 import { CodexEngine } from "./engine/codex";
 import type { Engine } from "./engine/engine";
 import { FakeEngine } from "./engine/fake";
@@ -69,7 +70,7 @@ app.whenReady().then(async () => {
   if (process.env.TOST_WORK_ENGINE === "fake") {
     engine = new FakeEngine(undefined, undefined, join(app.getAppPath(), "resources", "fake"));
   } else {
-    const codex = new CodexEngine(funnel, language);
+    const codex = new CodexEngine(funnel, language, documentTools(), () => store.getSettings().name);
     tools = new ToolServer(codex);
     await tools.start();
     codex.attachTools(tools);

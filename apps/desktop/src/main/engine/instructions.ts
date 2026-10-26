@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import type { Project, Task } from "../../shared/model";
 
 const LANGUAGE_NAMES = { en: "English", it: "Italian" } as const;
@@ -6,7 +7,12 @@ const LANGUAGE_NAMES = { en: "English", it: "Italian" } as const;
  * The block every agent session starts with. It says who the agent works for, where it may work, the rules and the
  * Tost Work tools. The rules are enforced by Tost Work too; the text only explains them.
  */
-export function instructionsFor(task: Task, project: Project | null, language: "en" | "it"): string {
+export function instructionsFor(
+  task: Task,
+  project: Project | null,
+  language: "en" | "it",
+  documents: { skills: string; author: string } | null = null,
+): string {
   const where = project
     ? `You work in the project "${project.name}". Its folder is ${task.workdir}.`
     : `This is a quick edit without a project. You work in a temporary folder, ${task.workdir}, on copies of the user's files. The originals stay untouched until the user saves a copy.`;
@@ -26,6 +32,18 @@ export function instructionsFor(task: Task, project: Project | null, language: "
         "9. A Word file must open in Word without any prompt: don't turn on updateFields in its settings, and don't add fields that point to other files.",
       ].join("\n"),
   ];
+  if (documents) {
+    const guide = (kind: string) => join(documents.skills, kind, "SKILL.md");
+    parts.push(
+      [
+        "Word, Excel and PowerPoint files: make and change them with the officecli command, which Tost Work installed for you. Never write their XML yourself.",
+        `Before you start on one, read the guide for its kind: ${guide("word")}, ${guide("excel")} or ${guide("powerpoint")}. For a PDF, read ${guide("pdf")}, then use the make_pdf tool.`,
+        documents.author.trim() ? `Files you create carry "${documents.author.trim()}" as their author.` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+  }
   if (project?.instructions.trim()) parts.push(`The project's instructions:\n${project.instructions.trim()}`);
   if (task.attachments.length)
     parts.push(`Files the user attached:\n${task.attachments.map((p) => `- ${p}`).join("\n")}`);

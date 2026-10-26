@@ -13,6 +13,8 @@ export interface ToolHandler {
   /** Puts the approval on the task and resolves at once, like `ask`. */
   approve(taskId: string, action: "overwrite" | "delete", paths: string[]): Promise<string>;
   reportFile(taskId: string, change: { path: string; kind: "add" | "update" | "delete" }): Promise<void>;
+  /** Makes a PDF of a Word, Excel or PowerPoint file and resolves with what to tell the agent. */
+  makePdf(taskId: string, path: string): Promise<string>;
   review(taskId: string, review: Review): Promise<void>;
 }
 
@@ -66,6 +68,15 @@ function toolsFor(session: Session, handler: ToolHandler): McpServer {
       await handler.reportFile(taskId, { path, kind });
       return text("noted");
     },
+  );
+  server.registerTool(
+    "make_pdf",
+    {
+      description:
+        "Make a PDF of a Word, Excel or PowerPoint file in the task's folder. Tost Work saves it next to the file, with the same name, adds it to the task and returns its path.",
+      inputSchema: { path: absolute },
+    },
+    async ({ path }) => text(await handler.makePdf(taskId, path)),
   );
   server.registerTool(
     "submit_review",

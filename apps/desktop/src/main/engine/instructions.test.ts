@@ -26,4 +26,13 @@ describe("instructionsFor", () => {
     expect(text).toContain("- /tmp/q/letter.docx");
     expect(text).not.toContain("project's instructions");
   });
+
+  it("points to the document guides and names the author when OfficeCLI is there", () => {
+    const text = instructionsFor(task, project, "it", { skills: "/app/skills", author: "Giulia Rossi" });
+    expect(text).toContain("officecli command");
+    expect(text).toContain("/app/skills/word/SKILL.md");
+    expect(text).toContain("/app/skills/pdf/SKILL.md");
+    expect(text).toContain('"Giulia Rossi" as their author');
+    expect(instructionsFor(task, project, "it")).not.toContain("officecli");
+  });
 });

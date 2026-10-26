@@ -9,6 +9,13 @@ files:
   # The fake engine copies these sample files into tasks until the real engine lands.
   - resources/fake/**
   - package.json
+# Outside the app's archive, because Codex runs as its own process and reads them from disk. scripts/fetch-officecli.mjs
+# puts each platform's OfficeCLI in resources/bin/<os>-<arch>.
+extraResources:
+  - from: resources/bin/${os}-${arch}
+    to: bin
+  - from: resources/skills
+    to: skills
 mac:
   category: public.app-category.productivity
   target:
@@ -19,6 +26,9 @@ mac:
   identity: "-"
   # With an ad-hoc signature the hardened runtime blocks Electron's own libraries, so it waits for a real identity.
   hardenedRuntime: false
+  # OfficeCLI keeps its own Developer ID signature, with the JIT entitlement .NET needs; an ad-hoc one would drop it.
+  signIgnore:
+    - /Contents/Resources/bin/officecli$
 linux:
   # Set here and not at the top level, where it would also rename the Mac bundle to tost-work.app.
   executableName: tost-work

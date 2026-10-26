@@ -1,4 +1,7 @@
 /** @vitest-environment node */
+import { mkdtemp, realpath, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { FunnelEvent, RunRequest } from "cli-funnel";
 import { describe, expect, it } from "vitest";
 import type { EngineEvent, Task } from "../../shared/model";
@@ -344,6 +347,77 @@ describe("CodexEngine", () => {
   it("starts tasks on the model Codex lists first", async () => {
     const { engine } = setup(async () => ({ text: "" }));
     expect(await engine.defaults()).toEqual({ model: "gpt-6-sol", effort: "medium" });
+  });
+});
+
+describe("CodexEngine with the document tools", () => {
+  const made: [string, string][] = [];
+  const documents = {
+    skills: "/app/skills",
+    env: { PATH: "/app/bin:/usr/bin", OFFICECLI_SKIP_UPDATE: "1" },
+    makePdf: async (source: string, target: string) => {
+      made.push([source, target]);
+    },
+  };
+
+  it("gives Codex the tools' environment and the guides, and makes a PDF next to the file", async () => {
+    const work = await mkdtemp(join(tmpdir(), "tw-pdf-"));
+    await writeFile(join(work, "Proposta.docx"), "x");
+    await writeFile(join(work, "Proposta.pdf"), "an older one");
+    const { funnel, inputs } = fakeFunnel(async () => {
+      reply = await engine.makePdf("t1", join(work, "Proposta.docx"));
+      return { text: "" };
+    });
+    let reply = "";
+    const engine = new CodexEngine(
+      funnel,
+      () => "it",
+      documents,
+      () => "Giulia",
+    );
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const seen: EngineEvent[] = [];
+    const signal = new AbortController().signal;
+    for await (const e of engine.run({
+      task: task({ workdir: work }),
+      project: null,
+      workdir: work,
+      followUp: null,
+      signal,
+    }))
+      seen.push(e);
+    expect(inputs[0]?.env).toEqual(documents.env);
+    expect(inputs[0]?.system).toContain("/app/skills/word/SKILL.md");
+    // An existing PDF stays: the new one gets a free name.
+    const target = join(await realpath(work), "Proposta (2).pdf");
+    expect(made).toEqual([[join(await realpath(work), "Proposta.docx"), target]]);
+    expect(reply).toContain(target);
+    expect(seen).toContainEqual({ type: "file", change: { path: target, kind: "add", role: "made" } });
+  });
+
+  it("refuses a file outside the task's folder", async () => {
+    const work = await mkdtemp(join(tmpdir(), "tw-pdf-"));
+    const elsewhere = await mkdtemp(join(tmpdir(), "tw-pdf-out-"));
+    await writeFile(join(elsewhere, "Other.docx"), "x");
+    let error = "";
+    const { funnel } = fakeFunnel(async () => {
+      error = await engine.makePdf("t1", join(elsewhere, "Other.docx")).then(
+        () => "",
+        (e: Error) => e.message,
+      );
+      return { text: "" };
+    });
+    const engine = new CodexEngine(funnel, () => "it", documents);
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const signal = new AbortController().signal;
+    for await (const _ of engine.run({
+      task: task({ workdir: work }),
+      project: null,
+      workdir: work,
+      followUp: null,
+      signal,
+    }));
+    expect(error).toMatch(/outside the task's folder/);
   });
 });
 

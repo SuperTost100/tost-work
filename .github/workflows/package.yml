@@ -9,6 +9,7 @@ on:
       - apps/desktop/electron-builder.yml
       - apps/desktop/package.json
       - .github/workflows/package.yml
+      - apps/desktop/scripts/fetch-officecli.mjs
 
 permissions:
   contents: read
@@ -36,6 +37,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tost-work/desktop build
+      - run: node apps/desktop/scripts/fetch-officecli.mjs mac-arm64 mac-x64
       - run: pnpm --filter @tost-work/desktop exec electron-builder --mac --publish never
       # An app whose signature doesn't match its contents opens on no Mac: macOS calls it "damaged".
       - name: Check the apps' signatures
@@ -43,7 +45,21 @@ jobs:
         run: |
           for app in "mac-arm64/Tost Work.app" "mac/Tost Work.app"; do
             codesign --verify --deep --strict --verbose=2 "$app"
+            # OfficeCLI must still carry its own signature, or a downloaded copy won't run on a Mac.
+            codesign --verify --strict --verbose=2 "$app/Contents/Resources/bin/officecli"
+            codesign -dv "$app/Contents/Resources/bin/officecli" 2>&1 | grep "Authority=Developer ID Application"
           done
+      - name: Check that the bundled OfficeCLI runs
+        working-directory: apps/desktop/release
+        env:
+          OFFICECLI_SKIP_UPDATE: "1"
+          OFFICECLI_NO_AUTO_RESIDENT: "1"
+        run: |
+          officecli="mac-arm64/Tost Work.app/Contents/Resources/bin/officecli"
+          "$officecli" --version
+          "$officecli" create /tmp/check.docx
+          "$officecli" validate /tmp/check.docx
+          test -f "mac-arm64/Tost Work.app/Contents/Resources/skills/word/SKILL.md"
       # The artifact's name says which build it is, as the app's About panel and Settings do.
       - name: Name the artifact
         id: name

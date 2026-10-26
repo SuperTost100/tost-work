@@ -15,6 +15,10 @@ const handler: ToolHandler = {
     calls.push({ taskId, tool: "approve", args: { action, paths } });
     return `requested: ${action}`;
   },
+  makePdf: async (taskId, path) => {
+    calls.push({ taskId, tool: "pdf", args: path });
+    return `made: ${path.replace(/\.docx$/, ".pdf")}`;
+  },
   reportFile: async (taskId, change) => {
     calls.push({ taskId, tool: "file", args: change });
   },
@@ -53,10 +57,24 @@ const raw = (url: string, headers: Record<string, string>) =>
 const textOf = (result: unknown) => (result as { content: { text: string }[] }).content[0]?.text;
 
 describe("ToolServer", () => {
-  it("lists the four Tost Work tools", async () => {
+  it("lists the five Tost Work tools", async () => {
     const client = await connect(server.open("task-1"));
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["ask_user", "report_file", "request_approval", "submit_review"]);
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      "ask_user",
+      "make_pdf",
+      "report_file",
+      "request_approval",
+      "submit_review",
+    ]);
+    await client.close();
+  });
+
+  it("passes make_pdf to the handler and returns what it says", async () => {
+    const client = await connect(server.open("task-p"));
+    const made = await client.callTool({ name: "make_pdf", arguments: { path: "/w/Proposta.docx" } });
+    expect(textOf(made)).toBe("made: /w/Proposta.pdf");
+    expect(calls.at(-1)).toEqual({ taskId: "task-p", tool: "pdf", args: "/w/Proposta.docx" });
     await client.close();
   });
 
