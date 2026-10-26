@@ -6,11 +6,13 @@ import { applyEvent, resume } from "../../../shared/reduce";
  * An in-memory `window.tostWork` for tests: tasks run a short script synchronously, stop at one question,
  * and finish when it's answered.
  */
-export function createMemoryApi(): TostWorkApi & { emit(id: string, e: EngineEvent): void } {
+export function createMemoryApi(
+  initial: Partial<Settings> = { name: "Giulia", setupDone: true },
+): TostWorkApi & { emit(id: string, e: EngineEvent): void } {
   const projects: Project[] = [];
   const tasks = new Map<string, Task>();
   const listeners = new Set<(t: Task) => void>();
-  let settings: Settings = { ...DEFAULT_SETTINGS };
+  let settings: Settings = { ...DEFAULT_SETTINGS, ...initial };
   let account: CodexAccount = { installed: true, version: "0.164.0", loggedIn: false };
   const signInListeners = new Set<(e: SignInEvent) => void>();
   let n = 0;
