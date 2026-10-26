@@ -336,6 +336,8 @@ describe("a running task", () => {
       "Working on it · Read the notes",
     );
     expect(screen.getByText("writing · 1 of 2")).toBeTruthy();
+    // The dots in Recent are decorative; the row says it in words to screen readers.
+    expect(screen.getByRole("button", { name: /Write a proposal.*working/ })).toBeTruthy();
 
     act(() => api.emit(task?.id ?? "", { type: "stopped" }));
     expect(screen.queryByText("Working on it")).toBeNull();
@@ -345,7 +347,7 @@ describe("a running task", () => {
 describe("the account row", () => {
   it("opens Settings", () => {
     render(<App userName="Giulia" api={createMemoryApi()} />);
-    fireEvent.click(screen.getByRole("button", { name: /Giulia/ }));
-    expect(screen.getByRole("button", { name: /Giulia/ }).getAttribute("aria-current")).toBe("page");
+    fireEvent.click(screen.getByRole("button", { name: "Giulia, Settings" }));
+    expect(screen.getByRole("button", { name: "Giulia, Settings" }).getAttribute("aria-current")).toBe("page");
   });
 });

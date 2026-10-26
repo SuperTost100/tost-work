@@ -84,7 +84,12 @@ export function Sidebar({
         >
           <span className="truncate">{task.title}</span>
           {task.status === "needs-you" && <span className="tag mine">{t("tag.needsYou")}</span>}
-          {task.status === "running" && <WorkingDots />}
+          {task.status === "running" && (
+            <>
+              <WorkingDots />
+              <span className="sr-only">{t("tag.working")}</span>
+            </>
+          )}
         </button>
       ))}
       <span className="spacer" />
@@ -93,6 +98,7 @@ export function Sidebar({
         className={`me${current === "settings" ? " on" : ""}`}
         aria-current={current === "settings" ? "page" : undefined}
         title={t("nav.settings")}
+        aria-label={`${userName}, ${t("nav.settings")}`}
         onClick={() => onNavigate("settings")}
       >
         <span className="avatar">{userName.slice(0, 1).toUpperCase()}</span>

@@ -300,6 +300,15 @@ h3 {
 .spacer {
   flex: 1;
 }
+/* Read by screen readers, not shown. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 /* The whole row opens Settings, as the account row does in most apps. */
 .me {
   display: flex;
