@@ -8,10 +8,13 @@ import type { Review } from "../../shared/model";
 
 /** What the tools do for a task. The engine that runs the task implements it. */
 export interface ToolHandler {
-  /** Resolves with the user's answer, one of the options or their own words. */
-  ask(taskId: string, question: { text: string; options: string[] }): Promise<string>;
+  /**
+   * Resolves with the user's answer, one of the options or their own words. `signal` aborts when the agent gives up
+   * on the call, for example on disconnect; the handler should then take the question off the task.
+   */
+  ask(taskId: string, question: { text: string; options: string[] }, signal?: AbortSignal): Promise<string>;
   /** Resolves once the user decided, and after Tost Work kept copies or moved files to the Trash. */
-  approve(taskId: string, action: "overwrite" | "delete", paths: string[]): Promise<boolean>;
+  approve(taskId: string, action: "overwrite" | "delete", paths: string[], signal?: AbortSignal): Promise<boolean>;
   reportFile(taskId: string, change: { path: string; kind: "add" | "update" | "delete" }): Promise<void>;
   review(taskId: string, review: Review): Promise<void>;
 }
@@ -26,7 +29,9 @@ const absolute = z
 const item = z.object({ text: z.string().min(1).max(300), detail: z.string().max(300).optional() });
 const text = (value: string) => ({ content: [{ type: "text" as const, text: value }] });
 
-function toolsFor(taskId: string, handler: ToolHandler): McpServer {
+function toolsFor(taskId: string, handler: ToolHandler, gone: AbortSignal): McpServer {
+  // Aborts when the agent gives up: its connection closes, or it cancels the call.
+  const giveUp = (extra: { signal: AbortSignal }) => AbortSignal.any([gone, extra.signal]);
   const server = new McpServer({ name: "tost-work", version: "0.0.1" });
   server.registerTool(
     "ask_user",
@@ -38,7 +43,7 @@ function toolsFor(taskId: string, handler: ToolHandler): McpServer {
         options: z.array(z.string().min(1).max(120)).min(2).max(4),
       },
     },
-    async ({ question, options }) => text(await handler.ask(taskId, { text: question, options })),
+    async ({ question, options }, extra) => text(await handler.ask(taskId, { text: question, options }, extra.signal)),
   );
   server.registerTool(
     "request_approval",
@@ -47,7 +52,8 @@ function toolsFor(taskId: string, handler: ToolHandler): McpServer {
         "Ask before replacing or deleting existing files. Never overwrite or delete without it. If allowed, Tost Work keeps a copy of replaced files and moves deleted files to the Trash itself: don't delete them yourself.",
       inputSchema: { action: z.enum(["overwrite", "delete"]), paths: z.array(absolute).min(1).max(50) },
     },
-    async ({ action, paths }) => text((await handler.approve(taskId, action, paths)) ? "allowed" : "refused"),
+    async ({ action, paths }, extra) =>
+      text((await handler.approve(taskId, action, paths, giveUp(extra))) ? "allowed" : "refused"),
   );
   server.registerTool(
     "report_file",
@@ -146,9 +152,12 @@ export class ToolServer {
     if (!taskId) return deny(401, "Unauthorized");
 
     // Stateless: a fresh server and transport for each request, bound to the token's task.
-    const server = toolsFor(taskId, this.handler);
+    // Stateless, so a cancel arrives on another request; a closed connection is what tells this one to stop waiting.
+    const gone = new AbortController();
+    const server = toolsFor(taskId, this.handler, gone.signal);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on("close", () => {
+      gone.abort();
       void transport.close();
       void server.close();
     });

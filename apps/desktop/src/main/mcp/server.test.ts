@@ -129,4 +129,28 @@ describe("ToolServer", () => {
   it("refuses to start twice", async () => {
     await expect(server.start()).rejects.toThrow(/already running/);
   });
+
+  it("tells the handler when the agent's connection drops while it waits", async () => {
+    let seen: AbortSignal | undefined;
+    const waiting = new ToolServer({
+      ...handler,
+      ask: (_taskId, _q, signal) => {
+        seen = signal;
+        return new Promise((_resolve, reject) => signal?.addEventListener("abort", () => reject(new Error("gone"))));
+      },
+    });
+    await waiting.start();
+    const client = await connect(waiting.open("task-1"));
+    const call = client
+      .callTool({ name: "ask_user", arguments: { question: "?", options: ["a", "b"] } })
+      .catch(() => "dropped");
+    for (let i = 0; i < 100 && !seen; i++) await new Promise((r) => setTimeout(r, 5));
+    expect(seen?.aborted).toBe(false);
+    // As when the agent's process exits: its connection closes.
+    await client.close();
+    expect(await call).toBe("dropped");
+    for (let i = 0; i < 100 && !seen?.aborted; i++) await new Promise((r) => setTimeout(r, 5));
+    expect(seen?.aborted).toBe(true);
+    await waiting.stop();
+  });
 });
