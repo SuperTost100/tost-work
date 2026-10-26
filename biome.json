@@ -9,7 +9,8 @@
       "!**/release",
       "!mockups",
       "!**/*.md",
-      "!**/assets/icons"
+      "!**/assets/icons",
+      "!pnpm-lock.yaml"
     ]
   },
   "formatter": {

@@ -1,5 +1,5 @@
-import type { NewProjectInput, NewTaskInput, TostWorkApi } from "../../../shared/api";
-import type { EngineEvent, Project, Task } from "../../../shared/model";
+import type { CodexAccount, NewProjectInput, NewTaskInput, SignInEvent, TostWorkApi } from "../../../shared/api";
+import { DEFAULT_SETTINGS, type EngineEvent, type Project, type Settings, type Task } from "../../../shared/model";
 import { applyEvent, resume } from "../../../shared/reduce";
 
 /**
@@ -10,6 +10,9 @@ export function createMemoryApi(): TostWorkApi & { emit(id: string, e: EngineEve
   const projects: Project[] = [];
   const tasks = new Map<string, Task>();
   const listeners = new Set<(t: Task) => void>();
+  let settings: Settings = { ...DEFAULT_SETTINGS };
+  let account: CodexAccount = { installed: true, version: "0.164.0", loggedIn: false };
+  const signInListeners = new Set<(e: SignInEvent) => void>();
   let n = 0;
   const now = () => new Date(Date.UTC(2026, 9, 26, 9, 0, n++)).toISOString();
   const save = (t: Task) => {
@@ -26,6 +29,26 @@ export function createMemoryApi(): TostWorkApi & { emit(id: string, e: EngineEve
     platform: "linux",
     versions: { app: "0.0.1", electron: "test" },
     emit,
+    settings: {
+      get: async () => settings,
+      update: async (patch) => {
+        settings = { ...settings, ...patch };
+        return settings;
+      },
+    },
+    account: {
+      status: async () => account,
+      signIn: async () => {
+        account = { ...account, loggedIn: true, account: "giulia@example.com" };
+        for (const l of signInListeners) l({ type: "done", account });
+      },
+      sendCode: async () => {},
+      cancel: async () => {},
+      onSignIn: (l) => {
+        signInListeners.add(l);
+        return () => signInListeners.delete(l);
+      },
+    },
     projects: {
       list: async () => [...projects],
       create: async (input: NewProjectInput) => {

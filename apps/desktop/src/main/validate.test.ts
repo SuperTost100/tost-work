@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { absolutePath, paths, text } from "./validate";
+import { absolutePath, paths, settingsPatch, text } from "./validate";
 
 describe("IPC validation", () => {
   it("accepts absolute paths and rejects empty or relative ones", () => {
@@ -25,5 +25,24 @@ describe("IPC validation", () => {
 
   it("limits text length", () => {
     expect(() => text("x".repeat(11), "name", 10)).toThrow(/too long/);
+  });
+});
+
+describe("settingsPatch", () => {
+  it("keeps known settings and trims the name", () => {
+    expect(settingsPatch({ name: " Giulia ", level: "expert", language: null, setupDone: true })).toEqual({
+      name: "Giulia",
+      level: "expert",
+      language: null,
+      setupDone: true,
+    });
+  });
+
+  it("refuses unknown keys and wrong values", () => {
+    expect(() => settingsPatch({ admin: true })).toThrow(/Unknown setting/);
+    expect(() => settingsPatch({ level: "guru" })).toThrow(/four levels/);
+    expect(() => settingsPatch({ language: "fr" })).toThrow(/en, it or null/);
+    expect(() => settingsPatch({ setupDone: "yes" })).toThrow(/true or false/);
+    expect(() => settingsPatch(["name"])).toThrow(/object/);
   });
 });

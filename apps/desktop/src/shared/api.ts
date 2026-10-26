@@ -1,4 +1,4 @@
-import type { Project, Task } from "./model";
+import type { Project, Settings, Task } from "./model";
 
 export interface NewProjectInput {
   name: string;
@@ -25,10 +25,39 @@ export interface SaveResult {
   saved: string[];
 }
 
+/** Codex, which the ChatGPT subscription runs through. */
+export interface CodexAccount {
+  installed: boolean;
+  version?: string;
+  loggedIn: boolean;
+  account?: string;
+  plan?: string;
+}
+
+/** Progress of a sign-in, pushed to the interface while it runs. */
+export type SignInEvent =
+  | { type: "link"; url: string }
+  | { type: "code"; message: string }
+  | { type: "done"; account: CodexAccount }
+  | { type: "error"; message: string };
+
 /** What the preload exposes to the interface as `window.tostWork`. */
 export interface TostWorkApi {
   platform: "darwin" | "win32" | "linux";
   versions: { app: string; electron: string };
+  settings: {
+    get(): Promise<Settings>;
+    /** Saves the fields given and returns all settings. */
+    update(patch: Partial<Settings>): Promise<Settings>;
+  };
+  account: {
+    status(): Promise<CodexAccount>;
+    /** Opens the ChatGPT sign-in page through Codex. Progress arrives through `onSignIn`. */
+    signIn(): Promise<void>;
+    sendCode(code: string): Promise<void>;
+    cancel(): Promise<void>;
+    onSignIn(listener: (event: SignInEvent) => void): () => void;
+  };
   projects: {
     list(): Promise<Project[]>;
     create(input: NewProjectInput): Promise<Project>;
@@ -72,6 +101,13 @@ export interface TostWorkApi {
 
 /** IPC channel names, kept in one place so main and preload can't drift apart. */
 export const IPC = {
+  settingsGet: "settings:get",
+  settingsUpdate: "settings:update",
+  accountStatus: "account:status",
+  accountSignIn: "account:sign-in",
+  accountSendCode: "account:send-code",
+  accountCancel: "account:cancel",
+  accountSignInEvent: "account:sign-in-event",
   projectsList: "projects:list",
   projectsCreate: "projects:create",
   projectsTaskCounts: "projects:task-counts",

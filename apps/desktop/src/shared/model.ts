@@ -106,3 +106,17 @@ export type EngineEvent =
   | { type: "done" }
   | { type: "failed"; error: string }
   | { type: "stopped" };
+
+export type Level = "beginner" | "intermediate" | "advanced" | "expert";
+
+/** The user's choices, kept on this computer. */
+export interface Settings {
+  /** Shown in the greeting and on the avatar. Empty until setup asks for it. */
+  name: string;
+  level: Level;
+  /** null follows the system language. */
+  language: "en" | "it" | null;
+  setupDone: boolean;
+}
+
+export const DEFAULT_SETTINGS: Settings = { name: "", level: "beginner", language: null, setupDone: false };
