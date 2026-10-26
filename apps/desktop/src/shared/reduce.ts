@@ -4,6 +4,8 @@ import type { EngineEvent, Task } from "./model";
 export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
   const next: Task = { ...task, updatedAt: at };
   switch (event.type) {
+    case "session":
+      return { ...next, sessionId: event.sessionId };
     case "plan":
       return { ...next, steps: event.steps };
     case "message":
@@ -15,6 +17,10 @@ export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
     }
     case "question":
       return { ...next, status: "needs-you", question: event.question };
+    case "withdrawn":
+      // Only the question or approval it names: a newer one may already be on the task.
+      if (task.question?.id === event.id || task.approval?.id === event.id) return resume(task, at);
+      return task;
     case "approval":
       return { ...next, status: "needs-you", approval: event.approval };
     case "review":

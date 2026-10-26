@@ -2,11 +2,15 @@ import { join } from "node:path";
 import { createFunnel } from "cli-funnel";
 import { app, BrowserWindow, nativeTheme, shell } from "electron";
 import { IPC } from "../shared/api";
+import { languageFrom } from "../shared/i18n";
 import { Accounts } from "./accounts";
+import { CodexEngine } from "./engine/codex";
+import type { Engine } from "./engine/engine";
 import { FakeEngine } from "./engine/fake";
 import { TaskRunner } from "./engine/runner";
 import { fileGuard } from "./guard";
 import { registerIpc } from "./ipc";
+import { ToolServer } from "./mcp/server";
 import { Store } from "./store/store";
 
 const isMac = process.platform === "darwin";
@@ -50,16 +54,30 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   const store = new Store(join(app.getPath("userData"), "tost-work.db"));
   store.stopInterrupted(new Date().toISOString());
-  // shortcut: every task runs on the fake engine until the cli-funnel engine lands (cli-funnel #126 to #128).
-  const samples = join(app.getAppPath(), "resources", "fake");
+  const funnel = createFunnel();
+  const language = () => store.getSettings().language ?? languageFrom(app.getLocale());
+
+  // Tasks run on Codex. TOST_WORK_ENGINE=fake replays a script instead, for trying the interface without an account.
+  let engine: Engine;
+  let tools: ToolServer | null = null;
+  if (process.env.TOST_WORK_ENGINE === "fake") {
+    engine = new FakeEngine(undefined, undefined, join(app.getAppPath(), "resources", "fake"));
+  } else {
+    const codex = new CodexEngine(funnel, language);
+    tools = new ToolServer(codex);
+    await tools.start();
+    codex.attachTools(tools);
+    engine = codex;
+  }
+
   // shortcut: kept copies are never cleaned up; add a size limit or an age limit before the public beta.
   const guard = fileGuard(join(app.getPath("userData"), "kept"), (path) => shell.trashItem(path));
   const runner = new TaskRunner(
     store,
-    new FakeEngine(undefined, undefined, samples),
+    engine,
     (task) => {
       // On Mac the app outlives its window, so a task can change after the window is gone.
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.taskChanged, task);
@@ -67,7 +85,6 @@ app.whenReady().then(() => {
     undefined,
     guard,
   );
-  const funnel = createFunnel();
   const accounts = new Accounts(
     {
       detect: () => funnel.providers.codex.detect(),
@@ -82,6 +99,7 @@ app.whenReady().then(() => {
   registerIpc(store, runner, accounts, () => mainWindow);
   app.on("before-quit", () => {
     accounts.cancel();
+    void tools?.stop();
     funnel.close();
     store.close();
   });

@@ -6,3 +6,5 @@ allowBuilds:
   electron: true
   esbuild: true
   electron-winstaller: false
+minimumReleaseAgeExclude:
+  - cli-funnel@0.6.0
