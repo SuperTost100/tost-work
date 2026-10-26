@@ -2,6 +2,7 @@ import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
 import { useT } from "@/lib/useT";
 import type { Task } from "../../../shared/model";
+import { WorkingDots } from "../components/TaskTag";
 
 export type Section = "home" | "projects" | "skills" | "jobs" | "board" | "settings";
 
@@ -83,22 +84,27 @@ export function Sidebar({
         >
           <span className="truncate">{task.title}</span>
           {task.status === "needs-you" && <span className="tag mine">{t("tag.needsYou")}</span>}
+          {task.status === "running" && (
+            <>
+              <WorkingDots />
+              <span className="sr-only">{t("tag.working")}</span>
+            </>
+          )}
         </button>
       ))}
       <span className="spacer" />
-      <div className="me">
+      <button
+        type="button"
+        className={`me${current === "settings" ? " on" : ""}`}
+        aria-current={current === "settings" ? "page" : undefined}
+        title={t("nav.settings")}
+        aria-label={`${userName}, ${t("nav.settings")}`}
+        onClick={() => onNavigate("settings")}
+      >
         <span className="avatar">{userName.slice(0, 1).toUpperCase()}</span>
-        <span className="who grow">{userName}</span>
-        <button
-          type="button"
-          className="iconbtn"
-          title={t("nav.settings")}
-          aria-label={t("nav.settings")}
-          onClick={() => onNavigate("settings")}
-        >
-          <Icon name="settings-3" />
-        </button>
-      </div>
+        <span className="who grow truncate">{userName}</span>
+        <Icon name="settings-3" />
+      </button>
     </aside>
   );
 }

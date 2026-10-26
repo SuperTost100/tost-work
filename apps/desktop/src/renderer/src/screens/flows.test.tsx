@@ -317,3 +317,37 @@ describe("projects", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/arrives in a later version/);
   });
 });
+
+describe("a running task", () => {
+  it("says it's working, with the current step, until it stops", async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    await screen.findByText("Who pays the insurance?");
+    // While it waits for the user, the question is the status, not the working line.
+    expect(screen.queryByText("Working on it")).toBeNull();
+
+    const [task] = await api.tasks.list();
+    act(() => api.emit(task?.id ?? "", { type: "withdrawn", id: "q1" }));
+    expect((await screen.findByText("Working on it")).closest(".working")?.textContent).toBe(
+      "Working on it · Read the notes",
+    );
+    expect(screen.getByText("writing · 1 of 2")).toBeTruthy();
+    // The dots in Recent are decorative; the row says it in words to screen readers.
+    expect(screen.getByRole("button", { name: /Write a proposal.*working/ })).toBeTruthy();
+
+    act(() => api.emit(task?.id ?? "", { type: "stopped" }));
+    expect(screen.queryByText("Working on it")).toBeNull();
+  });
+});
+
+describe("the account row", () => {
+  it("opens Settings", () => {
+    render(<App userName="Giulia" api={createMemoryApi()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Giulia, Settings" }));
+    expect(screen.getByRole("button", { name: "Giulia, Settings" }).getAttribute("aria-current")).toBe("page");
+  });
+});

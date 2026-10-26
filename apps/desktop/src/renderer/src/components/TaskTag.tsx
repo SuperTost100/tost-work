@@ -1,6 +1,17 @@
 import { useT } from "@/lib/useT";
 import type { Task } from "../../../shared/model";
 
+/** Three dots that pulse while a task runs. They stand still when the system asks for reduced motion. */
+export function WorkingDots() {
+  return (
+    <span className="pulse" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
+
 /** The mono status tag. It turns ink-black when the task waits for the user. */
 export function TaskTag({ task }: { task: Task }) {
   const t = useT();
@@ -10,7 +21,12 @@ export function TaskTag({ task }: { task: Task }) {
     case "running": {
       const total = task.steps.length;
       const n = Math.max(1, task.steps.findIndex((s) => s.status === "in_progress") + 1);
-      return <span className="tag">{total ? t("tag.writing", { n: String(n), total: String(total) }) : "…"}</span>;
+      return (
+        <span className="tag">
+          <WorkingDots />
+          {total ? t("tag.writing", { n: String(n), total: String(total) }) : t("tag.working")}
+        </span>
+      );
     }
     case "done":
       return <span className="tag mine">{t("tag.toReview")}</span>;
