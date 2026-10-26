@@ -107,7 +107,12 @@ export class CodexEngine implements Engine, ToolHandler {
   async *run({ task, project, workdir, followUp, signal }: RunContext): AsyncIterable<EngineEvent> {
     if (!this.tools) throw new Error("The tool server isn't attached");
     const channel = new Channel<EngineEvent>();
-    const made = new Set(task.files.filter((f) => f.role === "made" && f.kind !== "delete").map((f) => f.path));
+    // Files the task created. A file with a kept copy existed before the task (it was overwritten with approval, or
+    // restored since), so changing it again always asks.
+    const kept = new Set((task.kept ?? []).map((k) => k.path));
+    const made = new Set(
+      task.files.filter((f) => f.role === "made" && f.kind !== "delete" && !kept.has(f.path)).map((f) => f.path),
+    );
     this.live.set(task.id, { channel, signal, workdir, made });
     const session = this.tools.open(task.id);
     const tools = this.tools;
@@ -275,7 +280,8 @@ export class CodexEngine implements Engine, ToolHandler {
     gaveUp?: AbortSignal,
   ): Promise<string | boolean | null> {
     const live = this.live.get(taskId);
-    if (!live || gaveUp?.aborted) return Promise.resolve(null);
+    // After Stop nothing new goes on the task: an abort that already happened never fires its listener.
+    if (!live || live.signal.aborted || gaveUp?.aborted) return Promise.resolve(null);
     const id = randomUUID();
     return new Promise((resolve) => {
       const done = (reply: string | boolean | null) => {

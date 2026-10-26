@@ -81,13 +81,14 @@ export function registerIpc(
     // A task without a project works in a temporary folder of its own, as a quick edit does.
     const workdir = project?.folder ?? join(tmpdir(), "tost-work", "quick", randomUUID());
     const given = paths(input?.attachments, "attachments");
+    // Before any copying: if the engine can't start a task, no folder or copies are left behind.
+    const { model, effort } = await runner.defaults();
     let attachments = given;
     if (!project) {
       await mkdir(workdir, { recursive: true });
       // The agent edits copies, so the user's originals stay as they are until they save a copy.
       attachments = await copyInto(given, workdir);
     }
-    const { model, effort } = await runner.defaults();
     const task = runner.create({ projectId, brief, workdir, attachments, model, effort });
     runner.launch(task.id);
     return task;

@@ -163,6 +163,49 @@ describe("CodexEngine", () => {
     expect(asked[0]).toMatchObject({ approval: { action: "overwrite", paths: ["/w/theirs.xlsx"] } });
   });
 
+  it("asks again before changing a file the task overwrote or restored earlier", async () => {
+    const decisions: unknown[] = [];
+    const {
+      seen,
+      run,
+      decisions: replies,
+    } = setup(async (input) => {
+      decisions.push(
+        await input.onApproval?.({
+          id: "c",
+          tool: "file_change",
+          input: { changes: { changes: [{ path: "/w/theirs.xlsx", kind: { type: "update" } }] } },
+        }),
+      );
+      return { text: "" };
+    });
+    replies.push(true);
+    await run(
+      task({
+        files: [{ path: "/w/theirs.xlsx", kind: "update", role: "made" }],
+        kept: [{ path: "/w/theirs.xlsx", copy: "/k/1", at: "", reason: "overwrite" }],
+      }),
+      "Change the totals",
+    );
+    expect(seen.filter((e) => e.type === "approval")).toHaveLength(1);
+    expect(decisions[0]).toBe("allow");
+  });
+
+  it("puts nothing new on a task once it's stopped", async () => {
+    const holder: { engine?: CodexEngine } = {};
+    const { engine, seen, controller, run } = setup(async () => {
+      controller.abort();
+      const reply = await holder.engine
+        ?.ask("t1", { text: "Late?", options: ["a", "b"] })
+        .catch((e: Error) => e.message);
+      expect(reply).toMatch(/stopped/);
+      return { text: "", finishReason: "cancelled" };
+    });
+    holder.engine = engine;
+    await run();
+    expect(seen.some((e) => e.type === "question")).toBe(false);
+  });
+
   it("turns a deletion into the approval card and never lets Codex delete itself", async () => {
     const decisions: unknown[] = [];
     const {
