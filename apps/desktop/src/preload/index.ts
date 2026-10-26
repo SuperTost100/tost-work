@@ -1,10 +1,26 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { SignInEvent } from "../shared/api";
 import { IPC, type TostWorkApi } from "../shared/api";
 import type { Task } from "../shared/model";
 
 const api: TostWorkApi = {
   platform: process.platform as TostWorkApi["platform"],
   versions: { app: process.env.npm_package_version ?? "0.0.1", electron: process.versions.electron ?? "" },
+  settings: {
+    get: () => ipcRenderer.invoke(IPC.settingsGet),
+    update: (patch) => ipcRenderer.invoke(IPC.settingsUpdate, patch),
+  },
+  account: {
+    status: () => ipcRenderer.invoke(IPC.accountStatus),
+    signIn: () => ipcRenderer.invoke(IPC.accountSignIn),
+    sendCode: (code) => ipcRenderer.invoke(IPC.accountSendCode, code),
+    cancel: () => ipcRenderer.invoke(IPC.accountCancel),
+    onSignIn: (listener) => {
+      const handler = (_: unknown, event: SignInEvent) => listener(event);
+      ipcRenderer.on(IPC.accountSignInEvent, handler);
+      return () => ipcRenderer.removeListener(IPC.accountSignInEvent, handler);
+    },
+  },
   projects: {
     list: () => ipcRenderer.invoke(IPC.projectsList),
     create: (input) => ipcRenderer.invoke(IPC.projectsCreate, input),

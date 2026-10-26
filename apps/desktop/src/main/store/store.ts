@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { Project, Task } from "../../shared/model";
+import { DEFAULT_SETTINGS, type Project, type Settings, type Task } from "../../shared/model";
 
 /**
  * Projects and tasks, in SQLite through Node's built-in driver, so there is no native module to rebuild for Electron.
@@ -23,7 +23,22 @@ export class Store {
       );
       create index if not exists tasks_updated on tasks (updated_at desc);
       create index if not exists tasks_project on tasks (project_id, updated_at desc);
+      create table if not exists settings (key text primary key, value text not null);
     `);
+  }
+
+  /** The saved settings over the defaults, so a setting added in a later version has a value. */
+  getSettings(): Settings {
+    const row = this.db.prepare("select value from settings where key = 'app'").get() as { value: string } | undefined;
+    return { ...DEFAULT_SETTINGS, ...(row ? (JSON.parse(row.value) as Partial<Settings>) : {}) };
+  }
+
+  saveSettings(settings: Settings): void {
+    this.db
+      .prepare(
+        "insert into settings (key, value) values ('app', ?) on conflict(key) do update set value = excluded.value",
+      )
+      .run(JSON.stringify(settings));
   }
 
   saveProject(project: Project): void {

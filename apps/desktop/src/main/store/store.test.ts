@@ -79,4 +79,12 @@ describe("Store", () => {
     expect(s.listProjectTasks("p1").map((t) => t.id)).toEqual(["first"]);
     expect(s.taskCounts()).toEqual({ p1: 1, p2: 30 });
   });
+
+  it("returns default settings until some are saved, and keeps defaults for new fields", () => {
+    const store = new Store(":memory:");
+    expect(store.getSettings()).toEqual({ name: "", level: "beginner", language: null, setupDone: false });
+    store.saveSettings({ name: "Giulia", level: "advanced", language: "it", setupDone: true });
+    expect(store.getSettings().name).toBe("Giulia");
+    expect(store.getSettings().level).toBe("advanced");
+  });
 });
