@@ -13,17 +13,24 @@ import { instructionsFor } from "./instructions";
 const END_TURN =
   "It's in front of the user now. End your turn here: don't do anything else and don't repeat it. Their reply arrives as your next message.";
 
-/** Shell commands that delete, where a command starts: the line, after ; & | ( or $(, or run by xargs or find -exec. */
+/**
+ * Shell commands that delete, where a command starts: the line, after ; & | ( { or $(, after a keyword such as then
+ * or do, or run by xargs, find -exec, env, exec or sudo.
+ */
 const SHELL_DELETES =
-  /(^|[\n;&|(`]|\$\(|\bxargs(\s+-\S+)*\s|-exec\s)\s*(sudo\s+)?(rm|rmdir|del|erase|rd|unlink|shred|trash)(\s|$)|(^|\s)find\s[^\n]*\s-delete\b/im;
+  /(^|[\n;&|(`{!]|\$\(|\b(then|do|else|elif|exec|command|env|nohup|time|xargs(\s+-\S+)*)\s|-exec\s)\s*(sudo\s+)?(rm|rmdir|del|erase|rd|unlink|shred|trash)(\s|$)|(^|\s)find\s[^\n]*\s-delete\b/im;
 /** Deletions in code a command runs, such as a Python, Node or PowerShell script. Looked for in the whole command. */
 const CODE_DELETES =
   /os\.(remove|unlink|rmdir)\(|shutil\.rmtree\(|\.(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync)\(|Remove-Item/i;
+/** A shell where a command starts, by name or path: bash and /bin/sh, but not a file named cleanup.sh. */
+const SHELL = String.raw`(^|[\s;&|(])(\S*\/)?((ba|z|da|k)?sh|fish)`;
 /** A shell's flag for running the string that follows: that string is a command, not text. */
-const PAYLOAD =
-  /(\b(ba|z|da|k)?sh|\bfish)\s+(-\w+\s+)*-c\s*$|\bcmd(\.exe)?\s+\/[ck]\s*$|\b(powershell|pwsh)(\.exe)?\s+(-\w+\s+)*-c(ommand)?\s*$/i;
+const PAYLOAD = new RegExp(
+  String.raw`${SHELL}\s+(-\w+\s+)*-c\s*$|\bcmd(\.exe)?\s+\/[ck]\s*$|\b(powershell|pwsh)(\.exe)?\s+(-\w+\s+)*-c(ommand)?\s*$`,
+  "i",
+);
 /** A line that hands a heredoc to a shell, whose body is then commands. */
-const SHELL_READS = /\b((ba|z|da|k)?sh|fish)\b/;
+const SHELL_READS = new RegExp(String.raw`${SHELL}(\s|<|$)`);
 const HEREDOC = /<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2[ \t]*(?=\n|$)/g;
 const QUOTED = /'[^']*'|"(?:[^"\\]|\\.)*"/g;
 const SUBSTITUTION = /\$\(([^()]*)\)|`([^`]*)`/g;
@@ -31,20 +38,26 @@ const SUBSTITUTION = /\$\(([^()]*)\)|`([^`]*)`/g;
 /** The text before `offset` on its line. */
 const lineBefore = (text: string, offset: number) => text.slice(text.lastIndexOf("\n", offset - 1) + 1, offset);
 
+/** The $(…) and `…` in a piece of text, which the shell runs even inside double quotes or an unquoted heredoc. */
+const substitutions = (text: string) =>
+  [...text.matchAll(SUBSTITUTION)].map((m) => `; ${shellText(m[1] ?? m[2] ?? "")} ;`).join(" ");
+
 /**
  * A command with the text it only writes taken out: heredoc bodies and quoted strings. What still runs stays: a
- * quoted command given to a shell with -c, a heredoc a shell reads, and $(…) or `…` inside double quotes.
+ * quoted command given to a shell with -c, a heredoc a shell reads, and $(…) or `…` inside double quotes or an
+ * unquoted heredoc.
  */
 function shellText(command: string): string {
   return command
-    .replace(HEREDOC, (body: string, _q: string, _tag: string, offset: number) =>
-      SHELL_READS.test(lineBefore(command, offset)) ? body : "",
-    )
+    .replace(HEREDOC, (body: string, quote: string, _tag: string, offset: number) => {
+      if (SHELL_READS.test(lineBefore(command, offset))) return body;
+      return quote ? "" : substitutions(body);
+    })
     .replace(QUOTED, (quoted: string, offset: number, whole: string) => {
       const inner = quoted.slice(1, -1);
       if (PAYLOAD.test(lineBefore(whole, offset))) return `; ${shellText(inner)} ;`;
       if (quoted.startsWith("'")) return "''";
-      return [...inner.matchAll(SUBSTITUTION)].map((m) => `; ${shellText(m[1] ?? m[2] ?? "")} ;`).join(" ") || '""';
+      return substitutions(inner) || '""';
     });
 }
 

@@ -371,6 +371,10 @@ describe("deletesFiles", () => {
       'cmd /c "del report.docx"',
       "echo `rm x`",
       "bash <<EOF\nrm -rf drafts\nEOF",
+      "/bin/sh <<EOF\nrm -rf drafts\nEOF",
+      "if test -f old.docx; then rm old.docx; fi",
+      'for f in *.tmp; do rm "$f"; done',
+      "cat <<EOF > plan.md\n$(rm old.docx)\nEOF",
     ])
       expect(deletesFiles(command), command).toBe(true);
   });
@@ -382,6 +386,9 @@ describe("deletesFiles", () => {
       'printf "Programma del primo incontro\\n" >> scaletta.txt',
       "python3 make_docx.py --title 'Corso del 27 ottobre'",
       "cat <<EOF > plan.md\nrm is not run here\nEOF",
+      // A script written to a file isn't run by writing it, and a quoted heredoc delimiter keeps $(…) literal.
+      "cat > cleanup.sh <<EOF\nrm old.docx\nEOF",
+      "cat <<'EOF' > plan.md\n$(rm old.docx)\nEOF",
     ])
       expect(deletesFiles(command), command).toBe(false);
   });
