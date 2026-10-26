@@ -14,11 +14,60 @@ const END_TURN =
   "It's in front of the user now. End your turn here: don't do anything else and don't repeat it. Their reply arrives as your next message.";
 
 /**
- * Commands that delete files. They are refused, so deletions go through the approval card and the Trash.
+ * Shell words that delete. Any standalone one counts, whatever comes before it (sudo, env, options, then, xargs), so
+ * the check runs only on what the shell runs: shellText takes out the text a command writes.
+ */
+const SHELL_DELETES = /(^|[\s;&|(`{!])(rm|rmdir|del|erase|rd|unlink|shred|trash)(\s|$)|(^|\s)find\s[^\n]*\s-delete\b/im;
+/** Deletions in code a command runs, such as a Python, Node or PowerShell script. Looked for in the whole command. */
+const CODE_DELETES =
+  /os\.(remove|unlink|rmdir)\(|shutil\.rmtree\(|\.(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync)\(|Remove-Item/i;
+/** A shell where a command starts, by name or path: bash and /bin/sh, but not a file named cleanup.sh. */
+const SHELL = String.raw`(^|[\s;&|(])(\S*\/)?((ba|z|da|k)?sh|fish)`;
+/** A shell's flag for running the string that follows: that string is a command, not text. */
+const PAYLOAD = new RegExp(
+  String.raw`${SHELL}\s+(-\w+\s+)*-c\s*$|\bcmd(\.exe)?\s+\/[ck]\s*$|\b(powershell|pwsh)(\.exe)?\s+(-\w+\s+)*-c(ommand)?\s*$`,
+  "i",
+);
+/** A line that hands a heredoc to a shell, whose body is then commands. */
+const SHELL_READS = new RegExp(String.raw`${SHELL}(\s|<|$)`);
+const HEREDOC = /<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2[ \t]*(?=\n|$)/g;
+const QUOTED = /'[^']*'|"(?:[^"\\]|\\.)*"/g;
+const SUBSTITUTION = /\$\(([^()]*)\)|`([^`]*)`/g;
+
+/** The text before `offset` on its line. */
+const lineBefore = (text: string, offset: number) => text.slice(text.lastIndexOf("\n", offset - 1) + 1, offset);
+
+/** The $(…) and `…` in a piece of text, which the shell runs even inside double quotes or an unquoted heredoc. */
+const substitutions = (text: string) =>
+  [...text.matchAll(SUBSTITUTION)].map((m) => `; ${shellText(m[1] ?? m[2] ?? "")} ;`).join(" ");
+
+/**
+ * A command with the text it only writes taken out: heredoc bodies and quoted strings. What still runs stays: a
+ * quoted command given to a shell with -c, a heredoc a shell reads, and $(…) or `…` inside double quotes or an
+ * unquoted heredoc.
+ */
+function shellText(command: string): string {
+  return command
+    .replace(HEREDOC, (body: string, quote: string, _tag: string, offset: number) => {
+      if (SHELL_READS.test(lineBefore(command, offset))) return body;
+      return quote ? "" : substitutions(body);
+    })
+    .replace(QUOTED, (quoted: string, offset: number, whole: string) => {
+      const inner = quoted.slice(1, -1);
+      if (PAYLOAD.test(lineBefore(whole, offset))) return `; ${shellText(inner)} ;`;
+      if (quoted.startsWith("'")) return "''";
+      return substitutions(inner) || '""';
+    });
+}
+
+/**
+ * Whether a command deletes files. Those are refused, so deletions go through the approval card and the Trash.
+ * Shell words are looked for only in what runs, so an Italian document saying "del corso" is not a `del` command.
  * shortcut: a script that deletes in another way still deletes; snapshot the folder before each run to close the gap.
  */
-const DELETES =
-  /(^|[\s;&|(`])(rm|rmdir|del|erase|rd|unlink|shred|trash)(\s|$)|os\.(remove|unlink|rmdir)|shutil\.rmtree|Remove-Item|\.unlink\(|fs\.rm/i;
+export function deletesFiles(command: string): boolean {
+  return CODE_DELETES.test(command) || SHELL_DELETES.test(shellText(command));
+}
 
 /** The parts of cli-funnel the engine uses, so tests can stand in for Codex. */
 export type CodexFunnel = Pick<Funnel, "stream" | "models">;
@@ -249,7 +298,7 @@ export class CodexEngine implements Engine, ToolHandler {
     if (request.tool.startsWith("mcp:")) return "allow";
     if (request.tool === "command") {
       const command = String((request.input as { command?: unknown } | undefined)?.command ?? "");
-      if (DELETES.test(command))
+      if (deletesFiles(command))
         return {
           decision: "deny",
           message:

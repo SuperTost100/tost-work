@@ -2,7 +2,7 @@
 import type { FunnelEvent, RunRequest } from "cli-funnel";
 import { describe, expect, it } from "vitest";
 import type { EngineEvent, Task } from "../../shared/model";
-import { CodexEngine, type CodexFunnel } from "./codex";
+import { CodexEngine, type CodexFunnel, deletesFiles } from "./codex";
 
 type Emit = (event: FunnelEvent) => void;
 type Script = (input: RunRequest, emit: Emit) => Promise<{ text: string; finishReason?: string }>;
@@ -344,5 +344,58 @@ describe("CodexEngine", () => {
   it("starts tasks on the model Codex lists first", async () => {
     const { engine } = setup(async () => ({ text: "" }));
     expect(await engine.defaults()).toEqual({ model: "gpt-6-sol", effort: "medium" });
+  });
+});
+
+describe("deletesFiles", () => {
+  it("finds commands that delete, whatever comes before them", () => {
+    for (const command of [
+      "rm -rf drafts",
+      "cd out && rm old.docx",
+      "ls; rmdir empty",
+      "find . -name '*.tmp' -delete",
+      "find . -name '*.tmp' | xargs rm",
+      "find . -exec rm {} +",
+      "sudo rm x",
+      "del report.docx",
+      "Remove-Item old.xlsx",
+      "python3 -c 'import os; os.remove(\"a\")'",
+      "python3 - <<'PY'\nimport shutil\nshutil.rmtree('drafts')\nPY",
+      "node -e \"require('fs').rmSync('x')\"",
+      // A quoted command given to a shell runs, and so does a substitution inside double quotes.
+      'powershell -Command "Remove-Item x"',
+      'echo "$(rm x)"',
+      'bash -c "$(rm x)"',
+      "bash -c 'rm -rf drafts'",
+      'sh -c "cd out && rm old.docx"',
+      'cmd /c "del report.docx"',
+      "echo `rm x`",
+      "bash <<EOF\nrm -rf drafts\nEOF",
+      "/bin/sh <<EOF\nrm -rf drafts\nEOF",
+      "if test -f old.docx; then rm old.docx; fi",
+      'for f in *.tmp; do rm "$f"; done',
+      "cat <<EOF > plan.md\n$(rm old.docx)\nEOF",
+      "env -i rm x",
+      "FOO=1 rm old.docx",
+      "env FOO=1 rm x",
+      "sudo -u bob rm x",
+      "sudo -u www-data rm old.docx",
+      "env -C /tmp rm old.docx",
+    ])
+      expect(deletesFiles(command), command).toBe(true);
+  });
+
+  it("leaves alone words inside the text a command writes", () => {
+    for (const command of [
+      "python3 - <<'PY'\nparas = ['Scaletta del corso', 'rd round']\ndel paras[0]\nPY",
+      "echo 'Obiettivi del corso' > note.txt",
+      'printf "Programma del primo incontro\\n" >> scaletta.txt',
+      "python3 make_docx.py --title 'Corso del 27 ottobre'",
+      "cat <<EOF > plan.md\nrm is not run here\nEOF",
+      // A script written to a file isn't run by writing it, and a quoted heredoc delimiter keeps $(…) literal.
+      "cat > cleanup.sh <<EOF\nrm old.docx\nEOF",
+      "cat <<'EOF' > plan.md\n$(rm old.docx)\nEOF",
+    ])
+      expect(deletesFiles(command), command).toBe(false);
   });
 });

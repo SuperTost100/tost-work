@@ -14,6 +14,9 @@ describe("instructionsFor", () => {
     expect(text).toContain("don't use Markdown");
     expect(text).toContain("request_approval with action overwrite");
     expect(text).toContain("The project's instructions:\nUse our template.");
+    // Business users get Word, Excel and PowerPoint files, not plain text.
+    expect(text).toContain("documents as Word (.docx)");
+    expect(text).toContain("Never deliver .txt or .md files");
   });
 
   it("explains the quick edit's copies and lists the attachments", () => {
