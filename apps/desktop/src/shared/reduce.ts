@@ -1,4 +1,4 @@
-import type { EngineEvent, Task } from "./model";
+import { type EngineEvent, MAX_ACTIVITY, type Task } from "./model";
 
 /** Applies one engine event to a task. Pure, so the main process and the tests share it. */
 export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
@@ -8,6 +8,14 @@ export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
       return { ...next, sessionId: event.sessionId };
     case "plan":
       return { ...next, steps: event.steps };
+    case "activity": {
+      const log = task.activity ?? [];
+      const last = log.at(-1);
+      // The same thing again, such as three edits to one file, stays one line.
+      if (last?.kind === event.kind && last.target === event.target) return task;
+      const line = { kind: event.kind, ...(event.target ? { target: event.target } : {}), at };
+      return { ...next, activity: [...log, line].slice(-MAX_ACTIVITY) };
+    }
     case "message":
       return { ...next, messages: [...task.messages, { from: "agent", text: event.text, at }] };
     case "file": {

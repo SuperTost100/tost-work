@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Task } from "./model";
+import { MAX_ACTIVITY, type Task } from "./model";
 import { applyEvent } from "./reduce";
 
 const waiting = {
@@ -17,5 +17,27 @@ describe("applyEvent withdrawn", () => {
 
   it("leaves a newer question alone", () => {
     expect(applyEvent(waiting, { type: "withdrawn", id: "q1" }, "t")).toBe(waiting);
+  });
+});
+
+describe("applyEvent activity", () => {
+  const task = { activity: [] } as unknown as Task;
+
+  it("adds a line per action, and keeps the same action twice in a row as one", () => {
+    let next = applyEvent(task, { type: "activity", kind: "edit", target: "a.docx" }, "t1");
+    next = applyEvent(next, { type: "activity", kind: "edit", target: "a.docx" }, "t2");
+    next = applyEvent(next, { type: "activity", kind: "read", target: "b.txt" }, "t3");
+    expect(next.activity).toEqual([
+      { kind: "edit", target: "a.docx", at: "t1" },
+      { kind: "read", target: "b.txt", at: "t3" },
+    ]);
+  });
+
+  it("keeps only the latest lines", () => {
+    let next = task;
+    for (let i = 0; i < MAX_ACTIVITY + 5; i++)
+      next = applyEvent(next, { type: "activity", kind: "read", target: `${i}` }, "t");
+    expect(next.activity).toHaveLength(MAX_ACTIVITY);
+    expect(next.activity?.[0]?.target).toBe("5");
   });
 });

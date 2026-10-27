@@ -204,6 +204,8 @@ export class TaskRunner {
       ...task,
       review: null,
       error: null,
+      // The activity, like the steps, is the latest run's.
+      activity: [],
       messages: [...task.messages, { from: "user", text, at, followUp: true }],
       updatedAt: at,
     });

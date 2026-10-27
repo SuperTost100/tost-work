@@ -10,7 +10,10 @@ import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
 import { RenameField } from "@/shell/Sidebar";
 import type { SaveResult, TostWorkApi } from "../../../shared/api";
+import type { MessageKey } from "../../../shared/i18n";
 import {
+  type Activity,
+  type ActivityKind,
   type AnsweredQuestion,
   answersText,
   BRIEF_MAX,
@@ -210,6 +213,68 @@ function WhatChanged({
         </button>
       </div>
     </aside>
+  );
+}
+
+const ACTIVITY_ICON: Record<ActivityKind, string> = {
+  read: "eye-2",
+  write: "file-new",
+  edit: "pencil",
+  folder: "folder-open",
+  "search-files": "search",
+  web: "world-2",
+  page: "web",
+  command: "terminal-box",
+  work: "file",
+  skill: "magic-2",
+  pdf: "file",
+};
+/** Kinds whose line names a file, search or site, and has a plainer line when it doesn't. */
+const HAS_TARGET = new Set<ActivityKind>(["read", "write", "edit", "web", "page", "work", "skill"]);
+
+/** One line of activity in the user's language: "Leggo note.txt". */
+function useActivityText() {
+  const t = useT();
+  return (a: Activity) =>
+    HAS_TARGET.has(a.kind) && !a.target
+      ? t(`activity.${a.kind}.any` as MessageKey)
+      : t(`activity.${a.kind}` as MessageKey, { target: a.target ?? "" });
+}
+
+/** Lines of activity shown while the agent works; the rest are counted above them. */
+const LIVE_LINES = 5;
+
+/**
+ * What the agent is doing, a line per action, so the user can see it's at work. While it runs the latest lines show;
+ * afterwards they fold into one line, like an answered round, that opens onto all of them.
+ */
+function ActivityLog({ activity, live }: { activity: Activity[]; live: boolean }) {
+  const t = useT();
+  const say = useActivityText();
+  // Unless the user chose, it's open while the agent works and folded once it's done.
+  const [chosen, setChosen] = useState<boolean | null>(null);
+  const open = chosen ?? live;
+  const lines = live ? activity.slice(-LIVE_LINES) : activity;
+  const earlier = activity.length - lines.length;
+  return (
+    <div className="answered activity">
+      <button type="button" aria-expanded={open} onClick={() => setChosen(!open)}>
+        <Icon name="history" />
+        {live ? t("activity.live") : t("activity.done", { n: String(activity.length) })}
+        <Icon name="down" className="chev" />
+      </button>
+      {open && (
+        <ol aria-live={live ? "polite" : undefined}>
+          {earlier > 0 && <li className="t3">{t("activity.earlier", { n: String(earlier) })}</li>}
+          {keyed(lines, (a) => `${a.kind} ${a.target ?? ""} ${a.at}`).map(([key, a]) => (
+            <li key={key}>
+              <Icon name={ACTIVITY_ICON[a.kind]} />
+              <span className="truncate">{say(a)}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }
 
@@ -541,6 +606,8 @@ export function Task({
   };
   const current = task.steps.findIndex((s) => s.status === "in_progress");
   const live = task.status === "running" || task.status === "needs-you";
+  const say = useActivityText();
+  const latest = task.activity?.at(-1);
   // The steps belong to the latest run, so after a follow-up they show under that instruction.
   const runStart = task.messages.findLastIndex((m) => m.followUp);
   const note = (i: number) => {
@@ -627,6 +694,7 @@ export function Task({
                   ))}
                 </div>
               )}
+              {(task.activity?.length ?? 0) > 0 && <ActivityLog activity={task.activity ?? []} live={live} />}
               {range(runStart > 0 ? runStart + 1 : 1, end)}
               {made.length > 0 && (
                 <Artifact api={api} task={task} files={made} picked={picked} onPick={setPicked} onError={onError} />
@@ -667,7 +735,7 @@ export function Task({
           </div>
           <div className="foot">
             <div className="col">
-              {task.status === "running" && <Working step={task.steps[current]?.text} />}
+              {task.status === "running" && <Working step={latest ? say(latest) : task.steps[current]?.text} />}
               {task.question ? (
                 <QuestionCard
                   key={task.question.id}

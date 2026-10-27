@@ -275,6 +275,35 @@ describe("approvals", () => {
   });
 });
 
+describe("what the agent is doing", () => {
+  it("shows the latest actions while it works, then folds them into one line", async () => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    const task = await api.tasks.start({ projectId: project.id, brief: "Write the course outline", attachments: [] });
+    act(() => {
+      api.emit(task.id, { type: "withdrawn", id: "q1" });
+      api.emit(task.id, { type: "activity", kind: "read", target: "note.txt" });
+      api.emit(task.id, { type: "activity", kind: "web", target: "corsi AI Biella" });
+    });
+    render(<App userName="Giulia" api={api} />);
+    const [open] = await screen.findAllByText("Write the course outline");
+    await act(async () => {
+      fireEvent.click(open as HTMLElement);
+    });
+    expect(screen.getByRole("button", { name: "What it's doing" }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Reading note.txt")).toBeTruthy();
+    // The line above the composer says the latest one.
+    expect(screen.getByRole("status").textContent).toContain("Searching the web: corsi AI Biella");
+
+    act(() => api.emit(task.id, { type: "done" }));
+    const line = screen.getByRole("button", { name: "What it did (2)" });
+    expect(line.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("Reading note.txt")).toBeNull();
+    fireEvent.click(line);
+    expect(screen.getByText("Reading note.txt")).toBeTruthy();
+  });
+});
+
 describe("a round of questions", () => {
   it("refuses a round with an answer missing, as the app does", async () => {
     const api = createMemoryApi();

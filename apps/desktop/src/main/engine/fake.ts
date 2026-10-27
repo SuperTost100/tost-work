@@ -1,7 +1,7 @@
 import { constants } from "node:fs";
 import { copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { EngineEvent, Review } from "../../shared/model";
+import type { ActivityKind, EngineEvent, Review } from "../../shared/model";
 import { freeName } from "../files";
 import type { Engine, RunContext } from "./engine";
 
@@ -16,6 +16,8 @@ export interface FakeScript {
   /** Asks to delete this file, relative to the task's folder, after the step. */
   remove?: { path: string; afterStep: number };
   review?: Review;
+  /** What the agent reports doing as each step starts, by step index. */
+  activity?: { kind: ActivityKind; target?: string }[][];
   summary: string;
 }
 
@@ -35,6 +37,22 @@ export const PROPOSAL_SCRIPT: FakeScript = {
   files: [
     { path: "Proposta.docx", kind: "add", afterStep: 2 },
     { path: "prezzi.xlsx", kind: "add", afterStep: 3 },
+  ],
+  activity: [
+    [{ kind: "folder" }, { kind: "read", target: "call-notes.txt" }],
+    [
+      { kind: "skill", target: "docx" },
+      { kind: "read", target: "proposal-template.docx" },
+    ],
+    [
+      { kind: "web", target: "transport insurance for training equipment" },
+      { kind: "write", target: "Proposta.docx" },
+    ],
+    [
+      { kind: "write", target: "prezzi.xlsx" },
+      { kind: "edit", target: "prezzi.xlsx" },
+    ],
+    [{ kind: "edit", target: "Proposta.docx" }, { kind: "command" }],
   ],
   review: {
     asked: [{ text: "A proposal from the call notes" }, { text: "Our template, all sections filled" }],
@@ -122,6 +140,7 @@ export class FakeEngine implements Engine {
         type: "plan",
         steps: steps.map((st, j) => ({ ...st, status: j < i ? "done" : j === i ? "in_progress" : "pending" })),
       };
+      for (const line of s.activity?.[i] ?? []) yield { type: "activity", ...line };
       await sleep(this.stepMs, signal);
       for (const f of s.files.filter((f) => f.afterStep === i)) {
         // Stop can land during the sleep above, and a stopped task writes nothing more.

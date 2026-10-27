@@ -97,6 +97,30 @@ export interface Message {
   followUp?: boolean;
 }
 
+/** What the agent did, in kinds the task screen words: "Reading note.txt", "Searching the web: …". */
+export type ActivityKind =
+  | "read"
+  | "write"
+  | "edit"
+  | "folder"
+  | "search-files"
+  | "web"
+  | "page"
+  | "command"
+  | "work"
+  | "skill"
+  | "pdf";
+
+export interface Activity {
+  kind: ActivityKind;
+  /** The file, search or site, when there is one. */
+  target?: string;
+  at: string;
+}
+
+/** The most activity lines a task keeps; older ones drop off. */
+export const MAX_ACTIVITY = 300;
+
 export interface Task {
   id: string;
   /** null for a quick edit, which has no project. */
@@ -123,6 +147,8 @@ export interface Task {
   kept?: KeptCopy[];
   /** Stopped because Tost Work closed while the task was working, not by the user. Resume carries on. */
   interrupted?: boolean;
+  /** What the agent did in the latest run, a line per tool call. Missing on tasks from before. */
+  activity?: Activity[];
   /** The agent's conversation, so a follow-up continues it. Set by the real engine. */
   sessionId?: string;
   error: string | null;
@@ -134,6 +160,7 @@ export interface Task {
 export type EngineEvent =
   | { type: "session"; sessionId: string }
   | { type: "plan"; steps: Step[] }
+  | { type: "activity"; kind: ActivityKind; target?: string }
   | { type: "message"; text: string }
   | { type: "file"; change: FileChange }
   | { type: "question"; question: Question }

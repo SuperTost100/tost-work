@@ -69,8 +69,11 @@ describe("TaskRunner with the fake engine", () => {
     runner.answer(task.id, ["The client pays it"]);
     await first;
 
+    expect(store.getTask(task.id)?.activity?.[1]).toMatchObject({ kind: "read", target: "call-notes.txt" });
     const asked = runner.followUp(task.id, "Make the prices round numbers");
     expect(asked.review).toBeNull();
+    // The activity, like the steps, starts again with the new run.
+    expect(asked.activity).toEqual([]);
     const final = await runner.start(task.id, "Make the prices round numbers");
 
     expect(final.status).toBe("done");

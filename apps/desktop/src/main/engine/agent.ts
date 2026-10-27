@@ -7,6 +7,7 @@ import type { AgentProvider, AiId, EngineEvent, KeyVendor, Review, Skill } from 
 import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
 import { freeName, inside } from "../files";
 import type { ToolHandler } from "../mcp/server";
+import { activityOf } from "./activity";
 import type { Engine, RunContext } from "./engine";
 import { instructionsFor } from "./instructions";
 
@@ -366,7 +367,10 @@ export class AgentEngine implements Engine, ToolHandler {
         for await (const event of stream) {
           if (event.type === "session") channel.push({ type: "session", sessionId: event.sessionId });
           else if (event.type === "plan") channel.push({ type: "plan", steps: event.steps });
-          else if (event.type === "file.change" && event.status === "done") {
+          else if (event.type === "tool.start") {
+            const line = activityOf(event.name, event.input);
+            if (line) channel.push({ type: "activity", ...line });
+          } else if (event.type === "file.change" && event.status === "done") {
             const path = event.movedTo ?? event.path;
             if (event.kind === "delete") made.delete(path);
             else made.add(path);
