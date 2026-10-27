@@ -22,12 +22,23 @@ Agreed with Tost on 2026-10-26, after 0.0.3:
 2. Claude and an API key, so a trainer can hand out the key for the day.
 3. Installing Codex and Claude Code with one button ([#16](https://github.com/SuperTost100/tost-work/issues/16)).
 4. The menu bar and keyboard shortcuts ([#45](https://github.com/SuperTost100/tost-work/issues/45)).
-5. Internet for tasks ([#44](https://github.com/SuperTost100/tost-work/issues/44)): web search first, without asking before each site. A browser comes next, and computer use later at the Expert level.
+5. Internet for tasks ([#44](https://github.com/SuperTost100/tost-work/issues/44)): web search, without asking before each site. Done in 0.0.4.
 6. The Skills section.
 7. Jobs, with the app staying in the menu bar.
 8. The board.
 9. The PowerPoint preview, then the Linux and Windows builds.
 10. The working animation ([#46](https://github.com/SuperTost100/tost-work/issues/46)), folder snapshots ([#31](https://github.com/SuperTost100/tost-work/issues/31)) and the cleanup of old copies ([#32](https://github.com/SuperTost100/tost-work/issues/32)).
+11. The general instructions every task starts with (the AGENTS.md / CLAUDE.md for tasks) and the default skills. Tost writes part of them himself, so they're the last step before 0.1.0.
+
+Changed on 2026-10-27, after testing 0.0.4:
+
+- Research stays on each AI's own web search, which is cheaper and faster than a browser it looks at. A browser built into Tost Work, for everything else, isn't needed for 0.1.0 or 0.2.0. When it comes, it shows live in the task's side panel and has its own profile, and forms, sign-ins and anything that sends or buys ask first. Computer use comes after it, at the Expert level.
+- Agents ask their questions in rounds of up to 16, with as many rounds as they need.
+
+## After 0.2.0
+
+- The browser and computer use, above.
+- From 0.3.0: compacting a long task's context automatically, so it can run past the model's context window.
 
 ## What works in 0.1.0
 
