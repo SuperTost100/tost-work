@@ -263,6 +263,28 @@ describe("TaskRunner when the agent ends its turn to wait", () => {
     expect(between).not.toContain("done");
   });
 
+  it("sends a round's answers under their questions", async () => {
+    const round = (): EngineEvent[] => [
+      {
+        type: "question",
+        question: {
+          id: "r1",
+          text: "Which goal?",
+          options: ["A", "B"],
+          more: [{ text: "When?", options: ["Now", "Later"] }],
+        },
+      },
+    ];
+    const { store, runner, task, prompts } = turnTaking([round, () => [{ type: "message", text: "Done." }]]);
+    runner.launch(task.id);
+    await waitFor(() => store.getTask(task.id)?.status === "needs-you");
+    runner.answer(task.id, "Which goal?\n→ B\n\nWhen?\n→ Later");
+    await waitFor(() => store.getTask(task.id)?.status === "done");
+    expect(prompts[1]).toBe(
+      "My answers to your questions, each under its question:\n\nWhich goal?\n→ B\n\nWhen?\n→ Later",
+    );
+  });
+
   it("resumes a task Tost Work closed on, in its conversation or from the brief", async () => {
     const { store, runner, task, prompts } = turnTaking([() => [], () => [], () => [], () => []]);
     expect(() => runner.resume(task.id)).toThrow(/Only a task stopped by closing/);

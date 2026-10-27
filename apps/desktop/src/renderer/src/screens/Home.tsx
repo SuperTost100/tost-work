@@ -82,7 +82,13 @@ export function Home({
               </span>
               <div>
                 <b>{task.title}</b>
-                <p>{task.question?.text ?? (task.approval && approvalTitle(t, task.approval))}</p>
+                <p>
+                  {task.question
+                    ? task.question.more?.length
+                      ? t("home.questions", { text: task.question.text, n: String(task.question.more.length) })
+                      : task.question.text
+                    : task.approval && approvalTitle(t, task.approval)}
+                </p>
               </div>
             </button>
           ))}

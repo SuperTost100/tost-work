@@ -1,4 +1,4 @@
-import { Fragment, useRef, useState } from "react";
+import { Fragment, useCallback, useRef, useState } from "react";
 import { ApprovalCard } from "@/components/Approval";
 import { Composer } from "@/components/Composer";
 import { Preview } from "@/components/Preview";
@@ -10,7 +10,16 @@ import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
 import { RenameField } from "@/shell/Sidebar";
 import type { SaveResult, TostWorkApi } from "../../../shared/api";
-import type { FileChange, Project, ReviewItem, Task as TaskT } from "../../../shared/model";
+import {
+  answersText,
+  BRIEF_MAX,
+  type FileChange,
+  type Project,
+  type Question,
+  questionItems,
+  type ReviewItem,
+  type Task as TaskT,
+} from "../../../shared/model";
 import { AgentMessage } from "../components/AgentMessage";
 import { WorkingDots } from "../components/TaskTag";
 
@@ -233,6 +242,105 @@ function Checks({ title, items, icon }: { title: string; items: ReviewItem[]; ic
         </div>
       ))}
     </>
+  );
+}
+
+/**
+ * A round of questions, one at a time: an option or the user's own words answers it and moves on, and the last answer
+ * sends the whole round as one message. A single question sends at once, as before rounds.
+ */
+function QuestionCard({
+  question,
+  draft,
+  onDraft,
+  onSend,
+}: {
+  question: Question;
+  draft: string;
+  onDraft: (text: string) => void;
+  onSend: (text: string) => void;
+}) {
+  const t = useT();
+  const items = questionItems(question);
+  const [answers, setAnswers] = useState<string[]>([]);
+  // What's in the box for each question, so stepping back and forth never loses text not sent yet.
+  const [drafts, setDrafts] = useState<string[]>([]);
+  const [at, setAt] = useState(0);
+  const [tooLong, setTooLong] = useState(false);
+  // After Next or Back the old question's buttons are gone, so keyboard focus moves to the new question: its block
+  // is keyed by the question, so it mounts again and takes focus. The callback is stable, so typing (which renders
+  // the card again) doesn't pull focus out of the box.
+  const moved = useRef(false);
+  const takeFocus = useCallback((el: HTMLDivElement | null) => {
+    if (el && moved.current) el.focus();
+  }, []);
+  const item = items[at] ?? items[0];
+  if (!item) return null;
+  const go = (to: number, given: string[], picked = false) => {
+    const kept = [...drafts];
+    // An option picked replaces what was typed for that question.
+    kept[at] = picked ? "" : draft;
+    moved.current = true;
+    setDrafts(kept);
+    setAt(to);
+    // An answer in the user's own words goes back in the box; a picked option shows as picked instead.
+    const before = given[to] ?? "";
+    onDraft(kept[to] ?? (items[to]?.options.includes(before) ? "" : before));
+  };
+  const answer = (text: string, picked = false) => {
+    const next = [...answers];
+    next[at] = text;
+    setAnswers(next);
+    if (at < items.length - 1) return go(at + 1, next, picked);
+    const message = answersText(question, next);
+    // Each box has the message limit, but a round's answers go together, so the whole has to fit too.
+    setTooLong(message.length > BRIEF_MAX);
+    if (message.length > BRIEF_MAX) return;
+    // A picked option replaces what was typed, so a retry after a failed send can't bring the old text back.
+    if (picked) onDraft("");
+    onSend(message);
+  };
+  return (
+    <Composer
+      className="asking"
+      value={draft}
+      onChange={onDraft}
+      onSubmit={() => answer(draft.trim())}
+      placeholder={t("composer.answer")}
+      sendLabel={t(at < items.length - 1 ? "task.nextQuestion" : "composer.start")}
+      minHeight={44}
+    >
+      <div className="q" key={at} ref={takeFocus} tabIndex={-1}>
+        {items.length > 1 && (
+          <span className="row">
+            <span className="grow">{t("task.questionOf", { n: String(at + 1), total: String(items.length) })}</span>
+            {at > 0 && (
+              <button type="button" className="link" onClick={() => go(at - 1, answers)}>
+                {t("setup.back")}
+              </button>
+            )}
+          </span>
+        )}
+        {item.text}
+        {tooLong && (
+          <span className="d err" role="alert">
+            {t("task.roundTooLong", { max: BRIEF_MAX.toLocaleString() })}
+          </span>
+        )}
+      </div>
+      {item.options.map((option, i) => (
+        <button
+          type="button"
+          key={option}
+          className={answers[at] === option ? "o on" : "o"}
+          aria-pressed={items.length > 1 ? answers[at] === option : undefined}
+          onClick={() => answer(option, true)}
+        >
+          <span className="n">{i + 1}</span>
+          {option}
+        </button>
+      ))}
+    </Composer>
   );
 }
 
@@ -528,25 +636,13 @@ export function Task({
             <div className="col">
               {task.status === "running" && <Working step={task.steps[current]?.text} />}
               {task.question ? (
-                <Composer
-                  className="asking"
-                  value={answer}
-                  onChange={setAnswer}
-                  onSubmit={() => {
-                    send(answer.trim());
-                  }}
-                  placeholder={t("composer.answer")}
-                  sendLabel={t("composer.start")}
-                  minHeight={44}
-                >
-                  <div className="q">{task.question.text}</div>
-                  {task.question.options.map((option, i) => (
-                    <button type="button" key={option} className="o" onClick={() => send(option)}>
-                      <span className="n">{i + 1}</span>
-                      {option}
-                    </button>
-                  ))}
-                </Composer>
+                <QuestionCard
+                  key={task.question.id}
+                  question={task.question}
+                  draft={answer}
+                  onDraft={setAnswer}
+                  onSend={send}
+                />
               ) : task.approval ? (
                 <ApprovalCard approval={task.approval} t={t} onDecide={onDecide} />
               ) : (

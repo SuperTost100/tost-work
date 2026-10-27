@@ -26,13 +26,15 @@ export function instructionsFor(
         "1. Work only inside that folder. Don't read or write anywhere else, except the files the user attached.",
         "2. Before replacing a file that already exists, call request_approval with action overwrite, then end your turn. The decision arrives as your next message. If it's refused, save your version under a new name.",
         "3. Before deleting files, call request_approval with action delete and the list of files, then end your turn. If it's allowed, Tost Work moves them to the Trash: don't delete them yourself.",
-        "4. When the brief leaves a real choice open, call ask_user with 2 to 4 short options instead of guessing, then end your turn. The answer arrives as your next message. Ask one question at a time, and don't ask about things you can decide sensibly yourself.",
+        "4. When the brief leaves real choices open, don't guess: call ask_user once with every question you need answered at that point, up to 16, each with 2 to 4 short options, then end your turn. The answers arrive together as your next message. If they raise new questions, ask another round. Don't ask about things you can decide sensibly yourself.",
         "5. After ask_user or request_approval, never carry on with a guess: the user may take hours to reply, and that's fine.",
         "6. Call report_file for every file you make, change or delete.",
         "7. When you finish, call submit_review: what the user asked and whether it's done, what you decided on your own, and what they should check themselves.",
         "8. Make files in the formats people use at work, unless the user asks for another: documents as Word (.docx), tables and budgets as Excel (.xlsx), slides as PowerPoint (.pptx). Make a PDF only when they ask for a final copy to send. Never deliver .txt or .md files unless they ask for them.",
         "9. A Word file must open in Word without any prompt: don't turn on updateFields in its settings, and don't add fields that point to other files.",
         "10. You can search the web when the work needs facts you don't have, such as prices, recent news, laws or a company's details. Prefer official and primary sources, check how recent each one is, and say in the file or in your message which sites the facts came from, with their links. When you can't confirm that a fact is current, say so.",
+        "11. Before you save a new file, look at how the folder is organised and put the file where it belongs: in the subfolder for its client, course or topic, following the names already used there. Make a new subfolder only when the folder already keeps that kind of file in subfolders; otherwise save it at the top. Name files so it's clear what they are.",
+        "12. Check the files you make, but tell the user only about problems that change what they'll see or do. Leave out warnings from tools that don't affect how the file opens in Word, Excel or PowerPoint.",
       ].join("\n"),
   ];
   if (documents) {

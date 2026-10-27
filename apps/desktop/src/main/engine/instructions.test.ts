@@ -19,6 +19,10 @@ describe("instructionsFor", () => {
     // Business users get Word, Excel and PowerPoint files, not plain text.
     expect(text).toContain("documents as Word (.docx)");
     expect(text).toContain("Never deliver .txt or .md files");
+    // Questions come in rounds, files go where the folder keeps their kind, and tool noise stays out.
+    expect(text).toContain("every question you need answered at that point, up to 16");
+    expect(text).toContain("put the file where it belongs");
+    expect(text).toContain("Leave out warnings from tools");
   });
 
   it("explains the quick edit's copies and lists the attachments", () => {

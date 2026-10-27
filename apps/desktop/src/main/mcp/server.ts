@@ -4,12 +4,12 @@ import type { AddressInfo } from "node:net";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import type { Review } from "../../shared/model";
+import { MAX_QUESTIONS, type Review } from "../../shared/model";
 
 /** What the tools do for a task. The engine that runs the task implements it. */
 export interface ToolHandler {
   /** Puts the question on the task and resolves at once with what the agent does next: end its turn and wait. */
-  ask(taskId: string, question: { text: string; options: string[] }): Promise<string>;
+  ask(taskId: string, questions: { text: string; options: string[] }[]): Promise<string>;
   /** Puts the approval on the task and resolves at once, like `ask`. */
   approve(taskId: string, action: "overwrite" | "delete", paths: string[]): Promise<string>;
   reportFile(taskId: string, change: { path: string; kind: "add" | "update" | "delete" }): Promise<void>;
@@ -41,13 +41,26 @@ function toolsFor(session: Session, handler: ToolHandler): McpServer {
     "ask_user",
     {
       description:
-        "Ask the user a question when the brief leaves a choice open. Give 2 to 4 short answer options; the user can also write their own. Then end your turn: the answer arrives as your next message.",
+        "Ask the user what the brief leaves open, all at once: every question you need answered now, up to 16, each with 2 to 4 short answer options. The user can also write their own answer to each. Then end your turn: the answers arrive together as your next message. If they raise new questions, ask another round.",
       inputSchema: {
-        question: z.string().min(1).max(500),
-        options: z.array(z.string().min(1).max(120)).min(2).max(4),
+        questions: z
+          .array(
+            z.object({
+              question: z.string().min(1).max(500),
+              options: z.array(z.string().min(1).max(120)).min(2).max(4),
+            }),
+          )
+          .min(1)
+          .max(MAX_QUESTIONS),
       },
     },
-    async ({ question, options }) => text(await handler.ask(taskId, { text: question, options })),
+    async ({ questions }) =>
+      text(
+        await handler.ask(
+          taskId,
+          questions.map((q) => ({ text: q.question, options: q.options })),
+        ),
+      ),
   );
   server.registerTool(
     "request_approval",

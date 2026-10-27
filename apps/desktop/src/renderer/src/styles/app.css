@@ -1011,6 +1011,11 @@ h3 {
 .asking .o:hover {
   background: var(--hover);
 }
+/* The answer already picked, when the user steps back through a round. */
+.asking .o.on {
+  background: var(--hover);
+  font-weight: 500;
+}
 .asking .o .n {
   width: 18px;
   color: var(--t3);

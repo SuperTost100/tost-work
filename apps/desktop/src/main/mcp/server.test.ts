@@ -9,7 +9,7 @@ const calls: { taskId: string; tool: string; args: unknown }[] = [];
 const handler: ToolHandler = {
   ask: async (taskId, q) => {
     calls.push({ taskId, tool: "ask", args: q });
-    return `asked: ${q.text}`;
+    return `asked: ${q.map((x) => x.text).join(" | ")}`;
   },
   approve: async (taskId, action, paths) => {
     calls.push({ taskId, tool: "approve", args: { action, paths } });
@@ -83,9 +83,14 @@ describe("ToolServer", () => {
     const b = await connect(server.open("task-b"));
     const answer = await a.callTool({
       name: "ask_user",
-      arguments: { question: "Who pays?", options: ["Us", "Them"] },
+      arguments: {
+        questions: [
+          { question: "Who pays?", options: ["Us", "Them"] },
+          { question: "Which date?", options: ["Monday", "Friday"] },
+        ],
+      },
     });
-    expect(textOf(answer)).toBe("asked: Who pays?");
+    expect(textOf(answer)).toBe("asked: Who pays? | Which date?");
     const decision = await b.callTool({
       name: "request_approval",
       arguments: { action: "delete", paths: ["/w/a.txt"] },
@@ -102,11 +107,22 @@ describe("ToolServer", () => {
 
   it("rejects bad input before it reaches the handler", async () => {
     const client = await connect(server.open("task-1"));
-    const oneOption = await client.callTool({ name: "ask_user", arguments: { question: "Ok?", options: ["Yes"] } });
+    const oneOption = await client.callTool({
+      name: "ask_user",
+      arguments: { questions: [{ question: "Ok?", options: ["Yes"] }] },
+    });
     expect(oneOption.isError).toBe(true);
+    // Sixteen questions a round at most: more wait for the next round.
+    const many = Array.from({ length: 17 }, (_, i) => ({ question: `Q${i}?`, options: ["Yes", "No"] }));
+    const tooMany = await client.callTool({ name: "ask_user", arguments: { questions: many } });
+    expect(tooMany.isError).toBe(true);
+    const sixteen = await client.callTool({ name: "ask_user", arguments: { questions: many.slice(0, 16) } });
+    expect(sixteen.isError).toBeFalsy();
     const relative = await client.callTool({ name: "report_file", arguments: { path: "notes.txt", kind: "add" } });
     expect(relative.isError).toBe(true);
-    expect(calls).toEqual([]);
+    // Only the round of sixteen got through.
+    expect(calls.map((c) => c.tool)).toEqual(["ask"]);
+    expect(calls[0]?.args).toHaveLength(16);
     await client.close();
   });
 

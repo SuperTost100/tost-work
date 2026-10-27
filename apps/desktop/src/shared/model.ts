@@ -25,10 +25,30 @@ export interface FileChange {
   role: "made" | "used";
 }
 
+/** One round of questions. The first is `text` and `options`, so tasks saved before rounds still read; the rest are in `more`. */
 export interface Question {
   id: string;
   text: string;
   options: string[];
+  more?: QuestionItem[];
+}
+
+export interface QuestionItem {
+  text: string;
+  options: string[];
+}
+
+/** The most questions the agent may ask in one round. It can ask another round after reading the answers. */
+export const MAX_QUESTIONS = 16;
+
+/** Every question in the round, in order. */
+export const questionItems = (q: Question): QuestionItem[] => [{ text: q.text, options: q.options }, ...(q.more ?? [])];
+
+/** The answers to a round as one message: just the answer for one question, each question and its answer for several. */
+export function answersText(q: Question, answers: string[]): string {
+  const items = questionItems(q);
+  if (items.length === 1) return answers[0] ?? "";
+  return items.map((item, i) => `${item.text}\n→ ${answers[i] ?? ""}`).join("\n\n");
 }
 
 export interface Approval {

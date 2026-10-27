@@ -155,7 +155,7 @@ describe("AgentEngine", () => {
     const holder: { engine?: AgentEngine } = {};
     let reply = "";
     const { engine, seen, run } = setup(async () => {
-      reply = (await holder.engine?.ask("t1", { text: "Who pays?", options: ["Us", "Them"] })) ?? "";
+      reply = (await holder.engine?.ask("t1", [{ text: "Who pays?", options: ["Us", "Them"] }])) ?? "";
       return { text: "" };
     });
     holder.engine = engine;
@@ -264,7 +264,7 @@ describe("AgentEngine", () => {
     const { engine, seen, controller, run } = setup(async () => {
       controller.abort();
       const reply = await holder.engine
-        ?.ask("t1", { text: "Late?", options: ["a", "b"] })
+        ?.ask("t1", [{ text: "Late?", options: ["a", "b"] }])
         .catch((e: Error) => e.message);
       expect(reply).toMatch(/isn't running/);
       return { text: "", finishReason: "cancelled" };
@@ -316,7 +316,7 @@ describe("AgentEngine", () => {
   it("carries the Tost Work tools' questions, files and review into the task", async () => {
     const holder: { engine?: AgentEngine } = {};
     const { engine, seen, run } = setup(async () => {
-      await holder.engine?.ask("t1", { text: "Which template?", options: ["A", "B"] });
+      await holder.engine?.ask("t1", [{ text: "Which template?", options: ["A", "B"] }]);
       await holder.engine?.reportFile("t1", { path: "/w/a.docx", kind: "add" });
       await holder.engine?.review("t1", { asked: [{ text: "A proposal" }], decided: [], checkYourself: [] });
       return { text: "" };

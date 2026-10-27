@@ -273,6 +273,130 @@ describe("approvals", () => {
   });
 });
 
+describe("a round of questions", () => {
+  it("asks them one at a time, lets the user step back, and sends all the answers together", async () => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    const task = await api.tasks.start({ projectId: project.id, brief: "Plan the training day", attachments: [] });
+    act(() =>
+      api.emit(task.id, {
+        type: "question",
+        question: {
+          id: "r1",
+          text: "Who is it for?",
+          options: ["Everyone", "Engineers"],
+          more: [
+            { text: "How long?", options: ["Half a day", "A full day"] },
+            { text: "Where?", options: ["On site", "Online"] },
+          ],
+        },
+      }),
+    );
+    render(<App userName="Giulia" api={api} />);
+    const [open] = await screen.findAllByText("Plan the training day");
+    await act(async () => {
+      fireEvent.click(open as HTMLElement);
+    });
+    expect(screen.getByText("Question 1 of 3")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Engineers/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Half a day/ }));
+    // Back to the second, and the first answer in the user's own words this time.
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByRole("button", { name: /Half a day/ }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Two hours" } });
+    fireEvent.click(screen.getByRole("button", { name: "Next question" }));
+    expect(screen.getByText("Question 3 of 3")).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Online/ }));
+    });
+    const sent = (await api.tasks.get(task.id))?.messages.at(-1)?.text;
+    expect(sent).toBe("Who is it for?\n→ Engineers\n\nHow long?\n→ Two hours\n\nWhere?\n→ Online");
+  });
+
+  it("clears the box when the last answer is an option, even if sending it fails", async () => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    const task = await api.tasks.start({ projectId: project.id, brief: "Plan the visit", attachments: [] });
+    act(() =>
+      api.emit(task.id, {
+        type: "question",
+        question: { id: "r3", text: "Day?", options: ["Mon", "Fri"], more: [{ text: "Room?", options: ["A", "B"] }] },
+      }),
+    );
+    api.tasks.answer = async () => {
+      throw new Error("offline");
+    };
+    render(<App userName="Giulia" api={api} />);
+    const [open] = await screen.findAllByText("Plan the visit");
+    await act(async () => {
+      fireEvent.click(open as HTMLElement);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^1Mon$/ }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "stale text" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^2B$/ }));
+    });
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("keeps what was typed when stepping back, and won't send a round too long for one message", async () => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    const task = await api.tasks.start({ projectId: project.id, brief: "Plan the course", attachments: [] });
+    act(() =>
+      api.emit(task.id, {
+        type: "question",
+        question: {
+          id: "r2",
+          text: "Who?",
+          options: ["A", "B"],
+          more: [{ text: "Notes?", options: ["None", "Some"] }],
+        },
+      }),
+    );
+    render(<App userName="Giulia" api={api} />);
+    const [open] = await screen.findAllByText("Plan the course");
+    await act(async () => {
+      fireEvent.click(open as HTMLElement);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^1A$/ }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "half typed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.click(screen.getByRole("button", { name: /^1A$/ }));
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("half typed");
+
+    // Focus follows the question, so the keyboard carries on from there.
+    expect(document.activeElement?.textContent).toMatch(/Notes\?/);
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(document.activeElement?.textContent).toMatch(/Who\?/);
+    // Typing there keeps the focus in the box, keystroke after keystroke.
+    const box = screen.getByRole("textbox");
+    box.focus();
+    for (const text of ["t", "ty", "typ"]) {
+      fireEvent.change(box, { target: { value: text } });
+      expect(document.activeElement).toBe(box);
+    }
+    // Text typed and then replaced by an option doesn't come back.
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "typed first" } });
+    fireEvent.click(screen.getByRole("button", { name: /^1A$/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
+    expect(screen.getByRole("button", { name: /^1A$/ }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: /^1A$/ }));
+
+    // Two answers that each fit, but not together.
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "x".repeat(60_000) } });
+    fireEvent.click(screen.getByRole("button", { name: "Next question" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "y".repeat(60_000) } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    expect(screen.getByRole("alert").textContent).toMatch(/answers together are longer/);
+    expect((await api.tasks.get(task.id))?.status).toBe("needs-you");
+  });
+});
+
 describe("long messages", () => {
   it("won't send a text longer than a message holds, and says to attach it", () => {
     render(<App userName="Giulia" api={createMemoryApi()} />);

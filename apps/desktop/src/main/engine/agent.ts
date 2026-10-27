@@ -423,8 +423,11 @@ export class AgentEngine implements Engine, ToolHandler {
 
   // Tost Work's tools, called by the agent through the MCP server.
 
-  async ask(taskId: string, question: { text: string; options: string[] }): Promise<string> {
-    this.mustLive(taskId).channel.push({ type: "question", question: { id: randomUUID(), ...question } });
+  async ask(taskId: string, questions: { text: string; options: string[] }[]): Promise<string> {
+    const [first, ...more] = questions;
+    if (!first) throw new Error("Ask at least one question");
+    const question = { id: randomUUID(), ...first, ...(more.length ? { more } : {}) };
+    this.mustLive(taskId).channel.push({ type: "question", question });
     return END_TURN;
   }
 

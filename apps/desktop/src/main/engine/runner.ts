@@ -152,7 +152,12 @@ export class TaskRunner {
     const at = this.now();
     const next = this.save({ ...resume(task, at), messages: [...task.messages, { from: "user", text: answer, at }] });
     if (!this.engine.answer(taskId, task.question.id, answer))
-      this.continueWith(taskId, `My answer to your question "${task.question.text}": ${answer}`);
+      this.continueWith(
+        taskId,
+        task.question.more?.length
+          ? `My answers to your questions, each under its question:\n\n${answer}`
+          : `My answer to your question "${task.question.text}": ${answer}`,
+      );
     return next;
   }
 
