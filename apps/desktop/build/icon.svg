@@ -1,0 +1,16 @@
+<!-- The app icon: the sidebar's "T" mark on macOS's icon grid, an 824 px tile with a soft shadow on a 1024 px canvas.
+     After changing it, export it again as icon.png, 1024 x 1024 with a transparent background (Chrome renders it as
+     drawn); electron-builder makes the Mac, Windows and Linux icons from that PNG. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Tost Work</title>
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#1b1712" filter="url(#shadow)"/>
+  <!-- The mark's T from Logo.tsx (a 64-unit box), scaled to the tile. -->
+  <g transform="translate(100 100) scale(12.875)">
+    <path d="M14 17h36v6H35v26h-6V23H14z" fill="#faf8f4"/>
+  </g>
+</svg>
