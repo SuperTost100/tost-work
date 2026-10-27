@@ -5,6 +5,7 @@ import { IPC, type MenuState } from "../shared/api";
 import { languageFrom, translate } from "../shared/i18n";
 import type { AgentProvider } from "../shared/model";
 import { Accounts } from "./accounts";
+import { giveAgentsOwnHomes } from "./agentHomes";
 import { menuTemplate, nextTextSize } from "./appMenu";
 import { documentTools } from "./documents";
 import { AgentEngine } from "./engine/agent";
@@ -88,6 +89,8 @@ app.whenReady().then(async () => {
   store.stopInterrupted(new Date().toISOString());
   // Before the window, so its background colour already follows the chosen theme.
   applyLook(null, store.getSettings());
+  // Codex and Claude Code read only what Tost Work gives them, not the user's own setup.
+  if (process.env.TOST_WORK_ENGINE !== "fake") giveAgentsOwnHomes(join(app.getPath("userData"), "agents"));
   const funnel = createFunnel();
   const language = () => store.getSettings().language ?? languageFrom(app.getLocale());
 
