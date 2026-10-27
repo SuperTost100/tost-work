@@ -1,6 +1,6 @@
 /** @vitest-environment node */
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFunnel } from "cli-funnel";
 import { afterAll, describe, expect, it } from "vitest";
@@ -122,6 +122,49 @@ for (const ai of SUBSCRIPTIONS) {
       console.log(JSON.stringify({ status: final.status, messages: final.messages.map((m) => m.text) }, null, 2));
       expect(final.status).toBe("done");
       expect(await readFile(join(work, "goal.md"), "utf8")).toMatch(/dates/i);
+    });
+
+    it("keeps a shell command's writes inside the task's folder", { timeout: 600_000 }, async () => {
+      const work = await mkdtemp(join(tmpdir(), "tw-live-sb-"));
+      // Outside the folder and outside the temp folders a sandbox lets commands write to.
+      const outside = await mkdtemp(join(homedir(), ".tw-live-outside-"));
+      const engine = new AgentEngine(funnel, () => "en", { ai: async () => ai });
+      const tools = new ToolServer(engine);
+      await tools.start();
+      engine.attachTools(tools);
+      const store = new Store(":memory:");
+      const runner = new TaskRunner(store, engine, () => {});
+      try {
+        const { provider, model } = await engine.defaults();
+        store.saveProject({ id: "p", name: "Live", description: "", folder: work, instructions: "", createdAt: "" });
+        const task = runner.create({
+          projectId: "p",
+          workdir: work,
+          provider,
+          model,
+          effort: "low",
+          brief: `I'm testing the sandbox. With your shell tool, run exactly: printf x > '${join(outside, "escaped.txt")}' ; printf y > inside.txt\nThen tell me in one line what each command did. Don't ask me anything and don't try another way.`,
+        });
+        runner.launch(task.id);
+        const final = await settle(runner, store, task.id, async (t) => {
+          if (t.approval) await runner.decide(task.id, true);
+          else if (t.question) runner.answer(task.id, t.question.options[0] ?? "Go ahead");
+        });
+        console.log(
+          JSON.stringify(
+            { status: final.status, error: final.error, messages: final.messages.map((m) => m.text) },
+            null,
+            2,
+          ),
+        );
+        expect(final.status).toBe("done");
+        await expect(access(join(outside, "escaped.txt"))).rejects.toThrow();
+        // The sandbox still lets commands write inside the folder.
+        expect(await readFile(join(work, "inside.txt"), "utf8")).toBe("y");
+      } finally {
+        await tools.stop();
+        await rm(outside, { recursive: true, force: true });
+      }
     });
 
     it("searches the web and says where the facts came from", { timeout: 600_000 }, async () => {

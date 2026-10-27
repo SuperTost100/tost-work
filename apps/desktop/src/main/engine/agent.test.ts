@@ -127,6 +127,8 @@ describe("AgentEngine", () => {
     await run();
     const input = inputs[0];
     expect(input?.selection).toMatchObject({ provider: "codex", access: "supervised", cwd: "/w", model: "gpt-6-sol" });
+    // Shell commands run in the CLI's sandbox, so they can't write outside the folder.
+    expect(input?.sandbox).toBe(true);
     expect(input?.system).toContain("plain Italian");
     expect(input?.mcpServers?.tost_work).toMatchObject({ type: "http", autoApprove: true });
     // Codex searches the web without asking before each site.
@@ -444,6 +446,8 @@ describe("AgentEngine", () => {
       if (e.type === "approval") engine.decide(t.id, e.approval.id, false);
     }
     expect(inputs[0]?.selection).toMatchObject({ provider: "claude", model: "claude-sonnet-5-5", cwd: workdir });
+    // Its shell commands run in Claude Code's sandbox: the policy can't tell where a command writes.
+    expect(inputs[0]?.sandbox).toBe(true);
     // Claude Code has its own search tool, so it gets no Codex options.
     expect(inputs[0]?.providerOptions).toBeUndefined();
     expect(decisions).toEqual([

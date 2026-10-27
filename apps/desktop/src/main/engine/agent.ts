@@ -198,12 +198,6 @@ export async function asCodexRequest(request: ApprovalRequest, workdir: string):
 }
 
 /**
- * Runs tasks through cli-funnel on Codex (the ChatGPT sign-in) or Claude Code (the Claude sign-in), at `supervised`:
- * every file change comes here first, and Tost Work's tools carry questions, approvals, files and the review.
- * shortcut: Codex's sandbox keeps commands' writes inside the folder, but Claude Code's commands can write anywhere;
- * turn on Claude Code's sandbox through cli-funnel when it offers it.
- */
-/**
  * Whether a CLI's error means it couldn't reach its service. Codex says "workspace routing discovery failed" or
  * "stream disconnected", Claude Code names the socket error.
  */
@@ -213,6 +207,11 @@ export function isNetworkError(message: string): boolean {
   );
 }
 
+/**
+ * Runs tasks through cli-funnel on Codex (the ChatGPT sign-in) or Claude Code (the Claude sign-in), at `supervised`:
+ * every file change comes here first, and Tost Work's tools carry questions, approvals, files and the review. Shell
+ * commands run in each CLI's own sandbox, so they can write only inside the task's folder and temp folders.
+ */
 export class AgentEngine implements Engine, ToolHandler {
   private live = new Map<string, Live>();
   private waiting = new Map<string, (reply: boolean | null) => void>();
@@ -332,6 +331,10 @@ export class AgentEngine implements Engine, ToolHandler {
       ...((task.provider ?? "codex") === "codex"
         ? { providerOptions: { codex: { webSearch: "cached" as const } } }
         : {}),
+      // Claude Code's file tools are held to the folder by the approval policy, but a shell command could write
+      // anywhere: its sandbox stops that. Codex at supervised was sandboxed already. A sandbox that can't start fails
+      // the run rather than letting it go unconfined.
+      sandbox: true,
       sessionId: task.sessionId,
       signal,
       planTool: true,

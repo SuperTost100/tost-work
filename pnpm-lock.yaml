@@ -188,8 +188,8 @@ importers:
         specifier: 1.32.2
         version: 1.32.2(supports-color@7.2.0)(zod@4.6.7)
       cli-funnel:
-        specifier: 0.6.0
-        version: 0.6.0
+        specifier: 0.6.1
+        version: 0.6.1
       zod:
         specifier: ^4.6.7
         version: 4.6.7
@@ -1206,8 +1206,8 @@ packages:
     resolution: {integrity: sha512-77PSwercCZU2Fc4sX94eF8k8Pxte6JAwL4/ICZLFjJLqegs7kCuAsqqj/70NQF6TvDpgFjkubQB2FW2ZZddvQg==}
     engines: {node: '>=8'}
 
-  cli-funnel@0.6.0:
-    resolution: {integrity: sha512-nVQlfn/Q+OvwtEP3P0BnONk+l8tzXZoZ5/fvL6KY+rSMw3id+/Sl9PjRXkGL1tBRKjcdlv/p84qfSn+Y62qANg==}
+  cli-funnel@0.6.1:
+    resolution: {integrity: sha512-bkKrkpuWr9UHcEk4VSB+EaDhRFHV/osU/egMDf9w+Dm+quqD7z2mQUfk9DFKJ5TPp+KBW7FB5b4lg46kBXOw7A==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -3560,7 +3560,7 @@ snapshots:
 
   ci-info@4.4.0: {}
 
-  cli-funnel@0.6.0: {}
+  cli-funnel@0.6.1: {}
 
   cliui@8.0.1:
     dependencies:
