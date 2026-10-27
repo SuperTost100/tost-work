@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
+import { Skills } from "./Skills";
 
 // Find first, then act: waiting inside act holds back the updates the wait is for.
 const click = async (name: string | RegExp) => {
@@ -31,7 +32,7 @@ describe("skills", () => {
     fireEvent.change(screen.getByLabelText("What to do"), { target: { value: "1. Read the call notes." } });
     await click("Save");
 
-    expect(await api.skills.list()).toMatchObject([
+    expect((await api.skills.list()).filter((s) => !s.builtIn)).toMatchObject([
       { id: "proposal-writer", title: "Proposal writer", description: "A client asks for a proposal." },
     ]);
     expect(screen.getByRole("button", { name: "Proposal writer" }).getAttribute("aria-current")).toBe("true");
@@ -63,7 +64,7 @@ describe("skills", () => {
     // Delete is in the skill's … menu, as for a task.
     api.pickInMenu("delete");
     await click("More for Price table");
-    expect((await api.skills.list()).map((s) => s.title)).toEqual(["Brand voice"]);
+    expect((await api.skills.list()).filter((s) => !s.builtIn).map((s) => s.title)).toEqual(["Brand voice"]);
     expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Brand voice");
   });
 
@@ -90,7 +91,7 @@ describe("skills", () => {
     await act(async () => {
       fireEvent.contextMenu(screen.getByRole("button", { name: "Brand voice" }));
     });
-    expect((await api.skills.list()).map((s) => s.title)).toEqual(["Price table"]);
+    expect((await api.skills.list()).filter((s) => !s.builtIn).map((s) => s.title)).toEqual(["Price table"]);
     expect(name.value).toBe("Price table");
   });
 
@@ -141,5 +142,70 @@ describe("skills", () => {
       await Promise.all(pending.map((finish) => finish()));
     });
     expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Zoom notes");
+  });
+
+  it("shows the built-in guides read-only, and Duplicate makes an editable copy", async () => {
+    const api = createMemoryApi();
+    render(<Root api={api} />);
+    await click("Skills");
+    // With none of their own yet, the page invites the user to make one, and lists the guides.
+    expect(await screen.findByText("No skills yet.")).toBeTruthy();
+    await click("Word documents");
+    expect((screen.getByLabelText("Skill name") as HTMLInputElement).readOnly).toBe(true);
+    expect(screen.getByText("Comes with Tost Work · read-only")).toBeTruthy();
+    await click("Duplicate to edit");
+    const name = screen.getByLabelText("Skill name") as HTMLInputElement;
+    expect(name.readOnly).toBe(false);
+    expect((await api.skills.list()).filter((s) => !s.builtIn).map((s) => s.id)).toEqual(["word-documents-copy"]);
+  });
+
+  it("keeps a version with its note on each save, and puts an old one back", async () => {
+    const api = createMemoryApi();
+    await api.skills.create("Proposal writer");
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<Root api={api} />);
+    await click("Skills");
+    await screen.findByLabelText("Skill name");
+    fireEvent.change(screen.getByLabelText("What to do"), { target: { value: "1. Round prices." } });
+    fireEvent.change(screen.getByLabelText("What changed, if you like"), { target: { value: "price rounding" } });
+    await click("Save");
+    expect(await screen.findByText("v2 · price rounding")).toBeTruthy();
+    expect(screen.getByText(/^Version 2/)).toBeTruthy();
+
+    await click("Restore v1");
+    expect((screen.getByLabelText("What to do") as HTMLTextAreaElement).value).toBe("");
+    expect(await screen.findByText("v3 · back to version 1")).toBeTruthy();
+  });
+
+  it("imports a skill, and says how many tasks used it", async () => {
+    const api = createMemoryApi();
+    const tasks = [{ skillsUsed: ["meeting-notes"] }, { skillsUsed: ["meeting-notes", "@word", "word"] }] as never[];
+    render(<Skills api={api} tasks={tasks} />);
+    await click("Import a skill");
+    expect(((await screen.findByLabelText("Skill name")) as HTMLInputElement).value).toBe("Meeting notes");
+    expect(screen.getByText("Version 1 · used 2 times · Available in every project")).toBeTruthy();
+  });
+
+  it("makes one copy of a guide however often Duplicate is clicked while it works", async () => {
+    const api = createMemoryApi();
+    const realDuplicate = api.skills.duplicate;
+    let finish = () => {};
+    let calls = 0;
+    api.skills.duplicate = (id) => {
+      calls++;
+      return new Promise((resolve) => {
+        finish = () => void realDuplicate(id).then(resolve);
+      });
+    };
+    render(<Root api={api} />);
+    await click("Skills");
+    await click("Word documents");
+    const button = screen.getByRole("button", { name: "Duplicate to edit" });
+    await act(async () => {
+      fireEvent.click(button);
+      fireEvent.click(button);
+    });
+    await act(async () => finish());
+    expect(calls).toBe(1);
   });
 });

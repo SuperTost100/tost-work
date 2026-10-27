@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { ApprovalCard } from "@/components/Approval";
 import { Composer } from "@/components/Composer";
 import { Preview } from "@/components/Preview";
@@ -136,6 +136,23 @@ function KeptRow({
   );
 }
 
+/** The skills a task read, by title; nothing when it read none. */
+function SkillsFollowed({ names = [], titles }: { names?: string[]; titles: Map<string, string> }) {
+  const t = useT();
+  if (names.length === 0) return null;
+  return (
+    <>
+      <h3>{t("task.skills")}</h3>
+      {names.map((name) => (
+        <div className="setrow" key={name}>
+          <Icon name="magic-2" />
+          <span className="grow truncate">{titles.get(name) ?? name.replace(/^@/, "")}</span>
+        </div>
+      ))}
+    </>
+  );
+}
+
 /** The quick edit's side panel: the files it changed, and Save a copy, which asks for a folder every time. */
 function WhatChanged({
   api,
@@ -145,6 +162,7 @@ function WhatChanged({
   onSaveCopy,
   onError,
   onRestore,
+  skillTitles,
 }: {
   api: TostWorkApi;
   task: TaskT;
@@ -153,6 +171,8 @@ function WhatChanged({
   onSaveCopy: () => Promise<SaveResult | null>;
   onError: (err: unknown) => void;
   onRestore: (path: string) => Promise<unknown>;
+  /** Titles of the skills the task read, by name. */
+  skillTitles: Map<string, string>;
 }) {
   const t = useT();
   const [saved, setSaved] = useState<SaveResult | null>(null);
@@ -197,6 +217,7 @@ function WhatChanged({
         )}
         {group(t("quick.edited"), edited)}
         {group(t("quick.new"), added)}
+        <SkillsFollowed names={task.skillsUsed} titles={skillTitles} />
       </div>
       <div className="foot2">
         <span className="t3 grow truncate" style={{ fontSize: 13 }} role="status" title={saved?.folder}>
@@ -238,7 +259,8 @@ function useActivityText() {
   return (a: Activity) =>
     HAS_TARGET.has(a.kind) && !a.target
       ? t(`activity.${a.kind}.any` as MessageKey)
-      : t(`activity.${a.kind}` as MessageKey, { target: a.target ?? "" });
+      : // A built-in guide is recorded as @word; the line says word.
+        t(`activity.${a.kind}` as MessageKey, { target: (a.target ?? "").replace(/^@/, "") });
 }
 
 /** Lines of activity shown while the agent works; the rest are counted above them. */
@@ -600,6 +622,22 @@ export function Task({
       .map((f) => ({ path: f.path, attached: false })),
   ];
   const [picked, setPicked] = useState<string | null>(null);
+  // The skills the task read, by folder name, shown by their titles.
+  // A Map, so a folder named like an object property ("constructor") isn't taken for a title.
+  const [skillTitles, setSkillTitles] = useState(() => new Map<string, string>());
+  const usedCount = task.skillsUsed?.length ?? 0;
+  useEffect(() => {
+    if (usedCount === 0) return;
+    let alive = true;
+    api.skills.list().then(
+      (list) => alive && setSkillTitles(new Map(list.map((s) => [s.id, s.title]))),
+      // Without the list, the folder names show instead.
+      () => alive && setSkillTitles(new Map()),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [api, usedCount]);
   const showFile = (path: string) => {
     setPicked(path);
     document.querySelector(".artifact")?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
@@ -772,6 +810,7 @@ export function Task({
             onSaveCopy={onSaveCopy}
             onRestore={onRestore}
             onError={onError}
+            skillTitles={skillTitles}
           />
         ) : (
           <aside className="rp">
@@ -788,6 +827,7 @@ export function Task({
               {used.map(({ path, attached }) => (
                 <FileLine key={path} path={path} sub={attached ? t("task.attachedFile") : undefined} />
               ))}
+              <SkillsFollowed names={task.skillsUsed} titles={skillTitles} />
               <h3>{t("task.settings")}</h3>
               <div className="setrow">
                 <Icon name="chip" />

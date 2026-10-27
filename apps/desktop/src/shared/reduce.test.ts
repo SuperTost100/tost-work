@@ -41,3 +41,14 @@ describe("applyEvent activity", () => {
     expect(next.activity?.[0]?.target).toBe("5");
   });
 });
+
+describe("applyEvent skills", () => {
+  it("keeps each skill the agent read on the task, once", () => {
+    let next = { activity: [] } as unknown as Task;
+    next = applyEvent(next, { type: "activity", kind: "skill", target: "brand-voice" }, "t1");
+    next = applyEvent(next, { type: "activity", kind: "read", target: "a.txt" }, "t2");
+    next = applyEvent(next, { type: "activity", kind: "skill", target: "brand-voice" }, "t3");
+    next = applyEvent(next, { type: "activity", kind: "skill", target: "word" }, "t4");
+    expect(next.skillsUsed).toEqual(["brand-voice", "word"]);
+  });
+});

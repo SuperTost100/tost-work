@@ -368,7 +368,7 @@ export class AgentEngine implements Engine, ToolHandler {
           if (event.type === "session") channel.push({ type: "session", sessionId: event.sessionId });
           else if (event.type === "plan") channel.push({ type: "plan", steps: event.steps });
           else if (event.type === "tool.start") {
-            const line = activityOf(event.name, event.input);
+            const line = activityOf(event.name, event.input, this.documents?.skills);
             if (line) channel.push({ type: "activity", ...line });
           } else if (event.type === "file.change" && event.status === "done") {
             const path = event.movedTo ?? event.path;

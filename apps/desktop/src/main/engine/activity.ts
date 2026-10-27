@@ -12,6 +12,19 @@ const fileName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? 
 const DOCUMENT = /[^\s"'`/\\]+\.(docx|xlsx|pptx|pdf|txt|md|csv|json|html|doc|xls|ppt|odt|ods|png|jpe?g)\b/i;
 /** A skill or guide being read: its folder names it. */
 const SKILL_FILE = /([^\s"'`/\\]+)[/\\]SKILL\.md\b/;
+
+/**
+ * The name a skill read is recorded under: its folder's, or @ and the folder's for a guide in Tost Work's own
+ * `builtIns` folder, as those guides' ids are, so a user's skill named "word" isn't taken for the Word guide.
+ */
+function skillRead(text: string, builtIns?: string): string | undefined {
+  const match = SKILL_FILE.exec(text);
+  if (!match?.[1]) return undefined;
+  const at = match.index;
+  const dir = builtIns?.replace(/[/\\]+$/, "");
+  const guide = dir && text.slice(Math.max(0, at - dir.length - 1), at - 1) === dir;
+  return guide ? `@${match[1]}` : match[1];
+}
 const READS = /(^|[\s;&|(])(cat|sed|head|tail|less|more|rg|grep|wc|nl|file|pdftotext|xxd)\s/;
 const LISTS = /^(\s*(ls|find|tree|pwd|stat)\b[^;&|]*([;&|]+|$))+$/;
 const OFFICE_READS = /officecli\s+(view|get|query|validate|check|info)\b/;
@@ -24,9 +37,9 @@ function innerCommand(command: string): string {
 }
 
 /** What a shell command is doing, in a word and a file: reading, writing a document, listing the folder, or running. */
-export function commandActivity(command: string): ActivityLine {
+export function commandActivity(command: string, builtIns?: string): ActivityLine {
   const inner = innerCommand(command);
-  const skill = SKILL_FILE.exec(inner)?.[1];
+  const skill = skillRead(inner, builtIns);
   if (skill) return { kind: "skill", target: skill };
   const doc = DOCUMENT.exec(inner)?.[0];
   if (doc && OFFICE_WRITES.test(inner)) return { kind: "edit", target: doc };
@@ -51,13 +64,13 @@ const text = (value: unknown) => (typeof value === "string" && value.trim() ? va
  * One line for a tool call by Codex or Claude Code, from cli-funnel's `tool.start`, or null for calls that say nothing
  * to the user: the plan tool, and Tost Work's own tools, whose questions, approvals and review show on their own.
  */
-export function activityOf(name: string, input: unknown): ActivityLine | null {
+export function activityOf(name: string, input: unknown, builtIns?: string): ActivityLine | null {
   const i = (input ?? {}) as Record<string, unknown>;
   switch (name) {
     // Claude Code
     case "Read": {
       const path = text(i.file_path);
-      const skill = path && SKILL_FILE.exec(path)?.[1];
+      const skill = path && skillRead(path, builtIns);
       if (skill) return { kind: "skill", target: skill };
       return path ? { kind: "read", target: fileName(path) } : { kind: "read" };
     }
@@ -80,7 +93,7 @@ export function activityOf(name: string, input: unknown): ActivityLine | null {
       return { kind: "page", target: host(i.url) };
     case "Bash":
     case "command":
-      return commandActivity(String(i.command ?? ""));
+      return commandActivity(String(i.command ?? ""), builtIns);
     // Codex
     case "file_change": {
       const changes = Array.isArray(i.changes) ? (i.changes as { path?: unknown; kind?: unknown }[]) : [];

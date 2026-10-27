@@ -229,13 +229,48 @@ export function registerIpc(
     if (!title) throw new Error("A skill needs a name");
     return { title, description: text(d.description, "description", 1024), steps: text(d.steps, "steps", BRIEF_MAX) };
   };
-  ipcMain.handle(IPC.skillsList, () => skills.list());
+  ipcMain.handle(IPC.skillsList, async () => [...(await skills.list()), ...(await skills.builtIns())]);
   ipcMain.handle(IPC.skillsCreate, (_e, title: unknown) => {
     const name = text(title, "title", 200).trim();
     if (!name) throw new Error("A skill needs a name");
     return skills.create(name);
   });
-  ipcMain.handle(IPC.skillsSave, (_e, id: unknown, value: unknown) => skills.save(skillId(id), draft(value)));
+  ipcMain.handle(IPC.skillsSave, (_e, id: unknown, value: unknown, note: unknown) =>
+    skills.save(skillId(id), draft(value), note == null ? "" : text(note, "note", 200)),
+  );
+  ipcMain.handle(IPC.skillsDuplicate, (_e, id: unknown) =>
+    skills.duplicate(skillId(id), (title) => t("skills.copyOf", { title })),
+  );
+  ipcMain.handle(IPC.skillsImport, async () => {
+    // Windows and Linux can't pick a folder or a file in one dialog, so a menu asks which first, on every system alike.
+    const from = await new Promise<"folder" | "zip" | null>((resolve) => {
+      let picked = false;
+      const pick = (kind: "folder" | "zip") => () => {
+        picked = true;
+        resolve(kind);
+      };
+      const menu = Menu.buildFromTemplate([
+        { label: t("skills.importFolder"), click: pick("folder") },
+        { label: t("skills.importZip"), click: pick("zip") },
+      ]);
+      const closed = () => setTimeout(() => picked || resolve(null), 100);
+      const win = window();
+      menu.popup(win ? { window: win, callback: closed } : { callback: closed });
+    });
+    if (!from) return null;
+    const result = await openDialog(
+      from === "folder"
+        ? { title: t("skills.importFolder"), properties: ["openDirectory"] }
+        : { title: t("skills.importZip"), properties: ["openFile"], filters: [{ name: "Zip", extensions: ["zip"] }] },
+    );
+    const picked = result.canceled ? undefined : result.filePaths[0];
+    return picked ? skills.import(picked) : null;
+  });
+  ipcMain.handle(IPC.skillsHistory, (_e, id: unknown) => skills.history(skillId(id)));
+  ipcMain.handle(IPC.skillsRestore, (_e, id: unknown, n: unknown) => {
+    if (typeof n !== "number" || !Number.isInteger(n) || n < 1) throw new Error("That version isn't kept any more");
+    return skills.restore(skillId(id), n);
+  });
   ipcMain.handle(IPC.skillsAddFiles, async (_e, id: unknown) => {
     const result = await openDialog({ title: t("skills.addFiles"), properties: ["openFile", "multiSelections"] });
     const skill = skillId(id);

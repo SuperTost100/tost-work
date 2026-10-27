@@ -9,6 +9,10 @@ export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
     case "plan":
       return { ...next, steps: event.steps };
     case "activity": {
+      const used = task.skillsUsed ?? [];
+      // A skill read is kept on the task for good, so the task can say which skills it followed.
+      if (event.kind === "skill" && event.target && !used.includes(event.target))
+        return applyEvent({ ...task, skillsUsed: [...used, event.target] }, event, at);
       const log = task.activity ?? [];
       const last = log.at(-1);
       // The same thing again, such as three edits to one file, stays one line.

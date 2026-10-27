@@ -35,6 +35,18 @@ Changed on 2026-10-27, after testing 0.0.4:
 - Research stays on each AI's own web search, which is cheaper and faster than a browser it looks at. A browser built into Tost Work, for everything else, isn't needed for 0.1.0 or 0.2.0. When it comes, it shows live in the task's side panel and has its own profile, and forms, sign-ins and anything that sends or buys ask first. Computer use comes after it, at the Expert level.
 - Agents ask their questions in rounds of up to 16, with as many rounds as they need.
 
+Changed on 2026-10-27, after testing 0.0.5:
+
+- Tasks see only what Tost Work gives them: its own instructions, the user's skills in Tost Work and the built-in guides. Codex and Claude Code run with their own settings folders in the app's data, so the user's own instructions, skills, plugins and MCP servers stay out, and the user signs in once more inside Tost Work.
+- Skills in 0.1.0: written by hand, imported from a folder or a `.zip`, copied from a built-in guide, with versions and Restore, and the skills each task followed.
+- Skills in 0.2.0: switching skills on or off per project, with project-only skills; making one with AI; trying a draft on a file.
+- Skills in 0.3.0: making one from a finished task.
+
+## From 0.2.0
+
+- AI renames tasks from their brief, so a task from a long paste gets a short title.
+- The Skills parts above.
+
 ## After 0.2.0
 
 - The browser and computer use, above.
@@ -46,8 +58,10 @@ Changed on 2026-10-27, after testing 0.0.4:
 - **Tasks:** brief, plan, live preview of the document, questions with answer choices, and a review against the brief at the end.
 - **Projects:** a folder with instructions, skills, jobs and a default model.
 - **Skills:**
-  - Skills are standard `SKILL.md` folders. They work in every project, and a project can turn some off or add its own.
-  - New skills can be written by hand, made with AI, made from a finished task, or imported.
+  - Skills are standard `SKILL.md` folders in `Documents/Tost Work/Skills`, and they work in every project.
+  - New skills are written by hand, imported, or copied from a built-in guide (Word, Excel, PowerPoint, PDF), which stay read-only.
+  - Each save keeps a version, with an optional note, that Restore can put back.
+  - A task lists the skills it followed, and each skill says how many tasks used it.
 - **Quick edit:** one file without a project. It works in a temporary folder made for it. The results stay there until the user saves them, and saving asks for a folder every time.
 - **Jobs:** cards with a four-step builder, grouped by next run.
 - **Board:** a list grouped by status, with columns as an option.
@@ -90,6 +104,7 @@ Every session starts with an instruction block from Tost Work. It says:
 - that the agent runs in Tost Work for a non-technical user;
 - the project folder and the project's instructions;
 - the user's language;
+- the user's skills, and the built-in guides for Word, Excel, PowerPoint and PDF;
 - the rules above;
 - the Tost Work tools it can use.
 

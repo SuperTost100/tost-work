@@ -20,6 +20,7 @@ import { applyLook } from "./look";
 import { ToolServer } from "./mcp/server";
 import { pickAi } from "./pickAi";
 import { SkillFolder } from "./skills";
+import { SkillVersions } from "./skillVersions";
 import { Store } from "./store/store";
 
 const isMac = process.platform === "darwin";
@@ -83,8 +84,12 @@ app.whenReady().then(async () => {
     decrypt: (data) => safeStorage.decryptString(data),
   });
   // Where people can see, back up and copy their skills, as the course teaches.
-  const skills = new SkillFolder(join(app.getPath("documents"), "Tost Work", "Skills"), (path) =>
-    shell.trashItem(path),
+  // The Word, Excel, PowerPoint and PDF guides show among them as built in; earlier versions stay in the app's data.
+  const documents = documentTools();
+  const skills = new SkillFolder(
+    join(app.getPath("documents"), "Tost Work", "Skills"),
+    (path) => shell.trashItem(path),
+    { builtIns: documents?.skills, versions: new SkillVersions(join(app.getPath("userData"), "skill-versions")) },
   );
   store.stopInterrupted(new Date().toISOString());
   // Before the window, so its background colour already follows the chosen theme.
@@ -101,7 +106,7 @@ app.whenReady().then(async () => {
     engine = new FakeEngine(undefined, undefined, join(app.getAppPath(), "resources", "fake"));
   } else {
     const agent = new AgentEngine(funnel, language, {
-      documents: documentTools(),
+      documents,
       user: () => {
         const { name, work, notes } = store.getSettings();
         return { name, work, notes };

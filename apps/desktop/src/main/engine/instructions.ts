@@ -59,7 +59,7 @@ export function instructionsFor(
   if (skills.length)
     parts.push(
       [
-        "The user's skills: their own instructions for kinds of work they do often. Each is a folder with a SKILL.md, and sometimes files it brings, such as a template. When the work matches a skill's description, read its SKILL.md before you start and follow it, and use the files it brings from its folder without changing them. In your review, say which skill you followed.",
+        "The user's skills: their own instructions for kinds of work they do often. Each is a folder with a SKILL.md, and sometimes files it brings, such as a template. When the work matches a skill's description, read its SKILL.md before you start and follow it, and use the files it brings from its folder without changing them. Where a skill and one of the guides above both cover the work, follow the skill wherever they differ. In your review, say which skill you followed.",
         ...skills.map(
           (s) => `- ${s.title}: ${s.description.trim() || "(no description)"} (${join(s.folder, "SKILL.md")})`,
         ),

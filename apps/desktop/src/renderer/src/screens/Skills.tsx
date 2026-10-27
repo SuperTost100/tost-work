@@ -1,33 +1,44 @@
-import { type MouseEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type MouseEvent, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
-import { useT } from "@/lib/useT";
+import { LanguageContext, useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
-import type { Skill, SkillDraft } from "../../../shared/model";
+import type { Skill, SkillDraft, SkillVersion, Task } from "../../../shared/model";
 
 const draftOf = (s: Skill): SkillDraft => ({ title: s.title, description: s.description, steps: s.steps });
 const same = (a: SkillDraft, b: SkillDraft) =>
   a.title.trim() === b.title.trim() &&
   a.description.trim() === b.description.trim() &&
   a.steps.trim() === b.steps.trim();
+const byTitle = (a: Skill, b: Skill) => a.title.localeCompare(b.title);
+
+/** The name a task records when it reads a skill: its id, the folder's name, or @ and the folder's for a guide. */
+export const usedName = (s: Skill) => s.id;
 
 /**
  * Skills, as in the mockup: the list, the open skill's editor and a side column. A skill is a SKILL.md folder in
- * Documents/Tost Work/Skills; "When to use it" is its description, which the agent reads to pick it.
+ * Documents/Tost Work/Skills; "When to use it" is its description, which the agent reads to pick it. The guides Tost
+ * Work comes with are listed under them, read-only, and Duplicate makes an editable copy.
  */
-export function Skills({ api }: { api: TostWorkApi }) {
+export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }) {
   const t = useT();
+  const lang = useContext(LanguageContext);
   const [skills, setSkills] = useState<Skill[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState<SkillDraft | null>(null);
+  const [note, setNote] = useState("");
+  const [versions, setVersions] = useState<SkillVersion[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const mine = (skills ?? []).filter((s) => !s.builtIn);
+  const guides = (skills ?? []).filter((s) => s.builtIn);
   const open = skills?.find((s) => s.id === openId) ?? null;
-  const dirty = open !== null && draft !== null && !same(draft, draftOf(open));
+  const dirty = open !== null && !open.builtIn && draft !== null && !same(draft, draftOf(open));
 
   const show = useCallback((skill: Skill | null) => {
     setOpenId(skill?.id ?? null);
     setDraft(skill ? draftOf(skill) : null);
+    setNote("");
   }, []);
 
   useEffect(() => {
@@ -36,7 +47,8 @@ export function Skills({ api }: { api: TostWorkApi }) {
       (list) => {
         if (!alive) return;
         setSkills(list);
-        show(list[0] ?? null);
+        // The user's own first; with none yet, the page invites them to make one.
+        show(list.find((s) => !s.builtIn) ?? null);
       },
       (err: unknown) => alive && setError(errorText(err)),
     );
@@ -45,14 +57,30 @@ export function Skills({ api }: { api: TostWorkApi }) {
     };
   }, [api, show]);
 
+  // The versions of the open skill, again after each save or restore.
+  const version = open?.version ?? 0;
+  useEffect(() => {
+    let alive = true;
+    if (!openId || openId.startsWith("@") || version === 0) {
+      setVersions([]);
+      return;
+    }
+    api.skills.history(openId).then(
+      (list) => alive && setVersions(list),
+      () => alive && setVersions([]),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [api, openId, version]);
+
   // Unsaved changes ask first, so switching skills can't lose them without a word.
   const leave = () => !dirty || window.confirm(t("skills.discard"));
   const put = (skill: Skill, replacing = openId) => {
-    setSkills((list) =>
-      [...(list ?? []).filter((s) => s.id !== replacing && s.id !== skill.id), skill].sort((a, b) =>
-        a.title.localeCompare(b.title),
-      ),
-    );
+    setSkills((list) => {
+      const rest = (list ?? []).filter((s) => s.id !== replacing && s.id !== skill.id);
+      return [...rest.filter((s) => !s.builtIn), skill].sort(byTitle).concat(rest.filter((s) => s.builtIn));
+    });
   };
   const run = async (action: () => Promise<void>) => {
     setError(null);
@@ -74,10 +102,42 @@ export function Skills({ api }: { api: TostWorkApi }) {
     if (!open || !draft?.title.trim()) return;
     setSaving(true);
     void run(async () => {
-      const saved = await api.skills.save(open.id, draft);
+      const saved = await api.skills.save(open.id, draft, note.trim() || undefined);
       put(saved);
       show(saved);
     }).finally(() => setSaving(false));
+  };
+  // One copy per click: a second click while the first is on its way does nothing.
+  const [duplicating, setDuplicating] = useState(false);
+  const copying = useRef(false);
+  const duplicate = (guide: Skill) => {
+    if (copying.current) return;
+    copying.current = true;
+    setDuplicating(true);
+    void run(async () => {
+      const copy = await api.skills.duplicate(guide.id);
+      put(copy, null);
+      show(copy);
+    }).finally(() => {
+      copying.current = false;
+      setDuplicating(false);
+    });
+  };
+  const importSkill = () =>
+    leave() &&
+    void run(async () => {
+      const skill = await api.skills.import();
+      if (!skill) return;
+      put(skill, null);
+      show(skill);
+    });
+  const restore = (n: number) => {
+    if (!open || !leave() || !window.confirm(t("skills.restoreConfirm", { n: String(n) }))) return;
+    void run(async () => {
+      const back = await api.skills.restore(open.id, n);
+      put(back);
+      show(back);
+    });
   };
   const addFiles = () =>
     open &&
@@ -98,7 +158,8 @@ export function Skills({ api }: { api: TostWorkApi }) {
       const rest = (current.current.skills ?? []).filter((s) => s.id !== skill.id);
       // The user may have opened the skill while it was going: then the editor moves to another one.
       const moved = current.current.openId === skill.id;
-      const next = moved ? (rest[0] ?? null) : null;
+      // To one of the user's own: a built-in guide isn't where they were working.
+      const next = moved ? (rest.find((s) => !s.builtIn) ?? null) : null;
       // Set now, not after the render, so another delete finishing in the same moment sees this one.
       current.current = { skills: rest, openId: moved ? (next?.id ?? null) : current.current.openId };
       setSkills((list) => (list ?? []).filter((s) => s.id !== skill.id));
@@ -137,6 +198,60 @@ export function Skills({ api }: { api: TostWorkApi }) {
     void menu(skill);
   };
 
+  const used = (s: Skill) => tasks.filter((task) => task.skillsUsed?.includes(usedName(s))).length;
+  const usedText = (n: number) =>
+    n === 0 ? null : n === 1 ? t("skills.usedOnce") : t("skills.used", { n: String(n) });
+  const date = (at: string) => new Date(at).toLocaleDateString(lang, { day: "numeric", month: "short" });
+
+  const row = (s: Skill) => (
+    <div key={s.id} className={s.id === openId ? "sitem on" : "sitem"}>
+      <button
+        type="button"
+        className="open"
+        aria-current={s.id === openId ? "true" : undefined}
+        onClick={() => s.id !== openId && leave() && show(s)}
+        onContextMenu={s.builtIn ? undefined : contextMenu(s)}
+      >
+        <span className="truncate grow">{s.title}</span>
+        {/* The editor says the version in words, so the list's tag is for the eye only. */}
+        {!s.builtIn && (s.version ?? 0) > 0 && (
+          <span className="v" aria-hidden="true">
+            v{s.version}
+          </span>
+        )}
+      </button>
+      {!s.builtIn && (
+        <button
+          type="button"
+          className="more"
+          aria-label={t("recent.more", { name: s.title })}
+          title={t("recent.more", { name: s.title })}
+          onClick={() => void menu(s)}
+          onContextMenu={contextMenu(s)}
+        >
+          <Icon name="more-1" />
+        </button>
+      )}
+    </div>
+  );
+
+  const invite = (
+    <div className="col" style={{ paddingTop: 96 }}>
+      <div className="hello">
+        <h1>{t("skills.emptyTitle")}</h1>
+      </div>
+      <p className="t2" style={{ fontSize: 15 }}>
+        {t("skills.emptyBody")}
+      </p>
+      <div className="row" style={{ marginTop: 18 }}>
+        <button type="button" className="btn dark" onClick={create}>
+          <Icon name="add" />
+          {t("skills.new")}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="main">
       <div className="top">
@@ -144,13 +259,13 @@ export function Skills({ api }: { api: TostWorkApi }) {
           <b>{t("nav.skills")}</b>
         </span>
         <span className="grow" />
-        {/* With no skills yet, the page's own button makes the first one. */}
-        {skills?.length ? (
+        {/* With no skills of their own yet, the page's own button makes the first one. */}
+        {mine.length > 0 && (
           <button type="button" className="btn" style={{ height: 30 }} onClick={create}>
             <Icon name="add" />
             {t("skills.new")}
           </button>
-        ) : null}
+        )}
       </div>
       {error && (
         <p className="fld-error" role="alert" style={{ margin: "10px 24px 0" }}>
@@ -158,48 +273,22 @@ export function Skills({ api }: { api: TostWorkApi }) {
         </p>
       )}
       {skills?.length === 0 ? (
-        <div className="scroll">
-          <div className="col" style={{ paddingTop: 96 }}>
-            <div className="hello">
-              <h1>{t("skills.emptyTitle")}</h1>
-            </div>
-            <p className="t2" style={{ fontSize: 15 }}>
-              {t("skills.emptyBody")}
-            </p>
-            <div className="row" style={{ marginTop: 18 }}>
-              <button type="button" className="btn dark" onClick={create}>
-                <Icon name="add" />
-                {t("skills.new")}
-              </button>
-            </div>
-          </div>
-        </div>
+        <div className="scroll">{invite}</div>
       ) : (
         <div className="skills">
           <nav className="slist" aria-label={t("nav.skills")}>
-            {skills?.map((s) => (
-              <div key={s.id} className={s.id === openId ? "sitem on" : "sitem"}>
-                <button
-                  type="button"
-                  className="open"
-                  aria-current={s.id === openId ? "true" : undefined}
-                  onClick={() => s.id !== openId && leave() && show(s)}
-                  onContextMenu={contextMenu(s)}
-                >
-                  <span className="truncate">{s.title}</span>
-                </button>
-                <button
-                  type="button"
-                  className="more"
-                  aria-label={t("recent.more", { name: s.title })}
-                  title={t("recent.more", { name: s.title })}
-                  onClick={() => void menu(s)}
-                  onContextMenu={contextMenu(s)}
-                >
-                  <Icon name="more-1" />
-                </button>
-              </div>
-            ))}
+            {mine.map(row)}
+            {guides.length > 0 && (
+              <>
+                <h4 className="sgroup">{t("skills.builtIn")}</h4>
+                {guides.map(row)}
+              </>
+            )}
+            <div className="sep" />
+            <button type="button" className="sitem action" onClick={importSkill}>
+              <Icon name="upload-2" />
+              {t("skills.import")}
+            </button>
           </nav>
           {open && draft ? (
             <div className="editor">
@@ -212,20 +301,46 @@ export function Skills({ api }: { api: TostWorkApi }) {
                   aria-label={t("skills.name")}
                   value={draft.title}
                   maxLength={200}
+                  readOnly={open.builtIn}
                   onChange={(e) => setDraft({ ...draft, title: e.target.value })}
                 />
-                <button
-                  type="button"
-                  className="btn dark"
-                  disabled={!dirty || saving || !draft.title.trim()}
-                  onClick={save}
-                >
-                  {t("skills.save")}
-                </button>
+                {open.builtIn ? (
+                  <button type="button" className="btn dark" disabled={duplicating} onClick={() => duplicate(open)}>
+                    <Icon name="copy-2" />
+                    {t("skills.duplicate")}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn dark"
+                    disabled={!dirty || saving || !draft.title.trim()}
+                    onClick={save}
+                  >
+                    {t("skills.save")}
+                  </button>
+                )}
               </div>
               <p className="t3" style={{ marginTop: 4 }}>
-                {t("skills.everywhere")}
+                {open.builtIn
+                  ? t("skills.builtInNote")
+                  : [
+                      version > 0 && t("skills.version", { n: String(version) }),
+                      usedText(used(open)),
+                      t("skills.everywhere"),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
               </p>
+              {dirty && (
+                <input
+                  className="input note-input"
+                  aria-label={t("skills.note")}
+                  placeholder={t("skills.note")}
+                  value={note}
+                  maxLength={200}
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              )}
               <label className="doc-h" htmlFor="skill-when">
                 {t("skills.when")}
               </label>
@@ -234,6 +349,7 @@ export function Skills({ api }: { api: TostWorkApi }) {
                 className="editable area"
                 rows={2}
                 maxLength={1024}
+                readOnly={open.builtIn}
                 placeholder={t("skills.whenHint")}
                 value={draft.description}
                 onChange={(e) => setDraft({ ...draft, description: e.target.value })}
@@ -245,31 +361,68 @@ export function Skills({ api }: { api: TostWorkApi }) {
                 id="skill-steps"
                 className="editable area"
                 rows={10}
+                readOnly={open.builtIn}
                 placeholder={t("skills.stepsHint")}
                 value={draft.steps}
                 onChange={(e) => setDraft({ ...draft, steps: e.target.value })}
               />
-              <div className="doc-h">{t("skills.files")}</div>
-              <div className="outs" style={{ marginTop: 0, flexWrap: "wrap" }}>
-                {open.files.map((name) => (
-                  <span className="out" key={name}>
-                    <Icon name="file" />
-                    {name}
-                  </span>
-                ))}
-                <button type="button" className="tbtn" onClick={addFiles}>
-                  <Icon name="add" />
-                  {t("skills.addFile")}
-                </button>
-              </div>
+              {!open.builtIn && (
+                <>
+                  <div className="doc-h">{t("skills.files")}</div>
+                  <div className="outs" style={{ marginTop: 0, flexWrap: "wrap" }}>
+                    {open.files.map((name) => (
+                      <span className="out" key={name}>
+                        <Icon name="file" />
+                        {name}
+                      </span>
+                    ))}
+                    <button type="button" className="tbtn" onClick={addFiles}>
+                      <Icon name="add" />
+                      {t("skills.addFile")}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
-            <div className="editor" />
+            <div className="editor">{mine.length === 0 ? invite : <p className="t3">{t("skills.pickOne")}</p>}</div>
           )}
           <aside className="smeta">
             <h3>{t("skills.whereOn")}</h3>
             <p>{t("skills.whereOnBody")}</p>
-            {open && (
+            {open && !open.builtIn && versions.length > 0 && (
+              <>
+                <h3>{t("skills.versions")}</h3>
+                <div className="vers">
+                  {versions.map((v, i) => (
+                    <div key={v.n}>
+                      <span className="grow truncate">
+                        v{v.n}
+                        {v.restoredFrom
+                          ? ` · ${t("skills.restoredFrom", { n: String(v.restoredFrom) })}`
+                          : v.note
+                            ? ` · ${v.note}`
+                            : ""}
+                      </span>
+                      {i === 0 ? (
+                        <span className="t3">{t("skills.current")}</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="tbtn"
+                          aria-label={`${t("skills.restore")} v${v.n}`}
+                          title={date(v.at)}
+                          onClick={() => restore(v.n)}
+                        >
+                          {t("skills.restore")}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {open && !open.builtIn && (
               <>
                 <h3>{t("skills.folder")}</h3>
                 <p className="truncate" title={open.folder}>

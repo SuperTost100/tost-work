@@ -191,6 +191,22 @@ describe("file actions", () => {
 });
 
 describe("quick edit", () => {
+  it("lists the skills it followed in its side panel too", async () => {
+    const api = createMemoryApi();
+    const task = await api.tasks.start({ projectId: null, brief: "Tidy this letter", attachments: [] });
+    render(<App userName="Giulia" api={api} />);
+    const [open] = await screen.findAllByText(/Tidy this letter/);
+    await act(async () => {
+      fireEvent.click(open as HTMLElement);
+    });
+    await act(async () => api.emit(task.id, { type: "activity", kind: "skill", target: "@word" }));
+    expect(await screen.findByText("Skills it followed")).toBeTruthy();
+    expect(await screen.findByText("Word documents")).toBeTruthy();
+    // A skill no longer there shows by its folder name, even one named like an object property.
+    await act(async () => api.emit(task.id, { type: "activity", kind: "skill", target: "constructor" }));
+    expect(await screen.findByText("constructor")).toBeTruthy();
+  });
+
   it("attaches a file, saves a copy and takes another instruction", async () => {
     const api = createMemoryApi();
     render(<App userName="Giulia" api={api} />);
@@ -295,8 +311,13 @@ describe("what the agent is doing", () => {
     // The line above the composer says the latest one.
     expect(screen.getByRole("status").textContent).toContain("Searching the web: corsi AI Biella");
 
+    // A guide the agent read shows in the side panel by its title.
+    await act(async () => api.emit(task.id, { type: "activity", kind: "skill", target: "@word" }));
+    expect(await screen.findByText("Skills it followed")).toBeTruthy();
+    expect(await screen.findByText("Word documents")).toBeTruthy();
+
     act(() => api.emit(task.id, { type: "done" }));
-    const line = screen.getByRole("button", { name: "What it did (2)" });
+    const line = screen.getByRole("button", { name: "What it did (3)" });
     expect(line.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByText("Reading note.txt")).toBeNull();
     fireEvent.click(line);

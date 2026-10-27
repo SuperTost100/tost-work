@@ -273,7 +273,7 @@ export function App({
   } else if (route.name === "settings") {
     screen = api ? <SettingsScreen api={api} settings={current} onChange={(next) => onSettings?.(next)} /> : null;
   } else if (route.section === "skills" && api) {
-    screen = <Skills api={api} />;
+    screen = <Skills api={api} tasks={tasks} />;
   } else {
     screen = <Soon section={sectionTitle[route.section]} />;
   }

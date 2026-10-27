@@ -20,9 +20,25 @@ import {
   questionItems,
   type Settings,
   type Skill,
+  type SkillDraft,
+  type SkillVersion,
   type Task,
 } from "../../../shared/model";
+
 import { applyEvent, resume } from "../../../shared/reduce";
+
+/** The built-in guide the memory API lists, as Tost Work lists its Word, Excel, PowerPoint and PDF guides. */
+const WORD_GUIDE: Skill = {
+  id: "@word",
+  name: "word",
+  title: "Word documents",
+  description: "Make or edit a Word document.",
+  steps: "Make it with officecli.",
+  files: [],
+  folder: "/Applications/Tost Work.app/Contents/Resources/skills/word",
+  updatedAt: "",
+  builtIn: true,
+};
 
 /**
  * An in-memory `window.tostWork` for tests: tasks run a short script synchronously, stop at one question,
@@ -45,6 +61,23 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "") || "skill";
+  // Each kept version holds the editor's fields, as SKILL.md text would.
+  const versions = new Map<string, (SkillVersion & { draft: SkillDraft })[]>();
+  const keep = (skill: Skill, more: { note?: string; restoredFrom?: number } = {}): Skill => {
+    const list = versions.get(skill.id) ?? [];
+    const n = (list.at(-1)?.n ?? 0) + 1;
+    const draft = { title: skill.title, description: skill.description, steps: skill.steps };
+    const note = more.note?.trim();
+    list.push({
+      n,
+      at: now(),
+      ...(note ? { note } : {}),
+      ...(more.restoredFrom ? { restoredFrom: more.restoredFrom } : {}),
+      draft,
+    });
+    versions.set(skill.id, list);
+    return { ...skill, version: n };
+  };
   const mustSkill = (id: string) => {
     const s = skills.find((x) => x.id === id);
     if (!s) throw new Error("That skill isn't there any more");
@@ -268,7 +301,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       },
     },
     skills: {
-      list: async () => [...skills].sort((a, b) => a.title.localeCompare(b.title)),
+      list: async () => [...[...skills].sort((a, b) => a.title.localeCompare(b.title)), WORD_GUIDE],
       create: async (title) => {
         let id = skillId(title);
         for (let n = 2; skills.some((s) => s.id === id); n++) id = `${skillId(title)}-${n}`;
@@ -282,14 +315,20 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
           folder: `/Users/giulia/Documents/Tost Work/Skills/${id}`,
           updatedAt: now(),
         };
-        skills = [...skills, skill];
-        return skill;
+        const kept = keep(skill);
+        skills = [...skills, kept];
+        return kept;
       },
-      save: async (id, draft) => {
+      save: async (id, draft, note) => {
         const current = mustSkill(id);
         const next = { ...current, ...draft, id: skillId(draft.title), name: skillId(draft.title), updatedAt: now() };
-        skills = skills.map((s) => (s.id === id ? next : s));
-        return next;
+        if (next.id !== id) {
+          versions.set(next.id, versions.get(id) ?? []);
+          versions.delete(id);
+        }
+        const kept = keep(next, { note });
+        skills = skills.map((s) => (s.id === id ? kept : s));
+        return kept;
       },
       addFiles: async (id) => {
         const current = mustSkill(id);
@@ -298,13 +337,39 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         return next;
       },
       reveal: async (id) => {
-        mustSkill(id);
+        if (id !== WORD_GUIDE.id) mustSkill(id);
       },
       remove: async (id) => {
         mustSkill(id);
         skills = skills.filter((s) => s.id !== id);
       },
       menu: async () => menuPick,
+      duplicate: async (id) => {
+        if (id !== WORD_GUIDE.id) throw new Error("That isn't one of Tost Work's guides");
+        const { builtIn: _b, ...guide } = WORD_GUIDE;
+        const copy = keep({
+          ...guide,
+          id: "word-documents-copy",
+          name: "word-documents-copy",
+          title: "Word documents (copy)",
+        });
+        skills = [...skills, copy];
+        return copy;
+      },
+      import: async () => {
+        const { builtIn: _b, ...guide } = WORD_GUIDE;
+        const skill = keep({ ...guide, id: "meeting-notes", name: "meeting-notes", title: "Meeting notes" });
+        skills = [...skills, skill];
+        return skill;
+      },
+      history: async (id) => [...(versions.get(mustSkill(id).id) ?? [])].reverse().map(({ draft: _d, ...v }) => v),
+      restore: async (id, n) => {
+        const old = versions.get(id)?.find((v) => v.n === n);
+        if (!old) throw new Error("That version isn't kept any more");
+        const next = keep({ ...mustSkill(id), ...old.draft, updatedAt: now() }, { restoredFrom: n });
+        skills = skills.map((s) => (s.id === id ? next : s));
+        return next;
+      },
     },
     files: {
       pick: async () => ["/Users/giulia/Documents/letter-bank.docx"],

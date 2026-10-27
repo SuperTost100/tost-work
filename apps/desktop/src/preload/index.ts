@@ -82,7 +82,11 @@ const api: TostWorkApi = {
   skills: {
     list: () => ipcRenderer.invoke(IPC.skillsList),
     create: (title) => ipcRenderer.invoke(IPC.skillsCreate, title),
-    save: (id, draft) => ipcRenderer.invoke(IPC.skillsSave, id, draft),
+    save: (id, draft, note) => ipcRenderer.invoke(IPC.skillsSave, id, draft, note),
+    duplicate: (id) => ipcRenderer.invoke(IPC.skillsDuplicate, id),
+    import: () => ipcRenderer.invoke(IPC.skillsImport),
+    history: (id) => ipcRenderer.invoke(IPC.skillsHistory, id),
+    restore: (id, n) => ipcRenderer.invoke(IPC.skillsRestore, id, n),
     addFiles: (id) => ipcRenderer.invoke(IPC.skillsAddFiles, id),
     reveal: (id) => ipcRenderer.invoke(IPC.skillsReveal, id),
     remove: (id) => ipcRenderer.invoke(IPC.skillsRemove, id),

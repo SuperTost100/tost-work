@@ -1,5 +1,5 @@
 import type { InstallResult } from "./install";
-import type { AgentProvider, CourseKey, Project, Settings, Skill, SkillDraft, Task } from "./model";
+import type { AgentProvider, CourseKey, Project, Settings, Skill, SkillDraft, SkillVersion, Task } from "./model";
 
 export interface NewProjectInput {
   name: string;
@@ -137,11 +137,20 @@ export interface TostWorkApi {
   };
   /** The user's skills, SKILL.md folders in Documents/Tost Work/Skills. */
   skills: {
+    /** The user's skills, then the guides Tost Work comes with (`builtIn`). */
     list(): Promise<Skill[]>;
     /** Makes a skill with this title and an empty text, ready to edit. */
     create(title: string): Promise<Skill>;
     /** Saves the editor's fields. A new title renames the skill's folder too. */
-    save(id: string, draft: SkillDraft): Promise<Skill>;
+    save(id: string, draft: SkillDraft, note?: string): Promise<Skill>;
+    /** Copies a built-in guide among the user's skills, to change. */
+    duplicate(id: string): Promise<Skill>;
+    /** Asks for a SKILL.md folder or a .zip of one and brings it in. Null when the user cancels. */
+    import(): Promise<Skill | null>;
+    /** The versions Tost Work kept, newest first. */
+    history(id: string): Promise<SkillVersion[]>;
+    /** Puts an earlier version back. */
+    restore(id: string, n: number): Promise<Skill>;
     /** Asks for files, such as a template, and copies them into the skill. */
     addFiles(id: string): Promise<Skill>;
     /** Shows the skill's folder in Finder or Explorer. */
@@ -177,6 +186,10 @@ export const IPC = {
   skillsReveal: "skills:reveal",
   skillsRemove: "skills:remove",
   skillsMenu: "skills:menu",
+  skillsDuplicate: "skills:duplicate",
+  skillsImport: "skills:import",
+  skillsHistory: "skills:history",
+  skillsRestore: "skills:restore",
   keyInfo: "key:info",
   keySave: "key:save",
   keyRemove: "key:remove",

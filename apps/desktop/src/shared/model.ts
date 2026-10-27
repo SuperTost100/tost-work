@@ -147,6 +147,8 @@ export interface Task {
   kept?: KeptCopy[];
   /** Stopped because Tost Work closed while the task was working, not by the user. Resume carries on. */
   interrupted?: boolean;
+  /** The skills the agent read, by folder name, in any run. Built-in guides count too. */
+  skillsUsed?: string[];
   /** What the agent did in the latest run, a line per tool call. Missing on tasks from before. */
   activity?: Activity[];
   /** The agent's conversation, so a follow-up continues it. Set by the real engine. */
@@ -273,6 +275,20 @@ export interface Skill {
   files: string[];
   folder: string;
   updatedAt: string;
+  /** One of the guides Tost Work comes with, such as Word's: read-only, and copied to change it. Its id starts with @. */
+  builtIn?: boolean;
+  /** The latest version Tost Work kept, 0 for a skill never saved here. */
+  version?: number;
+}
+
+/** A version of a skill Tost Work kept when it was saved. */
+export interface SkillVersion {
+  n: number;
+  at: string;
+  /** What changed, in the user's words. */
+  note?: string;
+  /** Set when this version put an older one back. */
+  restoredFrom?: number;
 }
 
 /** What the editor saves. */

@@ -1,14 +1,29 @@
 /** @vitest-environment node */
-import { chmod, mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
-import { formatSkill, parseSkill, SkillFolder, skillName } from "./skills";
+import { formatSkill, IMPORT_LIMITS, parseSkill, SkillFolder, skillName } from "./skills";
+import { SkillVersions } from "./skillVersions";
 
 async function folder() {
-  const root = join(await mkdtemp(join(tmpdir(), "tw-skills-")), "Skills");
+  const base = await mkdtemp(join(tmpdir(), "tw-skills-"));
+  const root = join(base, "Skills");
+  const guides = join(base, "guides");
+  await mkdir(join(guides, "word"), { recursive: true });
+  await writeFile(
+    join(guides, "word", "SKILL.md"),
+    "---\nname: word\ndescription: Make a Word file.\n---\n\n# Word documents\n\nUse officecli.",
+  );
   const trashed: string[] = [];
-  return { root, trashed, skills: new SkillFolder(root, async (p) => void trashed.push(p)) };
+  let clock = 0;
+  const skills = new SkillFolder(root, async (p) => void trashed.push(p), {
+    builtIns: guides,
+    versions: new SkillVersions(join(base, "versions")),
+    now: () => new Date(Date.UTC(2026, 9, 27, 9, 0, clock++)).toISOString(),
+  });
+  return { base, root, trashed, skills };
 }
 
 describe("SKILL.md", () => {
@@ -168,5 +183,152 @@ describe("SkillFolder", () => {
     expect(trashed).toEqual([join(root, "old")]);
     await expect(skills.get("../escape")).rejects.toThrow(/isn't a skill/);
     await expect(skills.remove("..")).rejects.toThrow(/isn't a skill/);
+  });
+
+  it("lists the built-in guides read-only, and duplicates one among the user's skills", async () => {
+    const { root, skills } = await folder();
+    const [word] = await skills.builtIns();
+    expect(word).toMatchObject({ id: "@word", title: "Word documents", builtIn: true });
+    // A guide's id can't be used as one of the user's skills.
+    await expect(skills.save("@word", { title: "x", description: "", steps: "" })).rejects.toThrow(/isn't a skill/);
+    const copy = await skills.duplicate("@word");
+    expect(copy).toMatchObject({
+      id: "word-documents-copy",
+      title: "Word documents (copy)",
+      steps: "Use officecli.",
+      version: 1,
+    });
+    const text = await readFile(join(root, "word-documents-copy", "SKILL.md"), "utf8");
+    expect(parseSkill(text).name).toBe("word-documents-copy");
+    expect((await skills.duplicate("@word", (t) => `${t} (copia)`)).title).toBe("Word documents (copia)");
+  });
+
+  it("keeps a version per save, with its note, and puts an old one back as a new version", async () => {
+    const { skills } = await folder();
+    const made = await skills.create("Proposal writer", "Proposals.", "1. Read.");
+    await skills.save(
+      made.id,
+      { title: "Proposal writer", description: "Proposals.", steps: "1. Read.\n2. Price." },
+      "price step",
+    );
+    // Saving the same text again keeps no new version.
+    const again = await skills.save(made.id, {
+      title: "Proposal writer",
+      description: "Proposals.",
+      steps: "1. Read.\n2. Price.",
+    });
+    expect(again.version).toBe(2);
+    expect((await skills.history(made.id)).map((v) => [v.n, v.note])).toEqual([
+      [2, "price step"],
+      [1, undefined],
+    ]);
+    const back = await skills.restore(made.id, 1);
+    expect(back).toMatchObject({ steps: "1. Read.", version: 3 });
+    expect((await skills.history(made.id))[0]).toMatchObject({ n: 3, restoredFrom: 1 });
+  });
+
+  it("takes the versions along when a new title renames the folder, and a new skill with an old name starts afresh", async () => {
+    const { skills } = await folder();
+    const made = await skills.create("Old name");
+    const renamed = await skills.save(made.id, { title: "New name", description: "", steps: "x" });
+    expect(renamed).toMatchObject({ id: "new-name", version: 2 });
+    expect((await skills.create("Old name")).version).toBe(1);
+  });
+
+  it("imports a SKILL.md folder with its subfolders, leaving out links and hidden files", async () => {
+    const { base, root, skills } = await folder();
+    const source = join(base, "downloads", "Meeting Notes");
+    await mkdir(join(source, "templates"), { recursive: true });
+    await writeFile(
+      join(source, "SKILL.md"),
+      "---\nname: notes\ndescription: Minutes.\nlicense: MIT\n---\n# Notes\n\nDo it.",
+    );
+    await writeFile(join(source, "templates", "minutes.docx"), "x");
+    await writeFile(join(source, ".DS_Store"), "x");
+    await symlink("/etc/passwd", join(source, "passwd"));
+    const imported = await skills.import(source);
+    expect(imported).toMatchObject({ id: "notes", title: "Notes", version: 1 });
+    expect((await readdir(join(root, "notes"))).sort()).toEqual(["SKILL.md", "templates"]);
+    expect(await readFile(join(root, "notes", "SKILL.md"), "utf8")).toContain("license: MIT");
+    // The same skill again gets a numbered folder, and its name follows it.
+    const second = await skills.import(source);
+    expect(second.id).toBe("notes-2");
+    expect(second.name).toBe("notes-2");
+    await expect(skills.import(join(base, "downloads"))).rejects.toThrow(/no SKILL.md/);
+  });
+
+  it("imports a zipped skill from its folder inside the zip, and refuses a path that leaves it", async () => {
+    const { base, root, skills } = await folder();
+    const zip = new JSZip();
+    zip.file("brand-voice/SKILL.md", "---\nname: brand-voice\ndescription: Tone.\n---\n# Brand voice\n\nBe direct.");
+    zip.file("brand-voice/examples/good.md", "x");
+    zip.file("__MACOSX/brand-voice/._SKILL.md", "x");
+    zip.file("README.txt", "outside the skill");
+    await writeFile(join(base, "brand.zip"), await zip.generateAsync({ type: "nodebuffer" }));
+    expect(await skills.import(join(base, "brand.zip"))).toMatchObject({ id: "brand-voice", title: "Brand voice" });
+    expect((await readdir(join(root, "brand-voice"))).sort()).toEqual(["SKILL.md", "examples"]);
+
+    const bad = new JSZip();
+    bad.file("SKILL.md", "---\nname: bad\ndescription: x\n---\nx");
+    bad.file("../../escape.txt", "x");
+    await writeFile(join(base, "bad.zip"), await bad.generateAsync({ type: "nodebuffer" }));
+    await expect(skills.import(join(base, "bad.zip"))).rejects.toThrow(/outside its folder/);
+    // Nothing was left behind by the refused import.
+    expect((await readdir(root)).filter((n) => !n.startsWith(".")).sort()).toEqual(["brand-voice"]);
+    expect((await readdir(root)).some((n) => n.startsWith(".import-"))).toBe(false);
+  });
+
+  it("keeps every version when two saves of one skill come at once", async () => {
+    const { skills } = await folder();
+    const made = await skills.create("Notes");
+    await Promise.all([
+      skills.save(made.id, { title: "Notes", description: "", steps: "A" }, "first"),
+      skills.save(made.id, { title: "Notes", description: "", steps: "B" }, "second"),
+    ]);
+    expect((await skills.history(made.id)).map((v) => v.note)).toEqual(["second", "first", undefined]);
+  });
+
+  it("stops unpacking a zip entry at the size limit, and leaves nothing behind", async () => {
+    const { base, root, skills } = await folder();
+    const zip = new JSZip();
+    zip.file("SKILL.md", "---\nname: big\ndescription: x\n---\nx");
+    zip.file("huge.bin", Buffer.alloc(4096, 1));
+    await writeFile(join(base, "big.zip"), await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
+    const limit = IMPORT_LIMITS.bytes;
+    IMPORT_LIMITS.bytes = 1024;
+    try {
+      await expect(skills.import(join(base, "big.zip"))).rejects.toThrow(/too big/);
+    } finally {
+      IMPORT_LIMITS.bytes = limit;
+    }
+    expect(await readdir(root)).toEqual([]);
+  });
+
+  it("takes a half-done import back out when keeping its version fails", async () => {
+    const base = await mkdtemp(join(tmpdir(), "tw-skills-"));
+    const root = join(base, "Skills");
+    // A file where the versions folder should be, so keeping the version fails after the folder is in place.
+    await writeFile(join(base, "versions"), "not a folder");
+    const skills = new SkillFolder(root, async () => {}, { versions: new SkillVersions(join(base, "versions")) });
+    const source = join(base, "notes");
+    await mkdir(source);
+    await writeFile(join(source, "SKILL.md"), "---\nname: notes\ndescription: x\n---\n# Notes\n\nx");
+    await expect(skills.import(source)).rejects.toThrow();
+    expect(await readdir(root)).toEqual([]);
+  });
+
+  it("keeps an older skill's history when setting it aside fails during an import", async () => {
+    const base = await mkdtemp(join(tmpdir(), "tw-skills-"));
+    const versions = new SkillVersions(join(base, "versions"));
+    await versions.record("notes", "old text", "2026-10-01T00:00:00Z");
+    versions.setAside = async () => {
+      throw new Error("disk full");
+    };
+    const skills = new SkillFolder(join(base, "Skills"), async () => {}, { versions });
+    const source = join(base, "notes");
+    await mkdir(source);
+    await writeFile(join(source, "SKILL.md"), "---\nname: notes\ndescription: x\n---\n# Notes\n\nx");
+    await expect(skills.import(source)).rejects.toThrow(/disk full/);
+    expect(await versions.text("notes", 1)).toBe("old text");
   });
 });

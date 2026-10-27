@@ -70,6 +70,8 @@ describe("instructionsFor", () => {
       },
     ]);
     expect(text).toContain("the user's skills listed below, which you may read");
+    // The user's own skill wins over a built-in guide where both cover the work.
+    expect(text).toContain("follow the skill wherever they differ");
     expect(text).toContain("- Proposal writer: A client asks for a proposal. (/Docs/Skills/proposal-writer/SKILL.md)");
     expect(instructionsFor(task, project, "it")).not.toContain("The user's skills:");
   });

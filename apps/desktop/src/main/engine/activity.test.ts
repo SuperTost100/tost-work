@@ -41,6 +41,22 @@ describe("activity", () => {
     });
   });
 
+  it("tells a built-in guide from a user's skill with the same folder name", () => {
+    const guides = "/Applications/Tost Work.app/Contents/Resources/skills";
+    expect(activityOf("Read", { file_path: `${guides}/word/SKILL.md` }, guides)).toEqual({
+      kind: "skill",
+      target: "@word",
+    });
+    expect(activityOf("Read", { file_path: "/Users/g/Documents/Tost Work/Skills/word/SKILL.md" }, guides)).toEqual({
+      kind: "skill",
+      target: "word",
+    });
+    expect(commandActivity(`/bin/bash -lc "sed -n '1,80p' '${guides}/excel/SKILL.md'"`, guides)).toEqual({
+      kind: "skill",
+      target: "@excel",
+    });
+  });
+
   it("says which skill a command reads, and what a command does to a document", () => {
     expect(commandActivity(`/bin/bash -lc "sed -n '1,200p' /Users/g/Skills/brand-voice/SKILL.md"`)).toEqual({
       kind: "skill",
