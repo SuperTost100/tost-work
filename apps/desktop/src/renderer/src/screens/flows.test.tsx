@@ -273,6 +273,31 @@ describe("approvals", () => {
   });
 });
 
+describe("long messages", () => {
+  it("won't send a text longer than a message holds, and says to attach it", () => {
+    render(<App userName="Giulia" api={createMemoryApi()} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "x".repeat(100_001) } });
+    expect(screen.getByRole("button", { name: "Start task" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("alert").textContent).toMatch(/Attach it as a file/);
+  });
+
+  it("folds a long brief behind Show all", async () => {
+    const api = createMemoryApi();
+    const brief = `Summarise this email. ${"Lorem ipsum dolor sit amet. ".repeat(80)}THE END`;
+    await api.tasks.start({ projectId: null, brief, attachments: [] });
+    render(<App userName="Giulia" api={api} />);
+    const [open] = await screen.findAllByText(/^Summarise this email/);
+    await act(async () => {
+      fireEvent.click(open as HTMLElement);
+    });
+    expect(document.querySelector(".you")?.textContent).not.toMatch(/THE END/);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Show all" }));
+    });
+    expect(document.querySelector(".you")?.textContent).toMatch(/THE END/);
+  });
+});
+
 describe("the files of a task", () => {
   it("shows a file picked in the side panel, and lists the attached files as used", async () => {
     const api = createMemoryApi();

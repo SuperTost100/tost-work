@@ -103,12 +103,13 @@ export class Store {
 
   /** Tasks that were running when the app quit can't continue, so they are marked stopped on the next start. */
   stopInterrupted(at: string): number {
-    const rows = this.db.prepare("select data from tasks where status in ('running', 'needs-you')").all() as {
+    // A task waiting for the user isn't cut off: its agent ended its turn, and the answer starts the next one.
+    const rows = this.db.prepare("select data from tasks where status = 'running'").all() as {
       data: string;
     }[];
     for (const row of rows) {
       const task = JSON.parse(row.data) as Task;
-      this.saveTask({ ...task, status: "stopped", question: null, approval: null, updatedAt: at });
+      this.saveTask({ ...task, status: "stopped", interrupted: true, question: null, approval: null, updatedAt: at });
     }
     return rows.length;
   }

@@ -228,6 +228,11 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         return { folder, saved: made.map((f) => `${folder}/${f.path.split("/").pop()}`) };
       },
       stop: async (id) => emit(id, { type: "stopped" }),
+      resume: async (id) => {
+        const t = tasks.get(id);
+        if (!t?.interrupted) throw new Error("Only a task stopped by closing Tost Work can be resumed");
+        return save({ ...t, status: "running", interrupted: undefined });
+      },
       menu: async () => menuPick,
       rename: async (id, title) => {
         const t = tasks.get(id);

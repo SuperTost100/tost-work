@@ -110,6 +110,8 @@ export interface TostWorkApi {
     /** Asks for a folder, every time, and copies the files the task made into it. Null when the user cancels. */
     saveCopy(id: string): Promise<SaveResult | null>;
     stop(id: string): Promise<void>;
+    /** Carries on with a task that stopped when Tost Work closed, in the same conversation. */
+    resume(id: string): Promise<Task>;
     /** Shows the task's menu where the pointer is, and resolves with what the user picked, or null. */
     menu(id: string): Promise<TaskMenuAction | null>;
     rename(id: string, title: string): Promise<Task>;
@@ -164,6 +166,7 @@ export const IPC = {
   tasksStart: "tasks:start",
   tasksAnswer: "tasks:answer",
   tasksStop: "tasks:stop",
+  tasksResume: "tasks:resume",
   tasksDecide: "tasks:decide",
   tasksFollowUp: "tasks:follow-up",
   tasksSaveCopy: "tasks:save-copy",

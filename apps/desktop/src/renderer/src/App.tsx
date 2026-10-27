@@ -257,6 +257,7 @@ export function App({
           onDecide={(allow) => api.tasks.decide(task.id, allow)}
           onRestore={(path) => api.files.restore(task.id, path)}
           onStop={() => void api.tasks.stop(task.id).catch(report)}
+          onResume={() => void api.tasks.resume(task.id).catch(report)}
           onOpenProject={() => project && setRoute({ name: "project", id: project.id })}
           onError={report}
           renaming={renaming === task.id && !tasks.slice(0, RECENT).some((x) => x.id === task.id)}

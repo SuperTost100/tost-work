@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { realpath, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
+import { translate } from "../../shared/i18n";
 import type { AgentProvider, AiId, EngineEvent, KeyVendor, Review } from "../../shared/model";
 import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
 import { freeName, inside } from "../files";
@@ -202,6 +203,16 @@ export async function asCodexRequest(request: ApprovalRequest, workdir: string):
  * shortcut: Codex's sandbox keeps commands' writes inside the folder, but Claude Code's commands can write anywhere;
  * turn on Claude Code's sandbox through cli-funnel when it offers it.
  */
+/**
+ * Whether a CLI's error means it couldn't reach its service. Codex says "workspace routing discovery failed" or
+ * "stream disconnected", Claude Code names the socket error.
+ */
+export function isNetworkError(message: string): boolean {
+  return /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|ECONNRESET|ENETUNREACH|EHOSTUNREACH|getaddrinfo|fetch failed|connection refused|network (error|is unreachable)|routing discovery failed|stream disconnected|error sending request/i.test(
+    message,
+  );
+}
+
 export class AgentEngine implements Engine, ToolHandler {
   private live = new Map<string, Live>();
   private waiting = new Map<string, (reply: boolean | null) => void>();
@@ -215,6 +226,7 @@ export class AgentEngine implements Engine, ToolHandler {
   private user: () => { name: string; work: string; notes: string };
   private ai: () => Promise<AiId>;
   private courseKey: () => { key: string; vendor: KeyVendor } | null;
+  private online: () => boolean;
 
   constructor(
     private funnel: AgentFunnel,
@@ -227,12 +239,20 @@ export class AgentEngine implements Engine, ToolHandler {
       ai?: () => Promise<AiId>;
       /** The course API key, read for each run so a removed key stops being used. */
       courseKey?: () => { key: string; vendor: KeyVendor } | null;
+      /** Whether the computer has a network connection, so a task without one fails at once with a clear reason. */
+      online?: () => boolean;
     } = {},
   ) {
     this.documents = options.documents ?? null;
     this.user = options.user ?? (() => ({ name: "", work: "", notes: "" }));
     this.ai = options.ai ?? (async () => "chatgpt");
     this.courseKey = options.courseKey ?? (() => null);
+    this.online = options.online ?? (() => true);
+  }
+
+  /** Why the task can't reach its AI, in the user's language. */
+  private offline(provider: AgentProvider): string {
+    return translate(this.language(), "task.offline", { ai: provider === "claude" ? "Claude" : "ChatGPT" });
   }
 
   /** The tool server takes this engine as its handler, so it's attached after both exist. */
@@ -261,6 +281,8 @@ export class AgentEngine implements Engine, ToolHandler {
 
   async *run({ task, project, workdir, followUp, signal }: RunContext): AsyncIterable<EngineEvent> {
     if (!this.tools) throw new Error("The tool server isn't attached");
+    // Without a connection Codex retries for minutes before it gives up, so the task fails straight away instead.
+    if (!this.online()) throw new Error(this.offline(task.provider ?? "codex"));
     const channel = new Channel<EngineEvent>();
     // Files the task created. A file with a kept copy existed before the task (it was overwritten with approval, or
     // restored since), so changing it again always asks.
@@ -349,7 +371,15 @@ export class AgentEngine implements Engine, ToolHandler {
         }
       } catch (err) {
         if (signal.aborted) channel.push({ type: "stopped" });
-        else channel.push({ type: "failed", error: err instanceof Error ? err.message : String(err) });
+        else {
+          const message = err instanceof Error ? err.message : String(err);
+          channel.push({
+            type: "failed",
+            // Only an error that is about the network gets the plain explanation; any other keeps the CLI's words,
+            // even when the connection dropped meanwhile.
+            error: isNetworkError(message) ? this.offline(task.provider ?? "codex") : message,
+          });
+        }
       } finally {
         // A file change Codex still holds ends with the turn. Its card stays, and the decision starts the next run.
         for (const id of [...live.pending]) this.waiting.get(id)?.(null);

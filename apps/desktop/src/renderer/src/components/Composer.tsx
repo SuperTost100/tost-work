@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Icon } from "@/lib/Icon";
 import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
+import { BRIEF_MAX } from "../../../shared/model";
 
 /** Files attached to a brief, kept by whoever owns the brief so they survive a trip to another section. */
 export interface Attachments {
@@ -37,7 +38,8 @@ export function Composer({
   attach?: Attachments;
 }) {
   const t = useT();
-  const canSend = !disabled && value.trim().length > 0;
+  const tooLong = value.length > BRIEF_MAX;
+  const canSend = !disabled && !tooLong && value.trim().length > 0;
   return (
     <div className={className ? `composer ${className}` : "composer"}>
       {children}
@@ -97,6 +99,11 @@ export function Composer({
           <Icon name="arrow-up" />
         </button>
       </div>
+      {tooLong && (
+        <p className="toolong" role="alert">
+          {t("composer.tooLong", { max: BRIEF_MAX.toLocaleString() })}
+        </p>
+      )}
     </div>
   );
 }

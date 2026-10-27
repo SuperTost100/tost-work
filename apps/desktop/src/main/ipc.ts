@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { app, type BrowserWindow, dialog, ipcMain, Menu, type OpenDialogOptions, shell } from "electron";
 import { IPC, type NewProjectInput, type NewTaskInput, type SaveResult, type TaskMenuAction } from "../shared/api";
 import { languageFrom, type MessageKey, translate } from "../shared/i18n";
-import type { AgentProvider, Project, Settings } from "../shared/model";
+import { type AgentProvider, BRIEF_MAX, type Project, type Settings } from "../shared/model";
 import type { Accounts } from "./accounts";
 import type { TaskRunner } from "./engine/runner";
 import { type Conflict, copyInto, describe, readablePath, savablePaths, saveCopies } from "./files";
@@ -97,7 +97,7 @@ export function registerIpc(
   ipcMain.handle(IPC.tasksGet, (_e, id: unknown) => store.getTask(text(id, "id", 100)) ?? null);
 
   ipcMain.handle(IPC.tasksStart, async (_e, input: NewTaskInput) => {
-    const brief = text(input?.brief, "brief").trim();
+    const brief = text(input?.brief, "brief", BRIEF_MAX).trim();
     if (!brief) throw new Error("A task needs a brief");
     const projectId = input?.projectId == null ? null : text(input.projectId, "projectId", 100);
     const project = projectId ? store.getProject(projectId) : undefined;
@@ -119,16 +119,17 @@ export function registerIpc(
   });
 
   ipcMain.handle(IPC.tasksAnswer, (_e, id: unknown, answer: unknown) =>
-    runner.answer(text(id, "id", 100), text(answer, "answer", 5000)),
+    runner.answer(text(id, "id", 100), text(answer, "answer", BRIEF_MAX)),
   );
   ipcMain.handle(IPC.tasksStop, (_e, id: unknown) => runner.stop(text(id, "id", 100)));
+  ipcMain.handle(IPC.tasksResume, (_e, id: unknown) => runner.resume(text(id, "id", 100)));
   ipcMain.handle(IPC.tasksDecide, (_e, id: unknown, allow: unknown) => {
     if (typeof allow !== "boolean") throw new Error("allow must be true or false");
     return runner.decide(text(id, "id", 100), allow);
   });
   ipcMain.handle(IPC.tasksFollowUp, (_e, id: unknown, message: unknown) => {
     const taskId = text(id, "id", 100);
-    const body = text(message, "message").trim();
+    const body = text(message, "message", BRIEF_MAX).trim();
     if (!body) throw new Error("Write what to change first");
     const task = runner.followUp(taskId, body);
     runner.launch(taskId, body);

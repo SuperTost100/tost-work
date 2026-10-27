@@ -895,6 +895,11 @@ h3 {
 .you .outs {
   margin-top: 10px;
 }
+.composer .toolong {
+  padding: 0 14px 12px;
+  font-size: 13px;
+  color: var(--t2);
+}
 .steps {
   margin: 26px 0 0;
   display: grid;

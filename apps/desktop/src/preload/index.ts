@@ -52,6 +52,7 @@ const api: TostWorkApi = {
     start: (input) => ipcRenderer.invoke(IPC.tasksStart, input),
     answer: (id, answer) => ipcRenderer.invoke(IPC.tasksAnswer, id, answer),
     stop: (id) => ipcRenderer.invoke(IPC.tasksStop, id),
+    resume: (id) => ipcRenderer.invoke(IPC.tasksResume, id),
     decide: (id, allow) => ipcRenderer.invoke(IPC.tasksDecide, id, allow),
     followUp: (id, text) => ipcRenderer.invoke(IPC.tasksFollowUp, id, text),
     saveCopy: (id) => ipcRenderer.invoke(IPC.tasksSaveCopy, id),

@@ -48,14 +48,15 @@ describe("Store", () => {
     expect(s.listTasks().map((t) => t.title)).toEqual(["touched", "new"]);
   });
 
-  it("marks tasks left running by a quit as stopped", () => {
+  it("marks tasks left working by a quit as interrupted, and leaves one waiting for the user as it was", () => {
     const s = new Store(":memory:");
     s.saveTask(task("r", "running", "2026-10-01T00:00:00Z"));
     s.saveTask({ ...task("q", "needs-you", "2026-10-01T00:00:00Z"), question: { id: "x", text: "?", options: [] } });
     s.saveTask(task("d", "done", "2026-10-01T00:00:00Z"));
-    expect(s.stopInterrupted("2026-10-02T00:00:00Z")).toBe(2);
-    expect(s.getTask("q")?.status).toBe("stopped");
-    expect(s.getTask("q")?.question).toBeNull();
+    expect(s.stopInterrupted("2026-10-02T00:00:00Z")).toBe(1);
+    expect(s.getTask("r")).toMatchObject({ status: "stopped", interrupted: true });
+    // Its agent ended its turn to ask, so the answer still starts the next one after a restart.
+    expect(s.getTask("q")).toMatchObject({ status: "needs-you", question: { id: "x" } });
     expect(s.getTask("d")?.status).toBe("done");
   });
 

@@ -4,7 +4,7 @@ import type { EngineEvent, Task } from "../../shared/model";
 import { Store } from "../store/store";
 import type { Engine, RunContext } from "./engine";
 import { FakeEngine, PROPOSAL_SCRIPT } from "./fake";
-import { TaskRunner, titleFrom } from "./runner";
+import { RESUME_PROMPT, TaskRunner, titleFrom } from "./runner";
 
 function setup() {
   const store = new Store(":memory:");
@@ -261,6 +261,76 @@ describe("TaskRunner when the agent ends its turn to wait", () => {
     // The first run's end doesn't show the task as done while the answer waits for the next run.
     const between = statuses.slice(answered, statuses.lastIndexOf("done"));
     expect(between).not.toContain("done");
+  });
+
+  it("resumes a task Tost Work closed on, in its conversation or from the brief", async () => {
+    const { store, runner, task, prompts } = turnTaking([() => [], () => [], () => [], () => []]);
+    expect(() => runner.resume(task.id)).toThrow(/Only a task stopped by closing/);
+
+    // Closed before the agent's first answer: no conversation yet, so the brief runs again.
+    store.saveTask({ ...task, status: "running" });
+    store.stopInterrupted("2026-10-27T00:00:00Z");
+    expect(store.getTask(task.id)).toMatchObject({ status: "stopped", interrupted: true });
+    runner.resume(task.id);
+    await waitFor(() => store.getTask(task.id)?.status === "done");
+    expect(prompts).toEqual([null]);
+    expect(store.getTask(task.id)?.interrupted).toBeUndefined();
+
+    // A resume that fails before the run starts, as offline, stays resumable and says why.
+    const offline: Engine = {
+      defaults: async () => ({ provider: "codex", model: "m", effort: "low" }),
+      // biome-ignore lint/correctness/useYield: it fails before its first event, as the engine does offline.
+      async *run() {
+        throw new Error("Tost Work can't reach ChatGPT.");
+      },
+      answer: () => false,
+      decide: () => false,
+    };
+    store.saveTask({ ...(store.getTask(task.id) as Task), status: "running" });
+    store.stopInterrupted("2026-10-27T00:00:00Z");
+    await new TaskRunner(store, offline, () => {}).start(task.id);
+    expect(store.getTask(task.id)).toMatchObject({
+      status: "stopped",
+      interrupted: true,
+      error: "Tost Work can't reach ChatGPT.",
+    });
+    // Back online, Resume works.
+    runner.resume(task.id);
+    await waitFor(() => store.getTask(task.id)?.status === "done");
+    expect(store.getTask(task.id)?.interrupted).toBeUndefined();
+    expect(store.getTask(task.id)?.error).toBeNull();
+
+    // Not while a kept copy is being put back: the run could write the same file.
+    const gate: { finish: (() => void) | null } = { finish: null };
+    const idle: Engine = {
+      defaults: async () => ({ provider: "codex", model: "m", effort: "low" }),
+      async *run() {},
+      answer: () => false,
+      decide: () => false,
+    };
+    const slow = new TaskRunner(store, idle, () => {}, undefined, {
+      keep: async () => null as never,
+      trash: async () => {},
+      restore: () => new Promise<void>((r) => (gate.finish = r)),
+    });
+    store.saveTask({
+      ...(store.getTask(task.id) as Task),
+      status: "stopped",
+      interrupted: true,
+      kept: [{ path: "/w/a.docx", copy: "/k/a.docx", at: "", reason: "overwrite" }],
+    });
+    const restoring = slow.restore(task.id, "/w/a.docx");
+    expect(() => slow.resume(task.id)).toThrow(/Wait for the restore/);
+    await waitFor(() => gate.finish !== null);
+    gate.finish?.();
+    await restoring;
+
+    // Closed mid-conversation: the agent hears why it stopped and carries on.
+    store.saveTask({ ...(store.getTask(task.id) as Task), sessionId: "s1", status: "running" });
+    store.stopInterrupted("2026-10-27T00:00:01Z");
+    runner.resume(task.id);
+    await waitFor(() => prompts.length === 3 && store.getTask(task.id)?.status === "done");
+    expect(prompts).toEqual([null, null, RESUME_PROMPT]);
   });
 
   it("stops a task that waits with no run left", async () => {

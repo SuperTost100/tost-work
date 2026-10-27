@@ -4,6 +4,9 @@ import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
 
 const press = async (api: ReturnType<typeof createMemoryApi>, action: Parameters<typeof api.pressMenu>[0]) => {
+  // Let React finish its effects first: the window subscribes to the menu in one, and on a slow machine a press could
+  // otherwise arrive before anyone listens.
+  await act(async () => {});
   await act(async () => {
     api.pressMenu(action);
   });

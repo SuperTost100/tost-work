@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { FunnelEvent, RunRequest } from "cli-funnel";
 import { describe, expect, it } from "vitest";
 import type { EngineEvent, Task } from "../../shared/model";
-import { AgentEngine, type AgentFunnel, deletesFiles } from "./agent";
+import { AgentEngine, type AgentFunnel, deletesFiles, isNetworkError } from "./agent";
 
 type Emit = (event: FunnelEvent) => void;
 type Script = (input: RunRequest, emit: Emit) => Promise<{ text: string; finishReason?: string }>;
@@ -24,10 +24,12 @@ function fakeFunnel(script: Script) {
         events.push(e);
         wake?.();
       }).then((r) => ({ toolCalls: [], deniedActions: [], finishReason: "stop", ...r }));
-      void result.finally(() => {
+      // Settles either way: a script that throws fails the run through `result`, not as a stray rejection here.
+      const end = () => {
         ended = true;
         wake?.();
-      });
+      };
+      result.then(end, end);
       return {
         result,
         async *[Symbol.asyncIterator]() {
@@ -532,6 +534,55 @@ describe("AgentEngine with the document tools", () => {
 });
 
 describe("deletesFiles", () => {
+  it("says in plain words that the network is down, at once when the computer is offline", async () => {
+    const { funnel, inputs } = fakeFunnel(async () => ({ text: "" }));
+    const offline = new AgentEngine(funnel, () => "it", { online: () => false });
+    offline.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const runs = offline.run({
+      task: task(),
+      project: null,
+      workdir: "/w",
+      followUp: null,
+      signal: new AbortController().signal,
+    });
+    await expect(runs[Symbol.asyncIterator]().next()).rejects.toThrow(/non riesce a raggiungere ChatGPT/);
+    expect(inputs).toHaveLength(0);
+
+    // Online, a CLI's own network error is put the same way, and any other error keeps the CLI's words.
+    const { run, seen } = setup(async () => {
+      throw new Error("API Error: Connection refused (ECONNREFUSED)");
+    });
+    await run();
+    expect(seen.at(-1)).toMatchObject({ type: "failed", error: expect.stringMatching(/Controlla la connessione/) });
+    const other = setup(async () => {
+      throw new Error("model not found");
+    });
+    await other.run();
+    expect(other.seen.at(-1)).toEqual({ type: "failed", error: "model not found" });
+
+    // A connection that drops during the run doesn't hide another reason.
+    let online = true;
+    const { funnel: dropping } = fakeFunnel(async () => {
+      online = false;
+      throw new Error("model not found");
+    });
+    const engine = new AgentEngine(dropping, () => "it", { online: () => online });
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const events: EngineEvent[] = [];
+    const signal = new AbortController().signal;
+    for await (const e of engine.run({ task: task(), project: null, workdir: "/w", followUp: null, signal }))
+      events.push(e);
+    expect(events.at(-1)).toEqual({ type: "failed", error: "model not found" });
+  });
+
+  it("tells network errors from the rest", () => {
+    expect(isNetworkError("workspace routing discovery failed")).toBe(true);
+    expect(isNetworkError("stream disconnected before completion: error sending request")).toBe(true);
+    expect(isNetworkError("getaddrinfo ENOTFOUND api.anthropic.com")).toBe(true);
+    expect(isNetworkError("You've hit your usage limit")).toBe(false);
+    expect(isNetworkError("The network folder is read-only")).toBe(false);
+  });
+
   it("finds commands that delete, whatever comes before them", () => {
     for (const command of [
       "rm -rf drafts",

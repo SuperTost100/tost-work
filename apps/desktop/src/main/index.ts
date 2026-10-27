@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { createFunnel } from "cli-funnel";
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, safeStorage, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, safeStorage, shell } from "electron";
 import { IPC, type MenuState } from "../shared/api";
 import { languageFrom, translate } from "../shared/i18n";
 import type { AgentProvider } from "../shared/model";
@@ -105,6 +105,7 @@ app.whenReady().then(async () => {
           keys.info() !== null,
         ),
       courseKey: () => keys.get(),
+      online: () => net.isOnline(),
     });
     tools = new ToolServer(agent);
     await tools.start();
@@ -197,7 +198,31 @@ app.whenReady().then(async () => {
       refreshMenu();
     },
   );
-  app.on("before-quit", () => {
+  // Quitting stops the tasks still working, so it asks first. They show as interrupted, with Resume, next time.
+  let quitting = false;
+  app.on("before-quit", (event) => {
+    const working = runner.workingCount();
+    if (!quitting && working > 0) {
+      const lang = language();
+      const options = {
+        type: "question" as const,
+        buttons: [translate(lang, "quit.quit"), translate(lang, "quit.cancel")],
+        defaultId: 1,
+        cancelId: 1,
+        message:
+          working === 1 ? translate(lang, "quit.title") : translate(lang, "quit.titleMany", { n: String(working) }),
+        detail: translate(lang, "quit.detail"),
+      };
+      const choice =
+        mainWindow && !mainWindow.isDestroyed()
+          ? dialog.showMessageBoxSync(mainWindow, options)
+          : dialog.showMessageBoxSync(options);
+      if (choice !== 0) {
+        event.preventDefault();
+        return;
+      }
+    }
+    quitting = true;
     accounts.codex.cancel();
     accounts.claude.cancel();
     void tools?.stop();

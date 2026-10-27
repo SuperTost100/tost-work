@@ -44,6 +44,10 @@ export function decisionNote(approval: Approval, allow: boolean): string {
 }
 
 /** Starts tasks on an engine, keeps each task's state in the store and reports every change. */
+/** What the agent hears when a task resumes after Tost Work closed during its turn. */
+export const RESUME_PROMPT =
+  "Tost Work closed while you were working on this task, so your last turn was cut short. Check what you had already done in the folder, then carry on where you left off.";
+
 export class TaskRunner {
   private running = new Map<string, AbortController>();
   /** A reply that came while the run that asked was still ending its turn. It starts the next run. */
@@ -105,22 +109,27 @@ export class TaskRunner {
     const controller = new AbortController();
     this.running.set(taskId, controller);
     try {
+      // An interrupted task stays resumable until its run really starts: a resume that fails at once, for example
+      // offline, leaves Resume on the task to try again.
       task = this.save({ ...task, status: "running", error: null, updatedAt: this.now() });
       for await (const event of this.engine.run({ task, project, workdir, followUp, signal: controller.signal })) {
         // A reply already waits for the next run, so this run's end isn't the task's: it stays running.
         if (event.type === "done" && this.queued.has(taskId)) continue;
         // Read the stored task each time, so an answer saved meanwhile isn't overwritten.
-        task = this.save(applyEvent(this.mustGet(taskId), event, this.now()));
+        task = this.save(applyEvent({ ...this.mustGet(taskId), interrupted: undefined }, event, this.now()));
       }
       // The stored task, not the last snapshot: a rename may have landed while the engine finished.
       const latest = this.mustGet(taskId);
       task =
         latest.status === "running" && !this.queued.has(taskId)
-          ? this.save(applyEvent(latest, { type: "done" }, this.now()))
+          ? this.save(applyEvent({ ...latest, interrupted: undefined }, { type: "done" }, this.now()))
           : latest;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      task = this.save(applyEvent(this.mustGet(taskId), { type: "failed", error: message }, this.now()));
+      const current = this.mustGet(taskId);
+      task = current.interrupted
+        ? this.save({ ...current, status: "stopped", error: message, updatedAt: this.now() })
+        : this.save(applyEvent(current, { type: "failed", error: message }, this.now()));
     } finally {
       this.running.delete(taskId);
     }
@@ -151,6 +160,20 @@ export class TaskRunner {
   private continueWith(taskId: string, prompt: string): void {
     if (this.running.has(taskId)) this.queued.set(taskId, prompt);
     else this.launch(taskId, prompt);
+  }
+
+  /**
+   * Carries on with a task that stopped when Tost Work closed. With a conversation to go back to, the agent is told why
+   * it stopped; without one, the brief runs again from the start.
+   */
+  resume(taskId: string): Task {
+    const task = this.mustGet(taskId);
+    if (this.running.has(taskId)) throw new Error("This task is still working");
+    if (!task.interrupted) throw new Error("Only a task stopped by closing Tost Work can be resumed");
+    // A run started now could write to a file the restore is about to put back.
+    if (this.restoring.has(taskId)) throw new Error("Wait for the restore to finish");
+    this.launch(taskId, task.sessionId ? RESUME_PROMPT : null);
+    return task;
   }
 
   /** Adds the user's next instruction to a task that isn't working. Call `launch` with the same text to run it. */
@@ -278,6 +301,11 @@ export class TaskRunner {
     // A task waiting for the user may have no run left: its agent ended the turn to wait.
     const task = this.store.getTask(taskId);
     if (task?.status === "needs-you") this.save(applyEvent(task, { type: "stopped" }, this.now()));
+  }
+
+  /** How many tasks are working right now, so quitting can ask first. */
+  workingCount(): number {
+    return this.running.size;
   }
 
   isRunning(taskId: string): boolean {

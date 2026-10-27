@@ -94,6 +94,8 @@ export interface Task {
   review: Review | null;
   /** Missing on tasks saved before copies were kept. */
   kept?: KeptCopy[];
+  /** Stopped because Tost Work closed while the task was working, not by the user. Resume carries on. */
+  interrupted?: boolean;
   /** The agent's conversation, so a follow-up continues it. Set by the real engine. */
   sessionId?: string;
   error: string | null;
@@ -198,3 +200,6 @@ export const DEFAULT_SETTINGS: Settings = {
 
 /** The longest "what else to know" note the AI gets with every task. */
 export const NOTES_MAX = 4000;
+
+/** The longest message a task takes, about 25 pages: a longer text goes in as an attached file. */
+export const BRIEF_MAX = 100_000;

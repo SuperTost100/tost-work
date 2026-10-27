@@ -236,6 +236,24 @@ function Checks({ title, items, icon }: { title: string; items: ReviewItem[]; ic
   );
 }
 
+/** Characters of a message shown before the rest folds away behind "Show all". */
+const FOLD_AT = 1200;
+
+/** A message the user wrote, folded when it's long, such as a pasted email. */
+function LongText({ text }: { text: string }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  if (text.length <= FOLD_AT) return <>{text}</>;
+  return (
+    <>
+      {open ? text : `${text.slice(0, FOLD_AT).trimEnd()}…`}{" "}
+      <button type="button" className="link" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {t(open ? "task.showLess" : "task.showAll")}
+      </button>
+    </>
+  );
+}
+
 function Artifact({
   api,
   task,
@@ -325,6 +343,7 @@ export function Task({
   onDecide,
   onRestore,
   onStop,
+  onResume,
   onOpenProject,
   onError,
   renaming = false,
@@ -340,6 +359,8 @@ export function Task({
   onDecide: (allow: boolean) => Promise<unknown>;
   onRestore: (path: string) => Promise<unknown>;
   onStop: () => void;
+  /** Carries on with a task that stopped when Tost Work closed. */
+  onResume: () => void;
   onOpenProject: () => void;
   /** Shows a failed action, such as a file that was moved before Open, in the app's alert. */
   onError: (err: unknown) => void;
@@ -388,7 +409,7 @@ export function Task({
     if (!m) return null;
     return m.from === "user" ? (
       <div className="you" style={{ marginTop: 18 }} key={i}>
-        {m.text}
+        <LongText text={m.text} />
       </div>
     ) : (
       <AgentMessage key={i} text={m.text} />
@@ -438,7 +459,7 @@ export function Task({
           <div className="scroll">
             <div className="col">
               <div className="you">
-                {task.brief}
+                <LongText text={task.brief} />
                 {task.attachments.length > 0 && (
                   <div className="outs" style={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
                     {task.attachments.map((path) => (
@@ -470,7 +491,26 @@ export function Task({
               {made.length > 0 && (
                 <Artifact api={api} task={task} files={made} picked={picked} onPick={setPicked} onError={onError} />
               )}
-              {task.status === "stopped" && <p className="agent t3">{t("task.stopped")}</p>}
+              {task.status === "stopped" &&
+                (task.interrupted ? (
+                  <div className="agent t3 row">
+                    <span className="grow">
+                      {t("task.interrupted")}
+                      {/* A resume that failed, for example offline, says why; Resume stays to try again. */}
+                      {task.error && (
+                        <>
+                          <br />
+                          {t("task.failed", { error: task.error })}
+                        </>
+                      )}
+                    </span>
+                    <button type="button" className="btn" onClick={onResume}>
+                      {t("task.resume")}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="agent t3">{t("task.stopped")}</p>
+                ))}
               {task.status === "failed" && <p className="agent">{t("task.failed", { error: task.error ?? "" })}</p>}
               {task.review && (
                 <>
