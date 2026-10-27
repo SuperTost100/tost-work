@@ -418,12 +418,27 @@ h3 {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   font-size: 14px;
   color: var(--t2);
+  white-space: nowrap;
 }
 .crumb b {
   font-weight: 500;
   color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crumb > :not(b) {
+  flex: none;
+}
+/* The detail after a title gives way first. */
+.crumb > .truncate,
+.crumb > .link {
+  flex: 0 1000 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .scroll {
   flex: 1;
@@ -736,6 +751,7 @@ h3 {
     ui-monospace,
     monospace;
   white-space: nowrap;
+  flex: none;
 }
 .tag.mine {
   background: var(--ink);
@@ -853,7 +869,7 @@ h3 {
 /* ===== Task ===== */
 .task {
   display: grid;
-  grid-template-columns: 1fr 292px;
+  grid-template-columns: minmax(0, 1fr) clamp(200px, 30%, 292px);
   flex: 1;
   min-height: 0;
 }
@@ -916,6 +932,14 @@ h3 {
 }
 .artifact .head b {
   font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.artifact .head .tbtn {
+  flex: none;
+  white-space: nowrap;
 }
 .artifact .head .t3 {
   font-size: 13px;
@@ -931,22 +955,15 @@ h3 {
   -webkit-mask-image: linear-gradient(#000 70%, transparent);
   mask-image: linear-gradient(#000 70%, transparent);
 }
-.page h3 {
-  font-size: 15px;
-  font-weight: 700;
-  margin: 14px 0 5px;
-}
-.page h3:first-child {
-  margin-top: 0;
-}
-.page p {
-  font-size: 14px;
-  line-height: 1.65;
+/* Only Markdown takes the app's ink: a Word page is white in both themes and keeps the document's own colours. */
+.pv-md p {
   color: var(--ink);
 }
+/* Above the conversation, so a preview scrolling under the fade can't draw over it. */
 .foot {
   padding: 0 32px 16px;
   position: relative;
+  z-index: 1;
 }
 .foot::before {
   content: "";
@@ -1489,9 +1506,13 @@ h3 {
   color: var(--t3);
   margin: 18px 0 2px;
 }
+/* File names stay on one line: long ones are cut, and a row too wide for the card scrolls sideways. */
 .ftabs {
   display: flex;
   gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 .ftabs a {
   height: 28px;
@@ -1511,7 +1532,7 @@ h3 {
 /* Quick edit: one panel lists what changed. 360px while it lists files; the change cards will need the mockup's 440px. */
 .qe {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: minmax(0, 1fr) clamp(200px, 30%, 360px);
   flex: 1;
   min-height: 0;
 }
@@ -2633,11 +2654,16 @@ fieldset.fld > legend {
 
 /* ===== File previews ===== */
 .ftabs button {
+  flex: none;
+  max-width: 200px;
   height: 28px;
   padding: 0 10px;
   border-radius: 7px;
   font-size: 13px;
   color: var(--t2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ftabs button.on {
   background: var(--paper);
@@ -2668,7 +2694,7 @@ fieldset.fld > legend {
   font-size: 16px;
   margin: 16px 0 6px;
 }
-.pv-md h1:first-child {
+.pv-md > :first-child {
   margin-top: 0;
 }
 .pv-text {

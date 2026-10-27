@@ -242,6 +242,8 @@ function Artifact({
                 aria-selected={f.path === current.path}
                 key={f.path}
                 className={f.path === current.path ? "on" : undefined}
+                // The whole path, so two files with the same name in different folders can be told apart.
+                title={f.path}
                 onClick={() => setPicked(f.path)}
               >
                 {fileName(f.path)}
