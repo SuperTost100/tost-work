@@ -18,6 +18,7 @@ import { KeyStore } from "./keys";
 import { applyLook } from "./look";
 import { ToolServer } from "./mcp/server";
 import { pickAi } from "./pickAi";
+import { SkillFolder } from "./skills";
 import { Store } from "./store/store";
 
 const isMac = process.platform === "darwin";
@@ -75,6 +76,10 @@ app.whenReady().then(async () => {
     encrypt: (text) => safeStorage.encryptString(text),
     decrypt: (data) => safeStorage.decryptString(data),
   });
+  // Where people can see, back up and copy their skills, as the course teaches.
+  const skills = new SkillFolder(join(app.getPath("documents"), "Tost Work", "Skills"), (path) =>
+    shell.trashItem(path),
+  );
   store.stopInterrupted(new Date().toISOString());
   // Before the window, so its background colour already follows the chosen theme.
   applyLook(null, store.getSettings());
@@ -106,6 +111,7 @@ app.whenReady().then(async () => {
         ),
       courseKey: () => keys.get(),
       online: () => net.isOnline(),
+      skills: () => skills.list(),
     });
     tools = new ToolServer(agent);
     await tools.start();
@@ -197,6 +203,7 @@ app.whenReady().then(async () => {
       applyLook(mainWindow, settings);
       refreshMenu();
     },
+    skills,
   );
   // Quitting stops the tasks still working, so it asks first. They show as interrupted, with Resume, next time.
   let quitting = false;

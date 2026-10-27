@@ -1758,6 +1758,43 @@ ins {
   background: var(--sel);
   font-weight: 500;
 }
+/* The list's items are buttons, so they reset the button look and fill the row. */
+.slist .sitem {
+  width: 100%;
+  text-align: left;
+}
+.editor .title-input {
+  min-width: 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 2px 8px;
+  margin: 0 -8px;
+  border-radius: 8px;
+}
+.editor .title-input:hover,
+.editor .title-input:focus {
+  background: var(--hover);
+  outline: none;
+}
+.editor textarea.editable {
+  display: block;
+  width: calc(100% + 16px);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  resize: vertical;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.editor textarea.editable:focus {
+  background: var(--hover);
+  outline: none;
+}
 .slist .sitem .v {
   margin-left: auto;
   font:
@@ -1775,6 +1812,7 @@ ins {
   letter-spacing: -0.03em;
 }
 .doc-h {
+  display: block;
   font-size: 12.5px;
   color: var(--t3);
   margin: 26px 0 6px;

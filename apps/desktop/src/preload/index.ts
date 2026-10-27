@@ -73,6 +73,14 @@ const api: TostWorkApi = {
     reveal: (taskId, path) => ipcRenderer.invoke(IPC.filesReveal, taskId, path),
     restore: (taskId, path) => ipcRenderer.invoke(IPC.filesRestore, taskId, path),
   },
+  skills: {
+    list: () => ipcRenderer.invoke(IPC.skillsList),
+    create: (title) => ipcRenderer.invoke(IPC.skillsCreate, title),
+    save: (id, draft) => ipcRenderer.invoke(IPC.skillsSave, id, draft),
+    addFiles: (id) => ipcRenderer.invoke(IPC.skillsAddFiles, id),
+    reveal: (id) => ipcRenderer.invoke(IPC.skillsReveal, id),
+    remove: (id) => ipcRenderer.invoke(IPC.skillsRemove, id),
+  },
 };
 
 contextBridge.exposeInMainWorld("tostWork", api);

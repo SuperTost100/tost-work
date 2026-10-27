@@ -1,5 +1,5 @@
 import type { InstallResult } from "./install";
-import type { AgentProvider, CourseKey, Project, Settings, Task } from "./model";
+import type { AgentProvider, CourseKey, Project, Settings, Skill, SkillDraft, Task } from "./model";
 
 export interface NewProjectInput {
   name: string;
@@ -134,6 +134,20 @@ export interface TostWorkApi {
     /** Puts back the copy kept before the file was replaced. Restoring again undoes it. */
     restore(taskId: string, path: string): Promise<Task>;
   };
+  /** The user's skills, SKILL.md folders in Documents/Tost Work/Skills. */
+  skills: {
+    list(): Promise<Skill[]>;
+    /** Makes a skill with this title and an empty text, ready to edit. */
+    create(title: string): Promise<Skill>;
+    /** Saves the editor's fields. A new title renames the skill's folder too. */
+    save(id: string, draft: SkillDraft): Promise<Skill>;
+    /** Asks for files, such as a template, and copies them into the skill. */
+    addFiles(id: string): Promise<Skill>;
+    /** Shows the skill's folder in Finder or Explorer. */
+    reveal(id: string): Promise<void>;
+    /** Moves the skill's folder to the Trash. */
+    remove(id: string): Promise<void>;
+  };
 }
 
 /** What the task menu offers. */
@@ -152,6 +166,12 @@ export const IPC = {
   settingsChanged: "settings:changed",
   menuAction: "menu:action",
   menuState: "menu:state",
+  skillsList: "skills:list",
+  skillsCreate: "skills:create",
+  skillsSave: "skills:save",
+  skillsAddFiles: "skills:add-files",
+  skillsReveal: "skills:reveal",
+  skillsRemove: "skills:remove",
   keyInfo: "key:info",
   keySave: "key:save",
   keyRemove: "key:remove",

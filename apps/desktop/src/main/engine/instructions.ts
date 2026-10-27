@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { Project, Task } from "../../shared/model";
+import type { Project, Skill, Task } from "../../shared/model";
 
 const LANGUAGE_NAMES = { en: "English", it: "Italian" } as const;
 
@@ -13,6 +13,7 @@ export function instructionsFor(
   language: "en" | "it",
   documents: { skills: string } | null = null,
   user: { name: string; work: string; notes: string } = { name: "", work: "", notes: "" },
+  skills: Pick<Skill, "title" | "description" | "folder">[] = [],
 ): string {
   const where = project
     ? `You work in the project "${project.name}". Its folder is ${task.workdir}.`
@@ -23,7 +24,7 @@ export function instructionsFor(
     where,
     "Rules:\n" +
       [
-        "1. Work only inside that folder. Don't read or write anywhere else, except the files the user attached.",
+        "1. Work only inside that folder. Don't read or write anywhere else, except the files the user attached and the user's skills listed below, which you may read.",
         "2. Before replacing a file that already exists, call request_approval with action overwrite, then end your turn. The decision arrives as your next message. If it's refused, save your version under a new name.",
         "3. Before deleting files, call request_approval with action delete and the list of files, then end your turn. If it's allowed, Tost Work moves them to the Trash: don't delete them yourself.",
         "4. When the brief leaves real choices open, don't guess: call ask_user once with every question you need answered at that point, up to 16, each with 2 to 4 short options, then end your turn. The answers arrive together as your next message. If they raise new questions, ask another round. Don't ask about things you can decide sensibly yourself.",
@@ -55,6 +56,15 @@ export function instructionsFor(
     user.notes.trim() && `What else to know:\n${user.notes.trim()}`,
   ].filter(Boolean);
   if (about.length) parts.push(`About the user, from their profile in Tost Work:\n${about.join("\n")}`);
+  if (skills.length)
+    parts.push(
+      [
+        "The user's skills: their own instructions for kinds of work they do often. Each is a folder with a SKILL.md, and sometimes files it brings, such as a template. When the work matches a skill's description, read its SKILL.md before you start and follow it, and use the files it brings from its folder without changing them. In your review, say which skill you followed.",
+        ...skills.map(
+          (s) => `- ${s.title}: ${s.description.trim() || "(no description)"} (${join(s.folder, "SKILL.md")})`,
+        ),
+      ].join("\n"),
+    );
   if (project?.instructions.trim()) parts.push(`The project's instructions:\n${project.instructions.trim()}`);
   if (task.attachments.length)
     parts.push(`Files the user attached:\n${task.attachments.map((p) => `- ${p}`).join("\n")}`);

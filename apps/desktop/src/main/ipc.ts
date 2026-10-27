@@ -11,6 +11,7 @@ import type { TaskRunner } from "./engine/runner";
 import { type Conflict, copyInto, describe, readablePath, savablePaths, saveCopies } from "./files";
 import type { Installer } from "./installer";
 import type { KeyStore } from "./keys";
+import type { SkillFolder } from "./skills";
 import type { Store } from "./store/store";
 import { absolutePath, paths, settingsPatch, text } from "./validate";
 
@@ -24,6 +25,7 @@ export function registerIpc(
   window: () => BrowserWindow | null,
   /** Applies saved settings to the window and the menu bar. */
   settingsSaved: (settings: Settings) => void,
+  skills: SkillFolder,
 ): void {
   const account = (provider: unknown): Accounts => {
     if (provider !== "codex" && provider !== "claude") throw new Error("provider must be codex or claude");
@@ -215,6 +217,32 @@ export function registerIpc(
     runner.remove(task.id);
     return true;
   });
+
+  // Skills. Ids are folder names, which SkillFolder checks; the text fields have the format's limits.
+  const skillId = (id: unknown) => text(id, "id", 200);
+  const draft = (value: unknown) => {
+    const d = (value ?? {}) as Record<string, unknown>;
+    const title = text(d.title, "title", 200).trim();
+    if (!title) throw new Error("A skill needs a name");
+    return { title, description: text(d.description, "description", 1024), steps: text(d.steps, "steps", BRIEF_MAX) };
+  };
+  ipcMain.handle(IPC.skillsList, () => skills.list());
+  ipcMain.handle(IPC.skillsCreate, (_e, title: unknown) => {
+    const name = text(title, "title", 200).trim();
+    if (!name) throw new Error("A skill needs a name");
+    return skills.create(name);
+  });
+  ipcMain.handle(IPC.skillsSave, (_e, id: unknown, value: unknown) => skills.save(skillId(id), draft(value)));
+  ipcMain.handle(IPC.skillsAddFiles, async (_e, id: unknown) => {
+    const result = await openDialog({ title: t("skills.addFiles"), properties: ["openFile", "multiSelections"] });
+    const skill = skillId(id);
+    return skills.addFiles(skill, result.canceled ? [] : result.filePaths);
+  });
+  ipcMain.handle(IPC.skillsReveal, async (_e, id: unknown) => {
+    const error = await shell.openPath(await skills.folderOf(skillId(id)));
+    if (error) throw new Error(error);
+  });
+  ipcMain.handle(IPC.skillsRemove, (_e, id: unknown) => skills.remove(skillId(id)));
 
   ipcMain.handle(IPC.filesPick, async () => {
     const result = await openDialog({ title: t("attach.pick"), properties: ["openFile", "multiSelections"] });

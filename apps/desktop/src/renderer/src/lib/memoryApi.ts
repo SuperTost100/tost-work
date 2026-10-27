@@ -16,6 +16,7 @@ import {
   keyVendor,
   type Project,
   type Settings,
+  type Skill,
   type Task,
 } from "../../../shared/model";
 import { applyEvent, resume } from "../../../shared/reduce";
@@ -35,6 +36,17 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   changeSettings(patch: Partial<Settings>): void;
 } {
   const projects: Project[] = [];
+  let skills: Skill[] = [];
+  const skillId = (title: string) =>
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "skill";
+  const mustSkill = (id: string) => {
+    const s = skills.find((x) => x.id === id);
+    if (!s) throw new Error("That skill isn't there any more");
+    return s;
+  };
   const tasks = new Map<string, Task>();
   const listeners = new Set<(t: Task) => void>();
   let settings: Settings = { ...DEFAULT_SETTINGS, ...initial };
@@ -244,6 +256,44 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       onChange: (l) => {
         listeners.add(l);
         return () => listeners.delete(l);
+      },
+    },
+    skills: {
+      list: async () => [...skills].sort((a, b) => a.title.localeCompare(b.title)),
+      create: async (title) => {
+        let id = skillId(title);
+        for (let n = 2; skills.some((s) => s.id === id); n++) id = `${skillId(title)}-${n}`;
+        const skill: Skill = {
+          id,
+          name: id,
+          title,
+          description: "",
+          steps: "",
+          files: [],
+          folder: `/Users/giulia/Documents/Tost Work/Skills/${id}`,
+          updatedAt: now(),
+        };
+        skills = [...skills, skill];
+        return skill;
+      },
+      save: async (id, draft) => {
+        const current = mustSkill(id);
+        const next = { ...current, ...draft, id: skillId(draft.title), name: skillId(draft.title), updatedAt: now() };
+        skills = skills.map((s) => (s.id === id ? next : s));
+        return next;
+      },
+      addFiles: async (id) => {
+        const current = mustSkill(id);
+        const next = { ...current, files: [...current.files, "template.docx"].sort() };
+        skills = skills.map((s) => (s.id === id ? next : s));
+        return next;
+      },
+      reveal: async (id) => {
+        mustSkill(id);
+      },
+      remove: async (id) => {
+        mustSkill(id);
+        skills = skills.filter((s) => s.id !== id);
       },
     },
     files: {

@@ -223,3 +223,27 @@ export const NOTES_MAX = 4000;
 
 /** The longest message a task takes, about 25 pages: a longer text goes in as an attached file. */
 export const BRIEF_MAX = 100_000;
+
+/** One of the user's skills: a SKILL.md folder in Documents/Tost Work/Skills. */
+export interface Skill {
+  /** The folder's name, which is also the skill's `name` for skills made here. */
+  id: string;
+  name: string;
+  /** What people see: the SKILL.md's first heading. */
+  title: string;
+  /** When to use it: the frontmatter description, which the agent reads to pick a skill. */
+  description: string;
+  /** What to do: the SKILL.md's text after its heading. */
+  steps: string;
+  /** The other files in the folder, such as a template, by name. */
+  files: string[];
+  folder: string;
+  updatedAt: string;
+}
+
+/** What the editor saves. */
+export interface SkillDraft {
+  title: string;
+  description: string;
+  steps: string;
+}

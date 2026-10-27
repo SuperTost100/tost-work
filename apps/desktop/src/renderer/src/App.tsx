@@ -9,6 +9,7 @@ import { Profile } from "@/screens/Profile";
 import { Project } from "@/screens/Project";
 import { Projects } from "@/screens/Projects";
 import { Settings as SettingsScreen } from "@/screens/Settings";
+import { Skills } from "@/screens/Skills";
 import { Soon } from "@/screens/Soon";
 import { Task } from "@/screens/Task";
 import { RECENT, type Section, Sidebar } from "@/shell/Sidebar";
@@ -271,6 +272,8 @@ export function App({
     screen = <Profile api={api} settings={current} onSaved={(next) => onSettings?.(next)} />;
   } else if (route.name === "settings") {
     screen = api ? <SettingsScreen api={api} settings={current} onChange={(next) => onSettings?.(next)} /> : null;
+  } else if (route.section === "skills" && api) {
+    screen = <Skills api={api} />;
   } else {
     screen = <Soon section={sectionTitle[route.section]} />;
   }

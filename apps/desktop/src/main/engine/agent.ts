@@ -3,7 +3,7 @@ import { realpath, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
 import { translate } from "../../shared/i18n";
-import type { AgentProvider, AiId, EngineEvent, KeyVendor, Review } from "../../shared/model";
+import type { AgentProvider, AiId, EngineEvent, KeyVendor, Review, Skill } from "../../shared/model";
 import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
 import { freeName, inside } from "../files";
 import type { ToolHandler } from "../mcp/server";
@@ -226,6 +226,7 @@ export class AgentEngine implements Engine, ToolHandler {
   private ai: () => Promise<AiId>;
   private courseKey: () => { key: string; vendor: KeyVendor } | null;
   private online: () => boolean;
+  private skills: () => Promise<Skill[]>;
 
   constructor(
     private funnel: AgentFunnel,
@@ -240,6 +241,8 @@ export class AgentEngine implements Engine, ToolHandler {
       courseKey?: () => { key: string; vendor: KeyVendor } | null;
       /** Whether the computer has a network connection, so a task without one fails at once with a clear reason. */
       online?: () => boolean;
+      /** The user's skills, read for each run so a skill saved a moment ago is there. */
+      skills?: () => Promise<Skill[]>;
     } = {},
   ) {
     this.documents = options.documents ?? null;
@@ -247,6 +250,7 @@ export class AgentEngine implements Engine, ToolHandler {
     this.ai = options.ai ?? (async () => "chatgpt");
     this.courseKey = options.courseKey ?? (() => null);
     this.online = options.online ?? (() => true);
+    this.skills = options.skills ?? (async () => []);
   }
 
   /** Why the task can't reach its AI, in the user's language. */
@@ -308,6 +312,8 @@ export class AgentEngine implements Engine, ToolHandler {
       apiKey = key.key;
     }
 
+    // A skills folder that can't be read leaves the task without skills rather than failing it.
+    const skills = await this.skills().catch(() => []);
     const stream = this.funnel.stream({
       selection: {
         provider: task.provider ?? "codex",
@@ -323,6 +329,7 @@ export class AgentEngine implements Engine, ToolHandler {
         this.language(),
         this.documents && { skills: this.documents.skills },
         this.user(),
+        skills,
       ),
       ...(this.documents ? { env: this.documents.env } : {}),
       ...(apiKey ? { apiKey } : {}),

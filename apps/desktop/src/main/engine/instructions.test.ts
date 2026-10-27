@@ -60,4 +60,17 @@ describe("instructionsFor", () => {
     const bare = instructionsFor(task, project, "it", null, { name: "Giulia", work: "", notes: "" });
     expect(bare).not.toContain("What they do");
   });
+
+  it("lists the user's skills with where to read them, and lets the agent read there", () => {
+    const text = instructionsFor(task, project, "it", null, undefined, [
+      {
+        title: "Proposal writer",
+        description: "A client asks for a proposal.",
+        folder: "/Docs/Skills/proposal-writer",
+      },
+    ]);
+    expect(text).toContain("the user's skills listed below, which you may read");
+    expect(text).toContain("- Proposal writer: A client asks for a proposal. (/Docs/Skills/proposal-writer/SKILL.md)");
+    expect(instructionsFor(task, project, "it")).not.toContain("The user's skills:");
+  });
 });
