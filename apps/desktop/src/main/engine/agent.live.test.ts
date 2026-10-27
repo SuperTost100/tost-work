@@ -4,7 +4,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFunnel } from "cli-funnel";
 import { afterAll, describe, expect, it } from "vitest";
-import { type AiId, SUBSCRIPTIONS, type Task } from "../../shared/model";
+import { type AiId, questionItems, SUBSCRIPTIONS, type Task } from "../../shared/model";
 import { fileGuard } from "../guard";
 import { ToolServer } from "../mcp/server";
 import { Store } from "../store/store";
@@ -66,7 +66,11 @@ for (const ai of SUBSCRIPTIONS) {
       runner.launch(task.id);
       const final = await settle(runner, store, task.id, async (t) => {
         if (t.approval) await runner.decide(task.id, true);
-        else if (t.question) runner.answer(task.id, t.question.options[0] ?? "Go ahead");
+        else if (t.question)
+          runner.answer(
+            task.id,
+            questionItems(t.question).map((q) => q.options[0] ?? "Go ahead"),
+          );
       });
       await tools.stop();
 
@@ -116,7 +120,7 @@ for (const ai of SUBSCRIPTIONS) {
         await new Promise((r) => setTimeout(r, 45_000));
         expect(store.getTask(task.id)?.question?.id).toBe(t.question?.id);
         expect(store.getTask(task.id)?.files).toEqual([]);
-        runner.answer(task.id, "Agree the course dates");
+        runner.answer(task.id, ["Agree the course dates"]);
       });
       await tools.stop();
       console.log(JSON.stringify({ status: final.status, messages: final.messages.map((m) => m.text) }, null, 2));
@@ -148,7 +152,11 @@ for (const ai of SUBSCRIPTIONS) {
         runner.launch(task.id);
         const final = await settle(runner, store, task.id, async (t) => {
           if (t.approval) await runner.decide(task.id, true);
-          else if (t.question) runner.answer(task.id, t.question.options[0] ?? "Go ahead");
+          else if (t.question)
+            runner.answer(
+              task.id,
+              questionItems(t.question).map((q) => q.options[0] ?? "Go ahead"),
+            );
         });
         console.log(
           JSON.stringify(
@@ -191,7 +199,11 @@ for (const ai of SUBSCRIPTIONS) {
         runner.launch(task.id);
         const final = await settle(runner, store, task.id, async (t) => {
           if (t.approval) await runner.decide(task.id, true);
-          else if (t.question) runner.answer(task.id, t.question.options[0] ?? "Go ahead");
+          else if (t.question)
+            runner.answer(
+              task.id,
+              questionItems(t.question).map((q) => q.options[0] ?? "Go ahead"),
+            );
         });
         const note = await readFile(join(work, "node.md"), "utf8");
         console.log(JSON.stringify({ status: final.status, error: final.error, note }, null, 2));

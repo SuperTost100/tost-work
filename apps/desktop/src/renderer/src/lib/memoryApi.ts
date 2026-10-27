@@ -10,11 +10,14 @@ import type {
 } from "../../../shared/api";
 import {
   type AgentProvider,
+  answersText,
+  BRIEF_MAX,
   type CourseKey,
   DEFAULT_SETTINGS,
   type EngineEvent,
   keyVendor,
   type Project,
+  questionItems,
   type Settings,
   type Skill,
   type Task,
@@ -198,10 +201,16 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         });
         return tasks.get(t.id) ?? t;
       },
-      answer: async (id, answer) => {
+      answer: async (id, answers) => {
         const t = tasks.get(id);
         if (!t?.question) throw new Error("This task isn't waiting for an answer");
-        save({ ...resume(t, now()), messages: [...t.messages, { from: "user", text: answer, at: now() }] });
+        const items = questionItems(t.question);
+        // The same checks as the runner, so the screen tests meet the real rules.
+        if (answers.length !== items.length) throw new Error("Send one answer per question");
+        const text = answersText(t.question, answers);
+        if (text.length > BRIEF_MAX) throw new Error("These answers are too long to send together");
+        const answered = items.map((item, i) => ({ question: item.text, answer: answers[i] ?? "" }));
+        save({ ...resume(t, now()), messages: [...t.messages, { from: "user", text, at: now(), answers: answered }] });
         emit(id, { type: "file", change: { path: "/tmp/Proposta.docx", kind: "add", role: "made" } });
         emit(id, {
           type: "review",

@@ -244,8 +244,8 @@ export function App({
           api={api}
           task={task}
           project={project}
-          onAnswer={(answer) =>
-            api.tasks.answer(task.id, answer).then(
+          onAnswer={(answers) =>
+            api.tasks.answer(task.id, answers).then(
               () => true,
               (err: unknown) => {
                 report(err);

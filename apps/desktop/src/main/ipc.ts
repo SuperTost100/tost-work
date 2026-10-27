@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { app, type BrowserWindow, dialog, ipcMain, Menu, type OpenDialogOptions, shell } from "electron";
 import { IPC, type NewProjectInput, type NewTaskInput, type SaveResult, type TaskMenuAction } from "../shared/api";
 import { languageFrom, type MessageKey, translate } from "../shared/i18n";
-import { type AgentProvider, BRIEF_MAX, type Project, type Settings } from "../shared/model";
+import { type AgentProvider, BRIEF_MAX, MAX_QUESTIONS, type Project, type Settings } from "../shared/model";
 import type { Accounts } from "./accounts";
 import type { TaskRunner } from "./engine/runner";
 import { type Conflict, copyInto, describe, readablePath, savablePaths, saveCopies } from "./files";
@@ -120,9 +120,13 @@ export function registerIpc(
     return task;
   });
 
-  ipcMain.handle(IPC.tasksAnswer, (_e, id: unknown, answer: unknown) =>
-    runner.answer(text(id, "id", 100), text(answer, "answer", BRIEF_MAX)),
-  );
+  ipcMain.handle(IPC.tasksAnswer, (_e, id: unknown, answers: unknown) => {
+    if (!Array.isArray(answers) || answers.length > MAX_QUESTIONS) throw new Error("Send one answer per question");
+    return runner.answer(
+      text(id, "id", 100),
+      answers.map((a) => text(a, "answer", BRIEF_MAX)),
+    );
+  });
   ipcMain.handle(IPC.tasksStop, (_e, id: unknown) => runner.stop(text(id, "id", 100)));
   ipcMain.handle(IPC.tasksResume, (_e, id: unknown) => runner.resume(text(id, "id", 100)));
   ipcMain.handle(IPC.tasksDecide, (_e, id: unknown, allow: unknown) => {

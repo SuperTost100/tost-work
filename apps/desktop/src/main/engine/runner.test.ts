@@ -40,7 +40,7 @@ describe("TaskRunner with the fake engine", () => {
     expect(waiting?.question?.options).toHaveLength(3);
     expect(waiting?.files.map((f) => f.path)).toEqual(["/tmp/project/Proposta.docx"]);
 
-    runner.answer(task.id, "Include it in our price");
+    runner.answer(task.id, ["Include it in our price"]);
     const final = await done;
 
     expect(final.status).toBe("done");
@@ -66,7 +66,7 @@ describe("TaskRunner with the fake engine", () => {
     const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
     const first = runner.start(task.id);
     await waitFor(() => store.getTask(task.id)?.status === "needs-you");
-    runner.answer(task.id, "The client pays it");
+    runner.answer(task.id, ["The client pays it"]);
     await first;
 
     const asked = runner.followUp(task.id, "Make the prices round numbers");
@@ -106,7 +106,7 @@ describe("TaskRunner with the fake engine", () => {
   it("refuses an answer when no question is open", () => {
     const { runner } = setup();
     const task = runner.create({ projectId: null, brief: "Hello", workdir: "/tmp/p" });
-    expect(() => runner.answer(task.id, "yes")).toThrow(/isn't waiting/);
+    expect(() => runner.answer(task.id, ["yes"])).toThrow(/isn't waiting/);
   });
 });
 
@@ -230,7 +230,7 @@ describe("TaskRunner when the agent ends its turn to wait", () => {
     expect(first.status).toBe("needs-you");
     expect(first.question?.text).toBe("Which goal?");
 
-    runner.answer(task.id, "B");
+    runner.answer(task.id, ["B"]);
     await waitFor(() => store.getTask(task.id)?.status === "done");
     expect(prompts).toEqual([null, 'My answer to your question "Which goal?": B']);
     expect(store.getTask(task.id)?.messages.map((m) => m.text)).toEqual(["Prepare the call", "B", "Done."]);
@@ -251,7 +251,7 @@ describe("TaskRunner when the agent ends its turn to wait", () => {
     hold();
     const first = runner.start(task.id);
     await waitFor(() => store.getTask(task.id)?.status === "needs-you");
-    runner.answer(task.id, "A");
+    runner.answer(task.id, ["A"]);
     expect(prompts).toHaveLength(1);
     const answered = statuses.length;
     release();
@@ -278,11 +278,30 @@ describe("TaskRunner when the agent ends its turn to wait", () => {
     const { store, runner, task, prompts } = turnTaking([round, () => [{ type: "message", text: "Done." }]]);
     runner.launch(task.id);
     await waitFor(() => store.getTask(task.id)?.status === "needs-you");
-    runner.answer(task.id, "Which goal?\n→ B\n\nWhen?\n→ Later");
+    runner.answer(task.id, ["B", "Later"]);
     await waitFor(() => store.getTask(task.id)?.status === "done");
     expect(prompts[1]).toBe(
       "My answers to your questions, each under its question:\n\nWhich goal?\n→ B\n\nWhen?\n→ Later",
     );
+    // The task keeps each answer with its question, for the line that opens on the task screen.
+    expect(store.getTask(task.id)?.messages.at(-2)?.answers).toEqual([
+      { question: "Which goal?", answer: "B" },
+      { question: "When?", answer: "Later" },
+    ]);
+  });
+
+  it("refuses a round with an answer missing", async () => {
+    const round = (): EngineEvent[] => [
+      {
+        type: "question",
+        question: { id: "r1", text: "Which goal?", options: ["A", "B"], more: [{ text: "When?", options: ["Now"] }] },
+      },
+    ];
+    const { store, runner, task } = turnTaking([round]);
+    runner.launch(task.id);
+    await waitFor(() => store.getTask(task.id)?.status === "needs-you");
+    expect(() => runner.answer(task.id, ["B"])).toThrow(/one answer per question/);
+    expect(store.getTask(task.id)?.question?.id).toBe("r1");
   });
 
   it("resumes a task Tost Work closed on, in its conversation or from the brief", async () => {

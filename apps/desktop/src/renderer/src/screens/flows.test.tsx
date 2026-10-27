@@ -119,16 +119,16 @@ describe("the answer draft", () => {
     // The send succeeds later, and the question stays open, so the box stays on screen.
     const [waiting] = await api.tasks.list();
     let finish = () => {};
-    let sent = "";
-    api.tasks.answer = (_id, answer) => {
-      sent = answer;
+    let sent: string[] = [];
+    api.tasks.answer = (_id, answers) => {
+      sent = answers;
       return new Promise((resolve) => {
         finish = () => waiting && resolve(waiting);
       });
     };
     fireEvent.change(box, { target: { value: "Half and half" } });
     fireEvent.keyDown(box, { key: "Enter" });
-    expect(sent).toBe("Half and half");
+    expect(sent).toEqual(["Half and half"]);
     fireEvent.change(box, { target: { value: "Also add a note" } });
     await act(async () => finish());
     expect(box.value).toBe("Also add a note");
@@ -159,7 +159,9 @@ describe("a typed answer", () => {
     await act(async () => {
       fireEvent.keyDown(box, { key: "Enter" });
     });
-    expect(await screen.findByText("Split it half and half")).toBeTruthy();
+    // Sent, it's on the task as the answered line, which opens onto the answer.
+    fireEvent.click(await screen.findByRole("button", { name: "You answered 1 question" }));
+    expect(screen.getByText("Split it half and half")).toBeTruthy();
   });
 });
 
@@ -274,6 +276,20 @@ describe("approvals", () => {
 });
 
 describe("a round of questions", () => {
+  it("refuses a round with an answer missing, as the app does", async () => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    const task = await api.tasks.start({ projectId: project.id, brief: "Plan it", attachments: [] });
+    act(() =>
+      api.emit(task.id, {
+        type: "question",
+        question: { id: "r9", text: "Who?", options: ["A", "B"], more: [{ text: "When?", options: ["Now", "Later"] }] },
+      }),
+    );
+    await expect(api.tasks.answer(task.id, ["A"])).rejects.toThrow(/one answer per question/);
+    expect((await api.tasks.get(task.id))?.question?.id).toBe("r9");
+  });
+
   it("asks them one at a time, lets the user step back, and sends all the answers together", async () => {
     const api = createMemoryApi();
     const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
@@ -311,6 +327,14 @@ describe("a round of questions", () => {
     });
     const sent = (await api.tasks.get(task.id))?.messages.at(-1)?.text;
     expect(sent).toBe("Who is it for?\n→ Engineers\n\nHow long?\n→ Two hours\n\nWhere?\n→ Online");
+
+    // The answered round is one folded line that opens onto each question and its answer.
+    const line = await screen.findByRole("button", { name: "You answered 3 questions" });
+    expect(line.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("Two hours")).toBeNull();
+    fireEvent.click(line);
+    expect(screen.getByText("How long?")).toBeTruthy();
+    expect(screen.getByText("Two hours")).toBeTruthy();
   });
 
   it("clears the box when the last answer is an option, even if sending it fails", async () => {

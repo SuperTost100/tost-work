@@ -154,6 +154,8 @@ const en = {
   "task.interrupted": "Tost Work closed while this task was working.",
   "task.resume": "Resume",
   "task.questionOf": "Question {n} of {total}",
+  "task.answered": "You answered {n} questions",
+  "task.answeredOne": "You answered 1 question",
   "task.nextQuestion": "Next question",
   "task.roundTooLong":
     "Your answers together are longer than one message can hold ({max} characters). Shorten one, or attach the long text as a file.",
@@ -459,6 +461,8 @@ const it: Record<MessageKey, string> = {
   "task.interrupted": "Tost Work si è chiuso mentre l'attività era in corso.",
   "task.resume": "Riprendi",
   "task.questionOf": "Domanda {n} di {total}",
+  "task.answered": "Hai risposto a {n} domande",
+  "task.answeredOne": "Hai risposto a 1 domanda",
   "task.nextQuestion": "Domanda successiva",
   "task.roundTooLong":
     "Le risposte insieme superano quello che un messaggio può contenere ({max} caratteri). Accorciane una, oppure allega il testo lungo come file.",

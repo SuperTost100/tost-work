@@ -102,7 +102,8 @@ export interface TostWorkApi {
     get(id: string): Promise<Task | null>;
     /** Creates the task and starts it right away. */
     start(input: NewTaskInput): Promise<Task>;
-    answer(id: string, answer: string): Promise<Task>;
+    /** One answer per question in the round, in order. */
+    answer(id: string, answers: string[]): Promise<Task>;
     /** Allows or refuses the overwrite or delete the task asked for. */
     decide(id: string, allow: boolean): Promise<Task>;
     /** Sends another instruction to a task that finished or stopped, and runs it again. */

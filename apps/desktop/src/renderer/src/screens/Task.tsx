@@ -11,6 +11,7 @@ import { useT } from "@/lib/useT";
 import { RenameField } from "@/shell/Sidebar";
 import type { SaveResult, TostWorkApi } from "../../../shared/api";
 import {
+  type AnsweredQuestion,
   answersText,
   BRIEF_MAX,
   type FileChange,
@@ -258,7 +259,7 @@ function QuestionCard({
   question: Question;
   draft: string;
   onDraft: (text: string) => void;
-  onSend: (text: string) => void;
+  onSend: (answers: string[]) => void;
 }) {
   const t = useT();
   const items = questionItems(question);
@@ -298,7 +299,7 @@ function QuestionCard({
     if (message.length > BRIEF_MAX) return;
     // A picked option replaces what was typed, so a retry after a failed send can't bring the old text back.
     if (picked) onDraft("");
-    onSend(message);
+    onSend(next);
   };
   return (
     <Composer
@@ -341,6 +342,36 @@ function QuestionCard({
         </button>
       ))}
     </Composer>
+  );
+}
+
+/**
+ * A round of questions the user answered: one grey line between the agent's messages, like the steps, that opens to
+ * show each question with its answer.
+ */
+function AnswerLine({ answers }: { answers: AnsweredQuestion[] }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="answered">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icon name="question" />
+        {answers.length === 1 ? t("task.answeredOne") : t("task.answered", { n: String(answers.length) })}
+        <Icon name="down" className="chev" />
+      </button>
+      {open && (
+        <ol>
+          {keyed(answers, (a) => a.question).map(([key, a]) => (
+            <li key={key}>
+              <span className="q">{a.question}</span>
+              <span className="a">
+                <LongText text={a.answer} />
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }
 
@@ -461,7 +492,7 @@ export function Task({
   task: TaskT;
   project: Project | null;
   /** Resolves true once the answer is sent, false when it failed and the draft should stay. */
-  onAnswer: (answer: string) => Promise<boolean>;
+  onAnswer: (answers: string[]) => Promise<boolean>;
   onFollowUp: (text: string) => void;
   onSaveCopy: () => Promise<SaveResult | null>;
   onDecide: (allow: boolean) => Promise<unknown>;
@@ -480,12 +511,12 @@ export function Task({
   const [answer, setAnswer] = useState("");
   // One answer at a time: a second click before the first returns would be refused and shown as an error.
   const sending = useRef(false);
-  const send = (text: string) => {
+  const send = (answers: string[]) => {
     if (sending.current) return;
     sending.current = true;
     // Once the answer is in, the draft goes, unless it was edited while the answer was sending.
     const draft = answer;
-    void onAnswer(text).then((sent) => {
+    void onAnswer(answers).then((sent) => {
       sending.current = false;
       if (sent) setAnswer((current) => (current === draft ? "" : current));
     });
@@ -515,6 +546,7 @@ export function Task({
   const note = (i: number) => {
     const m = task.messages[i];
     if (!m) return null;
+    if (m.answers) return <AnswerLine key={i} answers={m.answers} />;
     return m.from === "user" ? (
       <div className="you" style={{ marginTop: 18 }} key={i}>
         <LongText text={m.text} />

@@ -3015,3 +3015,54 @@ label.opt:has(input:focus-visible) {
 [data-full-screen] .lights-space {
   display: none;
 }
+/* A round of answered questions: one grey line like the steps, which opens onto each question and its answer. */
+.answered {
+  margin-top: 20px;
+}
+.answered > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 4px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--t2);
+  cursor: pointer;
+}
+.answered > button:hover {
+  color: var(--ink);
+}
+.answered > button .ic {
+  color: var(--t3);
+}
+.answered .chev {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.15s;
+}
+.answered > button[aria-expanded="true"] .chev {
+  transform: rotate(180deg);
+}
+.answered ol {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 0 7px;
+  padding: 2px 0 2px 19px;
+  border-left: 2px solid var(--line);
+  list-style: none;
+}
+.answered .q {
+  display: block;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--t3);
+}
+.answered .a {
+  display: block;
+  font-size: 15px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

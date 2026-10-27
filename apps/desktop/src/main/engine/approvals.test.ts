@@ -41,7 +41,7 @@ describe("overwrite approvals", () => {
     expect(status()?.approval).toMatchObject({ action: "overwrite", paths: [join(work, "Proposta.docx")] });
     await runner.decide(task.id, true);
     await waitFor(() => status()?.question != null);
-    runner.answer(task.id, "The client pays it");
+    runner.answer(task.id, ["The client pays it"]);
     const final = await done;
 
     expect(await readFile(join(work, "Proposta.docx"), "utf8")).toBe("new");
@@ -57,7 +57,7 @@ describe("overwrite approvals", () => {
     await waitFor(() => status()?.approval != null);
     await runner.decide(task.id, false);
     await waitFor(() => status()?.question != null);
-    runner.answer(task.id, "The client pays it");
+    runner.answer(task.id, ["The client pays it"]);
     const final = await done;
 
     expect(await readFile(join(work, "Proposta.docx"), "utf8")).toBe("old");
@@ -74,7 +74,7 @@ describe("overwrite approvals", () => {
     await waitFor(() => status()?.approval != null);
     await runner.decide(task.id, true);
     await waitFor(() => status()?.question != null);
-    runner.answer(task.id, "The client pays it");
+    runner.answer(task.id, ["The client pays it"]);
     await done;
 
     const restored = await runner.restore(task.id, path);
@@ -92,7 +92,7 @@ describe("overwrite approvals", () => {
     await waitFor(() => status()?.approval != null);
     await runner.decide(task.id, true);
     await waitFor(() => status()?.question != null);
-    runner.answer(task.id, "The client pays it");
+    runner.answer(task.id, ["The client pays it"]);
     await done;
     await rm(path);
     const restored = await runner.restore(task.id, path);
@@ -242,7 +242,7 @@ describe("approvals and Stop", () => {
     await waitFor(() => status()?.approval != null);
     await runner.decide(task.id, true);
     await waitFor(() => status()?.question != null);
-    runner.answer(task.id, "The client pays it");
+    runner.answer(task.id, ["The client pays it"]);
     await done;
     const first = runner.restore(task.id, path);
     await expect(runner.restore(task.id, path)).rejects.toThrow(/already in progress/);

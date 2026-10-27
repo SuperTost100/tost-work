@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AgentProvider, Approval, KeptCopy, Project, Task } from "../../shared/model";
+import { answersText, BRIEF_MAX, questionItems } from "../../shared/model";
 import { applyEvent, resume } from "../../shared/reduce";
 import type { Guard } from "../guard";
 import type { Store } from "../store/store";
@@ -146,11 +147,20 @@ export class TaskRunner {
     });
   }
 
-  answer(taskId: string, answer: string): Task {
+  /** Takes one answer per question in the round, and keeps each with its question for the task screen. */
+  answer(taskId: string, answers: string[]): Task {
     const task = this.mustGet(taskId);
     if (!task.question) throw new Error("This task isn't waiting for an answer");
+    const items = questionItems(task.question);
+    if (answers.length !== items.length) throw new Error("Send one answer per question");
+    const answer = answersText(task.question, answers);
+    if (answer.length > BRIEF_MAX) throw new Error("These answers are too long to send together");
     const at = this.now();
-    const next = this.save({ ...resume(task, at), messages: [...task.messages, { from: "user", text: answer, at }] });
+    const answered = items.map((item, i) => ({ question: item.text, answer: answers[i] ?? "" }));
+    const next = this.save({
+      ...resume(task, at),
+      messages: [...task.messages, { from: "user", text: answer, at, answers: answered }],
+    });
     if (!this.engine.answer(taskId, task.question.id, answer))
       this.continueWith(
         taskId,

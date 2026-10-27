@@ -44,6 +44,11 @@ export const MAX_QUESTIONS = 16;
 /** Every question in the round, in order. */
 export const questionItems = (q: Question): QuestionItem[] => [{ text: q.text, options: q.options }, ...(q.more ?? [])];
 
+export interface AnsweredQuestion {
+  question: string;
+  answer: string;
+}
+
 /** The answers to a round as one message: just the answer for one question, each question and its answer for several. */
 export function answersText(q: Question, answers: string[]): string {
   const items = questionItems(q);
@@ -86,6 +91,8 @@ export interface Message {
   from: "user" | "agent";
   text: string;
   at: string;
+  /** For the answers to a round of questions: each question with its answer, shown as one line that opens. */
+  answers?: AnsweredQuestion[];
   /** True for an instruction sent after the task finished, which starts a new run with its own steps. */
   followUp?: boolean;
 }
