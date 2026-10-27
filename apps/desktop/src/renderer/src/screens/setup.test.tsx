@@ -57,6 +57,24 @@ describe("first-run setup", () => {
     expect((await api.projects.list()).map((p) => p.name)).toEqual(["Proposals"]);
   });
 
+  it("says how much room is left once the notes near their limit", async () => {
+    render(<Root api={createMemoryApi({ name: "Giulia" })} />);
+    await click("Next");
+    const notes = screen.getByLabelText("What else the AI should know");
+    fireEvent.change(notes, { target: { value: "x".repeat(3000) } });
+    expect(screen.queryByText(/of 4,000 characters/)).toBeNull();
+    fireEvent.change(notes, { target: { value: "x".repeat(3700) } });
+    expect(screen.getByText(/3,700 of 4,000 characters/)).toBeTruthy();
+  });
+
+  it("writes the count the Italian way when the app is in Italian", async () => {
+    render(<Root api={createMemoryApi({ name: "Giulia", language: "it" })} />);
+    await click("Avanti");
+    fireEvent.change(screen.getByLabelText("Cos'altro deve sapere l'AI"), { target: { value: "x".repeat(3700) } });
+    // Italian groups thousands only from five digits, so 3700 has no separator where English writes 3,700.
+    expect(screen.getByText(/^3700 caratteri su 4000\./)).toBeTruthy();
+  });
+
   it("takes the course key, refusing what isn't one, and makes it the default", async () => {
     const api = createMemoryApi({ name: "Giulia" });
     render(<Root api={api} />);

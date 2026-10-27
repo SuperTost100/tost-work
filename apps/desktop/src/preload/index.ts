@@ -20,6 +20,7 @@ const api: TostWorkApi = {
     ipcRenderer.on(IPC.menuAction, handler);
     return () => ipcRenderer.removeListener(IPC.menuAction, handler);
   },
+  menuState: (state) => ipcRenderer.send(IPC.menuState, state),
   account: {
     status: (provider) => ipcRenderer.invoke(IPC.accountStatus, provider),
     signIn: (provider) => ipcRenderer.invoke(IPC.accountSignIn, provider),

@@ -1,5 +1,5 @@
 import type { MenuItemConstructorOptions } from "electron";
-import type { MenuAction } from "../shared/api";
+import type { MenuAction, MenuState } from "../shared/api";
 import type { MessageKey } from "../shared/i18n";
 import { type Settings, sectionOn } from "../shared/model";
 
@@ -7,6 +7,8 @@ export interface MenuOptions {
   t: (key: MessageKey) => string;
   isMac: boolean;
   settings: Settings;
+  /** Whether a task is open and working: the Task items act on it, so they're off without one. */
+  task: MenuState;
   /** Hands an action to the window, which carries it out. */
   send: (action: MenuAction) => void;
   /** One step bigger or smaller, or back to normal: the menu's zoom is the Text size setting. */
@@ -76,10 +78,15 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
     submenu: [
       // Enter in the box already sends, so the shortcut only shows here.
       { label: t("appMenu.send"), accelerator: "CmdOrCtrl+Enter", registerAccelerator: false, click: action("send") },
-      { label: t("appMenu.stop"), accelerator: "CmdOrCtrl+.", click: action("stop") },
+      { label: t("appMenu.stop"), accelerator: "CmdOrCtrl+.", enabled: o.task.running, click: action("stop") },
       { type: "separator" },
-      { label: t("menu.rename"), click: action("rename") },
-      { label: t("menu.reveal"), accelerator: "Shift+CmdOrCtrl+R", click: action("reveal") },
+      { label: t("menu.rename"), enabled: o.task.task, click: action("rename") },
+      {
+        label: t("menu.reveal"),
+        accelerator: "Shift+CmdOrCtrl+R",
+        enabled: o.task.task,
+        click: action("reveal"),
+      },
     ],
   };
   const window: MenuItemConstructorOptions = {

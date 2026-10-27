@@ -6,13 +6,14 @@ import { translate } from "../shared/i18n";
 import { DEFAULT_SETTINGS } from "../shared/model";
 import { menuTemplate, nextTextSize } from "./appMenu";
 
-function build(isMac: boolean, settings = DEFAULT_SETTINGS) {
+function build(isMac: boolean, settings = DEFAULT_SETTINGS, task = { task: true, running: true }) {
   const sent: MenuAction[] = [];
   const sizes: number[] = [];
   const menu = menuTemplate({
     t: (key) => translate("it", key),
     isMac,
     settings,
+    task,
     dev: false,
     send: (a) => sent.push(a),
     textSize: (step) => sizes.push(step),
@@ -65,6 +66,18 @@ describe("menuTemplate", () => {
     expect(sizes).toEqual([1, 0]);
     // Enter in the box already sends, so the menu shows the shortcut without taking it over.
     expect(item("Attività", "Invia")?.registerAccelerator).toBe(false);
+  });
+
+  it("turns the Task items off without an open task, and Stop off when it isn't working", () => {
+    const none = build(true, DEFAULT_SETTINGS, { task: false, running: false });
+    expect(none.item("Attività", "Interrompi")?.enabled).toBe(false);
+    expect(none.item("Attività", "Rinomina")?.enabled).toBe(false);
+    expect(none.item("Attività", "Mostra nella cartella")?.enabled).toBe(false);
+    // Send stays on: it sends what's in the box, on Home too.
+    expect(none.item("Attività", "Invia")?.enabled).not.toBe(false);
+    const done = build(true, DEFAULT_SETTINGS, { task: true, running: false });
+    expect(done.item("Attività", "Interrompi")?.enabled).toBe(false);
+    expect(done.item("Attività", "Rinomina")?.enabled).toBe(true);
   });
 
   it("turns Quick edit off in the menu when it's off in Settings", () => {

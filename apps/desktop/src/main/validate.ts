@@ -4,6 +4,7 @@ import {
   type AiId,
   LEVELS,
   type Level,
+  NOTES_MAX,
   SECTION_LEVEL,
   type SectionKey,
   type Settings,
@@ -43,7 +44,7 @@ export const settingsPatch = (v: unknown): Partial<Settings> => {
     const value = input[key];
     if (key === "name") patch.name = text(value, "name", 80).trim();
     else if (key === "work") patch.work = text(value, "work", 300).trim();
-    else if (key === "notes") patch.notes = text(value, "notes", 4000).trim();
+    else if (key === "notes") patch.notes = text(value, "notes", NOTES_MAX).trim();
     else if (key === "level") {
       if (!LEVELS.includes(value as Level)) throw new Error("level must be one of the four levels");
       patch.level = value as Level;

@@ -1088,8 +1088,16 @@ h3 {
   border-radius: 8px;
   margin: 0 -6px;
 }
-.fileline:hover {
+.fileline:has(button):hover {
   background: var(--hover);
+}
+/* The file's name in the side panel: a click shows it in the preview card. */
+.fileline .pick-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  text-align: left;
 }
 .thumb {
   width: 30px;

@@ -50,7 +50,8 @@ export function App({
   const [projectBrief, setProjectBrief] = useState("");
   const [files, setFiles] = useState<string[]>([]);
   const [projectFiles, setProjectFiles] = useState<string[]>([]);
-  const [projectId, setProjectId] = useState<string | null>(null);
+  // undefined until the user picks: then Home offers the project used last. null is "No project", picked on purpose.
+  const [projectId, setProjectId] = useState<string | null | undefined>(undefined);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const starting = useRef(false);
@@ -134,8 +135,11 @@ export function App({
     jobs: t("nav.jobs"),
     board: t("nav.board"),
   };
-  // With quick edit turned off, the home composer always works in a project: the chosen one, or the first.
-  const homeProjectId = quickEdit ? projectId : (projectId ?? projects[0]?.id ?? null);
+  // Home starts on the project of the latest task (tasks come newest first), else the first project. With quick edit
+  // turned off, "No project" isn't on offer, so the composer always works in a project.
+  const lastUsed =
+    tasks.find((x) => x.projectId && projects.some((p) => p.id === x.projectId))?.projectId ?? projects[0]?.id ?? null;
+  const homeProjectId = projectId === undefined || (projectId === null && !quickEdit) ? lastUsed : projectId;
 
   // The menu bar's items. The handler is read through a ref, so the subscription doesn't change with every render.
   const focusComposer = () =>
@@ -162,8 +166,16 @@ export function App({
       if (openTask.status === "running" || openTask.status === "needs-you")
         void api.tasks.stop(openTask.id).catch(report);
     } else if (action === "rename") setRenaming(openTask.id);
-    else if (action === "reveal") void api.tasks.reveal(openTask.id).catch(report);
+    else if (action === "reveal") {
+      // The newest file the task made or changed is selected in the folder; without one, the folder opens.
+      const last = openTask.files.filter((f) => f.kind !== "delete" && f.role === "made").at(-1);
+      void (last ? api.files.reveal(openTask.id, last.path) : api.tasks.reveal(openTask.id)).catch(report);
+    }
   };
+  const openStatus = openTask?.status;
+  useEffect(() => {
+    api?.menuState({ task: openStatus !== undefined, running: openStatus === "running" || openStatus === "needs-you" });
+  }, [api, openStatus]);
   const menuHandler = useRef(onMenu);
   menuHandler.current = onMenu;
   useEffect(() => api?.onMenu((action) => menuHandler.current(action)), [api]);

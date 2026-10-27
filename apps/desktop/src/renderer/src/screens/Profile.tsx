@@ -1,8 +1,22 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { errorText } from "@/lib/errorText";
-import { useT } from "@/lib/useT";
+import { LanguageContext, useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
-import type { Settings } from "../../../shared/model";
+import { NOTES_MAX, type Settings } from "../../../shared/model";
+
+/** Shown once the notes come close to their limit, so a long paste isn't cut without a word. */
+export function NotesLimit({ length }: { length: number }) {
+  const t = useT();
+  // Numbers follow the app's language, which can differ from the system's.
+  const lang = useContext(LanguageContext);
+  if (length < NOTES_MAX * 0.9) return null;
+  const n = (x: number) => x.toLocaleString(lang);
+  return (
+    <span className="t3" role="status" style={{ fontSize: 12.5 }}>
+      {t("profile.notesLimit", { n: n(length), max: n(NOTES_MAX) })}
+    </span>
+  );
+}
 
 /** What the user tells the AI about themselves. Every task's instructions carry it. */
 export function Profile({
@@ -79,11 +93,12 @@ export function Profile({
             <textarea
               className="input area"
               value={notes}
-              maxLength={4000}
+              maxLength={NOTES_MAX}
               rows={7}
               placeholder={t("profile.notesHint")}
               onChange={(e) => setNotes(e.target.value)}
             />
+            <NotesLimit length={notes.length} />
           </label>
           <div className="row">
             <span className="grow t3" role="status" style={{ fontSize: 13 }}>

@@ -43,6 +43,12 @@ export type SignInEvent =
   | { type: "error"; message: string };
 
 /** What a menu bar item asks the window to do. */
+/** What the Task menu acts on: whether a task is open, and whether it's working and can be stopped. */
+export interface MenuState {
+  task: boolean;
+  running: boolean;
+}
+
 export type MenuAction = "new-task" | "new-project" | "quick-edit" | "settings" | "send" | "stop" | "rename" | "reveal";
 
 /** What the preload exposes to the interface as `window.tostWork`. */
@@ -58,6 +64,8 @@ export interface TostWorkApi {
   };
   /** The menu bar's items, which the window carries out. */
   onMenu(listener: (action: MenuAction) => void): () => void;
+  /** Tells the menu bar whether a task is open and working, so its Task items turn on and off with it. */
+  menuState(state: MenuState): void;
   /** The subscriptions, one per agent CLI. */
   account: {
     status(provider: AgentProvider): Promise<AgentAccount>;
@@ -141,6 +149,7 @@ export const IPC = {
   accountInstall: "account:install",
   settingsChanged: "settings:changed",
   menuAction: "menu:action",
+  menuState: "menu:state",
   keyInfo: "key:info",
   keySave: "key:save",
   keyRemove: "key:remove",

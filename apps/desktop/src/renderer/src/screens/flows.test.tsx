@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { App } from "@/App";
 import { createMemoryApi } from "@/lib/memoryApi";
@@ -270,6 +270,44 @@ describe("approvals", () => {
     // Undo puts the edited version back, so the row is back to offering Restore.
     expect(screen.getByText("The version before the edit is kept")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Restore" })).toBeTruthy();
+  });
+});
+
+describe("the files of a task", () => {
+  it("shows a file picked in the side panel, and lists the attached files as used", async () => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Proposals", folder: "/home/giulia/Proposals" });
+    const task = await api.tasks.start({
+      projectId: project.id,
+      brief: "Compare the offers",
+      attachments: ["/home/giulia/offer.pdf"],
+    });
+    act(() => {
+      api.emit(task.id, { type: "file", change: { path: "/home/giulia/Proposals/a.docx", kind: "add", role: "made" } });
+      api.emit(task.id, { type: "file", change: { path: "/home/giulia/Proposals/b.xlsx", kind: "add", role: "made" } });
+      api.emit(task.id, {
+        type: "file",
+        change: { path: "/home/giulia/Proposals/prices.xlsx", kind: "update", role: "used" },
+      });
+    });
+    render(<App userName="Giulia" api={api} />);
+    // Find first, then act: waiting inside act holds back the updates the wait is for.
+    const [open] = await screen.findAllByText("Compare the offers");
+    await act(async () => {
+      fireEvent.click(open as HTMLElement);
+    });
+    // The newest file shows first; picking the other one in the side panel switches the card to it.
+    expect(screen.getByRole("tab", { name: "b.xlsx" }).getAttribute("aria-selected")).toBe("true");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "a.docx" }));
+    });
+    expect(screen.getByRole("tab", { name: "a.docx" }).getAttribute("aria-selected")).toBe("true");
+    const panel = within(document.querySelector(".rp") as HTMLElement);
+    expect(panel.getByText("Used")).toBeTruthy();
+    expect(panel.getByText("offer.pdf")).toBeTruthy();
+    // The attachment says it was attached; a file the task only read doesn't.
+    expect(panel.getAllByText("Attached")).toHaveLength(1);
+    expect(panel.getByText("prices.xlsx")).toBeTruthy();
   });
 });
 

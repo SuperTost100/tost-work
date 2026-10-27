@@ -37,7 +37,7 @@ export function Projects({
                   {p.description && <p>{p.description}</p>}
                   <div className="meta">
                     <span className="grow">{p.folder}</span>
-                    <span>{t("projects.tasks", { n: String(count) })}</span>
+                    <span>{count === 1 ? t("projects.oneTask") : t("projects.tasks", { n: String(count) })}</span>
                   </div>
                 </button>
               );

@@ -108,6 +108,16 @@ describe("settings", () => {
     expect(task?.projectId).toBe("p1");
   });
 
+  it("starts the first task in the project made in setup, with quick edit on too", async () => {
+    const api = createMemoryApi({ name: "Giulia", setupDone: true });
+    await api.projects.create({ name: "Proposals", folder: "/home/giulia/Proposals" });
+    render(<Root api={api} />);
+    fireEvent.change(await screen.findByRole("textbox"), { target: { value: "Write a proposal" } });
+    await click("Start task");
+    const [task] = await api.tasks.list();
+    expect(task?.projectId).toBe("p1");
+  });
+
   it("asks for a project when quick edit is off and there is none", async () => {
     const api = createMemoryApi({ name: "Giulia", setupDone: true, sections: { quickEdit: false } });
     render(<Root api={api} />);

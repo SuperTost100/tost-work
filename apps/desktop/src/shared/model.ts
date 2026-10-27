@@ -195,3 +195,6 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultAi: null,
   setupDone: false,
 };
+
+/** The longest "what else to know" note the AI gets with every task. */
+export const NOTES_MAX = 4000;

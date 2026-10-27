@@ -16,6 +16,7 @@ const en = {
   "profile.workHint": "For example: I run AI courses for companies, at tost.one",
   "profile.notes": "What else the AI should know",
   "profile.notesHint": "Your clients, how you like documents to look, words you never use, what to always check…",
+  "profile.notesLimit": "{n} of {max} characters. Anything past the limit isn't kept.",
   "profile.save": "Save",
   "profile.saved": "Saved. The next tasks will use it.",
   "about.version": "Tost Work {version} · build {build}",
@@ -91,6 +92,11 @@ const en = {
   "home.greeting.afternoon": "Good afternoon, {name}.",
   "home.greeting.evening": "Good evening, {name}.",
   "home.firstTask": "Let's do your first task.",
+  "home.line.0": "What are we working on?",
+  "home.line.1": "Where do we start?",
+  "home.line.2": "What shall we get done?",
+  "home.line.3": "Which file is next?",
+  "home.line.4": "What can I take off your hands?",
   "composer.placeholder": "What should get done?",
   "composer.attach": "Attach files",
   "composer.start": "Start task",
@@ -109,6 +115,7 @@ const en = {
   "projects.empty":
     "No projects yet. A project is a folder on your computer, and everything the AI makes for it goes there.",
   "projects.tasks": "{n} tasks",
+  "projects.oneTask": "1 task",
   "project.tasks": "Tasks",
   "project.noTasks": "No tasks in this project yet.",
   "project.instructions": "Instructions",
@@ -127,6 +134,7 @@ const en = {
   "task.stop": "Stop",
   "task.made": "Made by this task",
   "task.used": "Used",
+  "task.attachedFile": "Attached",
   "task.noFiles": "The files it makes will show up here.",
   "task.settings": "Task settings",
   "task.model": "Model",
@@ -277,6 +285,7 @@ const it: Record<MessageKey, string> = {
   "profile.workHint": "Per esempio: tengo corsi di AI per aziende, con tost.one",
   "profile.notes": "Cos'altro deve sapere l'AI",
   "profile.notesHint": "I tuoi clienti, come vuoi i documenti, parole che non usi mai, cosa controllare sempre…",
+  "profile.notesLimit": "{n} caratteri su {max}. Quello che va oltre il limite non viene tenuto.",
   "profile.save": "Salva",
   "profile.saved": "Salvato. Le prossime attività lo useranno.",
   "about.version": "Tost Work {version} · build {build}",
@@ -352,6 +361,11 @@ const it: Record<MessageKey, string> = {
   "home.greeting.afternoon": "Buon pomeriggio, {name}.",
   "home.greeting.evening": "Buonasera, {name}.",
   "home.firstTask": "Facciamo la tua prima attività.",
+  "home.line.0": "Su cosa lavoriamo?",
+  "home.line.1": "Da dove cominciamo?",
+  "home.line.2": "Cosa portiamo a termine?",
+  "home.line.3": "Quale file tocca adesso?",
+  "home.line.4": "Cosa posso fare al posto tuo?",
   "composer.placeholder": "Cosa c'è da fare?",
   "composer.attach": "Allega file",
   "composer.start": "Avvia l'attività",
@@ -370,6 +384,7 @@ const it: Record<MessageKey, string> = {
   "projects.empty":
     "Nessun progetto per ora. Un progetto è una cartella sul tuo computer, e tutto quello che l'AI crea per il progetto finisce lì.",
   "projects.tasks": "{n} attività",
+  "projects.oneTask": "1 attività",
   "project.tasks": "Attività",
   "project.noTasks": "Ancora nessuna attività in questo progetto.",
   "project.instructions": "Istruzioni",
@@ -388,6 +403,7 @@ const it: Record<MessageKey, string> = {
   "task.stop": "Interrompi",
   "task.made": "Creati da questa attività",
   "task.used": "Usati",
+  "task.attachedFile": "Allegato",
   "task.noFiles": "I file che crea compariranno qui.",
   "task.settings": "Impostazioni dell'attività",
   "task.model": "Modello",
@@ -532,9 +548,14 @@ export function translate(lang: Language, key: MessageKey, vars: Record<string, 
   return text.replace(/\{(\w+)\}/g, (_, name: string) => vars[name] ?? `{${name}}`);
 }
 
-/** The greeting for the hour of the day: morning until 12, afternoon until 18. */
+/** The greeting for the hour of the day: morning from 5 to 12, afternoon until 18, evening through the night. */
 export function greetingKey(hour: number): MessageKey {
+  if (hour < 5) return "home.greeting.evening";
   if (hour < 12) return "home.greeting.morning";
   if (hour < 18) return "home.greeting.afternoon";
   return "home.greeting.evening";
 }
+
+/** How many lines Home picks from under the greeting, once the first task is done. */
+export const HOME_LINES = 5;
+export const homeLineKey = (index: number) => `home.line.${index % HOME_LINES}` as MessageKey;

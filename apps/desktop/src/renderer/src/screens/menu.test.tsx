@@ -36,10 +36,29 @@ describe("the menu bar", () => {
 
     await press(api, "rename");
     expect(screen.getByRole("textbox", { name: "Rename" })).toBeTruthy();
+    expect(api.menuStateNow()).toEqual({ task: true, running: true });
     await press(api, "reveal");
     expect(revealed).toEqual([task?.id]);
     await press(api, "stop");
     expect((await api.tasks.get(task?.id ?? ""))?.status).toBe("stopped");
+  });
+
+  it("selects the newest file the task made when showing it in the folder", async () => {
+    const api = createMemoryApi();
+    const shown: string[] = [];
+    api.files.reveal = async (_id, path) => {
+      shown.push(path);
+    };
+    render(<Root api={api} />);
+    fireEvent.change(await screen.findByRole("textbox"), { target: { value: "Write a proposal" } });
+    await press(api, "send");
+    const [task] = await api.tasks.list();
+    await act(async () => {
+      api.emit(task?.id ?? "", { type: "file", change: { path: "/w/notes.docx", kind: "add", role: "made" } });
+      api.emit(task?.id ?? "", { type: "file", change: { path: "/w/brief.pdf", kind: "update", role: "used" } });
+    });
+    await press(api, "reveal");
+    expect(shown).toEqual(["/w/notes.docx"]);
   });
 
   it("renames a task Recent doesn't show, in its own header", async () => {

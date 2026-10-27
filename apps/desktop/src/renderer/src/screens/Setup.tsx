@@ -7,7 +7,8 @@ import { Logo } from "@/lib/Logo";
 import { useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
-import { type AiId, type Level, type Settings, SUBSCRIPTIONS } from "../../../shared/model";
+import { type AiId, type Level, NOTES_MAX, type Settings, SUBSCRIPTIONS } from "../../../shared/model";
+import { NotesLimit } from "./Profile";
 
 const TOTAL = 5;
 const LEVELS: Level[] = ["beginner", "intermediate", "advanced", "expert"];
@@ -174,11 +175,12 @@ export function Setup({
                 <textarea
                   className="input area"
                   value={notes}
-                  maxLength={4000}
+                  maxLength={NOTES_MAX}
                   rows={5}
                   placeholder={t("profile.notesHint")}
                   onChange={(e) => setNotes(e.target.value)}
                 />
+                <NotesLimit length={notes.length} />
               </label>
               <p className="t3" style={{ fontSize: 13 }}>
                 {t("setup.about.later")}

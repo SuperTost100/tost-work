@@ -36,16 +36,39 @@ function Thumb({ path }: { path: string }) {
   );
 }
 
-function FileLine({ file, onOpen }: { file: FileChange; onOpen?: () => void }) {
+function FileLine({
+  path,
+  sub,
+  onOpen,
+  onSelect,
+}: {
+  path: string;
+  /** A short line under the name, such as where the file came from. */
+  sub?: string;
+  onOpen?: () => void;
+  onSelect?: () => void;
+}) {
   const t = useT();
-  return (
-    <div className="fileline" title={file.path}>
-      <Thumb path={file.path} />
+  const name = (
+    <>
+      <Thumb path={path} />
       <span className="grow">
         <span className="nm truncate" style={{ display: "block" }}>
-          {fileName(file.path)}
+          {fileName(path)}
         </span>
+        {sub && <span className="sb">{sub}</span>}
       </span>
+    </>
+  );
+  return (
+    <div className="fileline" title={path}>
+      {onSelect ? (
+        <button type="button" className="pick-file grow" onClick={onSelect}>
+          {name}
+        </button>
+      ) : (
+        name
+      )}
       {onOpen && (
         <button type="button" className="tbtn" onClick={onOpen}>
           <Icon name="external-link" />
@@ -142,7 +165,7 @@ function WhatChanged({
         <h3>{title}</h3>
         {files.map((f) => (
           <Fragment key={f.path}>
-            <FileLine file={f} onOpen={() => void api.files.open(task.id, f.path).catch(onError)} />
+            <FileLine path={f.path} onOpen={() => void api.files.open(task.id, f.path).catch(onError)} />
             <KeptRow task={task} path={f.path} onRestore={onRestore} />
           </Fragment>
         ))}
@@ -217,15 +240,20 @@ function Artifact({
   api,
   task,
   files,
+  picked,
+  onPick,
   onError,
 }: {
   api: TostWorkApi;
   task: TaskT;
   files: FileChange[];
+  /** The file the user chose, here or in the side panel; null follows the newest. */
+  picked: string | null;
+  onPick: (path: string) => void;
   onError: (err: unknown) => void;
 }) {
   const t = useT();
-  const [picked, setPicked] = useState<string | null>(null);
+  const setPicked = onPick;
   // Follow the newest file while the task writes, unless the user picked one.
   const current = files.find((f) => f.path === picked) ?? files[files.length - 1];
   if (!current) return null;
@@ -337,7 +365,20 @@ export function Task({
   // A task without a project is a quick edit: it works on copies in a temporary folder until the user saves.
   const quick = task.projectId === null;
   const made = task.files.filter((f) => f.role === "made");
-  const used = task.files.filter((f) => f.role === "used");
+  // What the task worked from: the files the user attached, then any other file it reports reading, unless it
+  // changed them. Only the attached ones say so.
+  const notMade = (path: string) => !made.some((f) => f.path === path);
+  const used = [
+    ...task.attachments.filter(notMade).map((path) => ({ path, attached: true })),
+    ...task.files
+      .filter((f) => f.role === "used" && !task.attachments.includes(f.path) && notMade(f.path))
+      .map((f) => ({ path: f.path, attached: false })),
+  ];
+  const [picked, setPicked] = useState<string | null>(null);
+  const showFile = (path: string) => {
+    setPicked(path);
+    document.querySelector(".artifact")?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  };
   const current = task.steps.findIndex((s) => s.status === "in_progress");
   const live = task.status === "running" || task.status === "needs-you";
   // The steps belong to the latest run, so after a follow-up they show under that instruction.
@@ -426,7 +467,9 @@ export function Task({
                 </div>
               )}
               {range(runStart > 0 ? runStart + 1 : 1, end)}
-              {made.length > 0 && <Artifact api={api} task={task} files={made} onError={onError} />}
+              {made.length > 0 && (
+                <Artifact api={api} task={task} files={made} picked={picked} onPick={setPicked} onError={onError} />
+              )}
               {task.status === "stopped" && <p className="agent t3">{t("task.stopped")}</p>}
               {task.status === "failed" && <p className="agent">{t("task.failed", { error: task.error ?? "" })}</p>}
               {task.review && (
@@ -500,13 +543,13 @@ export function Task({
               {made.length === 0 && <p className="empty">{t("task.noFiles")}</p>}
               {made.map((f) => (
                 <Fragment key={f.path}>
-                  <FileLine file={f} />
+                  <FileLine path={f.path} onSelect={f.kind === "delete" ? undefined : () => showFile(f.path)} />
                   <KeptRow task={task} path={f.path} onRestore={onRestore} />
                 </Fragment>
               ))}
               {used.length > 0 && <h3>{t("task.used")}</h3>}
-              {used.map((f) => (
-                <FileLine key={f.path} file={f} />
+              {used.map(({ path, attached }) => (
+                <FileLine key={path} path={path} sub={attached ? t("task.attachedFile") : undefined} />
               ))}
               <h3>{t("task.settings")}</h3>
               <div className="setrow">

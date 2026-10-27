@@ -1,9 +1,10 @@
+import { useState } from "react";
 import { approvalTitle } from "@/components/Approval";
 import { type Attachments, Composer } from "@/components/Composer";
 import { ProjectPicker } from "@/components/ProjectPicker";
 import { TaskTag } from "@/components/TaskTag";
 import { useT } from "@/lib/useT";
-import { greetingKey } from "../../../shared/i18n";
+import { greetingKey, HOME_LINES, homeLineKey } from "../../../shared/i18n";
 import type { Project, Task } from "../../../shared/model";
 
 export function Home({
@@ -20,6 +21,7 @@ export function Home({
   onNewProject,
   allowNoProject = true,
   now = new Date(),
+  line,
 }: {
   userName: string;
   brief: string;
@@ -35,8 +37,11 @@ export function Home({
   /** Whether "No project" (a quick edit) is on offer. */
   allowNoProject?: boolean;
   now?: Date;
+  /** Which line shows under the greeting; a random one by default, kept while Home is open. */
+  line?: number;
 }) {
   const t = useT();
+  const [randomLine] = useState(() => Math.floor(Math.random() * HOME_LINES));
   const waiting = tasks.filter((x) => x.status === "needs-you");
   const recent = tasks.slice(0, 6);
   const projectName = (id: string | null) => projects.find((p) => p.id === id)?.name;
@@ -48,12 +53,8 @@ export function Home({
           <div className="hello">
             <h1>
               {t(greetingKey(now.getHours()), { name: userName })}
-              {tasks.length === 0 && (
-                <>
-                  <br />
-                  <span>{t("home.firstTask")}</span>
-                </>
-              )}
+              <br />
+              <span>{t(tasks.length === 0 ? "home.firstTask" : homeLineKey(line ?? randomLine))}</span>
             </h1>
           </div>
           <Composer

@@ -1,6 +1,7 @@
 import type {
   AgentAccount,
   MenuAction,
+  MenuState,
   NewProjectInput,
   NewTaskInput,
   SignInEvent,
@@ -28,6 +29,8 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   pickInMenu(action: TaskMenuAction | null): void;
   /** Picks an item in the menu bar, as the user would. */
   pressMenu(action: MenuAction): void;
+  /** What the window last told the menu bar about the open task. */
+  menuStateNow(): MenuState;
   /** Changes settings from outside the window, as the View menu does. */
   changeSettings(patch: Partial<Settings>): void;
 } {
@@ -57,6 +60,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
 
   // What the next task menu returns, as if the user had picked it.
   let menuPick: TaskMenuAction | null = null;
+  let menuState: MenuState = { task: false, running: false };
 
   return {
     platform: "linux",
@@ -68,6 +72,10 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       menuListeners.add(l);
       return () => menuListeners.delete(l);
     },
+    menuState: (state) => {
+      menuState = state;
+    },
+    menuStateNow: () => menuState,
     pressMenu: (action) => {
       for (const l of menuListeners) l(action);
     },

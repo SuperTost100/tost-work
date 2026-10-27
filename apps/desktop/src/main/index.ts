@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { createFunnel } from "cli-funnel";
-import { app, BrowserWindow, dialog, Menu, nativeTheme, safeStorage, shell } from "electron";
-import { IPC } from "../shared/api";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, safeStorage, shell } from "electron";
+import { IPC, type MenuState } from "../shared/api";
 import { languageFrom, translate } from "../shared/i18n";
 import type { AgentProvider } from "../shared/model";
 import { Accounts } from "./accounts";
@@ -141,6 +141,7 @@ app.whenReady().then(async () => {
     );
   const accounts = { codex: accountsFor("codex"), claude: accountsFor("claude") };
   // The menu bar speaks the interface's language and follows the settings, so it's rebuilt when they change.
+  let taskState: MenuState = { task: false, running: false };
   const refreshMenu = () => {
     const settings = store.getSettings();
     const lang = language();
@@ -148,6 +149,7 @@ app.whenReady().then(async () => {
       t: (key) => translate(lang, key),
       isMac,
       settings,
+      task: taskState,
       dev: !app.isPackaged,
       send: (action) => {
         if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.menuAction, action);
@@ -175,6 +177,14 @@ app.whenReady().then(async () => {
     Menu.setApplicationMenu(Menu.buildFromTemplate(menu));
   };
   refreshMenu();
+  // The window says when a task opens, closes or stops working; anything but two booleans is ignored.
+  ipcMain.on(IPC.menuState, (_e, state: unknown) => {
+    const s = state as Partial<MenuState> | null;
+    if (typeof s?.task !== "boolean" || typeof s.running !== "boolean") return;
+    if (s.task === taskState.task && s.running === taskState.running) return;
+    taskState = { task: s.task, running: s.running };
+    refreshMenu();
+  });
   registerIpc(
     store,
     runner,
