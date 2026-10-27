@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { approvalTitle } from "@/components/Approval";
 import { type Attachments, Composer } from "@/components/Composer";
 import { ProjectPicker } from "@/components/ProjectPicker";
 import { TaskTag } from "@/components/TaskTag";
-import { useT } from "@/lib/useT";
-import { greetingKey, HOME_LINES, homeLineKey } from "../../../shared/i18n";
+import { LanguageContext, useT } from "@/lib/useT";
+import { greeting, homeLine } from "../../../shared/i18n";
 import type { Project, Task } from "../../../shared/model";
 
 export function Home({
@@ -37,11 +37,12 @@ export function Home({
   /** Whether "No project" (a quick edit) is on offer. */
   allowNoProject?: boolean;
   now?: Date;
-  /** Which line shows under the greeting; a random one by default, kept while Home is open. */
+  /** Which line shows under the greeting, from 0 up to 1 along the list; random by default, kept while Home is open. */
   line?: number;
 }) {
   const t = useT();
-  const [randomLine] = useState(() => Math.floor(Math.random() * HOME_LINES));
+  const lang = useContext(LanguageContext);
+  const [randomLine] = useState(() => Math.random());
   const waiting = tasks.filter((x) => x.status === "needs-you");
   const recent = tasks.slice(0, 6);
   const projectName = (id: string | null) => projects.find((p) => p.id === id)?.name;
@@ -52,9 +53,9 @@ export function Home({
         <div className="col home-col">
           <div className="hello">
             <h1>
-              {t(greetingKey(now.getHours()), { name: userName })}
+              {greeting(lang, now.getHours(), userName)}
               <br />
-              <span>{t(tasks.length === 0 ? "home.firstTask" : homeLineKey(line ?? randomLine))}</span>
+              <span>{homeLine(lang, line ?? randomLine, tasks.length === 0)}</span>
             </h1>
           </div>
           <Composer

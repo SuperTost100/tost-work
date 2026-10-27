@@ -1,3 +1,5 @@
+import { FIRST_TASK, GREETINGS, LINES } from "./homeLines";
+
 /** Interface strings in English and Italian. The language comes from the system until setup lets the user choose. */
 const en = {
   "nav.newTask": "New task",
@@ -88,16 +90,7 @@ const en = {
   "delete.yes": "Delete",
   "recent.more": "More for {name}",
   "nav.collapse": "Collapse sidebar",
-  "home.greeting.morning": "Good morning, {name}.",
-  "home.greeting.afternoon": "Good afternoon, {name}.",
-  "home.greeting.evening": "Good evening, {name}.",
-  "home.firstTask": "Let's do your first task.",
   "home.questions": "{text} And {n} more.",
-  "home.line.0": "What are we working on?",
-  "home.line.1": "Where do we start?",
-  "home.line.2": "What shall we get done?",
-  "home.line.3": "Which file is next?",
-  "home.line.4": "What can I take off your hands?",
   "composer.placeholder": "What should get done?",
   "composer.attach": "Attach files",
   "composer.tooLong": "This is longer than one message can hold ({max} characters). Attach it as a file instead.",
@@ -395,16 +388,7 @@ const it: Record<MessageKey, string> = {
   "delete.yes": "Elimina",
   "recent.more": "Altro per {name}",
   "nav.collapse": "Comprimi la barra laterale",
-  "home.greeting.morning": "Buongiorno, {name}.",
-  "home.greeting.afternoon": "Buon pomeriggio, {name}.",
-  "home.greeting.evening": "Buonasera, {name}.",
-  "home.firstTask": "Facciamo la tua prima attività.",
   "home.questions": "{text} E altre {n}.",
-  "home.line.0": "Su cosa lavoriamo?",
-  "home.line.1": "Da dove cominciamo?",
-  "home.line.2": "Cosa portiamo a termine?",
-  "home.line.3": "Quale file tocca adesso?",
-  "home.line.4": "Cosa posso fare al posto tuo?",
   "composer.placeholder": "Cosa c'è da fare?",
   "composer.attach": "Allega file",
   "composer.tooLong": "È più lungo di quanto un messaggio possa contenere ({max} caratteri). Allegalo come file.",
@@ -626,13 +610,16 @@ export function translate(lang: Language, key: MessageKey, vars: Record<string, 
 }
 
 /** The greeting for the hour of the day: morning from 5 to 12, afternoon until 18, evening through the night. */
-export function greetingKey(hour: number): MessageKey {
-  if (hour < 5) return "home.greeting.evening";
-  if (hour < 12) return "home.greeting.morning";
-  if (hour < 18) return "home.greeting.afternoon";
-  return "home.greeting.evening";
+
+/** The greeting for the hour: evening until five in the morning, so midnight isn't "good morning". */
+export function greeting(lang: Language, hour: number, name: string): string {
+  const part = hour < 5 || hour >= 18 ? "evening" : hour < 12 ? "morning" : "afternoon";
+  return GREETINGS[lang][part].replace("{name}", name);
 }
 
-/** How many lines Home picks from under the greeting, once the first task is done. */
-export const HOME_LINES = 5;
-export const homeLineKey = (index: number) => `home.line.${index % HOME_LINES}` as MessageKey;
+/** The line under the greeting: the first-task line, or the one at `pick` (from 0 up to 1) in the language's list. */
+export function homeLine(lang: Language, pick: number, firstTask = false): string {
+  if (firstTask) return FIRST_TASK[lang];
+  const lines = LINES[lang];
+  return lines[Math.min(lines.length - 1, Math.floor(pick * lines.length))] ?? "";
+}
