@@ -50,7 +50,12 @@ function createWindow(store: Store): BrowserWindow {
 
   win.once("ready-to-show", () => win.show());
   // A load resets the zoom, so the text size goes back on after each one.
-  win.webContents.on("did-finish-load", () => applyLook(win, store.getSettings()));
+  win.webContents.on("did-finish-load", () => {
+    applyLook(win, store.getSettings());
+    win.webContents.send(IPC.fullScreen, win.isFullScreen());
+  });
+  win.on("enter-full-screen", () => win.webContents.send(IPC.fullScreen, true));
+  win.on("leave-full-screen", () => win.webContents.send(IPC.fullScreen, false));
   win.on("closed", () => {
     if (mainWindow === win) mainWindow = null;
   });

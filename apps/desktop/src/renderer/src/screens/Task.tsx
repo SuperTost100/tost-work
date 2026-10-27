@@ -601,8 +601,9 @@ export function Task({
               )}
               {task.status === "stopped" &&
                 (task.interrupted ? (
-                  <div className="agent t3 row">
-                    <span className="grow">
+                  <div className="agent row">
+                    {/* Only the note is grey: Resume is a normal button. */}
+                    <span className="grow t3">
                       {t("task.interrupted")}
                       {/* A resume that failed, for example offline, says why; Resume stays to try again. */}
                       {task.error && (

@@ -310,7 +310,8 @@ h3 {
   text-align: left;
   cursor: pointer;
 }
-.rec .more {
+.rec .more,
+.sitem .more {
   display: grid;
   place-items: center;
   flex: none;
@@ -326,10 +327,14 @@ h3 {
 }
 .rec:hover .more,
 .rec.on .more,
-.rec .more:focus-visible {
+.rec .more:focus-visible,
+.sitem:hover .more,
+.sitem.on .more,
+.sitem .more:focus-visible {
   opacity: 1;
 }
-.rec .more:hover {
+.rec .more:hover,
+.sitem .more:hover {
   background: var(--hover);
   color: var(--ink);
 }
@@ -371,6 +376,13 @@ h3 {
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+/* The gear stretches to the name's height beside it. */
+.me .iconbtn {
+  width: 38px;
+  height: auto;
+  align-self: stretch;
+  border-radius: 8px;
 }
 .me .who-btn:hover,
 .me .who-btn.on,
@@ -1733,7 +1745,8 @@ ins {
 /* Skills */
 .skills {
   display: grid;
-  grid-template-columns: 240px 1fr 260px;
+  /* The editor keeps most of the room in a small window: the list and the side column give way first. */
+  grid-template-columns: clamp(170px, 20vw, 240px) minmax(0, 1fr) clamp(190px, 21vw, 260px);
   flex: 1;
   min-height: 0;
 }
@@ -1745,9 +1758,9 @@ ins {
 .slist .sitem {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   height: 34px;
-  padding: 0 10px;
+  padding: 0 4px 0 10px;
   border-radius: 8px;
   font-size: 14px;
 }
@@ -1758,10 +1771,20 @@ ins {
   background: var(--sel);
   font-weight: 500;
 }
-/* The list's items are buttons, so they reset the button look and fill the row. */
-.slist .sitem {
-  width: 100%;
+/* Each row holds the open button and the … button, as Recent's do. */
+.slist .sitem .open {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
   text-align: left;
+  cursor: pointer;
 }
 .editor .title-input {
   min-width: 0;
@@ -1804,7 +1827,7 @@ ins {
 }
 .editor {
   overflow: auto;
-  padding: 28px 44px 64px;
+  padding: 28px clamp(20px, 3.5vw, 44px) 64px;
 }
 .editor h1 {
   font-size: 28px;
@@ -2083,7 +2106,7 @@ ol.editable li::before {
 /* Settings */
 .settings {
   display: grid;
-  grid-template-columns: 210px 1fr;
+  grid-template-columns: 232px 1fr;
   flex: 1;
   min-height: 0;
 }
@@ -2105,6 +2128,8 @@ ol.editable li::before {
   border-radius: 8px;
   font-size: 14px;
   color: var(--t2);
+  text-align: left;
+  white-space: nowrap;
 }
 .snav a .ic,
 .snav button .ic,
@@ -2657,6 +2682,15 @@ button.item {
   outline: none;
   border-color: var(--ink);
 }
+/* The system's arrow sits against the edge and differs per platform, so a select draws its own, inset like the text. */
+select.input {
+  appearance: none;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23878070' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 16px;
+}
 fieldset.fld {
   margin: 0;
   padding: 0;
@@ -2976,4 +3010,8 @@ label.opt:has(input:focus-visible) {
     400 12.5px / 1.4 "IBM Plex Mono",
     monospace;
   user-select: all;
+}
+/* In full screen macOS hides the traffic lights, so the sidebar doesn't keep their space. */
+[data-full-screen] .lights-space {
+  display: none;
 }

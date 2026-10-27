@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { type MouseEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
@@ -85,14 +85,56 @@ export function Skills({ api }: { api: TostWorkApi }) {
       const saved = await api.skills.addFiles(open.id);
       put(saved);
     });
-  const remove = () => {
-    if (!open || !window.confirm(t("skills.removeConfirm", { title: open.title }))) return;
+  // The list and the open skill as they are now, for work that finishes after the user moved on.
+  const current = useRef({ skills, openId });
+  // Updated once a render is on screen, so a render React drops can't leave its state here.
+  useLayoutEffect(() => {
+    current.current = { skills, openId };
+  });
+  const remove = (skill: Skill) => {
+    if (!window.confirm(t("skills.removeConfirm", { title: skill.title }))) return;
     void run(async () => {
-      await api.skills.remove(open.id);
-      const rest = (skills ?? []).filter((s) => s.id !== open.id);
-      setSkills(rest);
-      show(rest[0] ?? null);
+      await api.skills.remove(skill.id);
+      const rest = (current.current.skills ?? []).filter((s) => s.id !== skill.id);
+      // The user may have opened the skill while it was going: then the editor moves to another one.
+      const moved = current.current.openId === skill.id;
+      const next = moved ? (rest[0] ?? null) : null;
+      // Set now, not after the render, so another delete finishing in the same moment sees this one.
+      current.current = { skills: rest, openId: moved ? (next?.id ?? null) : current.current.openId };
+      setSkills((list) => (list ?? []).filter((s) => s.id !== skill.id));
+      if (moved) show(next);
     });
+  };
+
+  // Rename puts the cursor in the name, which saves with the rest of the skill.
+  const nameField = useRef<HTMLInputElement>(null);
+  const renameNext = useRef(false);
+  const focusName = useCallback((el: HTMLInputElement | null) => {
+    nameField.current = el;
+    if (el && renameNext.current) {
+      renameNext.current = false;
+      el.focus();
+      el.select();
+    }
+  }, []);
+  // The … button and a right-click open the same menu as a task's in the sidebar.
+  const menu = async (skill: Skill) => {
+    const action = await api.skills.menu(skill.id);
+    if (action === "reveal") void run(() => api.skills.reveal(skill.id));
+    else if (action === "delete") remove(skill);
+    else if (action === "rename") {
+      if (skill.id === openId) {
+        nameField.current?.focus();
+        nameField.current?.select();
+      } else if (leave()) {
+        renameNext.current = true;
+        show(skill);
+      }
+    }
+  };
+  const contextMenu = (skill: Skill) => (e: MouseEvent) => {
+    e.preventDefault();
+    void menu(skill);
   };
 
   return (
@@ -136,21 +178,36 @@ export function Skills({ api }: { api: TostWorkApi }) {
         <div className="skills">
           <nav className="slist" aria-label={t("nav.skills")}>
             {skills?.map((s) => (
-              <button
-                type="button"
-                key={s.id}
-                className={s.id === openId ? "sitem on" : "sitem"}
-                aria-current={s.id === openId ? "true" : undefined}
-                onClick={() => s.id !== openId && leave() && show(s)}
-              >
-                <span className="truncate">{s.title}</span>
-              </button>
+              <div key={s.id} className={s.id === openId ? "sitem on" : "sitem"}>
+                <button
+                  type="button"
+                  className="open"
+                  aria-current={s.id === openId ? "true" : undefined}
+                  onClick={() => s.id !== openId && leave() && show(s)}
+                  onContextMenu={contextMenu(s)}
+                >
+                  <span className="truncate">{s.title}</span>
+                </button>
+                <button
+                  type="button"
+                  className="more"
+                  aria-label={t("recent.more", { name: s.title })}
+                  title={t("recent.more", { name: s.title })}
+                  onClick={() => void menu(s)}
+                  onContextMenu={contextMenu(s)}
+                >
+                  <Icon name="more-1" />
+                </button>
+              </div>
             ))}
           </nav>
           {open && draft ? (
             <div className="editor">
               <div className="row">
                 <input
+                  // A new field for each skill, so Rename from the menu can focus it as it appears.
+                  key={open.id}
+                  ref={focusName}
                   className="title-input grow"
                   aria-label={t("skills.name")}
                   value={draft.title}
@@ -218,15 +275,16 @@ export function Skills({ api }: { api: TostWorkApi }) {
                 <p className="truncate" title={open.folder}>
                   {open.id}
                 </p>
-                <div className="row" style={{ marginTop: 10, gap: 8 }}>
-                  <button type="button" className="btn" onClick={() => void run(() => api.skills.reveal(open.id))}>
-                    <Icon name="folder-open" />
-                    {t("preview.reveal")}
-                  </button>
-                  <button type="button" className="btn" onClick={remove}>
-                    {t("skills.remove")}
-                  </button>
-                </div>
+                {/* Rename and Delete are in the skill's … menu, as for a task. */}
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ marginTop: 10 }}
+                  onClick={() => void run(() => api.skills.reveal(open.id))}
+                >
+                  <Icon name="folder-open" />
+                  {t("preview.reveal")}
+                </button>
               </>
             )}
           </aside>

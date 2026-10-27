@@ -147,10 +147,12 @@ export interface TostWorkApi {
     reveal(id: string): Promise<void>;
     /** Moves the skill's folder to the Trash. */
     remove(id: string): Promise<void>;
+    /** Shows the native skill menu, the same as a task's, and resolves with the pick. */
+    menu(id: string): Promise<TaskMenuAction | null>;
   };
 }
 
-/** What the task menu offers. */
+/** What the task menu offers. The skill menu offers the same. */
 export type TaskMenuAction = "rename" | "reveal" | "delete";
 
 /** IPC channel names, kept in one place so main and preload can't drift apart. */
@@ -166,12 +168,14 @@ export const IPC = {
   settingsChanged: "settings:changed",
   menuAction: "menu:action",
   menuState: "menu:state",
+  fullScreen: "window:full-screen",
   skillsList: "skills:list",
   skillsCreate: "skills:create",
   skillsSave: "skills:save",
   skillsAddFiles: "skills:add-files",
   skillsReveal: "skills:reveal",
   skillsRemove: "skills:remove",
+  skillsMenu: "skills:menu",
   keyInfo: "key:info",
   keySave: "key:save",
   keyRemove: "key:remove",

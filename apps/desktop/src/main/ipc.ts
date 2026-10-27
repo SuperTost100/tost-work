@@ -174,9 +174,8 @@ export function registerIpc(
     return task;
   };
   // A native menu, as Finder's and Mail's are. It only says what was picked; the window carries it out.
-  ipcMain.handle(IPC.tasksMenu, (_e, id: unknown) => {
-    const task = taskOf(id);
-    return new Promise<TaskMenuAction | null>((resolve) => {
+  const itemMenu = (canDelete: boolean) =>
+    new Promise<TaskMenuAction | null>((resolve) => {
       let picked = false;
       const pick = (action: TaskMenuAction) => () => {
         picked = true;
@@ -186,14 +185,14 @@ export function registerIpc(
         { label: t("menu.rename"), click: pick("rename") },
         { label: t("menu.reveal"), click: pick("reveal") },
         { type: "separator" },
-        { label: t("menu.delete"), enabled: !runner.isRunning(task.id), click: pick("delete") },
+        { label: t("menu.delete"), enabled: canDelete, click: pick("delete") },
       ]);
       // The menu closes before its click arrives on some systems, so a close with no pick waits a moment.
       const closed = () => setTimeout(() => picked || resolve(null), 100);
       const win = window();
       menu.popup(win ? { window: win, callback: closed } : { callback: closed });
     });
-  });
+  ipcMain.handle(IPC.tasksMenu, (_e, id: unknown) => itemMenu(!runner.isRunning(taskOf(id).id)));
   ipcMain.handle(IPC.tasksRename, (_e, id: unknown, title: unknown) =>
     runner.rename(text(id, "id", 100), text(title, "title", 200)),
   );
@@ -243,6 +242,10 @@ export function registerIpc(
     if (error) throw new Error(error);
   });
   ipcMain.handle(IPC.skillsRemove, (_e, id: unknown) => skills.remove(skillId(id)));
+  ipcMain.handle(IPC.skillsMenu, (_e, id: unknown) => {
+    skillId(id);
+    return itemMenu(true);
+  });
 
   ipcMain.handle(IPC.filesPick, async () => {
     const result = await openDialog({ title: t("attach.pick"), properties: ["openFile", "multiSelections"] });

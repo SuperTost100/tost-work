@@ -295,6 +295,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         mustSkill(id);
         skills = skills.filter((s) => s.id !== id);
       },
+      menu: async () => menuPick,
     },
     files: {
       pick: async () => ["/Users/giulia/Documents/letter-bank.docx"],

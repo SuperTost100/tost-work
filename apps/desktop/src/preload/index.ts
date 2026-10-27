@@ -1,7 +1,13 @@
+/// <reference lib="dom" />
 import { contextBridge, ipcRenderer } from "electron";
 import type { MenuAction, SignInEvent } from "../shared/api";
 import { IPC, type TostWorkApi } from "../shared/api";
 import type { AgentProvider, Settings, Task } from "../shared/model";
+
+// In full screen macOS hides the traffic lights, so the page drops the space it keeps for them.
+ipcRenderer.on(IPC.fullScreen, (_: unknown, on: boolean) => {
+  document.documentElement.toggleAttribute("data-full-screen", on === true);
+});
 
 const api: TostWorkApi = {
   platform: process.platform as TostWorkApi["platform"],
@@ -80,6 +86,7 @@ const api: TostWorkApi = {
     addFiles: (id) => ipcRenderer.invoke(IPC.skillsAddFiles, id),
     reveal: (id) => ipcRenderer.invoke(IPC.skillsReveal, id),
     remove: (id) => ipcRenderer.invoke(IPC.skillsRemove, id),
+    menu: (id) => ipcRenderer.invoke(IPC.skillsMenu, id),
   },
 };
 

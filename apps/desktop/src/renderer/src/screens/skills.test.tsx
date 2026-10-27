@@ -60,8 +60,86 @@ describe("skills", () => {
     await click("Add a file");
     expect(await screen.findByText("template.docx")).toBeTruthy();
 
-    await click("Delete");
+    // Delete is in the skill's … menu, as for a task.
+    api.pickInMenu("delete");
+    await click("More for Price table");
     expect((await api.skills.list()).map((s) => s.title)).toEqual(["Brand voice"]);
     expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Brand voice");
+  });
+
+  it("opens the same menu on right-click, and Rename puts the cursor in the name", async () => {
+    const api = createMemoryApi();
+    await api.skills.create("Brand voice");
+    await api.skills.create("Price table");
+    render(<Root api={api} />);
+    await click("Skills");
+    await screen.findByLabelText("Skill name");
+
+    api.pickInMenu("rename");
+    const row = screen.getByRole("button", { name: "Price table" });
+    await act(async () => {
+      fireEvent.contextMenu(row);
+    });
+    const name = screen.getByLabelText("Skill name") as HTMLInputElement;
+    expect(name.value).toBe("Price table");
+    expect(document.activeElement).toBe(name);
+
+    // Deleting a skill that isn't open leaves the open one on screen.
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    api.pickInMenu("delete");
+    await act(async () => {
+      fireEvent.contextMenu(screen.getByRole("button", { name: "Brand voice" }));
+    });
+    expect((await api.skills.list()).map((s) => s.title)).toEqual(["Price table"]);
+    expect(name.value).toBe("Price table");
+  });
+
+  it("moves the editor off a skill that was opened while it was being deleted", async () => {
+    const api = createMemoryApi();
+    await api.skills.create("Brand voice");
+    await api.skills.create("Price table");
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const realRemove = api.skills.remove;
+    let finish = () => {};
+    api.skills.remove = (id) =>
+      new Promise((resolve) => {
+        finish = () => void realRemove(id).then(resolve);
+      });
+    render(<Root api={api} />);
+    await click("Skills");
+    await screen.findByLabelText("Skill name");
+
+    api.pickInMenu("delete");
+    await click("More for Price table");
+    await click("Price table");
+    expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Price table");
+    await act(async () => finish());
+    expect(screen.queryByRole("button", { name: "Price table" })).toBeNull();
+    expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Brand voice");
+  });
+
+  it("keeps the editor on a skill that's still there when two deletes finish together", async () => {
+    const api = createMemoryApi();
+    await api.skills.create("Brand voice");
+    await api.skills.create("Price table");
+    await api.skills.create("Zoom notes");
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const realRemove = api.skills.remove;
+    const pending: (() => Promise<void>)[] = [];
+    api.skills.remove = (id) =>
+      new Promise((resolve) => {
+        pending.push(() => realRemove(id).then(resolve));
+      });
+    render(<Root api={api} />);
+    await click("Skills");
+    await screen.findByLabelText("Skill name");
+    // Brand voice is open; delete it and the next one, then let both finish at once.
+    api.pickInMenu("delete");
+    await click("More for Brand voice");
+    await click("More for Price table");
+    await act(async () => {
+      await Promise.all(pending.map((finish) => finish()));
+    });
+    expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Zoom notes");
   });
 });
