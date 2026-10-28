@@ -174,7 +174,11 @@ describe("skills", () => {
 
     await click("Restore v1");
     expect((screen.getByLabelText("What to do") as HTMLTextAreaElement).value).toBe("");
-    expect(await screen.findByText("v3 · back to version 1")).toBeTruthy();
+    // v1 is current again, with v2 still there to put back.
+    expect(await screen.findByText(/^Version 1/)).toBeTruthy();
+    expect(document.querySelector(".vers .current")?.textContent).toMatch(/^v1/);
+    expect(screen.getByRole("button", { name: "Restore v2" })).toBeTruthy();
+    expect(screen.queryByText(/^v3/)).toBeNull();
   });
 
   it("imports a skill, and says how many tasks used it", async () => {

@@ -287,7 +287,7 @@ export interface SkillVersion {
   at: string;
   /** What changed, in the user's words. */
   note?: string;
-  /** Set when this version put an older one back. */
+  /** Set on versions kept by Restore before 0.0.7, which added a copy of the old version. */
   restoredFrom?: number;
 }
 

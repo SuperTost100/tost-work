@@ -38,37 +38,47 @@ export class SkillVersions {
     return (await this.read(id)).map(({ text: _text, ...v }) => v).reverse();
   }
 
-  async count(id: string): Promise<number> {
+  /**
+   * The version the SKILL.md is now: the newest one with the same text. A file changed outside Tost Work matches none
+   * and counts as the latest version.
+   */
+  async current(id: string, text: string): Promise<number> {
     const list = await this.read(id);
-    return list.at(-1)?.n ?? 0;
+    return list.findLast((v) => v.text === text)?.n ?? list.at(-1)?.n ?? 0;
   }
 
   async text(id: string, n: number): Promise<string | null> {
     return (await this.read(id)).find((v) => v.n === n)?.text ?? null;
   }
 
-  /** Keeps the SKILL.md as just saved, as the next version. Saving the same text again adds nothing. */
-  async record(id: string, text: string, at: string, more: { note?: string; restoredFrom?: number } = {}) {
+  /**
+   * Keeps the SKILL.md as just saved, as the next version. Text that matches a kept version adds nothing: that version
+   * becomes the current one again, which is how Restore puts an old version back.
+   */
+  async record(id: string, text: string, at: string, more: { note?: string } = {}) {
     const list = await this.read(id);
-    const last = list.at(-1);
-    if (last?.text === text && !more.restoredFrom) return;
+    if (list.some((v) => v.text === text)) return;
     const note = more.note?.trim();
-    const next: Kept = {
-      n: (last?.n ?? 0) + 1,
-      at,
-      ...(note ? { note } : {}),
-      ...(more.restoredFrom ? { restoredFrom: more.restoredFrom } : {}),
-      text,
-    };
+    const next: Kept = { n: (list.at(-1)?.n ?? 0) + 1, at, ...(note ? { note } : {}), text };
     await this.write(id, [...list, next].slice(-MAX_VERSIONS));
   }
 
-  /** The versions follow a skill whose folder was renamed. */
-  async rename(from: string, to: string): Promise<void> {
+  /**
+   * The versions follow a skill whose folder was renamed. `retext` gives each kept SKILL.md the new name, so a version
+   * put back later matches the one it came from.
+   */
+  async rename(from: string, to: string, retext?: (text: string) => string): Promise<void> {
     if (from === to) return;
     await rename(this.file(from), this.file(to)).catch((err: NodeJS.ErrnoException) => {
       if (err.code !== "ENOENT") throw err;
     });
+    if (!retext) return;
+    const list = await this.read(to);
+    if (list.length)
+      await this.write(
+        to,
+        list.map((v) => ({ ...v, text: retext(v.text) })),
+      );
   }
 
   /** Drops the versions under a folder name, for an import that didn't finish. */

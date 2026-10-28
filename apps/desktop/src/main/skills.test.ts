@@ -222,9 +222,19 @@ describe("SkillFolder", () => {
       [2, "price step"],
       [1, undefined],
     ]);
+    // Restore makes v1 current again, with no new version, and v2 stays to come back to.
     const back = await skills.restore(made.id, 1);
-    expect(back).toMatchObject({ steps: "1. Read.", version: 3 });
-    expect((await skills.history(made.id))[0]).toMatchObject({ n: 3, restoredFrom: 1 });
+    expect(back).toMatchObject({ steps: "1. Read.", version: 1 });
+    expect((await skills.history(made.id)).map((v) => v.n)).toEqual([2, 1]);
+    expect(await skills.restore(made.id, 2)).toMatchObject({ version: 2 });
+    // A change after a restore is the next version.
+    await skills.restore(made.id, 1);
+    const changed = await skills.save(made.id, {
+      title: "Proposal writer",
+      description: "Proposals.",
+      steps: "1. Skim.",
+    });
+    expect(changed.version).toBe(3);
   });
 
   it("takes the versions along when a new title renames the folder, and a new skill with an old name starts afresh", async () => {
@@ -232,6 +242,9 @@ describe("SkillFolder", () => {
     const made = await skills.create("Old name");
     const renamed = await skills.save(made.id, { title: "New name", description: "", steps: "x" });
     expect(renamed).toMatchObject({ id: "new-name", version: 2 });
+    // v1, kept under the old name, comes back as v1 under the new one, not as a new version.
+    expect(await skills.restore("new-name", 1)).toMatchObject({ id: "new-name", name: "new-name", version: 1 });
+    expect((await skills.history("new-name")).map((v) => v.n)).toEqual([2, 1]);
     expect((await skills.create("Old name")).version).toBe(1);
   });
 

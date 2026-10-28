@@ -63,18 +63,15 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       .replace(/^-|-$/g, "") || "skill";
   // Each kept version holds the editor's fields, as SKILL.md text would.
   const versions = new Map<string, (SkillVersion & { draft: SkillDraft })[]>();
-  const keep = (skill: Skill, more: { note?: string; restoredFrom?: number } = {}): Skill => {
+  // As the app: fields that match a kept version make it current again rather than adding one.
+  const keep = (skill: Skill, more: { note?: string } = {}): Skill => {
     const list = versions.get(skill.id) ?? [];
-    const n = (list.at(-1)?.n ?? 0) + 1;
     const draft = { title: skill.title, description: skill.description, steps: skill.steps };
+    const same = list.findLast((v) => JSON.stringify(v.draft) === JSON.stringify(draft));
+    if (same) return { ...skill, version: same.n };
+    const n = (list.at(-1)?.n ?? 0) + 1;
     const note = more.note?.trim();
-    list.push({
-      n,
-      at: now(),
-      ...(note ? { note } : {}),
-      ...(more.restoredFrom ? { restoredFrom: more.restoredFrom } : {}),
-      draft,
-    });
+    list.push({ n, at: now(), ...(note ? { note } : {}), draft });
     versions.set(skill.id, list);
     return { ...skill, version: n };
   };
@@ -366,7 +363,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       restore: async (id, n) => {
         const old = versions.get(id)?.find((v) => v.n === n);
         if (!old) throw new Error("That version isn't kept any more");
-        const next = keep({ ...mustSkill(id), ...old.draft, updatedAt: now() }, { restoredFrom: n });
+        const next = keep({ ...mustSkill(id), ...old.draft, updatedAt: now() });
         skills = skills.map((s) => (s.id === id ? next : s));
         return next;
       },

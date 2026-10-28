@@ -226,7 +226,7 @@ export class SkillFolder {
     return this.versions ? this.versions.list(await this.checked(id)) : [];
   }
 
-  /** Puts an earlier version back, kept as a new version, so the one it replaced can come back too. */
+  /** Puts an earlier version back. It becomes the current version again; the one it replaced stays in the list. */
   restore(id: string, n: number): Promise<Skill> {
     return this.serial(() => this.restoreNow(id, n));
   }
@@ -237,7 +237,7 @@ export class SkillFolder {
     if (text == null) throw new Error("That version isn't kept any more");
     const { description, body, extra } = parseSkill(text);
     await this.writeText(current, formatSkill(current, description, body, extra));
-    await this.keep(current, { restoredFrom: n });
+    await this.keep(current);
     return (await this.read(current)) as Skill;
   }
 
@@ -296,7 +296,11 @@ export class SkillFolder {
       if (target !== current) await rename(join(this.root, target), join(this.root, current));
       throw err;
     }
-    if (target !== current) await this.versions?.rename(current, target);
+    if (target !== current)
+      await this.versions?.rename(current, target, (text) => {
+        const { description, body, extra } = parseSkill(text);
+        return formatSkill(target, description, body, extra);
+      });
     await this.keep(target, { note });
     return (await this.read(target)) as Skill;
   }
@@ -343,12 +347,12 @@ export class SkillFolder {
       files,
       folder,
       updatedAt: mtime.toISOString(),
-      version: (await this.versions?.count(id)) ?? 0,
+      version: (await this.versions?.current(id, text)) ?? 0,
     };
   }
 
   /** Keeps the SKILL.md as it is now as the skill's next version. */
-  private async keep(id: string, more: { note?: string; restoredFrom?: number } = {}): Promise<void> {
+  private async keep(id: string, more: { note?: string } = {}): Promise<void> {
     if (!this.versions) return;
     const text = await readFile(join(this.root, id, "SKILL.md"), "utf8");
     await this.versions.record(id, text, this.now(), more);

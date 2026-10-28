@@ -394,8 +394,8 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
               <>
                 <h3>{t("skills.versions")}</h3>
                 <div className="vers">
-                  {versions.map((v, i) => (
-                    <div key={v.n}>
+                  {versions.map((v) => (
+                    <div key={v.n} className={v.n === version ? "current" : undefined}>
                       <span className="grow truncate">
                         v{v.n}
                         {v.restoredFrom
@@ -404,7 +404,7 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
                             ? ` · ${v.note}`
                             : ""}
                       </span>
-                      {i === 0 ? (
+                      {v.n === version ? (
                         <span className="t3">{t("skills.current")}</span>
                       ) : (
                         <button

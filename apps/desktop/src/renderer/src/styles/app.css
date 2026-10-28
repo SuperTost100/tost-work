@@ -613,10 +613,15 @@ h3 {
 :root[data-theme="dark"] .composer {
   box-shadow: none;
 }
+/* Text boxes grow with their text, up to a limit where they scroll, instead of a corner to drag. */
+textarea {
+  field-sizing: content;
+  resize: none;
+}
 .composer textarea {
   width: 100%;
   border: 0;
-  resize: none;
+  max-height: 40vh;
   background: transparent;
   color: var(--ink);
   font:
@@ -1090,7 +1095,8 @@ h3 {
   padding: 9px 11px;
   font: inherit;
   line-height: 1.5;
-  resize: vertical;
+  min-height: calc(5lh + 20px);
+  max-height: 50vh;
 }
 /* An empty list says so in a box of its own, so it can't be read as another heading. */
 .empty {
@@ -1834,10 +1840,14 @@ ins {
   border: 0;
   background: transparent;
   color: var(--ink);
-  resize: vertical;
   font: inherit;
   font-size: 15px;
   line-height: 1.7;
+  /* No limit: the page scrolls, as a document would. */
+  min-height: 2lh;
+}
+.editor textarea#skill-steps {
+  min-height: 10lh;
 }
 .editor textarea.editable:focus {
   background: var(--hover);
@@ -1926,8 +1936,13 @@ ol.editable li::before {
   border-bottom: 1px solid var(--line-2);
   color: var(--t2);
 }
-.smeta .vers div:first-child {
+.smeta .vers div.current {
   color: var(--ink);
+}
+/* Restore's text lines up with "current" on the right edge, as its padding only shows on hover. */
+.smeta .vers .tbtn {
+  margin-right: -10px;
+  font-size: 13px;
 }
 .md {
   font:
@@ -3042,6 +3057,19 @@ label.opt:has(input:focus-visible) {
 /* In full screen macOS hides the traffic lights, so the sidebar doesn't keep their space. */
 [data-full-screen] .lights-space {
   display: none;
+}
+/* In full screen there are no window buttons, so the sidebar button moves up into the logo's row. */
+[data-full-screen] .side .chrome {
+  position: relative;
+  height: 0;
+}
+[data-full-screen] .side .chrome .iconbtn {
+  position: absolute;
+  top: 14px;
+  right: 4px;
+}
+[data-full-screen] .side .brand {
+  padding-top: 16px;
 }
 /* A round of answered questions: one grey line like the steps, which opens onto each question and its answer. */
 .answered {
