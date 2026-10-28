@@ -130,7 +130,9 @@ export class Jobs {
   setOn(id: string, on: boolean): Job {
     const job = this.must(id);
     const at = this.now().toISOString();
-    return this.save({ ...job, on, ...(on ? { handled: at } : {}), updatedAt: at });
+    // A skip whose time went by while it was off is dropped, so it can't look like it's still in force.
+    const skip = job.skip && job.skip > at ? job.skip : null;
+    return this.save({ ...job, on, skip, ...(on ? { handled: at } : {}), updatedAt: at });
   }
 
   /** Leaves out the next run, or puts it back if it was left out already. */

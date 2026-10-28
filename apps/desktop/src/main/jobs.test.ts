@@ -165,11 +165,13 @@ describe("Jobs", () => {
   it("doesn't catch up on the runs it was off for, and notes a run that couldn't start", async () => {
     const { service, started, tick, failNext } = setup();
     const made = service.create(DRAFT);
+    service.skipOnce(made.id);
     service.setOn(made.id, false);
     await tick(at(29, 9));
     expect(started).toEqual([]);
     await tick(at(29, 10));
-    service.setOn(made.id, true);
+    // Its skip was for a time that went by while it was off, so it's gone.
+    expect(service.setOn(made.id, true).skip).toBeNull();
     await tick(at(29, 11));
     expect(started).toEqual([]);
     failNext();

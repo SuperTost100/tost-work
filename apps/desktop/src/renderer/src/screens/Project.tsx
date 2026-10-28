@@ -13,6 +13,7 @@ export function Project({
   attach,
   onOpenTask,
   onBack,
+  onAddJob,
 }: {
   project: ProjectT;
   tasks: Task[];
@@ -22,6 +23,8 @@ export function Project({
   attach?: Attachments;
   onOpenTask: (id: string) => void;
   onBack: () => void;
+  /** Opens the job builder in this project; missing while Jobs is turned off. */
+  onAddJob?: () => void;
 }) {
   const t = useT();
   const mine = tasks.filter((x) => x.projectId === project.id);
@@ -71,6 +74,18 @@ export function Project({
                 <span className="v">{project.instructions || t("project.instructionsEmpty")}</span>
               </span>
             </div>
+            {onAddJob && (
+              <div className="setrow">
+                <Icon name="calendar" />
+                <span className="grow">
+                  <span className="k">{t("nav.jobs")}</span>
+                  <span className="v">{t("project.jobs")}</span>
+                </span>
+                <button type="button" className="act" onClick={onAddJob}>
+                  {t("project.addJob")}
+                </button>
+              </div>
+            )}
             <div className="setrow">
               <Icon name="folder" />
               <span className="grow">

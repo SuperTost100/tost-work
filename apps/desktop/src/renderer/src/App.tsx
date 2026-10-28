@@ -5,6 +5,7 @@ import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
 import { Home } from "@/screens/Home";
+import { Jobs } from "@/screens/Jobs";
 import { Profile } from "@/screens/Profile";
 import { Project } from "@/screens/Project";
 import { Projects } from "@/screens/Projects";
@@ -46,6 +47,9 @@ export function App({
   const quickEdit = sectionOn(current, "quickEdit");
   const { projects, tasks, addProject, loadProject, loadTask, removeTask } = useData(api);
   const [route, setRoute] = useState<Route>({ name: "home" });
+  // The project whose "Add job" opened Jobs, so the builder starts in it.
+  const [jobFor, setJobFor] = useState<string | null>(null);
+  const clearJobFor = useCallback(() => setJobFor(null), []);
   // The briefs live here so they survive a trip to another section.
   const [brief, setBrief] = useState("");
   const [projectBrief, setProjectBrief] = useState("");
@@ -130,6 +134,13 @@ export function App({
           .catch(report),
       onRemove: (path) => set((prev) => prev.filter((p) => p !== path)),
     };
+
+  // A section turned off in Settings while it's open goes back to Home, so nothing of it stays usable.
+  const shownSection = route.name === "soon" ? route.section : null;
+  const sectionStillOn = shownSection === null || sectionOn(current, shownSection);
+  useEffect(() => {
+    if (!sectionStillOn) setRoute({ name: "home" });
+  }, [sectionStillOn]);
 
   const sectionTitle: Record<"skills" | "jobs" | "board", string> = {
     skills: t("nav.skills"),
@@ -255,6 +266,14 @@ export function App({
         }
         attach={attach(projectFiles, setProjectFiles)}
         onOpenTask={(id) => setRoute({ name: "task", id })}
+        onAddJob={
+          sectionOn(current, "jobs")
+            ? () => {
+                setJobFor(project.id);
+                setRoute({ name: "soon", section: "jobs" });
+              }
+            : undefined
+        }
         onBack={() => setRoute({ name: "projects" })}
       />
     ) : null;
@@ -298,6 +317,18 @@ export function App({
     screen = api ? <SettingsScreen api={api} settings={current} onChange={(next) => onSettings?.(next)} /> : null;
   } else if (route.section === "skills" && api) {
     screen = <Skills api={api} tasks={tasks} />;
+  } else if (route.section === "jobs" && api && sectionStillOn) {
+    screen = (
+      <Jobs
+        api={api}
+        projects={projects}
+        tasks={tasks}
+        newFor={jobFor}
+        onNewHandled={clearJobFor}
+        onOpenTask={(id) => setRoute({ name: "task", id })}
+        onError={report}
+      />
+    );
   } else {
     screen = <Soon section={sectionTitle[route.section]} />;
   }

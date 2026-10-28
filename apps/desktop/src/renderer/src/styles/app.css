@@ -2085,7 +2085,7 @@ ol.editable li::before {
 /* Jobs: one list grouped by next run */
 .jrow {
   display: grid;
-  grid-template-columns: 1fr 190px 230px;
+  grid-template-columns: minmax(0, 1fr) clamp(150px, 18vw, 190px) clamp(170px, 20vw, 210px) auto;
   gap: 18px;
   align-items: center;
   padding: 14px 12px;
@@ -2126,6 +2126,124 @@ ol.editable li::before {
   color: var(--t3);
   padding: 22px 0 4px;
   border-bottom: 1px solid var(--line-2);
+}
+/* The card's left part opens the builder; it reads as text, not as a button. */
+.jrow .jmain {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.jrow .jmain .meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jrow .col2 .tbtn {
+  margin-left: -10px;
+}
+.jrow .jlast {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.jrow .col3 .out {
+  max-width: 100%;
+  cursor: pointer;
+}
+.jrow .col3 .row {
+  gap: 8px;
+}
+.jempty {
+  margin-top: 8px;
+  padding: 18px 20px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+}
+.jempty p {
+  margin: 4px 0 0;
+  color: var(--t2);
+  font-size: 14px;
+}
+/* The builder: the mockup's modal, fixed over the window like the other dialogs. */
+.modal.jobmodal {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+}
+.jobmodal .mb {
+  min-height: 380px;
+  overflow: auto;
+}
+.jobmodal .msteps li {
+  padding: 0;
+}
+.jobmodal .msteps li button {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.jobmodal .msteps li:not(.on) button:hover {
+  background: var(--hover);
+}
+.jobmodal .mform .fld > legend,
+.jobmodal .mform .fld > span:first-child {
+  font-size: 12.5px;
+  color: var(--t3);
+}
+.jobmodal .mform fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.jobmodal .mform .fld > legend {
+  margin-bottom: 6px;
+}
+.jobmodal .radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink);
+}
+.jobmodal .radio input {
+  accent-color: var(--btn);
+}
+/* The modal's labels sit above their field, as in the rest of the app's forms. */
+.jobmodal .mform label.fld {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.jobmodal .note {
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+.jobmodal .summary {
+  margin: 0;
 }
 
 /* Modal */

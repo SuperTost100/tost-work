@@ -608,7 +608,7 @@ describe("projects", () => {
   it("shows a placeholder for sections that aren't built yet", () => {
     const settings = { ...DEFAULT_SETTINGS, name: "Giulia", level: "intermediate" as const, setupDone: true };
     render(<App userName="Giulia" api={createMemoryApi()} settings={settings} />);
-    fireEvent.click(screen.getByRole("button", { name: "Jobs" }));
+    fireEvent.click(screen.getByRole("button", { name: "Board" }));
     expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/arrives in a later version/);
   });
 });
