@@ -97,6 +97,7 @@ describe("Store", () => {
       notify: { needsYou: "normal", failed: "normal", done: "off" },
       openAtLogin: false,
       stayInMenuBar: true,
+      sidebarHidden: false,
       setupDone: false,
     });
     store.saveSettings({ ...DEFAULT_SETTINGS, name: "Giulia", level: "advanced", language: "it", setupDone: true });

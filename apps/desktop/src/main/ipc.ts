@@ -101,8 +101,11 @@ export function registerIpc(
     return project;
   });
 
-  ipcMain.handle(IPC.projectsPickFolder, async () => {
-    const result = await openDialog({ properties: ["openDirectory", "createDirectory"] });
+  ipcMain.handle(IPC.projectsPickFolder, async (_e, defaultPath?: unknown) => {
+    const result = await openDialog({
+      properties: ["openDirectory", "createDirectory"],
+      defaultPath: defaultPath == null ? undefined : text(defaultPath, "defaultPath", 1000),
+    });
     return result.canceled ? null : (result.filePaths[0] ?? null);
   });
 

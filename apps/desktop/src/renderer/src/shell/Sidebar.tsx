@@ -32,6 +32,7 @@ export function Sidebar({
   showSection = () => true,
   userName,
   isMac,
+  onCollapse,
   tasks,
   openTaskId,
   onOpenTask,
@@ -48,6 +49,8 @@ export function Sidebar({
   showSection?: (key: SectionKey) => boolean;
   userName: string;
   isMac: boolean;
+  /** Hides the sidebar. */
+  onCollapse: () => void;
   tasks: Task[];
   openTaskId: string | null;
   onOpenTask: (id: string) => void;
@@ -81,7 +84,13 @@ export function Sidebar({
       <div className="chrome">
         {isMac && <span className="lights-space" />}
         <span className="grow" />
-        <button type="button" className="iconbtn" title={t("nav.collapse")} aria-label={t("nav.collapse")}>
+        <button
+          type="button"
+          className="iconbtn"
+          title={withShortcut(t("nav.collapse"), "B", isMac)}
+          aria-label={t("nav.collapse")}
+          onClick={onCollapse}
+        >
           <Icon name="layout-leftbar-close" />
         </button>
       </div>

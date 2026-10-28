@@ -40,16 +40,24 @@ describe("settingsPatch", () => {
 
   it("takes notifications and starting at login, and refuses unknown kinds or levels", () => {
     expect(
-      settingsPatch({ notifications: false, openAtLogin: true, stayInMenuBar: false, notify: { failed: "quiet" } }),
+      settingsPatch({
+        notifications: false,
+        openAtLogin: true,
+        stayInMenuBar: false,
+        sidebarHidden: true,
+        notify: { failed: "quiet" },
+      }),
     ).toEqual({
       notifications: false,
       openAtLogin: true,
       stayInMenuBar: false,
+      sidebarHidden: true,
       notify: { failed: "quiet" },
     });
     expect(() => settingsPatch({ notify: { email: "normal" } })).toThrow(/Unknown notification/);
     expect(() => settingsPatch({ notify: { done: "loud" } })).toThrow(/off, quiet or normal/);
     expect(() => settingsPatch({ openAtLogin: "yes" })).toThrow(/true or false/);
+    expect(() => settingsPatch({ sidebarHidden: 1 })).toThrow(/true or false/);
   });
 
   it("takes the profile's work and notes, trimmed", () => {

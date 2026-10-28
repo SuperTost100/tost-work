@@ -64,6 +64,15 @@ describe("the menu bar", () => {
     expect(shown).toEqual(["/w/notes.docx"]);
   });
 
+  it("renames a recent task in its own header while the sidebar is hidden", async () => {
+    const api = createMemoryApi({ name: "Giulia", setupDone: true, sidebarHidden: true });
+    render(<Root api={api} />);
+    fireEvent.change(await screen.findByRole("textbox"), { target: { value: "Write a proposal" } });
+    await press(api, "send");
+    await press(api, "rename");
+    expect(screen.getByRole("textbox", { name: "Rename" })).toBeTruthy();
+  });
+
   it("renames a task Recent doesn't show, in its own header", async () => {
     const api = createMemoryApi();
     const project = await api.projects.create({ name: "Proposals", folder: "/home/giulia/Proposals" });

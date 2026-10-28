@@ -62,10 +62,27 @@ describe("menuTemplate", () => {
     click("Attività", "Invia");
     click("Vista", "Testo più grande");
     click("Vista", "Testo normale");
-    expect(sent).toEqual(["new-task", "new-project", "quick-edit", "stop", "rename", "reveal", "send"]);
+    click("Vista", "Comprimi la barra laterale");
+    expect(sent).toEqual([
+      "new-task",
+      "new-project",
+      "quick-edit",
+      "stop",
+      "rename",
+      "reveal",
+      "send",
+      "toggle-sidebar",
+    ]);
     expect(sizes).toEqual([1, 0]);
     // Enter in the box already sends, so the menu shows the shortcut without taking it over.
     expect(item("Attività", "Invia")?.registerAccelerator).toBe(false);
+  });
+
+  it("offers the sidebar in View without a shortcut, so Cmd+B stays with the Skills editor", () => {
+    expect(build(true).item("Vista", "Comprimi la barra laterale")?.accelerator).toBeUndefined();
+    const hidden = build(true, { ...DEFAULT_SETTINGS, sidebarHidden: true });
+    expect(hidden.item("Vista", "Espandi la barra laterale")?.accelerator).toBeUndefined();
+    expect(hidden.item("Vista", "Comprimi la barra laterale")).toBeUndefined();
   });
 
   it("turns the Task items off without an open task, and Stop off when it isn't working", () => {

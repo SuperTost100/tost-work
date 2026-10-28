@@ -69,6 +69,8 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
       { label: t("appMenu.textSmaller"), accelerator: "CmdOrCtrl+-", click: () => o.textSize(-1) },
       { label: t("appMenu.textNormal"), accelerator: "CmdOrCtrl+0", click: () => o.textSize(0) },
       { type: "separator" },
+      // No accelerator: Cmd+B has to reach the Skills editor to make text bold, so the window handles the key.
+      { label: t(o.settings.sidebarHidden ? "nav.expand" : "nav.collapse"), click: action("toggle-sidebar") },
       { label: t("appMenu.fullScreen"), role: "togglefullscreen" },
       ...(o.dev ? [{ type: "separator" } as const, { role: "toggleDevTools" } as const] : []),
     ],

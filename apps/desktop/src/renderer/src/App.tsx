@@ -4,6 +4,7 @@ import { NewProjectDialog } from "@/components/NewProjectDialog";
 import { ProjectInstructionsDialog } from "@/components/ProjectInstructionsDialog";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
+import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
 import { Home } from "@/screens/Home";
 import { Jobs } from "@/screens/Jobs";
@@ -21,6 +22,9 @@ import { DEFAULT_SETTINGS, type Settings, sectionOn } from "../../shared/model";
 
 /** The main process accepts up to 20 attachments per task. */
 const MAX_FILES = 20;
+
+/** Where typing happens: Cmd+B belongs to the text there, not to the sidebar. */
+const EDITABLE = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
 
 type Route =
   | { name: "home" }
@@ -191,8 +195,30 @@ export function App({
   const focusComposer = () =>
     requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus());
   const openTask = route.name === "task" ? tasks.find((x) => x.id === route.id) : undefined;
+  const sidebarHidden = current.sidebarHidden;
+  // The value asked for last, so a second press before the first is saved undoes it rather than asking the same.
+  const wantedHidden = useRef<boolean | null>(null);
+  const toggleSidebar = () => {
+    const hidden = !(wantedHidden.current ?? sidebarHidden);
+    wantedHidden.current = hidden;
+    // A press that fails is forgotten only while it's still the latest, so a newer one keeps its place.
+    const settled = () => {
+      if (wantedHidden.current === hidden) wantedHidden.current = null;
+    };
+    void api?.settings.update({ sidebarHidden: hidden }).then(
+      (next) => {
+        settled();
+        onSettings?.(next);
+      },
+      (err: unknown) => {
+        settled();
+        report(err);
+      },
+    );
+  };
   const onMenu = (action: MenuAction) => {
-    if (action === "new-task") {
+    if (action === "toggle-sidebar") toggleSidebar();
+    else if (action === "new-task") {
       setRoute({ name: "home" });
       focusComposer();
     } else if (action === "new-project") setDialogOpen(true);
@@ -225,6 +251,21 @@ export function App({
   const menuHandler = useRef(onMenu);
   menuHandler.current = onMenu;
   useEffect(() => api?.onMenu((action) => menuHandler.current(action)), [api]);
+  // Cmd+B is no menu shortcut, because a menu would take the key from the Skills editor, where it makes text bold.
+  // The window handles it, and leaves it alone wherever the user is typing.
+  const toggleHandler = useRef(toggleSidebar);
+  toggleHandler.current = toggleSidebar;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "b" || e.shiftKey || e.altKey || e.defaultPrevented) return;
+      if (isMac ? !e.metaKey || e.ctrlKey : !e.ctrlKey || e.metaKey) return;
+      if (e.target instanceof Element && e.target.closest(EDITABLE)) return;
+      e.preventDefault();
+      toggleHandler.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isMac]);
   // The task may be older than the recent list, so it's loaded before the route turns to it. Only the latest click
   // counts, and only while the user hasn't gone elsewhere meanwhile; a task that's gone says so and stays put.
   const routeNow = useRef(route);
@@ -346,7 +387,8 @@ export function App({
           onResume={() => void api.tasks.resume(task.id).catch(report)}
           onOpenProject={() => project && setRoute({ name: "project", id: project.id })}
           onError={report}
-          renaming={renaming === task.id && !tasks.slice(0, RECENT).some((x) => x.id === task.id)}
+          // Recent tasks are renamed in the sidebar; with the sidebar hidden, here.
+          renaming={renaming === task.id && (sidebarHidden || !tasks.slice(0, RECENT).some((x) => x.id === task.id))}
           onRenamed={(title) => {
             setRenaming(null);
             if (title && title !== task.title) void api.tasks.rename(task.id, title).catch(report);
@@ -376,31 +418,48 @@ export function App({
   }
 
   return (
-    <div className="app">
-      <Sidebar
-        current={section}
-        onNavigate={navigate}
-        showSection={(key) => sectionOn(current, key)}
-        userName={userName}
-        isMac={isMac}
-        tasks={tasks}
-        openTaskId={route.name === "task" ? route.id : null}
-        onOpenTask={(id) => setRoute({ name: "task", id })}
-        onTaskMenu={openTaskMenu}
-        onRenameTask={(id, title) => void api?.tasks.rename(id, title).catch(report)}
-        onRevealTask={(id) => void api?.tasks.reveal(id).catch(report)}
-        renaming={renaming}
-        onRenamingChange={setRenaming}
-        onDeleteTask={(id) =>
-          void api?.tasks.remove(id).then((gone) => {
-            if (!gone) return;
-            removeTask(id);
-            // Project cards count tasks in the store, so they ask again.
-            void api.projects.taskCounts().then(setCounts, report);
-            setRoute((r) => (r.name === "task" && r.id === id ? { name: "home" } : r));
-          }, report)
-        }
-      />
+    <div className={`app${sidebarHidden ? " side-hidden" : ""}${isMac ? " mac" : ""}`}>
+      {sidebarHidden && (
+        <div className="reveal">
+          {isMac && <span className="lights-space" />}
+          <button
+            type="button"
+            className="iconbtn"
+            title={withShortcut(t("nav.expand"), "B", isMac)}
+            aria-label={t("nav.expand")}
+            onClick={toggleSidebar}
+          >
+            <Icon name="layout-leftbar-close" />
+          </button>
+        </div>
+      )}
+      {!sidebarHidden && (
+        <Sidebar
+          onCollapse={toggleSidebar}
+          current={section}
+          onNavigate={navigate}
+          showSection={(key) => sectionOn(current, key)}
+          userName={userName}
+          isMac={isMac}
+          tasks={tasks}
+          openTaskId={route.name === "task" ? route.id : null}
+          onOpenTask={(id) => setRoute({ name: "task", id })}
+          onTaskMenu={openTaskMenu}
+          onRenameTask={(id, title) => void api?.tasks.rename(id, title).catch(report)}
+          onRevealTask={(id) => void api?.tasks.reveal(id).catch(report)}
+          renaming={renaming}
+          onRenamingChange={setRenaming}
+          onDeleteTask={(id) =>
+            void api?.tasks.remove(id).then((gone) => {
+              if (!gone) return;
+              removeTask(id);
+              // Project cards count tasks in the store, so they ask again.
+              void api.projects.taskCounts().then(setCounts, report);
+              setRoute((r) => (r.name === "task" && r.id === id ? { name: "home" } : r));
+            }, report)
+          }
+        />
+      )}
       {screen ?? <div className="main" />}
       {error && (
         <div className="toast" role="alert">

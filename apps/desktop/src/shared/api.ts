@@ -65,7 +65,16 @@ export interface MenuState {
   running: boolean;
 }
 
-export type MenuAction = "new-task" | "new-project" | "quick-edit" | "settings" | "send" | "stop" | "rename" | "reveal";
+export type MenuAction =
+  | "new-task"
+  | "new-project"
+  | "quick-edit"
+  | "settings"
+  | "send"
+  | "stop"
+  | "rename"
+  | "reveal"
+  | "toggle-sidebar";
 
 /** What the preload exposes to the interface as `window.tostWork`. */
 export type JobChange = Job | { id: string; removed: true };
@@ -111,8 +120,8 @@ export interface TostWorkApi {
     create(input: NewProjectInput): Promise<Project>;
     /** How many tasks each project has, by project id. */
     taskCounts(): Promise<Record<string, number>>;
-    /** Opens the system folder picker. Resolves to null when the user cancels. */
-    pickFolder(): Promise<string | null>;
+    /** Opens the system folder picker, in `defaultPath` when given. Resolves to null when the user cancels. */
+    pickFolder(defaultPath?: string): Promise<string | null>;
     /** Shows the project's menu where the pointer is, and resolves with what the user picked, or null. */
     menu(id: string): Promise<ProjectMenuAction | null>;
     /** Saves the fields given, the name or the instructions the AI reads in every task. */

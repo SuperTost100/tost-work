@@ -16,6 +16,19 @@ const CLOCK_MS = 60_000;
 
 const fileName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 
+/** The folder as a path from the project's folder, or null when it isn't inside it. "" is the project folder itself. */
+export function insideProject(project: string, folder: string): string | null {
+  // A drive letter or a network share: a Windows path, where a backslash separates folders and case doesn't matter.
+  // Elsewhere a backslash is part of a folder's name.
+  const windows = /^[A-Za-z]:|^\\\\/.test(project);
+  const slashes = (p: string) => (windows ? p.replace(/\\/g, "/") : p).replace(/\/+$/, "");
+  const root = slashes(project);
+  const picked = slashes(folder);
+  const same = (a: string, b: string) => (windows ? a.toLowerCase() === b.toLowerCase() : a === b);
+  if (same(picked, root)) return "";
+  return same(picked.slice(0, root.length + 1), `${root}/`) ? picked.slice(root.length + 1) : null;
+}
+
 /** The task the job's latest run started, if it's among the ones loaded. */
 function lastTaskOf(job: Job, tasks: Task[]): Task | undefined {
   const last = job.last;
@@ -259,6 +272,7 @@ function JobBuilder({
   );
   const [ownFolder, setOwnFolder] = useState(Boolean(job?.output));
   const [error, setError] = useState<string | null>(null);
+  const [folderError, setFolderError] = useState<string | null>(null);
   const [started, setStarted] = useState<string | null>(null);
   // The ref stops a double click in the same tick; the state greys the buttons out.
   const saving = useRef(false);
@@ -285,7 +299,29 @@ function JobBuilder({
       ? t("jobs.missingFields")
       : s.repeat === "weekly" && !s.days?.length
         ? t("jobs.noDays")
-        : null;
+        : ownFolder && !draft.output
+          ? t("jobs.noFolder")
+          : null;
+
+  const projectFolder = projects.find((p) => p.id === draft.projectId)?.folder;
+  const chooseFolder = async () => {
+    if (!projectFolder) return;
+    try {
+      const picked = await api.projects.pickFolder(projectFolder);
+      if (!picked) return;
+      const inside = insideProject(projectFolder, picked);
+      if (inside === null) {
+        setFolderError(t("jobs.output.outside"));
+        return;
+      }
+      setFolderError(null);
+      // The project folder itself is the first option.
+      if (inside) set({ output: inside });
+      setOwnFolder(Boolean(inside));
+    } catch (err) {
+      setFolderError(errorText(err));
+    }
+  };
 
   /** Saves, making the job the first time; later saves change it. */
   const save = async (): Promise<Job | null> => {
@@ -298,7 +334,7 @@ function JobBuilder({
     setBusy(true);
     setError(null);
     try {
-      const clean = { ...draft, output: ownFolder ? draft.output.trim() : "" };
+      const clean = { ...draft, output: ownFolder ? draft.output : "" };
       const next = saved.current ? await api.jobs.update(saved.current.id, clean) : await api.jobs.create(clean);
       saved.current = next;
       return next;
@@ -338,7 +374,7 @@ function JobBuilder({
     {
       icon: "folder",
       name: "jobs.step.result",
-      sub: ownFolder && draft.output.trim() ? draft.output : t("jobs.output.ai"),
+      sub: ownFolder && draft.output ? draft.output : t("jobs.output.project"),
     },
     { icon: "play", name: "jobs.step.try", sub: t("jobs.step.try.d") },
   ];
@@ -390,7 +426,12 @@ function JobBuilder({
                     <select
                       className="input"
                       value={draft.projectId}
-                      onChange={(e) => set({ projectId: e.target.value })}
+                      // A folder picked in the old project isn't one of the new project's: the choice starts over.
+                      onChange={(e) => {
+                        set({ projectId: e.target.value, output: "" });
+                        setOwnFolder(false);
+                        setFolderError(null);
+                      }}
                     >
                       {projects.map((p) => (
                         <option key={p.id} value={p.id}>
@@ -481,21 +522,25 @@ function JobBuilder({
                   <legend>{t("jobs.output")}</legend>
                   <label className="radio">
                     <input type="radio" name="output" checked={!ownFolder} onChange={() => setOwnFolder(false)} />
-                    {t("jobs.output.ai")}
+                    {t("jobs.output.project")}
                   </label>
+                  <p className="t3 note indent">{t("jobs.output.project.d")}</p>
                   <label className="radio">
                     <input type="radio" name="output" checked={ownFolder} onChange={() => setOwnFolder(true)} />
-                    {t("jobs.output.folder")}
+                    {t("jobs.output.pick")}
                   </label>
                   {ownFolder && (
-                    <input
-                      className="input"
-                      aria-label={t("jobs.output.folder")}
-                      value={draft.output}
-                      maxLength={300}
-                      placeholder={t("jobs.output.folderHint")}
-                      onChange={(e) => set({ output: e.target.value })}
-                    />
+                    <div className="row indent pick">
+                      <button type="button" className="btn" onClick={() => void chooseFolder()}>
+                        {t("jobs.output.choose")}
+                      </button>
+                      {draft.output && <span className="truncate">{draft.output}</span>}
+                    </div>
+                  )}
+                  {folderError && (
+                    <p className="fld-error indent" role="alert">
+                      {folderError}
+                    </p>
                   )}
                   <p className="t3 note">{t("jobs.output.d")}</p>
                 </fieldset>

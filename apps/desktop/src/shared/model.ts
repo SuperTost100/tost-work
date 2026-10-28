@@ -212,6 +212,8 @@ export interface Settings {
   openAtLogin: boolean;
   /** Closing the window leaves Tost Work in the menu bar (or tray) while a job is on. */
   stayInMenuBar: boolean;
+  /** The sidebar is hidden, so the main area has the whole window. */
+  sidebarHidden: boolean;
   setupDone: boolean;
 }
 
@@ -282,6 +284,7 @@ export const DEFAULT_SETTINGS: Settings = {
   notify: { needsYou: "normal", failed: "normal", done: "off" },
   openAtLogin: false,
   stayInMenuBar: true,
+  sidebarHidden: false,
   setupDone: false,
 };
 
