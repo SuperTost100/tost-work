@@ -113,6 +113,14 @@ export class Store {
     return rows.map((r) => JSON.parse(r.data) as Job);
   }
 
+  /** Every task still working or waiting for the user, however old, newest first. */
+  listActiveTasks(): Task[] {
+    const rows = this.db
+      .prepare("select data from tasks where status in ('running', 'needs-you') order by updated_at desc")
+      .all() as { data: string }[];
+    return rows.map((r) => JSON.parse(r.data) as Task);
+  }
+
   /** Whether a run of this job still needs the user or is still working. */
   jobBusy(jobId: string): boolean {
     const row = this.db

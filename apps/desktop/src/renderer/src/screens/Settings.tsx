@@ -84,6 +84,8 @@ export function Settings({
   const signedIn = AIS.filter((ai) => connected[ai]);
   const shownDefault: AiId =
     settings.defaultAi && signedIn.includes(settings.defaultAi) ? settings.defaultAi : (signedIn[0] ?? "chatgpt");
+  // A Mac has a menu bar; Windows and Linux have a notification area.
+  const stayLabel = api.platform === "darwin" ? "settings.stayInMenuBar.mac" : "settings.stayInMenuBar.other";
   const save = (patch: Partial<SettingsData>) => {
     setError(null);
     api.settings.update(patch).then(onChange, (err: unknown) => setError(errorText(err)));
@@ -325,6 +327,17 @@ export function Settings({
                     label={t("settings.openAtLogin")}
                     on={settings.openAtLogin}
                     onChange={(openAtLogin) => save({ openAtLogin })}
+                  />
+                </div>
+                <div className="srow">
+                  <div className="lbl">
+                    <b>{t(stayLabel)}</b>
+                    <span>{t("settings.stayInMenuBar.d")}</span>
+                  </div>
+                  <Switch
+                    label={t(stayLabel)}
+                    on={settings.stayInMenuBar}
+                    onChange={(stayInMenuBar) => save({ stayInMenuBar })}
                   />
                 </div>
               </section>

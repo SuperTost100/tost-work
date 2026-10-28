@@ -8,6 +8,8 @@ files:
   - out/**
   # The fake engine copies these sample files into tasks until the real engine lands.
   - resources/fake/**
+  # The menu-bar and tray icons, read with nativeImage from the app's archive.
+  - resources/tray/**
   - package.json
 # Outside the app's archive, because Codex runs as its own process and reads them from disk. scripts/fetch-officecli.mjs
 # puts each platform's OfficeCLI in resources/bin/<os>-<arch>.

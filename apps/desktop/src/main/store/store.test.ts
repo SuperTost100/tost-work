@@ -96,6 +96,7 @@ describe("Store", () => {
       notifications: true,
       notify: { needsYou: "normal", failed: "normal", done: "off" },
       openAtLogin: false,
+      stayInMenuBar: true,
       setupDone: false,
     });
     store.saveSettings({ ...DEFAULT_SETTINGS, name: "Giulia", level: "advanced", language: "it", setupDone: true });
@@ -127,5 +128,14 @@ describe("Store", () => {
     expect(store.jobBusy("j")).toBe(true);
     store.saveTask({ ...task("a", "done", "2026-10-29T10:00:00Z"), jobId: "j" });
     expect(store.jobBusy("j")).toBe(false);
+  });
+
+  it("lists every task still working or waiting, however many newer ones finished", () => {
+    const store = new Store(":memory:");
+    store.saveTask(task("old", "needs-you", "2026-01-01T09:00:00Z"));
+    for (let i = 0; i < 60; i++)
+      store.saveTask(task(`d${i}`, "done", `2026-10-28T09:${String(i).padStart(2, "0")}:00Z`));
+    store.saveTask(task("now", "running", "2026-10-28T11:00:00Z"));
+    expect(store.listActiveTasks().map((t) => t.id)).toEqual(["now", "old"]);
   });
 });

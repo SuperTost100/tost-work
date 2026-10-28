@@ -8,11 +8,13 @@ import {
   ipcMain,
   Menu,
   Notification,
+  nativeImage,
   nativeTheme,
   net,
   powerMonitor,
   safeStorage,
   shell,
+  Tray,
 } from "electron";
 import { IPC, type MenuState } from "../shared/api";
 import { languageFrom, translate } from "../shared/i18n";
@@ -30,7 +32,7 @@ import { findInstalledCodex, Installer } from "./installer";
 import { registerIpc } from "./ipc";
 import { Jobs } from "./jobs";
 import { KeyStore } from "./keys";
-import { setOpenAtLogin } from "./loginItem";
+import { AT_LOGIN, setOpenAtLogin } from "./loginItem";
 import { applyLook } from "./look";
 import { ToolServer } from "./mcp/server";
 import { Notifier } from "./notify";
@@ -38,12 +40,15 @@ import { pickAi } from "./pickAi";
 import { SkillFolder } from "./skills";
 import { SkillVersions } from "./skillVersions";
 import { Store } from "./store/store";
+import { staysInMenuBar, trayMenu } from "./tray";
 
 const isMac = process.platform === "darwin";
 
 // macOS shows these in Tost Work > About, so a build can be told apart from another of the same version.
 app.setAboutPanelOptions({ applicationVersion: __APP_VERSION__, version: __APP_BUILD__ });
 let mainWindow: BrowserWindow | null = null;
+// Whether closing the last window leaves Tost Work running in the menu bar. Set once the jobs are loaded.
+let staysOpen = () => false;
 
 function createWindow(store: Store): BrowserWindow {
   const win = new BrowserWindow({
@@ -149,23 +154,25 @@ app.whenReady().then(async () => {
     engine = agent;
   }
 
-  // Shows a task in the window, making the window again if it was closed, as a notification click asks. A window
-  // that's still loading isn't listening yet, so the task waits here until the window asks for it.
+  // Brings the window back, making it again if it was closed; with a task, the window opens it, as a notification
+  // click asks. A window that's still loading isn't listening yet, so the task waits here until the window asks.
   let pendingTask: string | null = null;
   ipcMain.handle(IPC.takePendingTask, () => {
     const id = pendingTask;
     pendingTask = null;
     return id;
   });
-  const showTask = (taskId: string) => {
+  const showWindow = (taskId?: string) => {
+    if (isMac) void app.dock?.show();
     let win = mainWindow;
     if (!win || win.isDestroyed()) win = mainWindow = createWindow(store);
-    if (win.webContents.isLoading()) pendingTask = taskId;
-    else win.webContents.send(IPC.openTask, taskId);
+    if (taskId && win.webContents.isLoading()) pendingTask = taskId;
+    else if (taskId) win.webContents.send(IPC.openTask, taskId);
     if (win.isMinimized()) win.restore();
     win.show();
     win.focus();
   };
+  const showTask = (taskId: string) => showWindow(taskId);
   // Held until clicked or closed: a notification that's collected forgets its click.
   const shown = new Set<Notification>();
   const notifier = new Notifier(
@@ -217,10 +224,13 @@ app.whenReady().then(async () => {
       // On Mac the app outlives its window, so a task can change after the window is gone.
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.taskChanged, task);
       notifier.changed(task);
+      trayChanged();
     },
     undefined,
     guard,
   );
+  // Set once the tray exists below; jobs and tasks changing before that have nothing to update.
+  let trayChanged = () => {};
   // Jobs start their runs as tasks, like the ones the user starts, on the account new tasks use.
   const jobs = new Jobs({
     store,
@@ -246,6 +256,7 @@ app.whenReady().then(async () => {
     },
     changed: (change) => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.jobChanged, change);
+      trayChanged();
     },
   });
   // Every half minute, and on waking up, when a missed run is due straight away.
@@ -254,6 +265,41 @@ app.whenReady().then(async () => {
   powerMonitor.on("resume", lookAtJobs);
   powerMonitor.on("unlock-screen", lookAtJobs);
   lookAtJobs();
+
+  // The menu-bar icon (the tray on Windows and Linux), there only while Tost Work stays when its window closes.
+  let tray: Tray | null = null;
+  staysOpen = () => staysInMenuBar(store.getSettings(), jobs.list());
+  const updateTray = () => {
+    if (!staysOpen()) {
+      tray?.destroy();
+      tray = null;
+      return;
+    }
+    if (!tray) {
+      const icon = nativeImage.createFromPath(
+        join(app.getAppPath(), "resources", "tray", isMac ? "trayTemplate.png" : "tray.png"),
+      );
+      if (isMac) icon.setTemplateImage(true);
+      tray = new Tray(icon);
+      tray.setToolTip("Tost Work");
+      // On Windows and Linux a click opens the window; the menu is on the right click. A Mac shows the menu.
+      if (!isMac) tray.on("click", () => showWindow());
+    }
+    const lang = language();
+    const menu = trayMenu(
+      (key, vars) => translate(lang, key, vars),
+      lang,
+      jobs.list(),
+      store.listActiveTasks(),
+      new Date(),
+      { open: () => showWindow(), openTask: (id) => showWindow(id), quit: () => app.quit() },
+    );
+    tray.setContextMenu(Menu.buildFromTemplate(menu));
+  };
+  trayChanged = updateTray;
+  updateTray();
+  // The next job's time moves on by itself, so the menu is rebuilt every minute too.
+  setInterval(updateTray, 60_000);
 
   // One sign-in per agent CLI. Their progress goes to the window tagged with the CLI it belongs to.
   const accountsFor = (provider: AgentProvider) =>
@@ -326,6 +372,7 @@ app.whenReady().then(async () => {
     (settings) => {
       applyLook(mainWindow, settings);
       refreshMenu();
+      trayChanged();
       if (settings.openAtLogin !== atLogin) {
         atLogin = settings.openAtLogin;
         applyLogin(atLogin);
@@ -365,12 +412,22 @@ app.whenReady().then(async () => {
     funnel.close();
     store.close();
   });
-  mainWindow = createWindow(store);
+  // Started at login with a job on, Tost Work waits in the menu bar; otherwise it opens its window as usual. A Mac
+  // ignores the login item's arguments, so it says itself whether this start came from the login.
+  const startedAtLogin = process.argv.includes(AT_LOGIN) || (isMac && app.getLoginItemSettings().wasOpenedAtLogin);
+  if (startedAtLogin && staysOpen()) {
+    if (isMac) void app.dock?.hide();
+  } else mainWindow = createWindow(store);
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow(store);
+    // Through showWindow, so a Mac that hid the Dock icon at login shows it again with the window.
+    if (BrowserWindow.getAllWindows().length === 0) showWindow();
   });
 });
 
+// With a job on, Tost Work stays in the menu bar (the tray elsewhere), and a Mac drops its Dock icon until the window
+// comes back. Otherwise Windows and Linux quit, and a Mac keeps the app in the Dock, as before.
 app.on("window-all-closed", () => {
-  if (!isMac) app.quit();
+  if (staysOpen()) {
+    if (isMac) void app.dock?.hide();
+  } else if (!isMac) app.quit();
 });

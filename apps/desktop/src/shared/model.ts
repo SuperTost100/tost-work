@@ -208,6 +208,8 @@ export interface Settings {
   notify: Record<NotifyKind, NotifyLevel>;
   /** Tost Work starts when the user logs in to the computer, so jobs run on time. */
   openAtLogin: boolean;
+  /** Closing the window leaves Tost Work in the menu bar (or tray) while a job is on. */
+  stayInMenuBar: boolean;
   setupDone: boolean;
 }
 
@@ -277,6 +279,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // Finished work shows in the app; only what needs the user, or went wrong, interrupts them.
   notify: { needsYou: "normal", failed: "normal", done: "off" },
   openAtLogin: false,
+  stayInMenuBar: true,
   setupDone: false,
 };
 

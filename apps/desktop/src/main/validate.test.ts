@@ -39,9 +39,12 @@ describe("settingsPatch", () => {
   });
 
   it("takes notifications and starting at login, and refuses unknown kinds or levels", () => {
-    expect(settingsPatch({ notifications: false, openAtLogin: true, notify: { failed: "quiet" } })).toEqual({
+    expect(
+      settingsPatch({ notifications: false, openAtLogin: true, stayInMenuBar: false, notify: { failed: "quiet" } }),
+    ).toEqual({
       notifications: false,
       openAtLogin: true,
+      stayInMenuBar: false,
       notify: { failed: "quiet" },
     });
     expect(() => settingsPatch({ notify: { email: "normal" } })).toThrow(/Unknown notification/);

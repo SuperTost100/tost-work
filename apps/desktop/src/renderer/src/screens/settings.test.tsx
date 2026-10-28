@@ -143,6 +143,8 @@ describe("settings", () => {
     await click("Notifications", "switch");
     expect(screen.queryByRole("radiogroup", { name: "Didn't work" })).toBeNull();
     await click("Open Tost Work when you log in", "switch");
-    expect(await api.settings.get()).toMatchObject({ notifications: false, openAtLogin: true });
+    // The memory API is on Linux, which has a notification area rather than a menu bar.
+    await click("Stay in the notification area when you close the window", "switch");
+    expect(await api.settings.get()).toMatchObject({ notifications: false, openAtLogin: true, stayInMenuBar: false });
   });
 });
