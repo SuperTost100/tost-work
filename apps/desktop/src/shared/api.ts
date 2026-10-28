@@ -64,6 +64,8 @@ export interface TostWorkApi {
   };
   /** The menu bar's items, which the window carries out. */
   onMenu(listener: (action: MenuAction) => void): () => void;
+  /** A click on a notification, or in the menu bar's icon, asks the window to show this task. */
+  onOpenTask(listener: (taskId: string) => void): () => void;
   /** Tells the menu bar whether a task is open and working, so its Task items turn on and off with it. */
   menuState(state: MenuState): void;
   /** The subscriptions, one per agent CLI. */
@@ -178,6 +180,8 @@ export const IPC = {
   settingsChanged: "settings:changed",
   menuAction: "menu:action",
   menuState: "menu:state",
+  openTask: "window:open-task",
+  takePendingTask: "window:take-pending-task",
   fullScreen: "window:full-screen",
   skillsList: "skills:list",
   skillsCreate: "skills:create",

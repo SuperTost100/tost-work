@@ -27,6 +27,25 @@ const api: TostWorkApi = {
     return () => ipcRenderer.removeListener(IPC.menuAction, handler);
   },
   menuState: (state) => ipcRenderer.send(IPC.menuState, state),
+  onOpenTask: (listener) => {
+    // A click that came while the window was still loading waits in the main process. It's older than any click
+    // that arrives here, so a newer one wins, and nothing is delivered after unsubscribing.
+    let newer = false;
+    let listening = true;
+    const handler = (_: unknown, taskId: unknown) => {
+      if (typeof taskId !== "string") return;
+      newer = true;
+      listener(taskId);
+    };
+    ipcRenderer.on(IPC.openTask, handler);
+    void ipcRenderer.invoke(IPC.takePendingTask).then((taskId: unknown) => {
+      if (typeof taskId === "string" && !newer && listening) listener(taskId);
+    });
+    return () => {
+      listening = false;
+      ipcRenderer.removeListener(IPC.openTask, handler);
+    };
+  },
   account: {
     status: (provider) => ipcRenderer.invoke(IPC.accountStatus, provider),
     signIn: (provider) => ipcRenderer.invoke(IPC.accountSignIn, provider),

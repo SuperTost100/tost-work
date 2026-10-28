@@ -63,5 +63,15 @@ export function useData(api: TostWorkApi | undefined) {
     setTasks((list) => list.filter((t) => t.id !== id));
   }, []);
 
-  return { projects, tasks, addProject, loadProject, removeTask };
+  /** Loads one task that may not be among the recent ones, such as the one a notification opens. False if it's gone. */
+  const loadTask = useCallback(
+    async (id: string): Promise<boolean> => {
+      const task = await api?.tasks.get(id);
+      if (task) merge([task]);
+      return Boolean(task);
+    },
+    [api, merge],
+  );
+
+  return { projects, tasks, addProject, loadProject, loadTask, removeTask };
 }

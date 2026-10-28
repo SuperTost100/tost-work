@@ -5,6 +5,10 @@ import {
   LEVELS,
   type Level,
   NOTES_MAX,
+  NOTIFY_KINDS,
+  NOTIFY_LEVELS,
+  type NotifyKind,
+  type NotifyLevel,
   SECTION_LEVEL,
   type SectionKey,
   type Settings,
@@ -71,6 +75,19 @@ export const settingsPatch = (v: unknown): Partial<Settings> => {
       if (value !== null && !AIS.includes(value as AiId))
         throw new Error("defaultAi must be chatgpt, claude, key or null");
       patch.defaultAi = value as AiId | null;
+    } else if (key === "notifications" || key === "openAtLogin") {
+      if (typeof value !== "boolean") throw new Error(`${key} must be true or false`);
+      patch[key] = value;
+    } else if (key === "notify") {
+      if (typeof value !== "object" || value === null || Array.isArray(value))
+        throw new Error("notify must be an object");
+      const notify: Partial<Settings["notify"]> = {};
+      for (const [kind, level] of Object.entries(value)) {
+        if (!NOTIFY_KINDS.includes(kind as NotifyKind)) throw new Error(`Unknown notification: ${kind}`);
+        if (!NOTIFY_LEVELS.includes(level as NotifyLevel)) throw new Error(`${kind} must be off, quiet or normal`);
+        notify[kind as NotifyKind] = level as NotifyLevel;
+      }
+      patch.notify = notify as Settings["notify"];
     } else if (key === "setupDone") {
       if (typeof value !== "boolean") throw new Error("setupDone must be true or false");
       patch.setupDone = value;

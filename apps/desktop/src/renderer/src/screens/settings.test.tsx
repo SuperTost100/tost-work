@@ -126,4 +126,23 @@ describe("settings", () => {
     expect(await screen.findByRole("dialog")).toBeTruthy();
     expect(await api.tasks.list()).toEqual([]);
   });
+
+  it("sets each kind of notification on its own, and hides them when notifications are off", async () => {
+    const api = createMemoryApi();
+    render(<Root api={api} />);
+    await click("Settings");
+    await click("Notifications and startup");
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("radiogroup", { name: "Didn't work" })).getByText("Quiet"));
+    });
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("radiogroup", { name: "Finished" })).getByText("Normal"));
+    });
+    expect((await api.settings.get()).notify).toEqual({ needsYou: "normal", failed: "quiet", done: "normal" });
+
+    await click("Notifications", "switch");
+    expect(screen.queryByRole("radiogroup", { name: "Didn't work" })).toBeNull();
+    await click("Open Tost Work when you log in", "switch");
+    expect(await api.settings.get()).toMatchObject({ notifications: false, openAtLogin: true });
+  });
 });

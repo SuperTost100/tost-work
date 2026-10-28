@@ -49,6 +49,8 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   pickInMenu(action: TaskMenuAction | null): void;
   /** Picks an item in the menu bar, as the user would. */
   pressMenu(action: MenuAction): void;
+  /** As a click on a notification does. */
+  openFromOutside(taskId: string): void;
   /** What the window last told the menu bar about the open task. */
   menuStateNow(): MenuState;
   /** Changes settings from outside the window, as the View menu does. */
@@ -90,6 +92,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   let courseKey: CourseKey | null = null;
   const settingsListeners = new Set<(s: Settings) => void>();
   const menuListeners = new Set<(a: MenuAction) => void>();
+  const openListeners = new Set<(id: string) => void>();
   const signInListeners = new Set<(provider: AgentProvider, e: SignInEvent) => void>();
   let n = 0;
   const now = () => new Date(Date.UTC(2026, 9, 26, 9, 0, n++)).toISOString();
@@ -121,6 +124,13 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       menuState = state;
     },
     menuStateNow: () => menuState,
+    onOpenTask: (l) => {
+      openListeners.add(l);
+      return () => openListeners.delete(l);
+    },
+    openFromOutside: (id) => {
+      for (const l of openListeners) l(id);
+    },
     pressMenu: (action) => {
       for (const l of menuListeners) l(action);
     },
@@ -137,7 +147,12 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       },
       update: async (patch) => {
         // Sections are merged as in the main process: a patch names only the switches it changes.
-        settings = { ...settings, ...patch, sections: { ...settings.sections, ...patch.sections } };
+        settings = {
+          ...settings,
+          ...patch,
+          sections: { ...settings.sections, ...patch.sections },
+          notify: { ...settings.notify, ...patch.notify },
+        };
         return settings;
       },
     },

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Attachments } from "@/components/Composer";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
 import { errorText } from "@/lib/errorText";
@@ -44,7 +44,7 @@ export function App({
   const t = useT();
   const current = settings ?? { ...DEFAULT_SETTINGS, name: userName, setupDone: true };
   const quickEdit = sectionOn(current, "quickEdit");
-  const { projects, tasks, addProject, loadProject, removeTask } = useData(api);
+  const { projects, tasks, addProject, loadProject, loadTask, removeTask } = useData(api);
   const [route, setRoute] = useState<Route>({ name: "home" });
   // The briefs live here so they survive a trip to another section.
   const [brief, setBrief] = useState("");
@@ -180,6 +180,30 @@ export function App({
   const menuHandler = useRef(onMenu);
   menuHandler.current = onMenu;
   useEffect(() => api?.onMenu((action) => menuHandler.current(action)), [api]);
+  // The task may be older than the recent list, so it's loaded before the route turns to it. Only the latest click
+  // counts, and only while the user hasn't gone elsewhere meanwhile; a task that's gone says so and stays put.
+  const routeNow = useRef(route);
+  // After the route is shown, not during a render React may throw away.
+  useLayoutEffect(() => {
+    routeNow.current = route;
+  }, [route]);
+  const opening = useRef(0);
+  useEffect(
+    () =>
+      api?.onOpenTask((id) => {
+        const ticket = ++opening.current;
+        const from = routeNow.current;
+        loadTask(id).then(
+          (found) => {
+            if (ticket !== opening.current || routeNow.current !== from) return;
+            if (found) setRoute({ name: "task", id });
+            else setError(t("task.gone"));
+          },
+          (err: unknown) => ticket === opening.current && report(err),
+        );
+      }),
+    [api, loadTask, report, t],
+  );
 
   let screen: React.ReactNode;
   if (route.name === "home") {

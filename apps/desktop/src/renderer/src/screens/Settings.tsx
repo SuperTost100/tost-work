@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { AccountRow } from "@/components/AccountRow";
 import { KeyRow } from "@/components/KeyRow";
+import { Switch } from "@/components/Switch";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
@@ -10,6 +11,9 @@ import {
   AIS,
   type AiId,
   LEVELS,
+  NOTIFY_KINDS,
+  NOTIFY_LEVELS,
+  type NotifyLevel,
   SECTION_LEVEL,
   type SectionKey,
   type Settings as SettingsData,
@@ -23,6 +27,7 @@ const GROUPS = [
   { id: "level", icon: "layers", key: "settings.level" },
   { id: "accounts", icon: "key-2", key: "settings.accounts" },
   { id: "look", icon: "translate", key: "settings.look" },
+  { id: "notify", icon: "notification", key: "settings.notify" },
 ] as const;
 type Group = (typeof GROUPS)[number]["id"];
 const SECTIONS: { key: SectionKey; label: MessageKey }[] = [
@@ -272,6 +277,54 @@ export function Settings({
                     value={settings.theme}
                     text={(theme) => t(`settings.theme.${theme}` as MessageKey)}
                     onChange={(theme) => save({ theme })}
+                  />
+                </div>
+              </section>
+            )}
+
+            {active === "notify" && (
+              <section aria-labelledby="settings-notify">
+                <h1 id="settings-notify">{t("settings.notify")}</h1>
+                <div className="srow">
+                  <div className="lbl">
+                    <b>{t("settings.notifications")}</b>
+                    <span>{t("settings.notifications.d")}</span>
+                  </div>
+                  <Switch
+                    label={t("settings.notifications")}
+                    on={settings.notifications}
+                    onChange={(notifications) => save({ notifications })}
+                  />
+                </div>
+                {settings.notifications && (
+                  <>
+                    {NOTIFY_KINDS.map((kind) => (
+                      <div className="srow sub" key={kind}>
+                        <div className="lbl">
+                          <b>{t(`settings.notify.${kind}` as MessageKey)}</b>
+                        </div>
+                        <Choice<NotifyLevel>
+                          label={t(`settings.notify.${kind}` as MessageKey)}
+                          name={`notify-${kind}`}
+                          options={NOTIFY_LEVELS}
+                          value={settings.notify[kind]}
+                          text={(level) => t(`settings.notify.${level}` as MessageKey)}
+                          onChange={(level) => save({ notify: { [kind]: level } as SettingsData["notify"] })}
+                        />
+                      </div>
+                    ))}
+                    <p className="t3 note">{t("settings.notify.quiet.d")}</p>
+                  </>
+                )}
+                <div className="srow">
+                  <div className="lbl">
+                    <b>{t("settings.openAtLogin")}</b>
+                    <span>{t("settings.openAtLogin.d")}</span>
+                  </div>
+                  <Switch
+                    label={t("settings.openAtLogin")}
+                    on={settings.openAtLogin}
+                    onChange={(openAtLogin) => save({ openAtLogin })}
                   />
                 </div>
               </section>

@@ -18,7 +18,7 @@ describe("first-run setup", () => {
 
     fireEvent.change(await screen.findByLabelText("Your name"), { target: { value: "  Giulia " } });
     await click("Next");
-    expect(screen.getByText("Step 2 of 5")).toBeTruthy();
+    expect(screen.getByText("Step 2 of 6")).toBeTruthy();
 
     // About you is optional: empty, the button skips.
     expect(screen.getByRole("button", { name: "Skip for now" })).toBeTruthy();
@@ -32,6 +32,14 @@ describe("first-run setup", () => {
       fireEvent.click(screen.getByLabelText(/Advanced/));
     });
     expect((screen.getByLabelText(/Advanced/) as HTMLInputElement).checked).toBe(true);
+    await click("Next");
+
+    // Notifications start on; Advanced has jobs, so starting at login is asked too.
+    const notifications = screen.getByRole("switch", { name: /Tell me when a task needs me/ });
+    expect(notifications.getAttribute("aria-checked")).toBe("true");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("switch", { name: "Open Tost Work when you log in" }));
+    });
     await click("Next");
 
     // Claude can sign in too, and the course key can be pasted.
@@ -52,9 +60,20 @@ describe("first-run setup", () => {
       work: "I sell olive oil",
       notes: "Clients are in Japan",
       level: "advanced",
+      notifications: true,
+      openAtLogin: true,
       setupDone: true,
     });
     expect((await api.projects.list()).map((p) => p.name)).toEqual(["Proposals"]);
+  });
+
+  it("asks about starting at login only at levels that have jobs", async () => {
+    render(<Root api={createMemoryApi({ name: "Giulia" })} />);
+    await click("Next");
+    await click("Skip for now");
+    await click("Next");
+    expect(await screen.findByRole("switch", { name: /Tell me when a task needs me/ })).toBeTruthy();
+    expect(screen.queryByRole("switch", { name: "Open Tost Work when you log in" })).toBeNull();
   });
 
   it("says how much room is left once the notes near their limit", async () => {
@@ -80,6 +99,7 @@ describe("first-run setup", () => {
     render(<Root api={api} />);
     await click("Next");
     await click("Skip for now");
+    await click("Next");
     await click("Next");
     fireEvent.change(await screen.findByLabelText("API key"), { target: { value: "hello" } });
     await click("Use key");
@@ -109,6 +129,7 @@ describe("first-run setup", () => {
     render(<Root api={api} />);
     await click("Next");
     await click("Skip for now");
+    await click("Next");
     await click("Next");
     expect(await screen.findByText("Codex isn't installed yet. Tost Work installs it for you.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Skip for now" })).toBeTruthy();
@@ -149,6 +170,7 @@ describe("first-run setup", () => {
     await click("Next");
     await click("Skip for now");
     await click("Next");
+    await click("Next");
     await click("Sign in to ChatGPT");
     expect(await screen.findByText("Finish signing in on the page that opened.")).toBeTruthy();
     await click("Back");
@@ -182,6 +204,7 @@ describe("first-run setup", () => {
     render(<Root api={api} />);
     await click("Next");
     await click("Skip for now");
+    await click("Next");
     await click("Next");
     await click("Skip for now");
     await click("Choose folder");

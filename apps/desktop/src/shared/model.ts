@@ -198,8 +198,21 @@ export interface Settings {
   theme: Theme;
   /** The account new tasks run on. null picks the first one signed in. */
   defaultAi: AiId | null;
+  /** All notifications on or off: the one question setup asks. */
+  notifications: boolean;
+  /** How each kind of notification shows, while `notifications` is on. */
+  notify: Record<NotifyKind, NotifyLevel>;
+  /** Tost Work starts when the user logs in to the computer, so jobs run on time. */
+  openAtLogin: boolean;
   setupDone: boolean;
 }
+
+/** What a notification is about: a task or job that needs the user, failed, or finished. */
+export type NotifyKind = "needsYou" | "failed" | "done";
+export const NOTIFY_KINDS: NotifyKind[] = ["needsYou", "failed", "done"];
+/** "quiet" shows without a sound. */
+export type NotifyLevel = "off" | "quiet" | "normal";
+export const NOTIFY_LEVELS: NotifyLevel[] = ["off", "quiet", "normal"];
 
 /** The subscriptions, each signed in through its agent CLI. */
 export type Subscription = "chatgpt" | "claude";
@@ -256,6 +269,10 @@ export const DEFAULT_SETTINGS: Settings = {
   textSize: "normal",
   theme: "system",
   defaultAi: null,
+  notifications: true,
+  // Finished work shows in the app; only what needs the user, or went wrong, interrupts them.
+  notify: { needsYou: "normal", failed: "normal", done: "off" },
+  openAtLogin: false,
   setupDone: false,
 };
 

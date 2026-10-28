@@ -43,8 +43,13 @@ export function registerIpc(
   ipcMain.handle(IPC.settingsUpdate, (_e, patch: unknown) => {
     const current = store.getSettings();
     const changes = settingsPatch(patch);
-    // A patch names only the section switches it changes, so two quick toggles can't undo each other.
-    const settings = { ...current, ...changes, sections: { ...current.sections, ...changes.sections } };
+    // A patch names only the section switches and notifications it changes, so two quick toggles can't undo each other.
+    const settings = {
+      ...current,
+      ...changes,
+      sections: { ...current.sections, ...changes.sections },
+      notify: { ...current.notify, ...changes.notify },
+    };
     store.saveSettings(settings);
     settingsSaved(settings);
     return settings;

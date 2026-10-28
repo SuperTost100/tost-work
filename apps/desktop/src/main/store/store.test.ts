@@ -93,6 +93,9 @@ describe("Store", () => {
       textSize: "normal",
       theme: "system",
       defaultAi: null,
+      notifications: true,
+      notify: { needsYou: "normal", failed: "normal", done: "off" },
+      openAtLogin: false,
       setupDone: false,
     });
     store.saveSettings({ ...DEFAULT_SETTINGS, name: "Giulia", level: "advanced", language: "it", setupDone: true });

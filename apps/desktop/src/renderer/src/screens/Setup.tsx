@@ -2,15 +2,16 @@ import { useCallback, useRef, useState } from "react";
 import { AccountRow } from "@/components/AccountRow";
 import { KeyRow } from "@/components/KeyRow";
 import { Sprigs } from "@/components/Sprigs";
+import { Switch } from "@/components/Switch";
 import { errorText } from "@/lib/errorText";
 import { Logo } from "@/lib/Logo";
 import { useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
-import { type AiId, type Level, NOTES_MAX, type Settings, SUBSCRIPTIONS } from "../../../shared/model";
+import { type AiId, type Level, NOTES_MAX, type Settings, SUBSCRIPTIONS, sectionOn } from "../../../shared/model";
 import { NotesLimit } from "./Profile";
 
-const TOTAL = 5;
+const TOTAL = 6;
 const LEVELS: Level[] = ["beginner", "intermediate", "advanced", "expert"];
 const folderName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? "";
 
@@ -100,6 +101,7 @@ export function Setup({
     ["setup.name.title", "setup.name.sub"],
     ["setup.about.title", "setup.about.sub"],
     ["setup.level.title", "setup.level.sub"],
+    ["setup.start.title", "setup.start.sub"],
     ["setup.ai.title", "setup.ai.sub"],
     ["setup.project.title", "setup.project.sub"],
   ];
@@ -210,6 +212,36 @@ export function Setup({
           )}
 
           {step === 3 && (
+            <div className="sgroup">
+              <div className="srow">
+                <div className="lbl">
+                  <b>{t("setup.start.notifications")}</b>
+                  <span>{t("setup.start.notifications.d")}</span>
+                </div>
+                <Switch
+                  label={t("setup.start.notifications")}
+                  on={settings.notifications}
+                  onChange={(notifications) => void save({ notifications }).catch((e: Error) => setError(e.message))}
+                />
+              </div>
+              {/* Starting at login is for jobs, so it's asked only of levels that have them. */}
+              {sectionOn(settings, "jobs") && (
+                <div className="srow">
+                  <div className="lbl">
+                    <b>{t("settings.openAtLogin")}</b>
+                    <span>{t("settings.openAtLogin.d")}</span>
+                  </div>
+                  <Switch
+                    label={t("settings.openAtLogin")}
+                    on={settings.openAtLogin}
+                    onChange={(openAtLogin) => void save({ openAtLogin }).catch((e: Error) => setError(e.message))}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {step === 4 && (
             <>
               <p className="lede">{t("setup.ai.lede")}</p>
               <Connect
@@ -221,7 +253,7 @@ export function Setup({
             </>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <>
               <p className="lede">{t("setup.project.lede")}</p>
               <fieldset className="fld">
@@ -281,6 +313,11 @@ export function Setup({
               </button>
             )}
             {step === 3 && (
+              <button type="button" className="btn dark" disabled={busy} onClick={() => void go(4)}>
+                {t("setup.next")}
+              </button>
+            )}
+            {step === 4 && (
               <>
                 <span className="t3" style={{ fontSize: 13 }}>
                   {t("setup.next.project")}
@@ -289,13 +326,13 @@ export function Setup({
                   type="button"
                   className={anyConnected ? "btn dark" : "btn"}
                   disabled={busy}
-                  onClick={() => void go(4)}
+                  onClick={() => void go(5)}
                 >
                   {anyConnected ? t("setup.next") : t("setup.skip")}
                 </button>
               </>
             )}
-            {step === 4 && (
+            {step === 5 && (
               <>
                 <button type="button" className="btn" disabled={busy} onClick={() => void finish(false)}>
                   {t("setup.skip")}

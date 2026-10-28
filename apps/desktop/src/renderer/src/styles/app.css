@@ -2360,6 +2360,18 @@ ol.editable li::before {
   font-size: 13px;
   color: var(--t3);
 }
+/* A setting that belongs to the one above it, such as each kind of notification. */
+.srow.sub {
+  padding-left: 18px;
+}
+.srow.sub .lbl b {
+  font-size: 14px;
+  color: var(--t2);
+}
+.sbody .note {
+  font-size: 13px;
+  margin: 10px 0 0;
+}
 .switch {
   width: 34px;
   height: 20px;

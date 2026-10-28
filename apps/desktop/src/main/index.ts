@@ -1,6 +1,18 @@
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { createFunnel } from "cli-funnel";
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, safeStorage, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  Notification,
+  nativeTheme,
+  net,
+  safeStorage,
+  shell,
+} from "electron";
 import { IPC, type MenuState } from "../shared/api";
 import { languageFrom, translate } from "../shared/i18n";
 import type { AgentProvider } from "../shared/model";
@@ -16,8 +28,10 @@ import { fileGuard } from "./guard";
 import { findInstalledCodex, Installer } from "./installer";
 import { registerIpc } from "./ipc";
 import { KeyStore } from "./keys";
+import { setOpenAtLogin } from "./loginItem";
 import { applyLook } from "./look";
 import { ToolServer } from "./mcp/server";
+import { Notifier } from "./notify";
 import { pickAi } from "./pickAi";
 import { SkillFolder } from "./skills";
 import { SkillVersions } from "./skillVersions";
@@ -132,6 +146,65 @@ app.whenReady().then(async () => {
     engine = agent;
   }
 
+  // Shows a task in the window, making the window again if it was closed, as a notification click asks. A window
+  // that's still loading isn't listening yet, so the task waits here until the window asks for it.
+  let pendingTask: string | null = null;
+  ipcMain.handle(IPC.takePendingTask, () => {
+    const id = pendingTask;
+    pendingTask = null;
+    return id;
+  });
+  const showTask = (taskId: string) => {
+    let win = mainWindow;
+    if (!win || win.isDestroyed()) win = mainWindow = createWindow(store);
+    if (win.webContents.isLoading()) pendingTask = taskId;
+    else win.webContents.send(IPC.openTask, taskId);
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  };
+  // Held until clicked or closed: a notification that's collected forgets its click.
+  const shown = new Set<Notification>();
+  const notifier = new Notifier(
+    () => store.getSettings(),
+    () => Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible() && mainWindow.isFocused()),
+    (n) => {
+      if (!Notification.isSupported()) return;
+      const note = new Notification({
+        title: n.title,
+        body: translate(language(), `notify.${n.kind}`),
+        silent: n.silent,
+      });
+      shown.add(note);
+      note.on("click", () => {
+        shown.delete(note);
+        showTask(n.taskId);
+      });
+      note.on("close", () => shown.delete(note));
+      note.show();
+    },
+  );
+  notifier.know(store.listTasks(500));
+  // Starting at login, set again at each start so it follows the app if it moved. Only an installed app does it:
+  // a development run would register Electron itself.
+  const loginDeps = {
+    platform: process.platform,
+    setLoginItemSettings: (s: { openAtLogin: boolean; args?: string[] }) => app.setLoginItemSettings(s),
+    autostartDir: join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "autostart"),
+    exec: process.env.APPIMAGE ?? process.execPath,
+  };
+  let atLogin = store.getSettings().openAtLogin;
+  // One change at a time, so turning it on then off quickly can't end with the entry written after its removal.
+  let loginQueue: Promise<void> = Promise.resolve();
+  const applyLogin = (on: boolean) => {
+    if (!app.isPackaged) return;
+    loginQueue = loginQueue
+      .then(() => setOpenAtLogin(on, loginDeps))
+      .catch((err: unknown) => console.error("Couldn't change starting at login", err));
+  };
+  // Off as well as on, so a removal that failed last time is tried again.
+  applyLogin(atLogin);
+
   // shortcut: kept copies are never cleaned up; add a size limit or an age limit before the public beta.
   const guard = fileGuard(join(app.getPath("userData"), "kept"), (path) => shell.trashItem(path));
   const runner = new TaskRunner(
@@ -140,6 +213,7 @@ app.whenReady().then(async () => {
     (task) => {
       // On Mac the app outlives its window, so a task can change after the window is gone.
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.taskChanged, task);
+      notifier.changed(task);
     },
     undefined,
     guard,
@@ -215,6 +289,10 @@ app.whenReady().then(async () => {
     (settings) => {
       applyLook(mainWindow, settings);
       refreshMenu();
+      if (settings.openAtLogin !== atLogin) {
+        atLogin = settings.openAtLogin;
+        applyLogin(atLogin);
+      }
     },
     skills,
   );

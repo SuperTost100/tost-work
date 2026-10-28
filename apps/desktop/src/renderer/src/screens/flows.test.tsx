@@ -795,3 +795,42 @@ describe("copying a message", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("a notification click", () => {
+  it("opens the task it was about, even one older than the recent list", async () => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    const task = await api.tasks.start({ projectId: project.id, brief: "Write the course outline", attachments: [] });
+    // The recent list leaves it out, as it would with 50 newer tasks.
+    vi.spyOn(api.tasks, "list").mockResolvedValue([]);
+    render(<App userName="Giulia" api={api} />);
+    await screen.findAllByText(/Giulia/);
+    expect(screen.queryByText("Write the course outline")).toBeNull();
+    await act(async () => api.openFromOutside(task.id));
+    expect(await screen.findByRole("button", { name: "Stop" })).toBeTruthy();
+  });
+
+  it("says a deleted task is gone, and only the latest click opens", async () => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    const first = await api.tasks.start({ projectId: project.id, brief: "First outline", attachments: [] });
+    const second = await api.tasks.start({ projectId: project.id, brief: "Second outline", attachments: [] });
+    render(<App userName="Giulia" api={api} />);
+    await screen.findAllByText("Second outline");
+    await act(async () => api.openFromOutside("deleted"));
+    expect(await screen.findByText("That task isn't there any more.")).toBeTruthy();
+    // The first lookup answers last, but the second click is the one that counts.
+    const get = api.tasks.get;
+    vi.spyOn(api.tasks, "get").mockImplementation(async (id) => {
+      if (id === first.id) await new Promise((r) => setTimeout(r, 30));
+      return get(id);
+    });
+    await act(async () => {
+      api.openFromOutside(first.id);
+      api.openFromOutside(second.id);
+      await new Promise((r) => setTimeout(r, 60));
+    });
+    expect(screen.getByRole("button", { name: "Stop" })).toBeTruthy();
+    expect(screen.getAllByText("Second outline").length).toBeGreaterThan(1);
+  });
+});
