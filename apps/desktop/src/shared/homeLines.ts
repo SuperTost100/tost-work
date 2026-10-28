@@ -3,7 +3,6 @@
  *
  * Tost edits this file by hand. Keep the sentences you like, change or delete the others, add your own: each list
  * can be as long as you want, and the two languages don't need the same number. `{name}` is the user's name.
- * The first five lines in each list are the ones in 0.0.5; the rest are new suggestions to keep or delete.
  */
 
 export const GREETINGS = {
@@ -32,8 +31,7 @@ export const LINES = {
     "Da dove cominciamo?",
     "Cosa portiamo a termine?",
     "Quale file tocca adesso?",
-    "Cosa posso fare al posto tuo?",
-    // New suggestions:
+    "Cosa posso fare per te?",
     "Cosa togliamo dalla lista?",
     "Cosa prepariamo oggi?",
     "Che lavoro mi passi?",
@@ -47,8 +45,7 @@ export const LINES = {
     "Where do we start?",
     "What shall we get done?",
     "Which file is next?",
-    "What can I take off your hands?",
-    // New suggestions:
+    "What can I do for you?",
     "What's next on the list?",
     "What are we preparing today?",
     "What can I pick up for you?",
