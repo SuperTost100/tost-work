@@ -42,6 +42,19 @@ Changed on 2026-10-27, after testing 0.0.5:
 - Skills in 0.2.0: switching skills on or off per project, with project-only skills; making one with AI; trying a draft on a file.
 - Skills in 0.3.0: making one from a finished task.
 
+Changed on 2026-10-28, after testing 0.0.6:
+
+- A request to think something through or take stock gets its answer in the chat, with an offer to put it in a file. Files come straight away only when the user asks for one.
+- A skill's steps are edited formatted, like in Word, and saved as Markdown.
+- Restore makes the old version current again instead of adding a new one.
+- Jobs:
+  - Setup asks whether to open Tost Work at login, and Settings has a switch for it.
+  - A run missed while the computer was off happens once when it's back, unless the job says to wait for the next time.
+  - A run whose previous one still needs the user, or is still working, is skipped, and the job says why.
+  - A run may change the files it made itself, but asks before changing a file from an earlier run, so each run saves its files with the date in the name.
+  - Tost Work stays in the menu bar (the notification area on Windows and Linux) while a job is on, with a switch in Settings; otherwise closing the window quits as before.
+- Notifications, for tasks and jobs alike, while Tost Work isn't in front: "needs you", "failed" and "finished" each have none, quiet or normal in Settings. Setup asks one question for all of them.
+
 ## From 0.2.0
 
 - AI renames tasks from their brief, so a task from a long paste gets a short title.
@@ -63,7 +76,8 @@ Changed on 2026-10-27, after testing 0.0.5:
   - Each save keeps a version, with an optional note, that Restore can put back.
   - A task lists the skills it followed, and each skill says how many tasks used it.
 - **Quick edit:** one file without a project. It works in a temporary folder made for it. The results stay there until the user saves them, and saving asks for a folder every time.
-- **Jobs:** cards with a four-step builder, grouped by next run.
+- **Jobs:** cards with a four-step builder, grouped by next run. Each run is a task of its own, and Tost Work stays in the menu bar while a job is on, unless that's turned off in Settings.
+- **Notifications:** for work that needs the user, failed or finished, each set to none, quiet or normal.
 - **Board:** a list grouped by status, with columns as an option.
 - **Settings:** the four levels, a switch for each section, AI accounts, language, text size and theme.
 - **First-run setup and About.**
@@ -84,7 +98,7 @@ Integrations and the Advanced sections (agents working together, code tab) show 
 | 0.0.x | Mac and Linux |
 | 0.1.0 | Mac, Linux and Windows |
 
-The app stays in the menu bar (Mac) or tray (Windows, Linux) when the window is closed, so jobs run while the computer is on. A job missed while the computer was off runs when it wakes up.
+While a job is on, the app stays in the menu bar (Mac) or tray (Windows, Linux) when the window is closed, so jobs run while the computer is on; a switch in Settings turns this off. A job missed while the computer was off runs once when it wakes up, unless the job says to wait for the next time.
 
 ## What agents may do
 
