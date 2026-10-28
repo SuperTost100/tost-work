@@ -13,6 +13,7 @@
     "dist": "electron-vite build && electron-builder"
   },
   "dependencies": {
+    "@milkdown/kit": "7.22.3",
     "@modelcontextprotocol/sdk": "1.32.2",
     "cli-funnel": "0.6.1",
     "jszip": "3.10.2",

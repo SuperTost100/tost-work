@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
@@ -13,6 +13,27 @@ const click = async (name: string | RegExp) => {
 };
 
 afterEach(() => vi.restoreAllMocks());
+
+/** The formatted editor, once it has started. */
+const stepsBox = async () => {
+  const box = await screen.findByRole("textbox", { name: "What to do" });
+  await waitFor(() => expect(box.getAttribute("contenteditable")).not.toBeNull());
+  return box;
+};
+
+/** Puts text in the formatted editor as a paste does, formatting included. */
+const typeSteps = async (html: string) => {
+  const box = await stepsBox();
+  const text = html.replace(/<[^>]+>/g, "");
+  await act(async () => {
+    fireEvent.paste(box, {
+      clipboardData: {
+        types: ["text/html", "text/plain"],
+        getData: (type: string) => (type === "text/html" ? html : text),
+      },
+    });
+  });
+};
 
 describe("skills", () => {
   it("starts empty, makes a skill, edits and saves it", async () => {
@@ -29,8 +50,12 @@ describe("skills", () => {
 
     fireEvent.change(name, { target: { value: "Proposal writer" } });
     fireEvent.change(screen.getByLabelText("When to use it"), { target: { value: "A client asks for a proposal." } });
-    fireEvent.change(screen.getByLabelText("What to do"), { target: { value: "1. Read the call notes." } });
+    await typeSteps("<ol><li><p>Read the call <strong>notes</strong>.</p></li></ol>");
     await click("Save");
+    // Saved as Markdown, with the bold kept.
+    expect((await api.skills.list()).find((s) => s.id === "proposal-writer")?.steps).toBe(
+      "1. Read the call **notes**.",
+    );
 
     expect((await api.skills.list()).filter((s) => !s.builtIn)).toMatchObject([
       { id: "proposal-writer", title: "Proposal writer", description: "A client asks for a proposal." },
@@ -166,14 +191,14 @@ describe("skills", () => {
     render(<Root api={api} />);
     await click("Skills");
     await screen.findByLabelText("Skill name");
-    fireEvent.change(screen.getByLabelText("What to do"), { target: { value: "1. Round prices." } });
+    await typeSteps("<p>Round prices.</p>");
     fireEvent.change(screen.getByLabelText("What changed, if you like"), { target: { value: "price rounding" } });
     await click("Save");
     expect(await screen.findByText("v2 · price rounding")).toBeTruthy();
     expect(screen.getByText(/^Version 2/)).toBeTruthy();
 
     await click("Restore v1");
-    expect((screen.getByLabelText("What to do") as HTMLTextAreaElement).value).toBe("");
+    expect((await stepsBox()).textContent).toBe("");
     // v1 is current again, with v2 still there to put back.
     expect(await screen.findByText(/^Version 1/)).toBeTruthy();
     expect(document.querySelector(".vers .current")?.textContent).toMatch(/^v1/);

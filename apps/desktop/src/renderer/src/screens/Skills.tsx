@@ -1,4 +1,5 @@
 import { type MouseEvent, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { LanguageContext, useT } from "@/lib/useT";
@@ -354,17 +355,18 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
                 value={draft.description}
                 onChange={(e) => setDraft({ ...draft, description: e.target.value })}
               />
-              <label className="doc-h" htmlFor="skill-steps">
+              <div className="doc-h" aria-hidden="true">
                 {t("skills.steps")}
-              </label>
-              <textarea
+              </div>
+              {/* A new editor per skill, so undo never reaches into another skill's text. */}
+              <MarkdownEditor
+                key={open.id}
                 id="skill-steps"
-                className="editable area"
-                rows={10}
+                label={t("skills.steps")}
                 readOnly={open.builtIn}
                 placeholder={t("skills.stepsHint")}
                 value={draft.steps}
-                onChange={(e) => setDraft({ ...draft, steps: e.target.value })}
+                onChange={(steps) => setDraft((d) => (d ? { ...d, steps } : d))}
               />
               {!open.builtIn && (
                 <>
