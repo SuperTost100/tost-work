@@ -30,6 +30,7 @@
   --on-btn: #faf8f4;
   --need: #9a5b0b;
   --page-shadow: 0 1px 2px rgba(27, 23, 18, 0.06), 0 6px 18px rgba(27, 23, 18, 0.07);
+  --bubble: #24211d;
   color-scheme: light;
 }
 :root[data-theme="dark"] {
@@ -50,6 +51,7 @@
   --on-btn: #1b1712;
   --need: #e3a452;
   --page-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.35);
+  --bubble: #3b3732;
   color-scheme: dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -71,6 +73,7 @@
     --on-btn: #1b1712;
     --need: #e3a452;
     --page-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.35);
+    --bubble: #3b3732;
     color-scheme: dark;
   }
 }
@@ -1862,15 +1865,42 @@ ins {
 .md-editor {
   margin: 0 -8px;
 }
-.md-tools {
-  position: sticky;
-  top: -28px;
-  z-index: 1;
+/* The formatting bubble over selected text: dark, like the menus people know from Notes and Notion. */
+.md-bubble {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, calc(-100% - 8px));
   display: flex;
   gap: 2px;
-  padding: 4px 4px;
-  margin-bottom: 4px;
-  background: var(--canvas);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--bubble);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.md-bubble.below {
+  transform: translate(-50%, 8px);
+}
+.md-bubble button {
+  width: 32px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #f3efe8;
+  cursor: pointer;
+}
+.md-bubble button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.md-bubble button[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.18);
+}
+.md-bubble .ic {
+  width: 17px;
+  height: 17px;
 }
 .md-body {
   position: relative;

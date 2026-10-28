@@ -1,4 +1,8 @@
+import type { Editor } from "@milkdown/kit/core";
+import { editorViewCtx } from "@milkdown/kit/core";
+import { TextSelection } from "@milkdown/kit/prose/state";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { createRef } from "react";
 import { beforeAll, describe, expect, it } from "vitest";
 import { MarkdownEditor } from "./MarkdownEditor";
 
@@ -10,6 +14,21 @@ const started = async (name: string) => {
   await waitFor(() => expect(box.getAttribute("contenteditable")).not.toBeNull());
   return box;
 };
+
+/** Selects the words of the text, as a drag over them does, with the text focused. */
+const select = (editor: Editor | null, words: string) =>
+  act(async () => {
+    editor?.action((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      view.focus();
+      let from = -1;
+      view.state.doc.descendants((node, pos) => {
+        const at = node.isText ? (node.text ?? "").indexOf(words) : -1;
+        if (from < 0 && at >= 0) from = pos + at;
+      });
+      view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, from, from + words.length)));
+    });
+  });
 
 const paste = (box: HTMLElement, text: string) =>
   act(async () => {
@@ -54,16 +73,106 @@ describe("MarkdownEditor", () => {
     await waitFor(() => expect(box.querySelector("h1")?.textContent).toBe("Excel"));
   });
 
-  it("makes the selected text bold from the toolbar", async () => {
+  it("shows the bubble over selected text, and makes it bold", async () => {
     const seen: string[] = [];
-    render(<MarkdownEditor value="" label="Steps" onChange={(m) => seen.push(m)} />);
-    const box = await started("Steps");
-    await paste(box, "careful");
-    fireEvent.keyDown(box, { key: "a", ctrlKey: true });
+    const editor = createRef<Editor>();
+    render(<MarkdownEditor value="Be careful" label="Steps" editorRef={editor} onChange={(m) => seen.push(m)} />);
+    await started("Steps");
+    expect(screen.queryByRole("toolbar")).toBeNull();
+    await select(editor.current, "careful");
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Bold" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Bold" }));
     });
-    expect(seen.at(-1)).toBe("**careful**");
+    expect(seen.at(-1)).toBe("Be **careful**");
+    expect(screen.getByRole("button", { name: "Bold" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("keeps the bubble when focus moves onto it, and puts it under a selection with no room above", async () => {
+    const editor = createRef<Editor>();
+    render(<MarkdownEditor value="Be careful" label="Steps" editorRef={editor} onChange={() => {}} />);
+    const box = await started("Steps");
+    await select(editor.current, "careful");
+    const bold = await screen.findByRole("button", { name: "Bold" });
+    // jsdom lays nothing out, so the selection sits at the very top of the box.
+    expect(bold.closest(".md-bubble")?.classList.contains("below")).toBe(true);
+    await act(async () => {
+      fireEvent.blur(box, { relatedTarget: bold });
+    });
+    expect(screen.getByRole("toolbar")).toBeTruthy();
+    await act(async () => {
+      fireEvent.blur(box, { relatedTarget: document.body });
+    });
+    expect(screen.queryByRole("toolbar")).toBeNull();
+  });
+
+  it("keeps the bubble when its list button is used from the keyboard", async () => {
+    const seen: string[] = [];
+    const editor = createRef<Editor>();
+    render(
+      <MarkdownEditor value={"- Read\n- Price"} label="Steps" editorRef={editor} onChange={(m) => seen.push(m)} />,
+    );
+    await started("Steps");
+    await select(editor.current, "Price");
+    const numbers = await screen.findByRole("button", { name: "Turn into a numbered list" });
+    numbers.focus();
+    await act(async () => {
+      fireEvent.click(numbers);
+    });
+    expect(seen.at(-1)).toBe("1. Read\n2. Price");
+    expect(screen.getByRole("button", { name: "Turn into a bulleted list" })).toBeTruthy();
+  });
+
+  it("turns a list item into a heading of its own", async () => {
+    const seen: string[] = [];
+    const editor = createRef<Editor>();
+    render(
+      <MarkdownEditor value={"1. Read\n2. Price"} label="Steps" editorRef={editor} onChange={(m) => seen.push(m)} />,
+    );
+    await started("Steps");
+    await select(editor.current, "Price");
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: "Heading" }));
+    });
+    expect(seen.at(-1)).toBe("1. Read\n\n## Price");
+  });
+
+  it("takes an item out of the list with Backspace at its start", async () => {
+    const seen: string[] = [];
+    const editor = createRef<Editor>();
+    render(
+      <MarkdownEditor value={"1. Read\n2. Price"} label="Steps" editorRef={editor} onChange={(m) => seen.push(m)} />,
+    );
+    const box = await started("Steps");
+    await act(async () => {
+      editor.current?.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        let at = -1;
+        view.state.doc.descendants((node, pos) => {
+          if (at < 0 && node.isText && node.text === "Price") at = pos;
+        });
+        view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at)));
+      });
+    });
+    fireEvent.keyDown(box, { key: "Backspace" });
+    expect(seen.at(-1)).toBe("1. Read\n\nPrice");
+  });
+
+  it("switches a list between bullets and numbers, keeping its items", async () => {
+    const seen: string[] = [];
+    const editor = createRef<Editor>();
+    render(
+      <MarkdownEditor value={"- Read\n- Price"} label="Steps" editorRef={editor} onChange={(m) => seen.push(m)} />,
+    );
+    await started("Steps");
+    await select(editor.current, "Price");
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: "Turn into a numbered list" }));
+    });
+    expect(seen.at(-1)).toBe("1. Read\n2. Price");
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: "Turn into a bulleted list" }));
+    });
+    expect(seen.at(-1)).toBe("- Read\n- Price");
   });
 
   it("shows a new value without reporting its own tidying as an edit", async () => {
