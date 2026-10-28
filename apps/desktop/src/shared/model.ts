@@ -187,6 +187,9 @@ export type EngineEvent =
 
 export type Level = "beginner" | "intermediate" | "advanced" | "expert";
 
+export type LoginOpens = "menuBar" | "window";
+export const LOGIN_OPENS: LoginOpens[] = ["menuBar", "window"];
+
 /** The user's choices, kept on this computer. */
 export interface Settings {
   /** Shown in the greeting and on the avatar. Empty until setup asks for it. */
@@ -210,7 +213,9 @@ export interface Settings {
   notify: Record<NotifyKind, NotifyLevel>;
   /** Tost Work starts when the user logs in to the computer, so jobs run on time. */
   openAtLogin: boolean;
-  /** Closing the window leaves Tost Work in the menu bar (or tray) while a job is on. */
+  /** What a start at login shows: only the menu-bar icon, or the window too. */
+  loginOpens: LoginOpens;
+  /** Closing the window leaves Tost Work running in the menu bar (or the tray). */
   stayInMenuBar: boolean;
   /** The sidebar is hidden, so the main area has the whole window. */
   sidebarHidden: boolean;
@@ -283,6 +288,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // Finished work shows in the app; only what needs the user, or went wrong, interrupts them.
   notify: { needsYou: "normal", failed: "normal", done: "off" },
   openAtLogin: false,
+  loginOpens: "menuBar",
   stayInMenuBar: true,
   sidebarHidden: false,
   setupDone: false,

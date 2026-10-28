@@ -55,6 +55,15 @@ Changed on 2026-10-28, after testing 0.0.6:
   - Tost Work stays in the menu bar (the notification area on Windows and Linux) while a job is on, with a switch in Settings; otherwise closing the window quits as before.
 - Notifications, for tasks and jobs alike, while Tost Work isn't in front: "needs you", "failed" and "finished" each have none, quiet or normal in Settings. Setup asks one question for all of them.
 
+Changed on 2026-10-28, after testing 0.0.7:
+
+- The menu-bar icon (the tray on Windows and Linux) is there whenever Tost Work runs, job or not. Closing the window leaves the app running there unless that's turned off in Settings. This replaces "while a job is on" above.
+- A click on the icon opens a panel: what needs the user, what's working, the next job runs, New task, and Open, Settings and Quit. A right-click keeps the short menu. Linux trays don't report clicks, so Linux has the menu only.
+- Opening at login shows only the icon by default; Settings can make it open the window too.
+- An answer that stays in the chat skips the check against the brief, and the agent's words appear as it writes them.
+- Projects get a menu: rename, edit instructions, show the folder, remove from Tost Work (its folder and files stay).
+- A job's files go in the project folder, or in a folder of the project the user picks.
+
 ## From 0.2.0
 
 - AI renames tasks from their brief, so a task from a long paste gets a short title.
@@ -76,7 +85,7 @@ Changed on 2026-10-28, after testing 0.0.6:
   - Each save keeps a version, with an optional note, that Restore can put back.
   - A task lists the skills it followed, and each skill says how many tasks used it.
 - **Quick edit:** one file without a project. It works in a temporary folder made for it. The results stay there until the user saves them, and saving asks for a folder every time.
-- **Jobs:** cards with a four-step builder, grouped by next run. Each run is a task of its own, and Tost Work stays in the menu bar while a job is on, unless that's turned off in Settings.
+- **Jobs:** cards with a four-step builder, grouped by next run. Each run is a task of its own. Tost Work keeps its icon in the menu bar whenever it runs, and closing the window leaves it there unless that's turned off in Settings.
 - **Notifications:** for work that needs the user, failed or finished, each set to none, quiet or normal.
 - **Board:** a list grouped by status, with columns as an option.
 - **Settings:** the four levels, a switch for each section, AI accounts, language, text size and theme.
@@ -98,7 +107,7 @@ Integrations and the Advanced sections (agents working together, code tab) show 
 | 0.0.x | Mac and Linux |
 | 0.1.0 | Mac, Linux and Windows |
 
-While a job is on, the app stays in the menu bar (Mac) or tray (Windows, Linux) when the window is closed, so jobs run while the computer is on; a switch in Settings turns this off. A job missed while the computer was off runs once when it wakes up, unless the job says to wait for the next time.
+The app keeps its icon in the menu bar (Mac) or tray (Windows, Linux) whenever it runs, and stays there when the window is closed, so jobs run while the computer is on; a switch in Settings turns staying off. A job missed while the computer was off runs once when it wakes up, unless the job says to wait for the next time.
 
 ## What agents may do
 

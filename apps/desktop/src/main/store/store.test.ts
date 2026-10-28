@@ -96,6 +96,7 @@ describe("Store", () => {
       notifications: true,
       notify: { needsYou: "normal", failed: "normal", done: "off" },
       openAtLogin: false,
+      loginOpens: "menuBar",
       stayInMenuBar: true,
       sidebarHidden: false,
       setupDone: false,

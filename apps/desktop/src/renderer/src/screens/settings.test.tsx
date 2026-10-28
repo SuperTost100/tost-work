@@ -142,7 +142,17 @@ describe("settings", () => {
 
     await click("Notifications", "switch");
     expect(screen.queryByRole("radiogroup", { name: "Didn't work" })).toBeNull();
+    expect(screen.queryByRole("radiogroup", { name: "At login, show" })).toBeNull();
     await click("Open Tost Work when you log in", "switch");
+    // Starting at login offers what to show, the icon alone by default.
+    const opens = screen.getByRole("radiogroup", { name: "At login, show" });
+    expect((within(opens).getByRole("radio", { name: "Only the menu-bar icon" }) as HTMLInputElement).checked).toBe(
+      true,
+    );
+    await act(async () => {
+      fireEvent.click(within(opens).getByText("The window too"));
+    });
+    expect((await api.settings.get()).loginOpens).toBe("window");
     // The memory API is on Linux, which has a notification area rather than a menu bar.
     await click("Stay in the notification area when you close the window", "switch");
     expect(await api.settings.get()).toMatchObject({ notifications: false, openAtLogin: true, stayInMenuBar: false });

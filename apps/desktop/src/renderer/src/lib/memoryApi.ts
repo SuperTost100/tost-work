@@ -5,6 +5,7 @@ import type {
   MenuState,
   NewProjectInput,
   NewTaskInput,
+  PanelTarget,
   ProjectMenuAction,
   SignInEvent,
   TaskMenuAction,
@@ -14,6 +15,7 @@ import {
   type AgentProvider,
   answersText,
   BRIEF_MAX,
+  busyStatus,
   type CourseKey,
   DEFAULT_SETTINGS,
   type EngineEvent,
@@ -63,6 +65,8 @@ export type MemoryApi = TostWorkApi & {
   menuStateNow(): MenuState;
   /** Changes settings from outside the window, as the View menu does. */
   changeSettings(patch: Partial<Settings>): void;
+  /** What the panel's buttons asked for, in order, and the height it last asked for. */
+  panelCalls: { open: (PanelTarget | undefined)[]; quit: number; height: number };
 };
 
 export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", setupDone: true }): MemoryApi {
@@ -150,6 +154,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
 
   // Ids never come back, even after a task is removed.
   let taskCount = 0;
+  const panelCalls: MemoryApi["panelCalls"] = { open: [], quit: 0, height: 0 };
   const api: MemoryApi = {
     platform: "linux",
     pickInMenu: (action) => {
@@ -183,6 +188,18 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
     changeSettings: (patch) => {
       settings = { ...settings, ...patch };
       for (const l of settingsListeners) l(settings);
+    },
+    panelCalls,
+    panel: {
+      open: (target) => {
+        panelCalls.open.push(target);
+      },
+      quit: () => {
+        panelCalls.quit++;
+      },
+      fit: (height) => {
+        panelCalls.height = height;
+      },
     },
     emit,
     settings: {
@@ -282,6 +299,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
     },
     tasks: {
       list: async () => [...tasks.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+      listActive: async () => [...tasks.values()].filter((t) => busyStatus(t.status)),
       listForProject: async (projectId) => [...tasks.values()].filter((t) => t.projectId === projectId),
       get: async (id) => tasks.get(id) ?? null,
       start: async (input: NewTaskInput) => {

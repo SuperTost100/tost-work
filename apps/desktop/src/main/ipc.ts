@@ -110,6 +110,7 @@ export function registerIpc(
   });
 
   ipcMain.handle(IPC.tasksList, () => store.listTasks());
+  ipcMain.handle(IPC.tasksListActive, () => store.listActiveTasks());
   ipcMain.handle(IPC.tasksListForProject, (_e, projectId: unknown) =>
     store.listProjectTasks(text(projectId, "projectId", 100)),
   );

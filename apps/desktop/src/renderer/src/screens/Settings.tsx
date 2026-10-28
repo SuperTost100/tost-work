@@ -11,6 +11,8 @@ import {
   AIS,
   type AiId,
   LEVELS,
+  LOGIN_OPENS,
+  type LoginOpens,
   NOTIFY_KINDS,
   NOTIFY_LEVELS,
   type NotifyLevel,
@@ -329,6 +331,21 @@ export function Settings({
                     onChange={(openAtLogin) => save({ openAtLogin })}
                   />
                 </div>
+                {settings.openAtLogin && (
+                  <div className="srow sub">
+                    <div className="lbl">
+                      <b>{t("settings.loginOpens")}</b>
+                    </div>
+                    <Choice<LoginOpens>
+                      label={t("settings.loginOpens")}
+                      name="login-opens"
+                      options={LOGIN_OPENS}
+                      value={settings.loginOpens}
+                      text={(choice) => t(`settings.loginOpens.${choice}` as MessageKey)}
+                      onChange={(loginOpens) => save({ loginOpens })}
+                    />
+                  </div>
+                )}
                 <div className="srow">
                   <div className="lbl">
                     <b>{t(stayLabel)}</b>

@@ -4,6 +4,8 @@ import {
   type AiId,
   LEVELS,
   type Level,
+  LOGIN_OPENS,
+  type LoginOpens,
   NOTES_MAX,
   NOTIFY_KINDS,
   NOTIFY_LEVELS,
@@ -78,6 +80,9 @@ export const settingsPatch = (v: unknown): Partial<Settings> => {
     } else if (key === "notifications" || key === "openAtLogin" || key === "stayInMenuBar" || key === "sidebarHidden") {
       if (typeof value !== "boolean") throw new Error(`${key} must be true or false`);
       patch[key] = value;
+    } else if (key === "loginOpens") {
+      if (!LOGIN_OPENS.includes(value as LoginOpens)) throw new Error("loginOpens must be menuBar or window");
+      patch.loginOpens = value as LoginOpens;
     } else if (key === "notify") {
       if (typeof value !== "object" || value === null || Array.isArray(value))
         throw new Error("notify must be an object");

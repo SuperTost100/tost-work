@@ -3673,3 +3673,147 @@ label.opt:has(input:focus-visible) {
   width: 15px;
   height: 15px;
 }
+
+/* ===== Menu-bar panel ===== */
+/* Its own window: a Mac gives it a frosted background, so the page lets that show through around the cards. */
+html:has(.panel),
+html:has(.panel) body {
+  height: auto;
+  background: transparent;
+}
+.panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--side) 72%, transparent);
+  user-select: none;
+}
+.panel .ph {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 4px 4px;
+}
+.panel .brand {
+  padding: 0;
+  gap: 8px;
+}
+.panel .brand svg {
+  width: 20px;
+  height: 20px;
+}
+.panel .brand b {
+  font-size: 14.5px;
+}
+.panel .ph .btn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+  gap: 5px;
+}
+.pcard {
+  display: grid;
+  padding: 8px 6px 6px;
+  border-radius: 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.pcard h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 2px;
+  padding: 0 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--t2);
+}
+.pcard h3 .count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--need);
+  color: var(--paper);
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-grid;
+  place-items: center;
+}
+.prow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.prow:hover {
+  background: var(--hover);
+}
+.prow.still {
+  cursor: default;
+}
+.prow.still:hover {
+  background: none;
+}
+.prow > .ic {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--t3);
+}
+.prow .chev {
+  width: 14px;
+  height: 14px;
+  opacity: 0;
+}
+.prow:hover .chev,
+.prow:focus-visible .chev {
+  opacity: 1;
+}
+.prow .dot {
+  width: 8px;
+  height: 8px;
+  margin: 0 4px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--need);
+}
+.ptext {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  line-height: 1.35;
+}
+.pmeta {
+  font-size: 12px;
+  color: var(--t3);
+}
+.pwhen {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--t2);
+}
+.pcard.quiet p {
+  margin: 0;
+  padding: 6px 8px 8px;
+  font-size: 13px;
+  color: var(--t2);
+}
+.pfoot {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 0 0;
+}
+.pfoot .tbtn {
+  font-size: 13px;
+}

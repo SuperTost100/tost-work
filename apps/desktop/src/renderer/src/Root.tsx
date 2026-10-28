@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { App } from "@/App";
 import { errorText } from "@/lib/errorText";
+import { useLook } from "@/lib/useLook";
 import { LanguageContext } from "@/lib/useT";
 import { Setup } from "@/screens/Setup";
 import type { TostWorkApi } from "../../shared/api";
@@ -18,22 +19,7 @@ export function Root({ api = window.tostWork }: { api?: TostWorkApi }) {
   }, [api]);
   // The View menu changes the text size from outside the window.
   useEffect(() => api?.settings.onChange(setSettings), [api]);
-  useEffect(() => {
-    document.documentElement.lang = lang;
-  }, [lang]);
-  // The page gets the theme as an attribute, because on Linux Electron's theme choice doesn't reach the
-  // colour-scheme media query. "Same as system" follows the system as it changes.
-  const theme = settings?.theme;
-  useEffect(() => {
-    if (!theme) return;
-    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
-    const apply = () => {
-      document.documentElement.dataset.theme = theme === "system" ? (media?.matches ? "dark" : "light") : theme;
-    };
-    apply();
-    media?.addEventListener("change", apply);
-    return () => media?.removeEventListener("change", apply);
-  }, [theme]);
+  useLook(lang, settings?.theme);
 
   let screen: React.ReactNode;
   if (!api) screen = <App api={api} />;

@@ -13,10 +13,11 @@ import {
   net,
   powerMonitor,
   safeStorage,
+  screen,
   shell,
   Tray,
 } from "electron";
-import { IPC, type MenuState } from "../shared/api";
+import { IPC, type MenuAction, type MenuState } from "../shared/api";
 import { languageFrom, translate } from "../shared/i18n";
 import type { AgentProvider } from "../shared/model";
 import { Accounts } from "./accounts";
@@ -40,15 +41,60 @@ import { pickAi } from "./pickAi";
 import { SkillFolder } from "./skills";
 import { SkillVersions } from "./skillVersions";
 import { Store } from "./store/store";
-import { staysInMenuBar, trayMenu } from "./tray";
+import { opensWindow, panelBounds, staysInMenuBar, trayMenu } from "./tray";
 
 const isMac = process.platform === "darwin";
 
 // macOS shows these in Tost Work > About, so a build can be told apart from another of the same version.
 app.setAboutPanelOptions({ applicationVersion: __APP_VERSION__, version: __APP_BUILD__ });
 let mainWindow: BrowserWindow | null = null;
-// Whether closing the last window leaves Tost Work running in the menu bar. Set once the jobs are loaded.
+// The menu-bar panel, once the icon has been clicked. Hidden rather than closed between clicks.
+let panel: BrowserWindow | null = null;
+
+/** Sends to the main window and the menu-bar panel, whichever exist, so both keep their lists current. */
+function toWindows(channel: string, ...args: unknown[]): void {
+  for (const win of [mainWindow, panel]) if (win && !win.isDestroyed()) win.webContents.send(channel, ...args);
+}
+// Whether closing the window leaves Tost Work running in the menu bar. Set once the settings are loaded.
 let staysOpen = () => false;
+// What happens once the main window is closed. The menu-bar panel is a window too, hidden but never closed, so
+// Electron's "all windows closed" never comes once it exists: the main window's own close decides.
+let mainClosed = () => {};
+
+const PRELOAD = () => join(import.meta.dirname, "../preload/index.cjs");
+
+/** Loads the interface in a window; the menu-bar panel is the same page, told apart by its hash. */
+function loadPage(win: BrowserWindow, hash?: string): void {
+  const devUrl = process.env.ELECTRON_RENDERER_URL;
+  if (devUrl) void win.loadURL(hash ? `${devUrl}#${hash}` : devUrl);
+  else void win.loadFile(join(import.meta.dirname, "../renderer/index.html"), hash ? { hash } : undefined);
+}
+
+/** The panel the menu-bar icon opens: no frame, over other windows, gone as soon as the user clicks elsewhere. */
+function createPanel(width: number, height: number): BrowserWindow {
+  const win = new BrowserWindow({
+    width,
+    height,
+    show: false,
+    frame: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    // A Mac gives it the frosted look of other menu-bar panels; elsewhere it's the app's own background.
+    ...(isMac
+      ? { transparent: true, vibrancy: "popover" as const, visualEffectState: "active" as const }
+      : { backgroundColor: nativeTheme.shouldUseDarkColors ? "#22201D" : "#FAF8F4" }),
+    webPreferences: { preload: PRELOAD(), contextIsolation: true, sandbox: true, nodeIntegration: false },
+  });
+  if (isMac) win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  loadPage(win, "panel");
+  return win;
+}
 
 function createWindow(store: Store): BrowserWindow {
   const win = new BrowserWindow({
@@ -64,7 +110,7 @@ function createWindow(store: Store): BrowserWindow {
     // shortcut: Windows and Linux keep the system frame, switch to titleBarOverlay when we style those builds.
     ...(isMac ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 18, y: 16 } } : {}),
     webPreferences: {
-      preload: join(import.meta.dirname, "../preload/index.cjs"),
+      preload: PRELOAD(),
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
@@ -81,6 +127,7 @@ function createWindow(store: Store): BrowserWindow {
   win.on("leave-full-screen", () => win.webContents.send(IPC.fullScreen, false));
   win.on("closed", () => {
     if (mainWindow === win) mainWindow = null;
+    mainClosed();
   });
 
   // Links open in the user's browser, never inside the app.
@@ -89,9 +136,7 @@ function createWindow(store: Store): BrowserWindow {
     return { action: "deny" };
   });
 
-  const devUrl = process.env.ELECTRON_RENDERER_URL;
-  if (devUrl) void win.loadURL(devUrl);
-  else void win.loadFile(join(import.meta.dirname, "../renderer/index.html"));
+  loadPage(win);
   return win;
 }
 
@@ -173,6 +218,23 @@ app.whenReady().then(async () => {
     win.focus();
   };
   const showTask = (taskId: string) => showWindow(taskId);
+  // An action for the window, such as New task from the panel. A window still loading asks for it once it listens.
+  // A page that has loaded may still not be listening: only once it asks for the waiting action is it.
+  let pendingMenu: MenuAction | null = null;
+  const listening = new WeakSet<Electron.WebContents>();
+  ipcMain.handle(IPC.takePendingMenu, (e) => {
+    listening.add(e.sender);
+    const action = pendingMenu;
+    pendingMenu = null;
+    return action;
+  });
+  const showWindowWith = (action: MenuAction) => {
+    showWindow();
+    const win = mainWindow;
+    if (!win) return;
+    if (listening.has(win.webContents)) win.webContents.send(IPC.menuAction, action);
+    else pendingMenu = action;
+  };
   // Held until clicked or closed: a notification that's collected forgets its click.
   const shown = new Set<Notification>();
   const notifier = new Notifier(
@@ -238,7 +300,7 @@ app.whenReady().then(async () => {
     engine,
     (task) => {
       // On Mac the app outlives its window, so a task can change after the window is gone.
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.taskChanged, task);
+      toWindows(IPC.taskChanged, task);
       notifier.changed(task);
       trayChanged();
     },
@@ -276,7 +338,7 @@ app.whenReady().then(async () => {
       return task.id;
     },
     changed: (change) => {
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.jobChanged, change);
+      toWindows(IPC.jobChanged, change);
       trayChanged();
     },
   });
@@ -287,35 +349,82 @@ app.whenReady().then(async () => {
   powerMonitor.on("unlock-screen", lookAtJobs);
   lookAtJobs();
 
-  // The menu-bar icon (the tray on Windows and Linux), there only while Tost Work stays when its window closes.
-  let tray: Tray | null = null;
-  staysOpen = () => staysInMenuBar(store.getSettings(), jobs.list());
-  const updateTray = () => {
-    if (!staysOpen()) {
-      tray?.destroy();
-      tray = null;
-      return;
+  // The menu-bar icon (the tray on Windows and Linux), there as long as Tost Work runs. A click opens the panel and a
+  // right click the menu. Linux trays don't report clicks, so there the menu is all there is.
+  staysOpen = () => staysInMenuBar(store.getSettings());
+  const icon = nativeImage.createFromPath(
+    join(app.getAppPath(), "resources", "tray", isMac ? "trayTemplate.png" : "tray.png"),
+  );
+  if (isMac) icon.setTemplateImage(true);
+  const tray = new Tray(icon);
+  tray.setToolTip("Tost Work");
+  const PANEL_WIDTH = 340;
+  let panelHeight = 420;
+  // A click on the icon while the panel is open first takes the focus from it, which hides it: the click mustn't
+  // then open it again.
+  let panelHiddenAt = 0;
+  const placePanel = () => {
+    if (!panel || panel.isDestroyed()) return;
+    const at = tray.getBounds();
+    const area = screen.getDisplayNearestPoint({ x: at.x, y: at.y }).workArea;
+    panel.setBounds(panelBounds(at, { width: PANEL_WIDTH, height: panelHeight }, area));
+  };
+  const hidePanel = () => {
+    if (!panel || panel.isDestroyed() || !panel.isVisible()) return;
+    panelHiddenAt = Date.now();
+    panel.hide();
+  };
+  const togglePanel = () => {
+    if (panel?.isVisible()) return hidePanel();
+    if (Date.now() - panelHiddenAt < 250) return;
+    if (!panel || panel.isDestroyed()) {
+      const made = createPanel(PANEL_WIDTH, panelHeight);
+      made.on("blur", hidePanel);
+      made.on("closed", () => {
+        if (panel === made) panel = null;
+      });
+      panel = made;
     }
-    if (!tray) {
-      const icon = nativeImage.createFromPath(
-        join(app.getAppPath(), "resources", "tray", isMac ? "trayTemplate.png" : "tray.png"),
-      );
-      if (isMac) icon.setTemplateImage(true);
-      tray = new Tray(icon);
-      tray.setToolTip("Tost Work");
-      // On Windows and Linux a click opens the window; the menu is on the right click. A Mac shows the menu.
-      if (!isMac) tray.on("click", () => showWindow());
-    }
+    placePanel();
+    // The theme may have changed since the panel was made; a Mac's panel is see-through and follows by itself.
+    if (!isMac) panel.setBackgroundColor(nativeTheme.shouldUseDarkColors ? "#22201D" : "#FAF8F4");
+    panel.show();
+    panel.focus();
+  };
+  ipcMain.on(IPC.panelOpen, (_e, target: unknown) => {
+    hidePanel();
+    const t = typeof target === "object" && target !== null ? (target as Record<string, unknown>) : {};
+    if (typeof t.taskId === "string" && t.taskId.length <= 100) showWindow(t.taskId);
+    else if (t.action === "new-task" || t.action === "settings") showWindowWith(t.action);
+    else showWindow();
+  });
+  ipcMain.on(IPC.panelQuit, () => app.quit());
+  ipcMain.on(IPC.panelFit, (_e, height: unknown) => {
+    if (typeof height !== "number" || !Number.isFinite(height)) return;
+    panelHeight = Math.round(Math.min(Math.max(height, 120), 900));
+    placePanel();
+  });
+  const menuNow = () => {
     const lang = language();
-    const menu = trayMenu(
-      (key, vars) => translate(lang, key, vars),
-      lang,
-      jobs.list(),
-      store.listActiveTasks(),
-      new Date(),
-      { open: () => showWindow(), openTask: (id) => showWindow(id), quit: () => app.quit() },
+    return Menu.buildFromTemplate(
+      trayMenu((key, vars) => translate(lang, key, vars), lang, jobs.list(), store.listActiveTasks(), new Date(), {
+        open: () => showWindow(),
+        openTask: (id) => showWindow(id),
+        quit: () => app.quit(),
+      }),
     );
-    tray.setContextMenu(Menu.buildFromTemplate(menu));
+  };
+  if (process.platform === "linux") tray.on("click", () => showWindow());
+  else {
+    tray.on("click", togglePanel);
+    tray.on("right-click", () => {
+      hidePanel();
+      tray.popUpContextMenu(menuNow());
+    });
+  }
+  // Linux shows the menu it was given; the others build it when it's asked for, so it's always current.
+  const updateTray = () => {
+    if (process.platform === "linux") tray.setContextMenu(menuNow());
   };
   trayChanged = updateTray;
   updateTray();
@@ -357,7 +466,7 @@ app.whenReady().then(async () => {
         const next = { ...current, textSize: nextTextSize(current.textSize, step) };
         store.saveSettings(next);
         applyLook(mainWindow, next);
-        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.settingsChanged, next);
+        toWindows(IPC.settingsChanged, next);
       },
       // Only a Mac's About panel shows the build, so Windows and Linux get a small dialog with both.
       about: () => {
@@ -395,6 +504,8 @@ app.whenReady().then(async () => {
       refreshMenu();
       trayChanged();
       confirmNotifications(settings);
+      // The window that saved them has them; the panel hears, for its language and theme.
+      if (panel && !panel.isDestroyed()) panel.webContents.send(IPC.settingsChanged, settings);
       if (settings.openAtLogin !== atLogin) {
         atLogin = settings.openAtLogin;
         applyLogin(atLogin);
@@ -434,22 +545,26 @@ app.whenReady().then(async () => {
     funnel.close();
     store.close();
   });
-  // Started at login with a job on, Tost Work waits in the menu bar; otherwise it opens its window as usual. A Mac
-  // ignores the login item's arguments, so it says itself whether this start came from the login.
+  // Started at login, Tost Work waits in the menu bar unless the user chose to have the window too. A Mac ignores the
+  // login item's arguments, so it says itself whether this start came from the login.
   const startedAtLogin = process.argv.includes(AT_LOGIN) || (isMac && app.getLoginItemSettings().wasOpenedAtLogin);
-  if (startedAtLogin && staysOpen()) {
-    if (isMac) void app.dock?.hide();
-  } else mainWindow = createWindow(store);
+  if (opensWindow(startedAtLogin, store.getSettings())) mainWindow = createWindow(store);
+  else if (isMac) void app.dock?.hide();
+  // Closing the window leaves Tost Work in the menu bar (the tray elsewhere), and a Mac drops its Dock icon until the
+  // window comes back. Without that, Windows and Linux quit, and a Mac keeps the app in the Dock, as Mac apps do.
+  mainClosed = () => {
+    // Quitting closes the window too, after the store has closed: nothing is left to decide.
+    if (quitting) return;
+    if (staysOpen()) {
+      if (isMac) void app.dock?.hide();
+    } else if (!isMac) app.quit();
+  };
   app.on("activate", () => {
-    // Through showWindow, so a Mac that hid the Dock icon at login shows it again with the window.
-    if (BrowserWindow.getAllWindows().length === 0) showWindow();
+    // The Dock icon brings the window back. Through showWindow, so a Mac that hid the Dock icon shows it again.
+    if (!mainWindow || mainWindow.isDestroyed()) showWindow();
   });
 });
 
-// With a job on, Tost Work stays in the menu bar (the tray elsewhere), and a Mac drops its Dock icon until the window
-// comes back. Otherwise Windows and Linux quit, and a Mac keeps the app in the Dock, as before.
-app.on("window-all-closed", () => {
-  if (staysOpen()) {
-    if (isMac) void app.dock?.hide();
-  } else if (!isMac) app.quit();
-});
+// Listening is what stops Electron quitting by itself when the last window closes: the main window's close decides
+// (see mainClosed), since the hidden panel would keep this from ever coming once it exists.
+app.on("window-all-closed", () => {});

@@ -2,17 +2,48 @@
 import { describe, expect, it } from "vitest";
 import { translate } from "../shared/i18n";
 import type { Job, Task } from "../shared/model";
-import { staysInMenuBar, trayMenu } from "./tray";
+import { opensWindow, panelBounds, staysInMenuBar, trayMenu } from "./tray";
 
 const job = (title: string, time: string, on = true) =>
   ({ title, on, skip: null, schedule: { repeat: "daily", time } }) as unknown as Job;
 const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate("en", key, vars);
 
 describe("staysInMenuBar", () => {
-  it("stays only while a job is on and the setting allows it", () => {
-    expect(staysInMenuBar({ stayInMenuBar: true }, [job("a", "09:00", false), job("b", "10:00")])).toBe(true);
-    expect(staysInMenuBar({ stayInMenuBar: true }, [job("a", "09:00", false)])).toBe(false);
-    expect(staysInMenuBar({ stayInMenuBar: false }, [job("b", "10:00")])).toBe(false);
+  it("stays whenever the setting allows it, job or no job", () => {
+    expect(staysInMenuBar({ stayInMenuBar: true })).toBe(true);
+    expect(staysInMenuBar({ stayInMenuBar: false })).toBe(false);
+  });
+});
+
+describe("opensWindow", () => {
+  it("opens the window at login only when the user chose it", () => {
+    expect(opensWindow(true, { loginOpens: "menuBar" })).toBe(false);
+    expect(opensWindow(true, { loginOpens: "window" })).toBe(true);
+    expect(opensWindow(false, { loginOpens: "menuBar" })).toBe(true);
+  });
+});
+
+describe("panelBounds", () => {
+  const area = { x: 0, y: 25, width: 1440, height: 875 };
+  const size = { width: 340, height: 420 };
+
+  it("opens under a menu-bar icon, centred on it", () => {
+    expect(panelBounds({ x: 1000, y: 0, width: 24, height: 24 }, size, area)).toEqual({
+      x: 842,
+      y: 31,
+      width: 340,
+      height: 420,
+    });
+  });
+
+  it("stays inside the screen when the icon is near its edge", () => {
+    expect(panelBounds({ x: 1420, y: 0, width: 20, height: 24 }, size, area).x).toBe(1440 - 340 - 6);
+  });
+
+  it("opens above an icon in a taskbar at the bottom, and shrinks to fit a short screen", () => {
+    const taskbar = { x: 0, y: 0, width: 1920, height: 1040 };
+    expect(panelBounds({ x: 1700, y: 1048, width: 24, height: 24 }, size, taskbar).y).toBe(1040 - 420 - 6);
+    expect(panelBounds({ x: 1000, y: 0, width: 24, height: 24 }, { width: 340, height: 2000 }, area).height).toBe(863);
   });
 });
 

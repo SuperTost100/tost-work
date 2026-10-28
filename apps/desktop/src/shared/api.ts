@@ -93,6 +93,14 @@ export interface TostWorkApi {
   onMenu(listener: (action: MenuAction) => void): () => void;
   /** A click on a notification, or in the menu bar's icon, asks the window to show this task. */
   onOpenTask(listener: (taskId: string) => void): () => void;
+  /** The menu-bar panel's buttons. */
+  panel: {
+    /** Opens the main window, on a task or on a new task or Settings when asked, and closes the panel. */
+    open(target?: PanelTarget): void;
+    quit(): void;
+    /** Makes the panel as tall as its content. */
+    fit(height: number): void;
+  };
   /** Tells the menu bar whether a task is open and working, so its Task items turn on and off with it. */
   menuState(state: MenuState): void;
   /** The subscriptions, one per agent CLI. */
@@ -137,6 +145,8 @@ export interface TostWorkApi {
   tasks: {
     /** The 50 most recently updated tasks. */
     list(): Promise<Task[]>;
+    /** Every task working or waiting for the user, however old: the recent list stops at 50. */
+    listActive(): Promise<Task[]>;
     /** Every task of one project. */
     listForProject(projectId: string): Promise<Task[]>;
     get(id: string): Promise<Task | null>;
@@ -229,6 +239,9 @@ export type TaskMenuAction = "rename" | "reveal" | "delete";
 /** What the project menu offers. */
 export type ProjectMenuAction = "rename" | "instructions" | "reveal" | "remove";
 
+/** Where the panel's buttons take the main window. */
+export type PanelTarget = { taskId: string } | { action: "new-task" | "settings" };
+
 /** IPC channel names, kept in one place so main and preload can't drift apart. */
 export const IPC = {
   settingsGet: "settings:get",
@@ -244,6 +257,10 @@ export const IPC = {
   menuState: "menu:state",
   openTask: "window:open-task",
   takePendingTask: "window:take-pending-task",
+  takePendingMenu: "window:take-pending-menu",
+  panelOpen: "panel:open",
+  panelQuit: "panel:quit",
+  panelFit: "panel:fit",
   fullScreen: "window:full-screen",
   jobsList: "jobs:list",
   jobsCreate: "jobs:create",
@@ -277,6 +294,7 @@ export const IPC = {
   projectsReveal: "projects:reveal",
   projectsRemove: "projects:remove",
   tasksList: "tasks:list",
+  tasksListActive: "tasks:list-active",
   tasksListForProject: "tasks:list-for-project",
   tasksGet: "tasks:get",
   tasksStart: "tasks:start",

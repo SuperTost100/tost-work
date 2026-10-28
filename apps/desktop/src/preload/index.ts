@@ -22,9 +22,22 @@ const api: TostWorkApi = {
     },
   },
   onMenu: (listener) => {
+    // An action the panel asked for while this window was still loading waits in the main process, as a task does.
+    let listening = true;
     const handler = (_: unknown, action: MenuAction) => listener(action);
     ipcRenderer.on(IPC.menuAction, handler);
-    return () => ipcRenderer.removeListener(IPC.menuAction, handler);
+    void ipcRenderer.invoke(IPC.takePendingMenu).then((action: unknown) => {
+      if (typeof action === "string" && listening) listener(action as MenuAction);
+    });
+    return () => {
+      listening = false;
+      ipcRenderer.removeListener(IPC.menuAction, handler);
+    };
+  },
+  panel: {
+    open: (target) => ipcRenderer.send(IPC.panelOpen, target),
+    quit: () => ipcRenderer.send(IPC.panelQuit),
+    fit: (height) => ipcRenderer.send(IPC.panelFit, height),
   },
   menuState: (state) => ipcRenderer.send(IPC.menuState, state),
   onOpenTask: (listener) => {
@@ -76,6 +89,7 @@ const api: TostWorkApi = {
   },
   tasks: {
     list: () => ipcRenderer.invoke(IPC.tasksList),
+    listActive: () => ipcRenderer.invoke(IPC.tasksListActive),
     listForProject: (projectId) => ipcRenderer.invoke(IPC.tasksListForProject, projectId),
     get: (id) => ipcRenderer.invoke(IPC.tasksGet, id),
     start: (input) => ipcRenderer.invoke(IPC.tasksStart, input),
