@@ -1,5 +1,16 @@
 import type { InstallResult } from "./install";
-import type { AgentProvider, CourseKey, Project, Settings, Skill, SkillDraft, SkillVersion, Task } from "./model";
+import type {
+  AgentProvider,
+  CourseKey,
+  Job,
+  JobDraft,
+  Project,
+  Settings,
+  Skill,
+  SkillDraft,
+  SkillVersion,
+  Task,
+} from "./model";
 
 export interface NewProjectInput {
   name: string;
@@ -52,6 +63,8 @@ export interface MenuState {
 export type MenuAction = "new-task" | "new-project" | "quick-edit" | "settings" | "send" | "stop" | "rename" | "reveal";
 
 /** What the preload exposes to the interface as `window.tostWork`. */
+export type JobChange = Job | { id: string; removed: true };
+
 export interface TostWorkApi {
   platform: "darwin" | "win32" | "linux";
   versions: { app: string; electron: string };
@@ -137,6 +150,20 @@ export interface TostWorkApi {
     /** Puts back the copy kept before the file was replaced. Restoring again undoes it. */
     restore(taskId: string, path: string): Promise<Task>;
   };
+  /** Work that runs by itself on a schedule, a new task each time. */
+  jobs: {
+    list(): Promise<Job[]>;
+    create(draft: JobDraft): Promise<Job>;
+    update(id: string, draft: JobDraft): Promise<Job>;
+    setOn(id: string, on: boolean): Promise<Job>;
+    /** Leaves out the next run, or puts it back. */
+    skipOnce(id: string): Promise<Job>;
+    remove(id: string): Promise<void>;
+    /** Runs it now, as Try it does, and gives the task it started. */
+    runNow(id: string): Promise<string>;
+    /** A job changed or went, including when one of its runs started. */
+    onChange(listener: (change: JobChange) => void): () => void;
+  };
   /** The user's skills, SKILL.md folders in Documents/Tost Work/Skills. */
   skills: {
     /** The user's skills, then the guides Tost Work comes with (`builtIn`). */
@@ -183,6 +210,14 @@ export const IPC = {
   openTask: "window:open-task",
   takePendingTask: "window:take-pending-task",
   fullScreen: "window:full-screen",
+  jobsList: "jobs:list",
+  jobsCreate: "jobs:create",
+  jobsUpdate: "jobs:update",
+  jobsSetOn: "jobs:set-on",
+  jobsSkipOnce: "jobs:skip-once",
+  jobsRemove: "jobs:remove",
+  jobsRunNow: "jobs:run-now",
+  jobChanged: "jobs:changed",
   skillsList: "skills:list",
   skillsCreate: "skills:create",
   skillsSave: "skills:save",

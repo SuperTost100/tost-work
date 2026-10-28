@@ -1,5 +1,6 @@
 import type {
   AgentAccount,
+  JobChange,
   MenuAction,
   MenuState,
   NewProjectInput,
@@ -15,6 +16,7 @@ import {
   type CourseKey,
   DEFAULT_SETTINGS,
   type EngineEvent,
+  type Job,
   keyVendor,
   type Project,
   questionItems,
@@ -26,6 +28,7 @@ import {
 } from "../../../shared/model";
 
 import { applyEvent, resume } from "../../../shared/reduce";
+import { nextRun } from "../../../shared/schedule";
 
 /** The built-in guide the memory API lists, as Tost Work lists its Word, Excel, PowerPoint and PDF guides. */
 const WORD_GUIDE: Skill = {
@@ -44,7 +47,7 @@ const WORD_GUIDE: Skill = {
  * An in-memory `window.tostWork` for tests: tasks run a short script synchronously, stop at one question,
  * and finish when it's answered.
  */
-export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", setupDone: true }): TostWorkApi & {
+export type MemoryApi = TostWorkApi & {
   emit(id: string, e: EngineEvent): void;
   pickInMenu(action: TaskMenuAction | null): void;
   /** Picks an item in the menu bar, as the user would. */
@@ -55,8 +58,24 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   menuStateNow(): MenuState;
   /** Changes settings from outside the window, as the View menu does. */
   changeSettings(patch: Partial<Settings>): void;
-} {
+};
+
+export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", setupDone: true }): MemoryApi {
   const projects: Project[] = [];
+  const jobs = new Map<string, Job>();
+  // Ids never come back after a removal, as the app's random ones don't.
+  let jobCount = 0;
+  const jobListeners = new Set<(change: JobChange) => void>();
+  const saveJob = (job: Job): Job => {
+    jobs.set(job.id, job);
+    for (const l of jobListeners) l(job);
+    return job;
+  };
+  const mustJob = (id: string): Job => {
+    const job = jobs.get(id);
+    if (!job) throw new Error("That job isn't there any more");
+    return job;
+  };
   let skills: Skill[] = [];
   const skillId = (title: string) =>
     title
@@ -110,7 +129,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   let menuPick: TaskMenuAction | null = null;
   let menuState: MenuState = { task: false, running: false };
 
-  return {
+  const api: MemoryApi = {
     platform: "linux",
     pickInMenu: (action) => {
       menuPick = action;
@@ -312,6 +331,47 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         return () => listeners.delete(l);
       },
     },
+    jobs: {
+      list: async () => [...jobs.values()],
+      create: async (draft) => {
+        if (!projects.some((p) => p.id === draft.projectId)) throw new Error("That project doesn't exist");
+        const at = now();
+        return saveJob({
+          id: `j${++jobCount}`,
+          ...draft,
+          on: true,
+          skip: null,
+          handled: at,
+          last: null,
+          createdAt: at,
+          updatedAt: at,
+        });
+      },
+      update: async (id, draft) => saveJob({ ...mustJob(id), ...draft, skip: null, updatedAt: now() }),
+      setOn: async (id, on) => saveJob({ ...mustJob(id), on, updatedAt: now() }),
+      skipOnce: async (id) => {
+        const job = mustJob(id);
+        const next = nextRun(job.schedule, new Date(now()))?.toISOString() ?? null;
+        return saveJob({ ...job, skip: job.skip === next ? null : next, updatedAt: now() });
+      },
+      remove: async (id) => {
+        jobs.delete(id);
+        for (const l of jobListeners) l({ id, removed: true });
+      },
+      runNow: async (id) => {
+        const job = mustJob(id);
+        const task = await api.tasks.start({ projectId: job.projectId, brief: job.brief, attachments: [] });
+        save({ ...(tasks.get(task.id) ?? task), title: job.title, jobId: job.id });
+        // As the app: removed or changed while the run started, the job as it is now is kept, or stays gone.
+        const fresh = jobs.get(id);
+        if (fresh) saveJob({ ...fresh, last: { at: now(), taskId: task.id } });
+        return task.id;
+      },
+      onChange: (l) => {
+        jobListeners.add(l);
+        return () => jobListeners.delete(l);
+      },
+    },
     skills: {
       list: async () => [...[...skills].sort((a, b) => a.title.localeCompare(b.title)), WORD_GUIDE],
       create: async (title) => {
@@ -402,4 +462,5 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       },
     },
   };
+  return api;
 }

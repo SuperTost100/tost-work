@@ -10,6 +10,7 @@ import type { Accounts } from "./accounts";
 import type { TaskRunner } from "./engine/runner";
 import { type Conflict, copyInto, describe, readablePath, savablePaths, saveCopies } from "./files";
 import type { Installer } from "./installer";
+import { type Jobs, jobDraft } from "./jobs";
 import type { KeyStore } from "./keys";
 import type { SkillFolder } from "./skills";
 import type { Store } from "./store/store";
@@ -26,6 +27,7 @@ export function registerIpc(
   /** Applies saved settings to the window and the menu bar. */
   settingsSaved: (settings: Settings) => void,
   skills: SkillFolder,
+  jobs: Jobs,
 ): void {
   const account = (provider: unknown): Accounts => {
     if (provider !== "codex" && provider !== "claude") throw new Error("provider must be codex or claude");
@@ -234,6 +236,19 @@ export function registerIpc(
     if (!title) throw new Error("A skill needs a name");
     return { title, description: text(d.description, "description", 1024), steps: text(d.steps, "steps", BRIEF_MAX) };
   };
+  ipcMain.handle(IPC.jobsList, () => jobs.list());
+  ipcMain.handle(IPC.jobsCreate, (_e, draft: unknown) => jobs.create(jobDraft(draft)));
+  ipcMain.handle(IPC.jobsUpdate, (_e, id: unknown, draft: unknown) =>
+    jobs.update(text(id, "id", 100), jobDraft(draft)),
+  );
+  ipcMain.handle(IPC.jobsSetOn, (_e, id: unknown, on: unknown) => {
+    if (typeof on !== "boolean") throw new Error("on must be true or false");
+    return jobs.setOn(text(id, "id", 100), on);
+  });
+  ipcMain.handle(IPC.jobsSkipOnce, (_e, id: unknown) => jobs.skipOnce(text(id, "id", 100)));
+  ipcMain.handle(IPC.jobsRemove, (_e, id: unknown) => jobs.remove(text(id, "id", 100)));
+  ipcMain.handle(IPC.jobsRunNow, (_e, id: unknown) => jobs.runNow(text(id, "id", 100)));
+
   ipcMain.handle(IPC.skillsList, async () => [...(await skills.list()), ...(await skills.builtIns())]);
   ipcMain.handle(IPC.skillsCreate, (_e, title: unknown) => {
     const name = text(title, "title", 200).trim();

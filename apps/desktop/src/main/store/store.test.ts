@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, type Task } from "../../shared/model";
+import { DEFAULT_SETTINGS, type Job, type Task } from "../../shared/model";
 import { Store } from "./store";
 
 const task = (id: string, status: Task["status"], updatedAt: string): Task => ({
@@ -101,5 +101,31 @@ describe("Store", () => {
     store.saveSettings({ ...DEFAULT_SETTINGS, name: "Giulia", level: "advanced", language: "it", setupDone: true });
     expect(store.getSettings().name).toBe("Giulia");
     expect(store.getSettings().level).toBe("advanced");
+  });
+
+  it("keeps jobs, oldest first, and forgets a deleted one", () => {
+    const store = new Store(":memory:");
+    const job = (id: string, createdAt: string) =>
+      ({ id, projectId: "p", title: id, createdAt, schedule: { repeat: "daily", time: "09:00" } }) as Job;
+    store.saveJob(job("b", "2026-10-28T10:00:00Z"));
+    store.saveJob(job("a", "2026-10-27T10:00:00Z"));
+    store.saveJob({ ...job("b", "2026-10-28T10:00:00Z"), title: "Renamed" });
+    expect(store.listJobs().map((j) => [j.id, j.title])).toEqual([
+      ["a", "a"],
+      ["b", "Renamed"],
+    ]);
+    store.deleteJob("a");
+    expect(store.getJob("a")).toBeUndefined();
+    expect(store.listJobs()).toHaveLength(1);
+  });
+
+  it("says whether any run of a job still needs the user or is working", () => {
+    const store = new Store(":memory:");
+    store.saveTask({ ...task("a", "needs-you", "2026-10-28T09:00:00Z"), jobId: "j" });
+    store.saveTask({ ...task("b", "done", "2026-10-29T09:00:00Z"), jobId: "j" });
+    store.saveTask({ ...task("c", "running", "2026-10-29T09:00:00Z"), jobId: "other" });
+    expect(store.jobBusy("j")).toBe(true);
+    store.saveTask({ ...task("a", "done", "2026-10-29T10:00:00Z"), jobId: "j" });
+    expect(store.jobBusy("j")).toBe(false);
   });
 });

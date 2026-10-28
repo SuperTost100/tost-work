@@ -10,6 +10,7 @@ import {
   Notification,
   nativeTheme,
   net,
+  powerMonitor,
   safeStorage,
   shell,
 } from "electron";
@@ -27,6 +28,7 @@ import { TaskRunner } from "./engine/runner";
 import { fileGuard } from "./guard";
 import { findInstalledCodex, Installer } from "./installer";
 import { registerIpc } from "./ipc";
+import { Jobs } from "./jobs";
 import { KeyStore } from "./keys";
 import { setOpenAtLogin } from "./loginItem";
 import { applyLook } from "./look";
@@ -139,6 +141,7 @@ app.whenReady().then(async () => {
       courseKey: () => keys.get(),
       online: () => net.isOnline(),
       skills: () => skills.list(),
+      job: (id) => store.getJob(id),
     });
     tools = new ToolServer(agent);
     await tools.start();
@@ -218,6 +221,40 @@ app.whenReady().then(async () => {
     undefined,
     guard,
   );
+  // Jobs start their runs as tasks, like the ones the user starts, on the account new tasks use.
+  const jobs = new Jobs({
+    store,
+    busy: (jobId) => store.jobBusy(jobId),
+    start: async (job, at) => {
+      const project = store.getProject(job.projectId);
+      if (!project) throw new Error(translate(language(), "jobs.projectGone"));
+      const { provider, auth, model, effort } = await runner.defaults();
+      const day = new Intl.DateTimeFormat(language(), { day: "numeric", month: "short" }).format(at);
+      const task = runner.create({
+        projectId: project.id,
+        brief: job.brief,
+        workdir: project.folder,
+        provider,
+        auth,
+        model,
+        effort,
+        jobId: job.id,
+        title: `${job.title} · ${day}`,
+      });
+      runner.launch(task.id);
+      return task.id;
+    },
+    changed: (change) => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.jobChanged, change);
+    },
+  });
+  // Every half minute, and on waking up, when a missed run is due straight away.
+  const lookAtJobs = () => void jobs.tick().catch((err: unknown) => console.error("Jobs couldn't run", err));
+  setInterval(lookAtJobs, 30_000);
+  powerMonitor.on("resume", lookAtJobs);
+  powerMonitor.on("unlock-screen", lookAtJobs);
+  lookAtJobs();
+
   // One sign-in per agent CLI. Their progress goes to the window tagged with the CLI it belongs to.
   const accountsFor = (provider: AgentProvider) =>
     new Accounts(
@@ -295,6 +332,7 @@ app.whenReady().then(async () => {
       }
     },
     skills,
+    jobs,
   );
   // Quitting stops the tasks still working, so it asks first. They show as interrupted, with Resume, next time.
   let quitting = false;

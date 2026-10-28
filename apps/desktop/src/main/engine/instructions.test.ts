@@ -82,4 +82,17 @@ describe("instructionsFor", () => {
     expect(text).toContain("- Proposal writer: A client asks for a proposal. (/Docs/Skills/proposal-writer/SKILL.md)");
     expect(instructionsFor(task, project, "it")).not.toContain("The user's skills:");
   });
+
+  it("tells a job's run that nobody is watching, to date its files, and where they go", () => {
+    const run = { workdir: "/Users/giulia/Proposte", attachments: [], jobId: "j1" } as unknown as Task;
+    const text = instructionsFor(run, project, "it", null, undefined, [], {
+      title: "Follow-up check",
+      output: "Follow-up",
+    });
+    expect(text).toContain('a run of the job "Follow-up check"');
+    expect(text).toContain("The user isn't watching");
+    expect(text).toMatch(/carry today's date, \d{4}-\d{2}-\d{2}/);
+    expect(text).toContain("Put them in /Users/giulia/Proposte/Follow-up.");
+    expect(instructionsFor(task, project, "it")).not.toContain("a run of the job");
+  });
 });

@@ -15,6 +15,9 @@ export interface NewTask {
   auth?: "account" | "key";
   model?: string;
   effort?: string;
+  /** For a run of a job: the job, and the title its tasks carry. */
+  jobId?: string;
+  title?: string;
 }
 
 /** The first line of the brief, cut at a word, as the task's title until the agent names it. */
@@ -75,12 +78,13 @@ export class TaskRunner {
     const task: Task = {
       id: randomUUID(),
       projectId: input.projectId,
-      title: titleFrom(input.brief),
+      title: input.title ?? titleFrom(input.brief),
       brief: input.brief,
       attachments: input.attachments ?? [],
       workdir: input.workdir,
       provider: input.provider ?? "codex",
       ...(input.auth === "key" ? { auth: "key" as const } : {}),
+      ...(input.jobId ? { jobId: input.jobId } : {}),
       model: input.model ?? "gpt-5.5",
       effort: input.effort ?? "medium",
       status: "draft",

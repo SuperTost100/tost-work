@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import { contextBridge, ipcRenderer } from "electron";
-import type { MenuAction, SignInEvent } from "../shared/api";
+import type { JobChange, MenuAction, SignInEvent } from "../shared/api";
 import { IPC, type TostWorkApi } from "../shared/api";
 import type { AgentProvider, Settings, Task } from "../shared/model";
 
@@ -97,6 +97,20 @@ const api: TostWorkApi = {
     open: (taskId, path) => ipcRenderer.invoke(IPC.filesOpen, taskId, path),
     reveal: (taskId, path) => ipcRenderer.invoke(IPC.filesReveal, taskId, path),
     restore: (taskId, path) => ipcRenderer.invoke(IPC.filesRestore, taskId, path),
+  },
+  jobs: {
+    list: () => ipcRenderer.invoke(IPC.jobsList),
+    create: (draft) => ipcRenderer.invoke(IPC.jobsCreate, draft),
+    update: (id, draft) => ipcRenderer.invoke(IPC.jobsUpdate, id, draft),
+    setOn: (id, on) => ipcRenderer.invoke(IPC.jobsSetOn, id, on),
+    skipOnce: (id) => ipcRenderer.invoke(IPC.jobsSkipOnce, id),
+    remove: (id) => ipcRenderer.invoke(IPC.jobsRemove, id),
+    runNow: (id) => ipcRenderer.invoke(IPC.jobsRunNow, id),
+    onChange: (listener) => {
+      const handler = (_: unknown, change: JobChange) => listener(change);
+      ipcRenderer.on(IPC.jobChanged, handler);
+      return () => ipcRenderer.removeListener(IPC.jobChanged, handler);
+    },
   },
   skills: {
     list: () => ipcRenderer.invoke(IPC.skillsList),

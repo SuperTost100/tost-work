@@ -1,5 +1,7 @@
 /** The data Tost Work keeps about projects and tasks. Shared by the main process and the interface. */
 
+import type { JobSchedule } from "./schedule";
+
 export interface Project {
   id: string;
   name: string;
@@ -156,6 +158,8 @@ export interface Task {
   skillsUsed?: string[];
   /** What the agent did, a line per tool call, across every run. Missing on tasks from before. */
   activity?: Activity[];
+  /** Set on a run of a job. */
+  jobId?: string;
   /** The agent's conversation, so a follow-up continues it. Set by the real engine. */
   sessionId?: string;
   error: string | null;
@@ -319,3 +323,41 @@ export interface SkillDraft {
   description: string;
   steps: string;
 }
+
+/** Work that runs by itself on a schedule, as a new task each time, in one project. */
+export interface Job {
+  id: string;
+  projectId: string;
+  /** What it does, in a few words: the name on its card and on each run's task. */
+  title: string;
+  /** What each run is asked to do. */
+  brief: string;
+  schedule: JobSchedule;
+  /** A run missed while the computer was off or asleep: run once when it's back, or wait for the next one. */
+  missed: "run" | "skip";
+  /** The subfolder of the project where each run saves its files, or "" to let the agent choose. */
+  output: string;
+  on: boolean;
+  /** The run Skip once leaves out, as an ISO time, until it has passed. */
+  skip: string | null;
+  /** The latest run time dealt with, run or not, so a run never happens twice. */
+  handled: string | null;
+  /** How the latest run time went: the task it started, or why none started. */
+  last: JobLast | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type JobLast =
+  | { at: string; taskId: string }
+  /** Not run because the run before it was still waiting for the user, or still working. */
+  | { at: string; skipped: "waiting" }
+  /** Not run because the computer was off at the time and the job waits for the next one. */
+  | { at: string; skipped: "missed" }
+  /** Couldn't start, for example with no AI signed in. */
+  | { at: string; error: string };
+
+export type JobDraft = Pick<Job, "projectId" | "title" | "brief" | "schedule" | "missed" | "output">;
+
+/** A job runs again only if the run before it is over: one that needs the user waits for them. */
+export const busyStatus = (status: TaskStatus | undefined): boolean => status === "running" || status === "needs-you";

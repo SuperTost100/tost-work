@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { Project, Skill, Task } from "../../shared/model";
+import type { Job, Project, Skill, Task } from "../../shared/model";
 
 const LANGUAGE_NAMES = { en: "English", it: "Italian" } as const;
 
@@ -14,6 +14,7 @@ export function instructionsFor(
   documents: { skills: string } | null = null,
   user: { name: string; work: string; notes: string } = { name: "", work: "", notes: "" },
   skills: Pick<Skill, "title" | "description" | "folder">[] = [],
+  job: Pick<Job, "title" | "output"> | null = null,
 ): string {
   const where = project
     ? `You work in the project "${project.name}". Its folder is ${task.workdir}.`
@@ -71,6 +72,20 @@ export function instructionsFor(
         ),
       ].join("\n"),
     );
+  if (job) {
+    // The computer's own date, as the user reads it, not UTC's, which is a day off around midnight.
+    const now = new Date();
+    const today = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+      .map((n) => String(n).padStart(2, "0"))
+      .join("-");
+    parts.push(
+      [
+        `This task is a run of the job "${job.title}", which Tost Work starts by itself on a schedule. The user isn't watching: do the work from start to end without asking, unless you truly can't go on without an answer. A question waits for them and they get a notification.`,
+        `Save this run's files under new names that carry today's date, ${today}, for example "${job.title} ${today}.docx", so each run keeps its own and nothing from an earlier run is replaced.${job.output ? ` Put them in ${join(task.workdir, job.output)}.` : ""}`,
+        "Files from earlier runs are there to read when the work needs them, such as last week's list to compare with. Changing one still asks first.",
+      ].join("\n"),
+    );
+  }
   if (project?.instructions.trim()) parts.push(`The project's instructions:\n${project.instructions.trim()}`);
   if (task.attachments.length)
     parts.push(`Files the user attached:\n${task.attachments.map((p) => `- ${p}`).join("\n")}`);

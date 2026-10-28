@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import { DEFAULT_SETTINGS, type Project, type Settings, type Task } from "../../shared/model";
+import { DEFAULT_SETTINGS, type Job, type Project, type Settings, type Task } from "../../shared/model";
 
 /**
  * Projects and tasks, in SQLite through Node's built-in driver, so there is no native module to rebuild for Electron.
@@ -24,6 +24,7 @@ export class Store {
       create index if not exists tasks_updated on tasks (updated_at desc);
       create index if not exists tasks_project on tasks (project_id, updated_at desc);
       create table if not exists settings (key text primary key, value text not null);
+      create table if not exists jobs (id text primary key, data text not null, created_at text not null);
     `);
   }
 
@@ -91,6 +92,39 @@ export class Store {
       .prepare("select data from tasks where project_id = ? order by updated_at desc")
       .all(projectId) as { data: string }[];
     return rows.map((r) => JSON.parse(r.data) as Task);
+  }
+
+  saveJob(job: Job): void {
+    this.db
+      .prepare(
+        "insert into jobs (id, data, created_at) values (?, ?, ?) on conflict(id) do update set data = excluded.data",
+      )
+      .run(job.id, JSON.stringify(job), job.createdAt);
+  }
+
+  getJob(id: string): Job | undefined {
+    const row = this.db.prepare("select data from jobs where id = ?").get(id) as { data: string } | undefined;
+    return row ? (JSON.parse(row.data) as Job) : undefined;
+  }
+
+  /** Oldest first, the order they were made in. */
+  listJobs(): Job[] {
+    const rows = this.db.prepare("select data from jobs order by created_at").all() as { data: string }[];
+    return rows.map((r) => JSON.parse(r.data) as Job);
+  }
+
+  /** Whether a run of this job still needs the user or is still working. */
+  jobBusy(jobId: string): boolean {
+    const row = this.db
+      .prepare(
+        "select 1 from tasks where status in ('running', 'needs-you') and json_extract(data, '$.jobId') = ? limit 1",
+      )
+      .get(jobId);
+    return row !== undefined;
+  }
+
+  deleteJob(id: string): void {
+    this.db.prepare("delete from jobs where id = ?").run(id);
   }
 
   /** How many tasks each project has, for the project cards. */

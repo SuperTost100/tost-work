@@ -3,7 +3,7 @@ import { realpath, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
 import { translate } from "../../shared/i18n";
-import type { AgentProvider, AiId, EngineEvent, KeyVendor, Review, Skill } from "../../shared/model";
+import type { AgentProvider, AiId, EngineEvent, Job, KeyVendor, Review, Skill } from "../../shared/model";
 import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
 import { freeName, inside } from "../files";
 import type { ToolHandler } from "../mcp/server";
@@ -228,6 +228,7 @@ export class AgentEngine implements Engine, ToolHandler {
   private courseKey: () => { key: string; vendor: KeyVendor } | null;
   private online: () => boolean;
   private skills: () => Promise<Skill[]>;
+  private job: (id: string) => Pick<Job, "title" | "output"> | undefined;
 
   constructor(
     private funnel: AgentFunnel,
@@ -244,6 +245,8 @@ export class AgentEngine implements Engine, ToolHandler {
       online?: () => boolean;
       /** The user's skills, read for each run so a skill saved a moment ago is there. */
       skills?: () => Promise<Skill[]>;
+      /** The job a task is a run of, so the agent knows nobody is watching and where the files go. */
+      job?: (id: string) => Pick<Job, "title" | "output"> | undefined;
     } = {},
   ) {
     this.documents = options.documents ?? null;
@@ -252,6 +255,7 @@ export class AgentEngine implements Engine, ToolHandler {
     this.courseKey = options.courseKey ?? (() => null);
     this.online = options.online ?? (() => true);
     this.skills = options.skills ?? (async () => []);
+    this.job = options.job ?? (() => undefined);
   }
 
   /** Why the task can't reach its AI, in the user's language. */
@@ -331,6 +335,7 @@ export class AgentEngine implements Engine, ToolHandler {
         this.documents && { skills: this.documents.skills },
         this.user(),
         skills,
+        task.jobId ? (this.job(task.jobId) ?? null) : null,
       ),
       ...(this.documents ? { env: this.documents.env } : {}),
       ...(apiKey ? { apiKey } : {}),
