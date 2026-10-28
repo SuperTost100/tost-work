@@ -174,8 +174,11 @@ export interface TostWorkApi {
     save(id: string, draft: SkillDraft, note?: string): Promise<Skill>;
     /** Copies a built-in guide among the user's skills, to change. */
     duplicate(id: string): Promise<Skill>;
-    /** Asks for a SKILL.md folder or a .zip of one and brings it in. Null when the user cancels. */
-    import(): Promise<Skill | null>;
+    /**
+     * Brings in a SKILL.md folder or a .zip of one: the one dropped on Skills, or with none, one the user picks. Null
+     * when the user cancels.
+     */
+    import(dropped?: File): Promise<Skill | null>;
     /** The versions Tost Work kept, newest first. */
     history(id: string): Promise<SkillVersion[]>;
     /** Puts an earlier version back. */

@@ -215,6 +215,44 @@ describe("skills", () => {
     expect(screen.getByText("Version 1 · used 2 times · Available in every project")).toBeTruthy();
   });
 
+  it("imports every skill dropped on the page, and opens the last one", async () => {
+    const api = createMemoryApi();
+    const imported: (File | undefined)[] = [];
+    const realImport = api.skills.import;
+    api.skills.import = (dropped) => {
+      imported.push(dropped);
+      return realImport(dropped);
+    };
+    render(<Skills api={api} />);
+    const page = (await screen.findByRole("button", { name: "Import a skill" })).closest(".main") as HTMLElement;
+    const files = [new File(["zip"], "brief.zip"), new File([""], "quotes")];
+    const dataTransfer = { types: ["Files"], files, dropEffect: "none" };
+    fireEvent.dragOver(page, { dataTransfer });
+    expect(screen.getByText("Drop a skill's folder or a .zip to import it")).toBeTruthy();
+    await act(async () => {
+      fireEvent.drop(page, { dataTransfer });
+    });
+    expect(imported.map((f) => f?.name)).toEqual(["brief.zip", "quotes"]);
+    expect(screen.queryByText("Drop a skill's folder or a .zip to import it")).toBeNull();
+    expect(((await screen.findByLabelText("Skill name")) as HTMLInputElement).value).toBe("quotes");
+    expect(screen.getAllByRole("button", { name: /^brief/ }).length).toBeGreaterThan(0);
+  });
+
+  it("imports the other dropped skills when one can't come in, and names the one that couldn't", async () => {
+    const api = createMemoryApi();
+    const realImport = api.skills.import;
+    api.skills.import = (dropped) =>
+      dropped?.name === "notes.txt" ? Promise.reject(new Error("That folder has no SKILL.md")) : realImport(dropped);
+    render(<Skills api={api} />);
+    const page = (await screen.findByRole("button", { name: "Import a skill" })).closest(".main") as HTMLElement;
+    const files = [new File([""], "notes.txt"), new File(["zip"], "quotes.zip")];
+    await act(async () => {
+      fireEvent.drop(page, { dataTransfer: { types: ["Files"], files } });
+    });
+    expect(((await screen.findByLabelText("Skill name")) as HTMLInputElement).value).toBe("quotes");
+    expect(screen.getByRole("alert").textContent).toBe("notes.txt: That folder has no SKILL.md");
+  });
+
   it("makes one copy of a guide however often Duplicate is clicked while it works", async () => {
     const api = createMemoryApi();
     const realDuplicate = api.skills.duplicate;

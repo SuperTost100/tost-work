@@ -1,4 +1,13 @@
-import { type MouseEvent, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type DragEvent,
+  type MouseEvent,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
@@ -124,14 +133,47 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
       setDuplicating(false);
     });
   };
-  const importSkill = () =>
+  const importSkill = (dropped: File[] = []) =>
     leave() &&
     void run(async () => {
-      const skill = await api.skills.import();
-      if (!skill) return;
-      put(skill, null);
-      show(skill);
+      // One at a time, as the folder takes them one at a time; the last one in opens. One that can't come in doesn't
+      // stop the others: the error names it.
+      let last: Skill | null = null;
+      const failed: string[] = [];
+      for (const file of dropped.length ? dropped : [undefined]) {
+        try {
+          const skill = await api.skills.import(file);
+          if (!skill) continue;
+          put(skill, null);
+          last = skill;
+        } catch (err) {
+          if (!file) throw err;
+          failed.push(`${file.name}: ${errorText(err)}`);
+        }
+      }
+      if (last) show(last);
+      if (failed.length) setError(failed.join(" · "));
     });
+  // Files dragged from the Finder can be dropped anywhere on the page to import them.
+  const [dropping, setDropping] = useState(false);
+  const carriesFiles = (e: DragEvent) => e.dataTransfer.types.includes("Files");
+  const dropZone = {
+    onDragOver: (e: DragEvent) => {
+      if (!carriesFiles(e)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      setDropping(true);
+    },
+    onDragLeave: (e: DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false);
+    },
+    onDrop: (e: DragEvent) => {
+      if (!carriesFiles(e)) return;
+      e.preventDefault();
+      setDropping(false);
+      importSkill([...e.dataTransfer.files]);
+    },
+  };
   const restore = (n: number) => {
     if (!open || !leave() || !window.confirm(t("skills.restoreConfirm", { n: String(n) }))) return;
     void run(async () => {
@@ -254,7 +296,13 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
   );
 
   return (
-    <div className="main">
+    <div className={dropping ? "main dropping" : "main"} {...dropZone}>
+      {dropping && (
+        <div className="dropzone" aria-hidden="true">
+          <Icon name="upload-2" />
+          {t("skills.drop")}
+        </div>
+      )}
       <div className="top">
         <span className="crumb">
           <b>{t("nav.skills")}</b>
@@ -286,7 +334,7 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
               </>
             )}
             <div className="sep" />
-            <button type="button" className="sitem action" onClick={importSkill}>
+            <button type="button" className="sitem action" onClick={() => importSkill()}>
               <Icon name="upload-2" />
               {t("skills.import")}
             </button>
@@ -407,7 +455,10 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
                             : ""}
                       </span>
                       {v.n === version ? (
-                        <span className="t3">{t("skills.current")}</span>
+                        <span className="now">
+                          <Icon name="check" />
+                          {t("skills.current")}
+                        </span>
                       ) : (
                         <button
                           type="button"

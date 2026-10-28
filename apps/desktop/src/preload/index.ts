@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { JobChange, MenuAction, SignInEvent } from "../shared/api";
 import { IPC, type TostWorkApi } from "../shared/api";
 import type { AgentProvider, Settings, Task } from "../shared/model";
@@ -117,7 +117,8 @@ const api: TostWorkApi = {
     create: (title) => ipcRenderer.invoke(IPC.skillsCreate, title),
     save: (id, draft, note) => ipcRenderer.invoke(IPC.skillsSave, id, draft, note),
     duplicate: (id) => ipcRenderer.invoke(IPC.skillsDuplicate, id),
-    import: () => ipcRenderer.invoke(IPC.skillsImport),
+    // Only the preload can tell where a dropped file is on disk.
+    import: (dropped) => ipcRenderer.invoke(IPC.skillsImport, dropped ? webUtils.getPathForFile(dropped) : undefined),
     history: (id) => ipcRenderer.invoke(IPC.skillsHistory, id),
     restore: (id, n) => ipcRenderer.invoke(IPC.skillsRestore, id, n),
     addFiles: (id) => ipcRenderer.invoke(IPC.skillsAddFiles, id),

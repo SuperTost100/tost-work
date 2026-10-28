@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import { app, type BrowserWindow, dialog, ipcMain, Menu, type OpenDialogOptions, shell } from "electron";
 import { IPC, type NewProjectInput, type NewTaskInput, type SaveResult, type TaskMenuAction } from "../shared/api";
 import { languageFrom, type MessageKey, translate } from "../shared/i18n";
@@ -261,7 +261,13 @@ export function registerIpc(
   ipcMain.handle(IPC.skillsDuplicate, (_e, id: unknown) =>
     skills.duplicate(skillId(id), (title) => t("skills.copyOf", { title })),
   );
-  ipcMain.handle(IPC.skillsImport, async () => {
+  ipcMain.handle(IPC.skillsImport, async (_e, dropped: unknown) => {
+    if (dropped != null) {
+      const path = text(dropped, "path", 4096);
+      if (!isAbsolute(path)) throw new Error("Drop a skill's folder or a .zip of one");
+      // A SKILL.md dropped on its own stands for the folder it's in.
+      return skills.import(basename(path) === "SKILL.md" ? dirname(path) : path);
+    }
     // Windows and Linux can't pick a folder or a file in one dialog, so a menu asks which first, on every system alike.
     const from = await new Promise<"folder" | "zip" | null>((resolve) => {
       let picked = false;

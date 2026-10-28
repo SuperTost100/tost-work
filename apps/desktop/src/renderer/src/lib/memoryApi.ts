@@ -432,9 +432,14 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         skills = [...skills, copy];
         return copy;
       },
-      import: async () => {
+      import: async (dropped) => {
         const { builtIn: _b, ...guide } = WORD_GUIDE;
-        const skill = keep({ ...guide, id: "meeting-notes", name: "meeting-notes", title: "Meeting notes" });
+        const name = dropped ? dropped.name.replace(/\.zip$/i, "") : "meeting-notes";
+        const title = dropped ? name : "Meeting notes";
+        // A free folder name, as the real import picks one.
+        let id = name;
+        for (let n = 2; id === WORD_GUIDE.id || skills.some((s) => s.id === id); n++) id = `${name}-${n}`;
+        const skill = keep({ ...guide, id, name: id, title });
         skills = [...skills, skill];
         return skill;
       },

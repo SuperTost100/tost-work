@@ -2063,24 +2063,61 @@ ol.editable li::before {
   font-size: 13.5px;
   color: var(--t2);
 }
+/* Every row is the same height, whether it ends in Restore or in the current version's mark. */
 .smeta .vers div {
   display: flex;
   align-items: center;
   gap: 8px;
   justify-content: space-between;
-  min-height: 32px;
+  height: 38px;
   font-size: 13px;
-  padding: 5px 0;
   border-bottom: 1px solid var(--line-2);
   color: var(--t2);
 }
 .smeta .vers div.current {
   color: var(--ink);
+  font-weight: 600;
+}
+.smeta .vers .now {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  height: 24px;
+  padding: 0 9px 0 7px;
+  border-radius: 999px;
+  background: var(--btn);
+  color: var(--on-btn);
+  font-size: 12px;
+  font-weight: 500;
+}
+.smeta .vers .now .ic {
+  width: 13px;
+  height: 13px;
 }
 /* Restore's text lines up with "current" on the right edge, as its padding only shows on hover. */
 .smeta .vers .tbtn {
   margin-right: -10px;
   font-size: 13px;
+}
+/* Files dragged over Skills: the whole page takes them. */
+.main.dropping {
+  position: relative;
+}
+.dropzone {
+  position: absolute;
+  inset: 8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1.5px dashed var(--t3);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--canvas) 90%, transparent);
+  font-size: 15px;
+  color: var(--ink);
+  pointer-events: none;
 }
 .md {
   font:
