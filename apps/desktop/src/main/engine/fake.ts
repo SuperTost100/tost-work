@@ -183,6 +183,12 @@ export class FakeEngine implements Engine {
     }
     if (signal.aborted) return yield { type: "stopped" };
     if (s.review) yield { type: "review", review: s.review };
+    // The answer comes word by word, as a real agent writes it.
+    for (const word of s.summary.match(/\S+\s*/g) ?? []) {
+      yield { type: "text", text: word };
+      await sleep(this.stepMs / 25, signal);
+      if (signal.aborted) return yield { type: "stopped" };
+    }
     yield { type: "message", text: s.summary };
     yield { type: "done" };
   }

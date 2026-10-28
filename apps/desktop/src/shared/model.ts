@@ -173,6 +173,8 @@ export type EngineEvent =
   | { type: "plan"; steps: Step[] }
   | { type: "activity"; kind: ActivityKind; target?: string }
   | { type: "message"; text: string }
+  /** Words of the agent's answer as it writes them, shown live and never saved: the whole answer comes as a message. */
+  | { type: "text"; text: string }
   | { type: "file"; change: FileChange }
   | { type: "question"; question: Question }
   /** The agent stopped waiting for this question or approval, so it comes off the task. */

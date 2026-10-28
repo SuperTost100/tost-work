@@ -161,3 +161,34 @@ export function AgentMessage({ text }: { text: string }) {
     </div>
   );
 }
+
+/** Characters added per frame: a few, more when far behind, so an answer that came all at once still types quickly. */
+const typingStep = (behind: number) => Math.min(24, Math.max(2, Math.ceil(behind / 20)));
+
+/**
+ * An answer appearing as it's written, at an even pace whether the words come one at a time or a paragraph at once.
+ * It starts at `from` characters: the part already shown while it was still coming in.
+ */
+export function TypedMessage({
+  text,
+  from = 0,
+  onShown,
+}: {
+  text: string;
+  from?: number;
+  /** Called with how much shows after each step, to follow it down the page. */
+  onShown?: (shown: number) => void;
+}) {
+  const still = useMemo(() => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false, []);
+  const [shown, setShown] = useState(() => Math.min(from, text.length));
+  const end = still ? text.length : shown;
+  useEffect(() => {
+    if (still || shown >= text.length) return;
+    const frame = requestAnimationFrame(() => setShown((n) => Math.min(text.length, n + typingStep(text.length - n))));
+    return () => cancelAnimationFrame(frame);
+  }, [still, shown, text.length]);
+  useEffect(() => onShown?.(end), [end, onShown]);
+  // Whole words only, so none shows half typed.
+  const cut = end >= text.length ? end : text.slice(0, end).search(/\S*$/);
+  return <AgentMessage text={text.slice(0, cut)} />;
+}

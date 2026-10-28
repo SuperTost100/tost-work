@@ -104,6 +104,7 @@ export function registerIpc(
   );
   ipcMain.handle(IPC.projectsTaskCounts, () => store.taskCounts());
   ipcMain.handle(IPC.tasksGet, (_e, id: unknown) => store.getTask(text(id, "id", 100)) ?? null);
+  ipcMain.handle(IPC.tasksDraft, (_e, id: unknown) => runner.draft(text(id, "id", 100)));
 
   ipcMain.handle(IPC.tasksStart, async (_e, input: NewTaskInput) => {
     const brief = text(input?.brief, "brief", BRIEF_MAX).trim();

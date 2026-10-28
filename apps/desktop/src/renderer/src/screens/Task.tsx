@@ -24,7 +24,7 @@ import {
   type ReviewItem,
   type Task as TaskT,
 } from "../../../shared/model";
-import { AgentMessage, CopyButton } from "../components/AgentMessage";
+import { AgentMessage, CopyButton, TypedMessage } from "../components/AgentMessage";
 import { WorkingDots } from "../components/TaskTag";
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
@@ -282,6 +282,30 @@ export function activityByMessage(
     else before[Math.max(1, a.msg)]?.push(a);
   }
   return { before, tail, older };
+}
+
+/**
+ * What the agent has written of its next answer so far, while it runs. It starts from what the main process has
+ * gathered, so a task opened mid-answer shows the start too, and ends when the answer arrives as a message.
+ */
+function useDraft(api: TostWorkApi, taskId: string, messages: number, running: boolean): string {
+  const [draft, setDraft] = useState("");
+  useEffect(() => {
+    let alive = true;
+    const off = api.tasks.onText((id, text) => id === taskId && setDraft((d) => d + text));
+    void api.tasks.draft(taskId).then((d) => alive && setDraft(d));
+    return () => {
+      alive = false;
+      off();
+    };
+  }, [api, taskId]);
+  // A new message, or the run ending, clears it.
+  const [ended, setEnded] = useState({ messages, running });
+  if (ended.messages !== messages || ended.running !== running) {
+    setEnded({ messages, running });
+    setDraft("");
+  }
+  return running ? draft : "";
 }
 
 /** Lines of activity shown while the agent works; the rest are counted above them. */
@@ -649,6 +673,36 @@ export function Task({
   // A task without a project is a quick edit: it works on copies in a temporary folder until the user saves.
   const quick = task.projectId === null;
   const made = task.files.filter((f) => f.role === "made");
+  const draft = useDraft(api, task.id, task.messages.length, task.status === "running");
+  // How much of the draft shows, for the message it becomes: that one types on from there instead of starting over.
+  const draftShown = useRef({ at: -1, n: 0 });
+  // The newest answer, when it came while the task was open: it types out rather than appearing at once.
+  const [seen, setSeen] = useState(task.messages.length);
+  const [typing, setTyping] = useState<{ index: number; from: number } | null>(null);
+  if (seen !== task.messages.length) {
+    const index = task.messages.length - 1;
+    const last = task.messages[index];
+    setSeen(task.messages.length);
+    setTyping(
+      task.messages.length > seen && last?.from === "agent" && !last.answers
+        ? { index, from: draftShown.current.at === index ? draftShown.current.n : 0 }
+        : null,
+    );
+  }
+  // Typing follows the text down the page while the user is at the bottom; scrolling up leaves them there.
+  const scroller = useRef<HTMLDivElement>(null);
+  const pinned = useRef(true);
+  const follow = useCallback(() => {
+    const el = scroller.current;
+    if (el && pinned.current) el.scrollTop = el.scrollHeight;
+  }, []);
+  const followDraft = useCallback(
+    (n: number) => {
+      draftShown.current = { at: task.messages.length, n };
+      follow();
+    },
+    [task.messages.length, follow],
+  );
   // What the task worked from: the files the user attached, then any other file it reports reading, unless it
   // changed them. Only the attached ones say so.
   const notMade = (path: string) => !made.some((f) => f.path === path);
@@ -701,6 +755,8 @@ export function Task({
             </div>
             <CopyButton text={() => m.text} />
           </div>
+        ) : typing?.index === i ? (
+          <TypedMessage text={m.text} from={typing.from} onShown={follow} />
         ) : (
           <AgentMessage text={m.text} />
         )}
@@ -748,7 +804,14 @@ export function Task({
       </div>
       <div className={quick ? "qe" : "task"}>
         <div className="mid">
-          <div className="scroll">
+          <div
+            className="scroll"
+            ref={scroller}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+            }}
+          >
             <div className="col">
               <div className="msg mine">
                 <div className="you">
@@ -785,6 +848,7 @@ export function Task({
               {range(runStart > 0 ? runStart + 1 : 1, end)}
               {older.length > 0 && <ActivityLog key="older" activity={older} live={false} />}
               {(tail.length > 0 || waiting) && <ActivityLog key="tail" activity={tail} live={live} waiting={waiting} />}
+              {draft && <TypedMessage key={`draft-${end}`} text={draft} onShown={followDraft} />}
               {made.length > 0 && (
                 <Artifact api={api} task={task} files={made} picked={picked} onPick={setPicked} onError={onError} />
               )}
@@ -811,7 +875,8 @@ export function Task({
                 ))}
               {task.status === "failed" && <p className="agent">{t("task.failed", { error: task.error ?? "" })}</p>}
               {/* The check is on finished work: while it runs or waits on the user, it isn't finished. */}
-              {task.review && !live && (
+              {/* An answer in the chat has nothing to check against the brief: the check is for files it made. */}
+              {task.review && !live && made.length > 0 && (
                 <>
                   <div className="check-h">
                     <b>{t("task.review")}</b>

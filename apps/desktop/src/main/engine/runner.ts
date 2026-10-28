@@ -60,6 +60,8 @@ export class TaskRunner {
   private deciding = new Set<string>();
   /** Tasks with a restore under way, so a double click can't record two copies from one snapshot. */
   private restoring = new Set<string>();
+  /** The answer each run is writing, so far: a window opened meanwhile picks it up from here. */
+  private drafts = new Map<string, string>();
 
   constructor(
     private store: Store,
@@ -67,7 +69,13 @@ export class TaskRunner {
     private onChange: (task: Task) => void,
     private now: () => string = () => new Date().toISOString(),
     private guard: Guard = REFUSE,
+    private onText: (taskId: string, text: string) => void = () => {},
   ) {}
+
+  /** What the running task's agent has written of its answer so far, or "" between answers. */
+  draft(taskId: string): string {
+    return this.drafts.get(taskId) ?? "";
+  }
 
   defaults(): Promise<{ provider: AgentProvider; auth?: "account" | "key"; model: string; effort: string }> {
     return this.engine.defaults();
@@ -120,6 +128,18 @@ export class TaskRunner {
       for await (const event of this.engine.run({ task, project, workdir, followUp, signal: controller.signal })) {
         // A reply already waits for the next run, so this run's end isn't the task's: it stays running.
         if (event.type === "done" && this.queued.has(taskId)) continue;
+        // Words as they're written go straight to the window: saving the task for each would be a write per word.
+        if (event.type === "text") {
+          this.drafts.set(taskId, this.draft(taskId) + event.text);
+          // The window missing a word can't fail the task: the whole answer still comes as a message.
+          try {
+            this.onText(taskId, event.text);
+          } catch (err) {
+            console.error(`Task ${taskId}: couldn't pass on the answer as it's written`, err);
+          }
+          continue;
+        }
+        if (event.type === "message") this.drafts.delete(taskId);
         // Read the stored task each time, so an answer saved meanwhile isn't overwritten.
         task = this.save(applyEvent({ ...this.mustGet(taskId), interrupted: undefined }, event, this.now()));
       }
@@ -137,6 +157,7 @@ export class TaskRunner {
         : this.save(applyEvent(current, { type: "failed", error: message }, this.now()));
     } finally {
       this.running.delete(taskId);
+      this.drafts.delete(taskId);
     }
     const next = this.queued.get(taskId);
     this.queued.delete(taskId);

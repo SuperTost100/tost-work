@@ -120,9 +120,19 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
     for (const l of listeners) l(t);
     return t;
   };
+  const textListeners = new Set<(taskId: string, text: string) => void>();
+  // As the runner does: words go to the window and add up to the draft, and the message ends it.
+  const drafts = new Map<string, string>();
   const emit = (id: string, e: EngineEvent) => {
     const t = tasks.get(id);
-    if (t) save(applyEvent(t, e, now()));
+    if (!t) return;
+    if (e.type === "text") {
+      drafts.set(id, (drafts.get(id) ?? "") + e.text);
+      for (const l of textListeners) l(id, e.text);
+      return;
+    }
+    if (e.type === "message" || e.type === "done" || e.type === "failed" || e.type === "stopped") drafts.delete(id);
+    save(applyEvent(t, e, now()));
   };
 
   // What the next task menu returns, as if the user had picked it.
@@ -329,6 +339,11 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       onChange: (l) => {
         listeners.add(l);
         return () => listeners.delete(l);
+      },
+      draft: async (id) => drafts.get(id) ?? "",
+      onText: (l) => {
+        textListeners.add(l);
+        return () => textListeners.delete(l);
       },
     },
     jobs: {

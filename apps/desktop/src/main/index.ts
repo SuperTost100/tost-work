@@ -244,6 +244,9 @@ app.whenReady().then(async () => {
     },
     undefined,
     guard,
+    (taskId, text) => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.taskText, taskId, text);
+    },
   );
   // Set once the tray exists below; jobs and tasks changing before that have nothing to update.
   let trayChanged = () => {};

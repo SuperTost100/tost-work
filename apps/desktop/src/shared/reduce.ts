@@ -23,6 +23,9 @@ export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
     }
     case "message":
       return { ...next, messages: [...task.messages, { from: "agent", text: event.text, at }] };
+    case "text":
+      // Live words aren't part of the saved task.
+      return task;
     case "file": {
       // A later change to the same path replaces the earlier one, so each file is listed once.
       const others = task.files.filter((f) => f.path !== event.change.path);

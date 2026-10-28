@@ -196,7 +196,15 @@ for (const ai of SUBSCRIPTIONS) {
       await tools.start();
       engine.attachTools(tools);
       const store = new Store(":memory:");
-      const runner = new TaskRunner(store, engine, () => {});
+      const words: string[] = [];
+      const runner = new TaskRunner(
+        store,
+        engine,
+        () => {},
+        undefined,
+        undefined,
+        (_id, text) => words.push(text),
+      );
       try {
         const { provider, model } = await engine.defaults();
         store.saveProject({ id: "p", name: "Live", description: "", folder: work, instructions: "", createdAt: "" });
@@ -229,6 +237,11 @@ for (const ai of SUBSCRIPTIONS) {
         expect(final.files.filter((f) => f.role === "made")).toEqual([]);
         expect(final.messages.at(-1)?.text).toMatch(/Friday/);
         expect(final.messages.at(-1)?.text).toMatch(/Word|Excel|file|document/i);
+        // The answer came in pieces as it was written, and they add up to it.
+        const answer = final.messages.at(-1)?.text;
+        expect(answer).toBeTruthy();
+        expect(words.length).toBeGreaterThan(3);
+        expect(words.join("").replace(/\s+/g, " ")).toContain(String(answer).replace(/\s+/g, " ").slice(0, 80));
       } finally {
         await tools.stop();
       }

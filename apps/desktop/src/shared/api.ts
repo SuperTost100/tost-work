@@ -137,6 +137,10 @@ export interface TostWorkApi {
     remove(id: string): Promise<boolean>;
     /** Called with the full task every time it changes. Returns a function that stops listening. */
     onChange(listener: (task: Task) => void): () => void;
+    /** What the agent has written of its answer so far, while it writes it. */
+    draft(id: string): Promise<string>;
+    /** Called with each piece of an answer as the agent writes it. Returns a function that stops listening. */
+    onText(listener: (taskId: string, text: string) => void): () => void;
   };
   files: {
     /** Opens the system file picker. Resolves to the chosen paths, empty when the user cancels. */
@@ -255,6 +259,8 @@ export const IPC = {
   tasksReveal: "tasks:reveal",
   tasksRemove: "tasks:remove",
   taskChanged: "tasks:changed",
+  taskText: "tasks:text",
+  tasksDraft: "tasks:draft",
   filesPick: "files:pick",
   filesRead: "files:read",
   filesOpen: "files:open",

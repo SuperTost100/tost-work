@@ -142,6 +142,66 @@ describe("TaskRunner notifications", () => {
   });
 });
 
+describe("TaskRunner with an answer as it's written", () => {
+  it("passes the words on without saving them, keeps them as the draft, and drops it with the message", async () => {
+    const store = new Store(":memory:");
+    const saves: Task[] = [];
+    const words: string[] = [];
+    let draftBeforeMessage = "";
+    let runner: TaskRunner;
+    const engine = {
+      defaults: async () => ({ provider: "codex", model: "m", effort: "e" }),
+      async *run(ctx: RunContext): AsyncIterable<EngineEvent> {
+        yield { type: "text", text: "Both calls " };
+        yield { type: "text", text: "went well." };
+        draftBeforeMessage = runner.draft(ctx.task.id);
+        yield { type: "message", text: "Both calls went well." };
+      },
+      answer: () => false,
+      decide: () => false,
+    } as unknown as Engine;
+    runner = new TaskRunner(
+      store,
+      engine,
+      (t) => saves.push(t),
+      undefined,
+      undefined,
+      (_id, text) => words.push(text),
+    );
+    const task = runner.create({ projectId: null, brief: "Sum up", workdir: "/tmp/p", attachments: [] });
+    const final = await runner.start(task.id);
+    expect(words).toEqual(["Both calls ", "went well."]);
+    expect(draftBeforeMessage).toBe("Both calls went well.");
+    expect(runner.draft(task.id)).toBe("");
+    expect(final.messages.at(-1)?.text).toBe("Both calls went well.");
+    // Saved when made, at the start, for the message and at the end: never for a word.
+    expect(saves.map((t) => t.status)).toEqual(["draft", "running", "running", "done"]);
+  });
+});
+
+describe("TaskRunner when passing on words fails", () => {
+  it("still finishes the task with the whole answer", async () => {
+    const store = new Store(":memory:");
+    const runner = new TaskRunner(
+      store,
+      new FakeEngine({ ...PROPOSAL_SCRIPT, question: undefined }, 0),
+      () => {},
+      undefined,
+      undefined,
+      () => {
+        throw new Error("Object has been destroyed");
+      },
+    );
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p", attachments: [] });
+    const final = await runner.start(task.id);
+    expect(final.status).toBe("done");
+    expect(final.messages.at(-1)?.text).toBe(PROPOSAL_SCRIPT.summary);
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+});
+
 describe("TaskRunner when saving fails", () => {
   const brokenSetup = () => {
     const store = new Store(":memory:");

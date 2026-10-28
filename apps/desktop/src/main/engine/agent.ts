@@ -371,6 +371,7 @@ export class AgentEngine implements Engine, ToolHandler {
       try {
         for await (const event of stream) {
           if (event.type === "session") channel.push({ type: "session", sessionId: event.sessionId });
+          else if (event.type === "text.delta") channel.push({ type: "text", text: event.text });
           else if (event.type === "plan") channel.push({ type: "plan", steps: event.steps });
           else if (event.type === "tool.start") {
             const line = activityOf(event.name, event.input, this.documents?.skills);

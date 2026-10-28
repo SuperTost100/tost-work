@@ -357,6 +357,10 @@ describe("what the agent is doing", () => {
     act(() => {
       api.emit(task.id, { type: "withdrawn", id: "q1" });
       api.emit(task.id, { type: "activity", kind: "read", target: "prices.pdf" });
+      api.emit(task.id, {
+        type: "file",
+        change: { path: "/home/giulia/Courses/Quote.docx", kind: "add", role: "made" },
+      });
       api.emit(task.id, { type: "review", review });
       api.emit(task.id, { type: "question", question: { id: "q2", text: "Which services?", options: ["A", "B"] } });
     });
@@ -640,6 +644,55 @@ describe("projects", () => {
     render(<App userName="Giulia" api={createMemoryApi()} settings={settings} />);
     fireEvent.click(screen.getByRole("button", { name: "Board" }));
     expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/arrives in a later version/);
+  });
+});
+
+describe("an answer as it's written", () => {
+  const started = async (brief: string) => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    const task = await api.tasks.start({ projectId: project.id, brief, attachments: [] });
+    act(() => api.emit(task.id, { type: "withdrawn", id: "q1" }));
+    return { api, task };
+  };
+  const open = async (title: string) => {
+    const [row] = await screen.findAllByText(title);
+    await act(async () => {
+      fireEvent.click(row as HTMLElement);
+    });
+  };
+
+  it("shows the words as they come, from the start even when the task opens halfway, then the whole answer", async () => {
+    const { api, task } = await started("Sum up the calls");
+    act(() => api.emit(task.id, { type: "text", text: "Both calls " }));
+    render(<App userName="Giulia" api={api} />);
+    await open("Sum up the calls");
+    act(() => api.emit(task.id, { type: "text", text: "went well. " }));
+    expect(await screen.findByText("Both calls went well.")).toBeTruthy();
+
+    act(() => {
+      api.emit(task.id, { type: "message", text: "Both calls went well. Mark wants a proposal by Friday." });
+      api.emit(task.id, { type: "done" });
+    });
+    expect(await screen.findByText("Both calls went well. Mark wants a proposal by Friday.")).toBeTruthy();
+    // The draft went with the message: the text shows once.
+    expect(screen.queryByText("Both calls went well.")).toBeNull();
+  });
+
+  it("leaves out the brief check when the answer stayed in the chat", async () => {
+    const { api, task } = await started("Take stock of the calls");
+    act(() => {
+      api.emit(task.id, {
+        type: "review",
+        review: { asked: [{ text: "Take stock" }], decided: [], checkYourself: [] },
+      });
+      api.emit(task.id, { type: "message", text: "Here's where things stand." });
+      api.emit(task.id, { type: "done" });
+    });
+    render(<App userName="Giulia" api={api} />);
+    await open("Take stock of the calls");
+    expect(await screen.findByText("Here's where things stand.")).toBeTruthy();
+    expect(screen.queryByText("Check it against your brief")).toBeNull();
   });
 });
 

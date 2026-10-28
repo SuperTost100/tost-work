@@ -90,6 +90,12 @@ const api: TostWorkApi = {
       ipcRenderer.on(IPC.taskChanged, handler);
       return () => ipcRenderer.removeListener(IPC.taskChanged, handler);
     },
+    draft: (id) => ipcRenderer.invoke(IPC.tasksDraft, id),
+    onText: (listener) => {
+      const handler = (_: unknown, taskId: string, text: string) => listener(taskId, text);
+      ipcRenderer.on(IPC.taskText, handler);
+      return () => ipcRenderer.removeListener(IPC.taskText, handler);
+    },
   },
   files: {
     pick: () => ipcRenderer.invoke(IPC.filesPick),
