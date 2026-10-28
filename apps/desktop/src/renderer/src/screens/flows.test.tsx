@@ -308,8 +308,8 @@ describe("what the agent is doing", () => {
     });
     expect(screen.getByRole("button", { name: "What it's doing" }).getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByText("Reading note.txt")).toBeTruthy();
-    // The line above the composer says the latest one.
-    expect(screen.getByRole("status").textContent).toContain("Searching the web: corsi AI Biella");
+    // The line above the composer only says it's at work: the log above already says what it's doing.
+    expect(screen.getByRole("status").textContent).toBe("Working on it");
 
     // A guide the agent read shows in the side panel by its title.
     await act(async () => api.emit(task.id, { type: "activity", kind: "skill", target: "@word" }));
@@ -347,7 +347,37 @@ describe("what the agent is doing", () => {
     expect(message.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByText("Reading call-1.docx")).toBeNull();
     expect(screen.getByText("Reading plan.md")).toBeTruthy();
-    expect(screen.getByRole("status").textContent).toContain("Reading plan.md");
+  });
+
+  it("says it's asking a question while one waits, and keeps the check for when the work is over", async () => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    const task = await api.tasks.start({ projectId: project.id, brief: "Write the quote", attachments: [] });
+    const review = { asked: [{ text: "Write the quote" }], decided: [], checkYourself: [] };
+    act(() => {
+      api.emit(task.id, { type: "withdrawn", id: "q1" });
+      api.emit(task.id, { type: "activity", kind: "read", target: "prices.pdf" });
+      api.emit(task.id, { type: "review", review });
+      api.emit(task.id, { type: "question", question: { id: "q2", text: "Which services?", options: ["A", "B"] } });
+    });
+    render(<App userName="Giulia" api={api} />);
+    const [open] = await screen.findAllByText("Write the quote");
+    await act(async () => {
+      fireEvent.click(open as HTMLElement);
+    });
+    expect(screen.getByRole("button", { name: "What it's doing" })).toBeTruthy();
+    // The log's last line, and the announcement for screen readers.
+    const asking = screen.getAllByText("Asking you a question");
+    expect(asking.map((el) => Boolean(el.closest(".activity")))).toEqual([true, false]);
+    expect(asking[1]?.getAttribute("aria-live")).toBe("polite");
+    expect(screen.queryByText("Check it against your brief")).toBeNull();
+
+    act(() => {
+      api.emit(task.id, { type: "withdrawn", id: "q2" });
+      api.emit(task.id, { type: "done" });
+    });
+    expect(screen.queryAllByText("Asking you a question")).toHaveLength(0);
+    expect(screen.getByText("Check it against your brief")).toBeTruthy();
   });
 });
 
@@ -614,7 +644,7 @@ describe("projects", () => {
 });
 
 describe("a running task", () => {
-  it("says it's working, with the current step, until it stops", async () => {
+  it("says it's working until it stops", async () => {
     const api = createMemoryApi();
     render(<App userName="Giulia" api={api} />);
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal" } });
@@ -627,9 +657,7 @@ describe("a running task", () => {
 
     const [task] = await api.tasks.list();
     act(() => api.emit(task?.id ?? "", { type: "withdrawn", id: "q1" }));
-    expect((await screen.findByText("Working on it")).closest(".working")?.textContent).toBe(
-      "Working on it · Read the notes",
-    );
+    expect((await screen.findByText("Working on it")).closest(".working")?.textContent).toBe("Working on it");
     // Two signs while it works: the line above the composer and the tag in Recent. The header shows none.
     expect(screen.getAllByText("working")).toHaveLength(1);
     expect(screen.queryByText("writing · 1 of 2")).toBeNull();

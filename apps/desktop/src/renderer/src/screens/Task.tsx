@@ -291,7 +291,16 @@ const LIVE_LINES = 5;
  * What the agent is doing, a line per action, so the user can see it's at work. While it runs the latest lines show;
  * afterwards they fold into one line, like an answered round, that opens onto all of them.
  */
-function ActivityLog({ activity, live }: { activity: Activity[]; live: boolean }) {
+function ActivityLog({
+  activity,
+  live,
+  waiting,
+}: {
+  activity: Activity[];
+  live: boolean;
+  /** What the agent waits for from the user, as the last line: it's what it's doing now. */
+  waiting?: "question" | "approval";
+}) {
   const t = useT();
   const say = useActivityText();
   // Unless the user chose, it's open while the agent works and folded once it's done.
@@ -315,22 +324,29 @@ function ActivityLog({ activity, live }: { activity: Activity[]; live: boolean }
               <span className="truncate">{say(a)}</span>
             </li>
           ))}
+          {/* Screen readers hear this from the announcement above the composer, so once is enough. */}
+          {waiting && (
+            <li aria-hidden="true">
+              <Icon name={waiting === "question" ? "question" : "shield"} />
+              <span className="truncate">{t(waiting === "question" ? "activity.asking" : "activity.approval")}</span>
+            </li>
+          )}
         </ol>
       )}
     </div>
   );
 }
 
-/** Shows that the agent is still at work, above the composer, where it stays in view however far the user scrolled. */
-function Working({ step }: { step?: string }) {
+/**
+ * Shows that the agent is still at work, above the composer, where it stays in view however far the user scrolled.
+ * What it's doing is in the log above, so it isn't repeated here.
+ */
+function Working() {
   const t = useT();
   return (
     <div className="working" role="status">
       <WorkingDots />
-      <span className="truncate">
-        {t("task.working")}
-        {step && <span className="t3"> · {step}</span>}
-      </span>
+      <span className="truncate">{t("task.working")}</span>
     </div>
   );
 }
@@ -665,10 +681,8 @@ export function Task({
   };
   const current = task.steps.findIndex((s) => s.status === "in_progress");
   const live = task.status === "running" || task.status === "needs-you";
-  const say = useActivityText();
   const { before, tail, older } = activityByMessage(task.activity ?? [], task.messages.length);
-  // Right after a message there's no line yet, and the step says what's going on.
-  const latest = tail.at(-1);
+  const waiting = task.question ? "question" : task.approval ? "approval" : undefined;
   // The steps belong to the latest run, so after a follow-up they show under that instruction.
   const runStart = task.messages.findLastIndex((m) => m.followUp);
   const note = (i: number) => {
@@ -770,7 +784,7 @@ export function Task({
               )}
               {range(runStart > 0 ? runStart + 1 : 1, end)}
               {older.length > 0 && <ActivityLog key="older" activity={older} live={false} />}
-              {tail.length > 0 && <ActivityLog key="tail" activity={tail} live={live} />}
+              {(tail.length > 0 || waiting) && <ActivityLog key="tail" activity={tail} live={live} waiting={waiting} />}
               {made.length > 0 && (
                 <Artifact api={api} task={task} files={made} picked={picked} onPick={setPicked} onError={onError} />
               )}
@@ -796,7 +810,8 @@ export function Task({
                   <p className="agent t3">{t("task.stopped")}</p>
                 ))}
               {task.status === "failed" && <p className="agent">{t("task.failed", { error: task.error ?? "" })}</p>}
-              {task.review && (
+              {/* The check is on finished work: while it runs or waits on the user, it isn't finished. */}
+              {task.review && !live && (
                 <>
                   <div className="check-h">
                     <b>{t("task.review")}</b>
@@ -810,7 +825,11 @@ export function Task({
           </div>
           <div className="foot">
             <div className="col">
-              {task.status === "running" && <Working step={latest ? say(latest) : task.steps[current]?.text} />}
+              {task.status === "running" && <Working />}
+              {/* Always there, so a screen reader hears when a question or approval starts waiting, log open or not. */}
+              <span className="sr-only" aria-live="polite">
+                {waiting && t(waiting === "question" ? "activity.asking" : "activity.approval")}
+              </span>
               {task.question ? (
                 <QuestionCard
                   key={task.question.id}
