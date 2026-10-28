@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { App } from "@/App";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { DEFAULT_SETTINGS } from "../../../shared/model";
@@ -753,5 +753,45 @@ describe("the task menu in Recent", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "More for Write a proposal" })).toBeNull());
     expect(await api.tasks.list()).toEqual([]);
     expect(screen.queryByText("Who pays the insurance?")).toBeNull();
+  });
+});
+
+describe("copying a message", () => {
+  it("copies the agent's message with its formatting, and the user's as text", async () => {
+    const writes: ClipboardItem[][] = [];
+    const texts: string[] = [];
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        write: async (items: ClipboardItem[]) => void writes.push(items),
+        writeText: async (text: string) => void texts.push(text),
+      },
+    });
+    class Item {
+      constructor(readonly parts: Record<string, Blob>) {}
+    }
+    vi.stubGlobal("ClipboardItem", Item);
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    const task = await api.tasks.start({ projectId: project.id, brief: "Sum up the calls", attachments: [] });
+    act(() => {
+      api.emit(task.id, { type: "withdrawn", id: "q1" });
+      api.emit(task.id, { type: "message", text: "Two **calls** done." });
+    });
+    render(<App userName="Giulia" api={api} />);
+    const [open] = await screen.findAllByText("Sum up the calls");
+    await act(async () => {
+      fireEvent.click(open as HTMLElement);
+    });
+    const [brief, message] = screen.getAllByRole("button", { name: "Copy" });
+    await act(async () => fireEvent.click(brief as HTMLElement));
+    expect(texts).toEqual(["Sum up the calls"]);
+    await act(async () => fireEvent.click(message as HTMLElement));
+    expect(writes).toHaveLength(1);
+    const parts = (writes[0]?.[0] as unknown as Item | undefined)?.parts ?? {};
+    expect(await parts["text/plain"]?.text()).toBe("Two calls done.");
+    expect(await parts["text/html"]?.text()).toContain("<strong>calls</strong>");
+    expect(screen.getAllByRole("button", { name: "Copied" })).toHaveLength(2);
+    vi.unstubAllGlobals();
   });
 });

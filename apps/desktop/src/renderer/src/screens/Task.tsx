@@ -24,7 +24,7 @@ import {
   type ReviewItem,
   type Task as TaskT,
 } from "../../../shared/model";
-import { AgentMessage } from "../components/AgentMessage";
+import { AgentMessage, CopyButton } from "../components/AgentMessage";
 import { WorkingDots } from "../components/TaskTag";
 
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
@@ -681,8 +681,11 @@ export function Task({
         {m.answers ? (
           <AnswerLine answers={m.answers} />
         ) : m.from === "user" ? (
-          <div className="you" style={{ marginTop: 18 }}>
-            <LongText text={m.text} />
+          <div className="msg mine" style={{ marginTop: 18 }}>
+            <div className="you">
+              <LongText text={m.text} />
+            </div>
+            <CopyButton text={() => m.text} />
           </div>
         ) : (
           <AgentMessage text={m.text} />
@@ -733,18 +736,21 @@ export function Task({
         <div className="mid">
           <div className="scroll">
             <div className="col">
-              <div className="you">
-                <LongText text={task.brief} />
-                {task.attachments.length > 0 && (
-                  <div className="outs" style={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
-                    {task.attachments.map((path) => (
-                      <span className="out" key={path}>
-                        <Icon name="file" />
-                        {fileName(path)}
-                      </span>
-                    ))}
-                  </div>
-                )}
+              <div className="msg mine">
+                <div className="you">
+                  <LongText text={task.brief} />
+                  {task.attachments.length > 0 && (
+                    <div className="outs" style={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
+                      {task.attachments.map((path) => (
+                        <span className="out" key={path}>
+                          <Icon name="file" />
+                          {fileName(path)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <CopyButton text={() => task.brief} />
               </div>
               {runStart > 0 && range(1, runStart + 1)}
               {task.steps.length > 0 && (

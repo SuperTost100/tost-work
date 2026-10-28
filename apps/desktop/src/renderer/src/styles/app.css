@@ -3176,3 +3176,35 @@ label.opt:has(input:focus-visible) {
   width: 100%;
   margin-top: 12px;
 }
+
+/* A message with its copy button underneath, shown on hover or keyboard focus, like T3 Code. */
+.msg {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.msg.mine {
+  align-items: flex-end;
+}
+.msg.mine .you {
+  margin-left: 0;
+}
+/* The button takes no room of its own: it sits in the gap above whatever comes next, so spacing stays as it was. */
+.msg-tools {
+  display: flex;
+  margin: 2px -6px -20px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.msg:hover .msg-tools,
+.msg-tools:focus-within {
+  opacity: 1;
+}
+.msg-tools .iconbtn {
+  width: 26px;
+  height: 26px;
+}
+.msg-tools .iconbtn .ic {
+  width: 15px;
+  height: 15px;
+}

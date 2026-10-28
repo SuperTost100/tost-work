@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { messageHtml } from "./AgentMessage";
+import { messageHtml, messagePlain } from "./AgentMessage";
 
 describe("messageHtml", () => {
   it("keeps paragraphs, line breaks, lists and bold", () => {
@@ -23,5 +23,24 @@ describe("messageHtml", () => {
     );
     expect(html).not.toMatch(/video|audio|poster|src=/);
     expect(html).toContain("Testo");
+  });
+});
+
+describe("messagePlain", () => {
+  it("keeps paragraphs apart and list items on their lines, without Markdown marks", () => {
+    const html = messageHtml(
+      "Ecco la scaletta.\nPrima riga\n\n1. **Perché** il corso\n2. Chi partecipa\n\n- uno\n- due",
+    );
+    expect(messagePlain(html)).toBe(
+      "Ecco la scaletta.\nPrima riga\n\n1. Perché il corso\n2. Chi partecipa\n\n- uno\n- due",
+    );
+  });
+
+  it("keeps nested lists, quoted paragraphs, code indentation and loose text apart", () => {
+    const nested = messageHtml("- Prezzi\n  - manodopera\n  - materiali\n- Date");
+    expect(messagePlain(nested)).toBe("- Prezzi\n   - manodopera\n   - materiali\n- Date");
+    expect(messagePlain(messageHtml("> Prima.\n>\n> Seconda."))).toBe("Prima.\n\nSeconda.");
+    expect(messagePlain(messageHtml("```\n  indented\nnot\n```"))).toBe("  indented\nnot");
+    expect(messagePlain("loose <strong>text</strong><p>Then a paragraph.</p>")).toBe("loose text\n\nThen a paragraph.");
   });
 });
