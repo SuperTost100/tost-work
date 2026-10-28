@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, type Task, type TaskStatus } from "../shared/model";
-import { Notifier, notifyKind, type Shown } from "./notify";
+import { confirmsNotifications, Notifier, notifyKind, type Shown } from "./notify";
 
 const task = (status: TaskStatus, id = "t1") => ({ id, title: "Proposal", status }) as Task;
 
@@ -60,5 +60,28 @@ describe("Notifier", () => {
     twice.n.changed(task("needs-you"));
     twice.n.changed(task("needs-you"));
     expect(twice.shown).toHaveLength(1);
+  });
+});
+
+describe("confirmsNotifications", () => {
+  const off = { ...DEFAULT_SETTINGS, setupDone: true, notifications: false };
+  const on = { ...DEFAULT_SETTINGS, setupDone: true, notifications: true };
+
+  it("shows one when the switch goes on, or a kind goes on with all others off", () => {
+    expect(confirmsNotifications(off, on)).toBe(true);
+    const none = { ...on, notify: { needsYou: "off" as const, failed: "off" as const, done: "off" as const } };
+    expect(confirmsNotifications(none, { ...none, notify: { ...none.notify, done: "quiet" } })).toBe(true);
+  });
+
+  it("shows one when setup ends with them on", () => {
+    expect(confirmsNotifications({ ...on, setupDone: false }, on)).toBe(true);
+    expect(confirmsNotifications({ ...off, setupDone: false }, off)).toBe(false);
+  });
+
+  it("stays quiet when they were on already, or go off", () => {
+    expect(confirmsNotifications(on, { ...on, notify: { ...on.notify, done: "normal" } })).toBe(false);
+    expect(confirmsNotifications(on, off)).toBe(false);
+    const darker = { ...off, theme: "dark" as const };
+    expect(confirmsNotifications(off, darker)).toBe(false);
   });
 });

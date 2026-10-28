@@ -35,7 +35,7 @@ import { KeyStore } from "./keys";
 import { AT_LOGIN, setOpenAtLogin } from "./loginItem";
 import { applyLook } from "./look";
 import { ToolServer } from "./mcp/server";
-import { Notifier } from "./notify";
+import { confirmsNotifications, Notifier } from "./notify";
 import { pickAi } from "./pickAi";
 import { SkillFolder } from "./skills";
 import { SkillVersions } from "./skillVersions";
@@ -195,6 +195,22 @@ app.whenReady().then(async () => {
     },
   );
   notifier.know(store.listTasks(500));
+  let notifyBefore = store.getSettings();
+  const confirmNotifications = (settings: typeof notifyBefore) => {
+    const confirm = confirmsNotifications(notifyBefore, settings);
+    notifyBefore = settings;
+    if (!confirm || !Notification.isSupported()) return;
+    const lang = language();
+    const note = new Notification({
+      title: translate(lang, "notify.onTitle"),
+      body: translate(lang, "notify.onBody"),
+      silent: true,
+    });
+    shown.add(note);
+    note.on("click", () => shown.delete(note));
+    note.on("close", () => shown.delete(note));
+    note.show();
+  };
   // Starting at login, set again at each start so it follows the app if it moved. Only an installed app does it:
   // a development run would register Electron itself.
   const loginDeps = {
@@ -373,6 +389,7 @@ app.whenReady().then(async () => {
       applyLook(mainWindow, settings);
       refreshMenu();
       trayChanged();
+      confirmNotifications(settings);
       if (settings.openAtLogin !== atLogin) {
         atLogin = settings.openAtLogin;
         applyLogin(atLogin);

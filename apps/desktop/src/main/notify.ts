@@ -1,4 +1,11 @@
-import type { NotifyKind, NotifyLevel, Settings, Task, TaskStatus } from "../shared/model";
+import {
+  NOTIFY_KINDS,
+  type NotifyKind,
+  type NotifyLevel,
+  type Settings,
+  type Task,
+  type TaskStatus,
+} from "../shared/model";
 
 /** What a change of status is worth telling the user about, if anything. */
 export function notifyKind(before: TaskStatus | undefined, task: Task): NotifyKind | null {
@@ -13,6 +20,19 @@ export function notifyKind(before: TaskStatus | undefined, task: Task): NotifyKi
 /** How a notification of this kind shows, or "off". The general switch turns them all off. */
 export const notifyLevel = (settings: Pick<Settings, "notifications" | "notify">, kind: NotifyKind): NotifyLevel =>
   settings.notifications ? settings.notify[kind] : "off";
+
+type NotifySettings = Pick<Settings, "notifications" | "notify">;
+const anyOn = (s: NotifySettings) => NOTIFY_KINDS.some((kind) => notifyLevel(s, kind) !== "off");
+
+/**
+ * Whether turning notifications on should show one straight away. The Mac asks for permission the first time an app
+ * shows a notification, and no other way: so it asks when the user turns them on, not when the first real one comes
+ * and is lost. That's when they go from all off to some on, or when setup ends with them on.
+ */
+export function confirmsNotifications(before: NotifySettings & Pick<Settings, "setupDone">, after: typeof before) {
+  if (!anyOn(after)) return false;
+  return !anyOn(before) || (!before.setupDone && after.setupDone);
+}
 
 export interface Shown {
   kind: NotifyKind;
