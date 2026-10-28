@@ -263,6 +263,27 @@ function useActivityText() {
         t(`activity.${a.kind}` as MessageKey, { target: (a.target ?? "").replace(/^@/, "") });
 }
 
+/**
+ * The activity split by where it happened: the lines for message `i` came after the message before it, so they show
+ * just above it, and the tail came after the last message. Lines from before positions were kept are `older`: they
+ * show at the end too, but never as live, since they may be an earlier run's.
+ */
+export function activityByMessage(
+  activity: Activity[],
+  messages: number,
+): { before: Activity[][]; tail: Activity[]; older: Activity[] } {
+  const before: Activity[][] = Array.from({ length: messages }, () => []);
+  const tail: Activity[] = [];
+  const older: Activity[] = [];
+  for (const a of activity) {
+    if (a.msg === undefined) older.push(a);
+    else if (a.msg >= messages) tail.push(a);
+    // The brief is message 0, so nothing can come before it.
+    else before[Math.max(1, a.msg)]?.push(a);
+  }
+  return { before, tail, older };
+}
+
 /** Lines of activity shown while the agent works; the rest are counted above them. */
 const LIVE_LINES = 5;
 
@@ -645,19 +666,28 @@ export function Task({
   const current = task.steps.findIndex((s) => s.status === "in_progress");
   const live = task.status === "running" || task.status === "needs-you";
   const say = useActivityText();
-  const latest = task.activity?.at(-1);
+  const { before, tail, older } = activityByMessage(task.activity ?? [], task.messages.length);
+  // Right after a message there's no line yet, and the step says what's going on.
+  const latest = tail.at(-1);
   // The steps belong to the latest run, so after a follow-up they show under that instruction.
   const runStart = task.messages.findLastIndex((m) => m.followUp);
   const note = (i: number) => {
     const m = task.messages[i];
     if (!m) return null;
-    if (m.answers) return <AnswerLine key={i} answers={m.answers} />;
-    return m.from === "user" ? (
-      <div className="you" style={{ marginTop: 18 }} key={i}>
-        <LongText text={m.text} />
-      </div>
-    ) : (
-      <AgentMessage key={i} text={m.text} />
+    const done = before[i] ?? [];
+    return (
+      <Fragment key={i}>
+        {done.length > 0 && <ActivityLog activity={done} live={false} />}
+        {m.answers ? (
+          <AnswerLine answers={m.answers} />
+        ) : m.from === "user" ? (
+          <div className="you" style={{ marginTop: 18 }}>
+            <LongText text={m.text} />
+          </div>
+        ) : (
+          <AgentMessage text={m.text} />
+        )}
+      </Fragment>
     );
   };
   const range = (from: number, to: number) => Array.from({ length: Math.max(0, to - from) }, (_, k) => note(from + k));
@@ -732,8 +762,9 @@ export function Task({
                   ))}
                 </div>
               )}
-              {(task.activity?.length ?? 0) > 0 && <ActivityLog activity={task.activity ?? []} live={live} />}
               {range(runStart > 0 ? runStart + 1 : 1, end)}
+              {older.length > 0 && <ActivityLog key="older" activity={older} live={false} />}
+              {tail.length > 0 && <ActivityLog key="tail" activity={tail} live={live} />}
               {made.length > 0 && (
                 <Artifact api={api} task={task} files={made} picked={picked} onPick={setPicked} onError={onError} />
               )}

@@ -323,6 +323,32 @@ describe("what the agent is doing", () => {
     fireEvent.click(line);
     expect(screen.getByText("Reading note.txt")).toBeTruthy();
   });
+
+  it("shows each batch of actions above the message that followed it, and only the newest batch as live", async () => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    const task = await api.tasks.start({ projectId: project.id, brief: "Sum up the calls", attachments: [] });
+    act(() => {
+      api.emit(task.id, { type: "withdrawn", id: "q1" });
+      api.emit(task.id, { type: "activity", kind: "read", target: "call-1.docx" });
+      api.emit(task.id, { type: "message", text: "I found the notes from both calls." });
+      api.emit(task.id, { type: "activity", kind: "read", target: "plan.md" });
+    });
+    render(<App userName="Giulia" api={api} />);
+    const [open] = await screen.findAllByText("Sum up the calls");
+    await act(async () => {
+      fireEvent.click(open as HTMLElement);
+    });
+    const done = screen.getByRole("button", { name: "What it did (1)" });
+    const live = screen.getByRole("button", { name: "What it's doing" });
+    const message = screen.getByText("I found the notes from both calls.");
+    // The finished batch sits above the message, folded; the live one comes after it.
+    expect(done.compareDocumentPosition(message) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(message.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText("Reading call-1.docx")).toBeNull();
+    expect(screen.getByText("Reading plan.md")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toContain("Reading plan.md");
+  });
 });
 
 describe("a round of questions", () => {

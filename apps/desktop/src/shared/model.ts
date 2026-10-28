@@ -116,6 +116,11 @@ export interface Activity {
   /** The file, search or site, when there is one. */
   target?: string;
   at: string;
+  /**
+   * How many messages the task had when it happened, so the line shows where it happened, between those messages and
+   * the next. Missing on tasks from before, whose lines all show at the end.
+   */
+  msg?: number;
 }
 
 /** The most activity lines a task keeps; older ones drop off. */
@@ -149,7 +154,7 @@ export interface Task {
   interrupted?: boolean;
   /** The skills the agent read, by folder name, in any run. Built-in guides count too. */
   skillsUsed?: string[];
-  /** What the agent did in the latest run, a line per tool call. Missing on tasks from before. */
+  /** What the agent did, a line per tool call, across every run. Missing on tasks from before. */
   activity?: Activity[];
   /** The agent's conversation, so a follow-up continues it. Set by the real engine. */
   sessionId?: string;

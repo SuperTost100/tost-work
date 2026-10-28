@@ -21,16 +21,23 @@ describe("applyEvent withdrawn", () => {
 });
 
 describe("applyEvent activity", () => {
-  const task = { activity: [] } as unknown as Task;
+  const task = { activity: [], messages: [{ from: "user", text: "brief", at: "t0" }] } as unknown as Task;
 
   it("adds a line per action, and keeps the same action twice in a row as one", () => {
     let next = applyEvent(task, { type: "activity", kind: "edit", target: "a.docx" }, "t1");
     next = applyEvent(next, { type: "activity", kind: "edit", target: "a.docx" }, "t2");
     next = applyEvent(next, { type: "activity", kind: "read", target: "b.txt" }, "t3");
     expect(next.activity).toEqual([
-      { kind: "edit", target: "a.docx", at: "t1" },
-      { kind: "read", target: "b.txt", at: "t3" },
+      { kind: "edit", target: "a.docx", at: "t1", msg: 1 },
+      { kind: "read", target: "b.txt", at: "t3", msg: 1 },
     ]);
+  });
+
+  it("notes how many messages came before each line, and repeats a line once a message came in between", () => {
+    let next = applyEvent(task, { type: "activity", kind: "read", target: "a.txt" }, "t1");
+    next = applyEvent(next, { type: "message", text: "I read it." }, "t2");
+    next = applyEvent(next, { type: "activity", kind: "read", target: "a.txt" }, "t3");
+    expect(next.activity?.map((a) => a.msg)).toEqual([1, 2]);
   });
 
   it("keeps only the latest lines", () => {
@@ -44,7 +51,7 @@ describe("applyEvent activity", () => {
 
 describe("applyEvent skills", () => {
   it("keeps each skill the agent read on the task, once", () => {
-    let next = { activity: [] } as unknown as Task;
+    let next = { activity: [], messages: [] } as unknown as Task;
     next = applyEvent(next, { type: "activity", kind: "skill", target: "brand-voice" }, "t1");
     next = applyEvent(next, { type: "activity", kind: "read", target: "a.txt" }, "t2");
     next = applyEvent(next, { type: "activity", kind: "skill", target: "brand-voice" }, "t3");

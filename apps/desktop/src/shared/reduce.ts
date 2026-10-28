@@ -15,9 +15,10 @@ export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
         return applyEvent({ ...task, skillsUsed: [...used, event.target] }, event, at);
       const log = task.activity ?? [];
       const last = log.at(-1);
-      // The same thing again, such as three edits to one file, stays one line.
-      if (last?.kind === event.kind && last.target === event.target) return task;
-      const line = { kind: event.kind, ...(event.target ? { target: event.target } : {}), at };
+      const msg = task.messages.length;
+      // The same thing again, such as three edits to one file, stays one line, unless a message came in between.
+      if (last?.kind === event.kind && last.target === event.target && last.msg === msg) return task;
+      const line = { kind: event.kind, ...(event.target ? { target: event.target } : {}), at, msg };
       return { ...next, activity: [...log, line].slice(-MAX_ACTIVITY) };
     }
     case "message":
