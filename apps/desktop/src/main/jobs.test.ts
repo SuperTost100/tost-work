@@ -87,6 +87,8 @@ function setup() {
   const started: { jobId: string; at: Date }[] = [];
   let clock = at(28, 8);
   let fail = false;
+  let starting = () => {};
+  const changes: unknown[] = [];
   const service = new Jobs({
     store: {
       listJobs: () => [...jobs.values()],
@@ -94,22 +96,29 @@ function setup() {
       saveJob: (j) => void jobs.set(j.id, j),
       deleteJob: (id) => void jobs.delete(id),
       getProject: (id) => (id === "p" ? {} : undefined),
+      removeProject: (id) => {
+        const gone = [...jobs.values()].filter((j) => j.projectId === id).map((j) => j.id);
+        for (const jobId of gone) jobs.delete(jobId);
+        return gone;
+      },
     },
     busy: (jobId) =>
       [...status].some(([id, st]) => runOf.get(id) === jobId && (st === "running" || st === "needs-you")),
     start: async (j, when) => {
       if (fail) throw new Error("No AI is signed in");
+      starting();
       started.push({ jobId: j.id, at: when });
       const id = `t${started.length}`;
       status.set(id, "running");
       runOf.set(id, j.id);
       return id;
     },
-    changed: () => {},
+    changed: (change) => void changes.push(change),
     now: () => clock,
   });
   return {
     service,
+    changes,
     started,
     status,
     tick: (when: Date) => {
@@ -119,10 +128,31 @@ function setup() {
     failNext: () => {
       fail = true;
     },
+    whenStarting: (fn: () => void) => {
+      starting = fn;
+    },
   };
 }
 
 describe("Jobs", () => {
+  it("tells the window which jobs went with a removed project", () => {
+    const { service, changes } = setup();
+    const made = service.create(DRAFT);
+    service.removeProject("p");
+    expect(service.list()).toEqual([]);
+    expect(changes.at(-1)).toEqual({ id: made.id, removed: true });
+  });
+
+  it("doesn't bring back a job removed, with its project, while an earlier job was starting", async () => {
+    const { service, started, tick, whenStarting } = setup();
+    service.create(DRAFT);
+    service.create({ ...DRAFT, title: "Second" });
+    whenStarting(() => service.removeProject("p"));
+    await tick(at(28, 9));
+    expect(started).toHaveLength(1);
+    expect(service.list()).toEqual([]);
+  });
+
   it("runs a new job at its next time, never twice for one time, even when looks overlap", async () => {
     const { service, started, tick } = setup();
     const made = service.create(DRAFT);

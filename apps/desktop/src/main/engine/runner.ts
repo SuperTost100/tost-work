@@ -54,6 +54,10 @@ export const RESUME_PROMPT =
 
 export class TaskRunner {
   private running = new Map<string, AbortController>();
+  /** Resolves when a task's run has ended and saved its last state. */
+  private ended = new Map<string, Promise<void>>();
+  /** Projects being removed, which take no new task. */
+  private removing = new Set<string>();
   /** A reply that came while the run that asked was still ending its turn. It starts the next run. */
   private queued = new Map<string, string>();
   /** Tasks whose decision is being carried out, so a double click can't trash or copy twice. */
@@ -82,6 +86,8 @@ export class TaskRunner {
   }
 
   create(input: NewTask): Task {
+    // A start that was on its way while the project was being removed doesn't get to add a task to it.
+    if (input.projectId && this.removing.has(input.projectId)) throw new Error("That project doesn't exist");
     const at = this.now();
     const task: Task = {
       id: randomUUID(),
@@ -121,6 +127,8 @@ export class TaskRunner {
     const project: Project | null = task.projectId ? (this.store.getProject(task.projectId) ?? null) : null;
     const controller = new AbortController();
     this.running.set(taskId, controller);
+    let release = () => {};
+    this.ended.set(taskId, new Promise<void>((resolve) => (release = resolve)));
     try {
       // An interrupted task stays resumable until its run really starts: a resume that fails at once, for example
       // offline, leaves Resume on the task to try again.
@@ -158,6 +166,8 @@ export class TaskRunner {
     } finally {
       this.running.delete(taskId);
       this.drafts.delete(taskId);
+      this.ended.delete(taskId);
+      release();
     }
     const next = this.queued.get(taskId);
     this.queued.delete(taskId);
@@ -294,6 +304,8 @@ export class TaskRunner {
     const task = this.mustGet(taskId);
     if (this.running.has(taskId)) throw new Error("Wait for the task to finish before restoring");
     if (this.restoring.has(taskId)) throw new Error("A restore is already in progress");
+    // It would save the task again after its project's records are gone.
+    if (task.projectId && this.removing.has(task.projectId)) throw new Error("That project is being removed");
     // Stop can end the run while a decision still copies or trashes files; the restore waits for it.
     if (this.deciding.has(taskId)) throw new Error("Wait for the decision to finish");
     const latest = (task.kept ?? []).filter((k) => k.path === path).at(-1);
@@ -341,6 +353,45 @@ export class TaskRunner {
     // A task waiting for the user may have no run left: its agent ended the turn to wait.
     const task = this.store.getTask(taskId);
     if (task?.status === "needs-you") this.save(applyEvent(task, { type: "stopped" }, this.now()));
+  }
+
+  /**
+   * Stops every working or waiting task of a project and waits for their runs to end. A run still ending would save
+   * its task again after the project's tasks are deleted.
+   */
+  async stopProject(projectId: string): Promise<void> {
+    this.removing.add(projectId);
+    try {
+      await this.stopAll(projectId);
+    } catch (err) {
+      // Removal called off: the project stays, and takes new tasks again.
+      this.removing.delete(projectId);
+      throw err;
+    }
+  }
+
+  /** The project's records couldn't be removed after all: it stays, and takes new tasks again. */
+  projectStays(projectId: string): void {
+    this.removing.delete(projectId);
+  }
+
+  private async stopAll(projectId: string): Promise<void> {
+    // A task putting files back or acting on a decision saves itself when done, whatever its status: it goes first.
+    if (this.store.listProjectTasks(projectId).some((t) => this.deciding.has(t.id) || this.restoring.has(t.id)))
+      throw new Error("A task is saving its files. Try again in a moment.");
+    const active = () =>
+      this.store.listProjectTasks(projectId).filter((t) => t.status === "needs-you" || this.running.has(t.id));
+    // More than one round: a job can start a run in the gap while the first ones end.
+    for (let round = 0; round < 5 && active().length > 0; round++) {
+      const tasks = active();
+      for (const task of tasks) {
+        if (this.deciding.has(task.id) || this.restoring.has(task.id))
+          throw new Error("A task is saving its files. Try again in a moment.");
+        this.stop(task.id);
+      }
+      await Promise.all(tasks.map((task) => this.ended.get(task.id)));
+    }
+    if (active().length > 0) throw new Error("A task of this project is still working. Try again in a moment.");
   }
 
   /** How many tasks are working right now, so quitting can ask first. */

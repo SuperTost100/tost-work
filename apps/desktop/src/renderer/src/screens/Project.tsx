@@ -1,7 +1,10 @@
+import type { MouseEvent } from "react";
+import { messageHtml, messagePlain } from "@/components/AgentMessage";
 import { type Attachments, Composer } from "@/components/Composer";
 import { TaskTag } from "@/components/TaskTag";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
+import { RenameField } from "@/shell/Sidebar";
 import type { Project as ProjectT, Task } from "../../../shared/model";
 
 export function Project({
@@ -14,6 +17,10 @@ export function Project({
   onOpenTask,
   onBack,
   onAddJob,
+  onMenu,
+  renaming,
+  onRenamed,
+  onEditInstructions,
 }: {
   project: ProjectT;
   tasks: Task[];
@@ -25,9 +32,21 @@ export function Project({
   onBack: () => void;
   /** Opens the job builder in this project; missing while Jobs is turned off. */
   onAddJob?: () => void;
+  /** Shows the project's menu. */
+  onMenu: () => void;
+  /** Whether the name is being edited. */
+  renaming: boolean;
+  /** The new name, or null when the user kept the old one. */
+  onRenamed: (name: string | null) => void;
+  onEditInstructions: () => void;
 }) {
   const t = useT();
   const mine = tasks.filter((x) => x.projectId === project.id);
+  // Right-click opens the same menu as the … button, as in Finder.
+  const contextMenu = (e: MouseEvent) => {
+    e.preventDefault();
+    onMenu();
+  };
   return (
     <div className="main">
       <div className="top">
@@ -38,11 +57,30 @@ export function Project({
           <span className="t3">/</span>
           <b>{project.name}</b>
         </span>
+        <span className="grow" />
+        <button
+          type="button"
+          className="iconbtn"
+          aria-label={t("recent.more", { name: project.name })}
+          title={t("recent.more", { name: project.name })}
+          onClick={onMenu}
+          onContextMenu={contextMenu}
+        >
+          <Icon name="more-1" />
+        </button>
       </div>
       <div className="scroll">
         <div className="proj">
           <div>
-            <h1>{project.name}</h1>
+            {renaming ? (
+              <RenameField
+                title={project.name}
+                label={t("menu.rename")}
+                onDone={(name) => onRenamed(name && name !== project.name ? name : null)}
+              />
+            ) : (
+              <h1 onContextMenu={contextMenu}>{project.name}</h1>
+            )}
             {project.description && <p className="lede">{project.description}</p>}
             <Composer
               value={brief}
@@ -67,13 +105,22 @@ export function Project({
             ))}
           </div>
           <aside className="sidecol">
-            <div className="setrow">
+            <button type="button" className="setrow press" onClick={onEditInstructions}>
               <Icon name="edit-2" />
               <span className="grow">
                 <span className="k">{t("project.instructions")}</span>
-                <span className="v">{project.instructions || t("project.instructionsEmpty")}</span>
+                {/* The text without its Markdown marks, on one line: "- Cita le fonti" reads as "Cita le fonti". */}
+                <span className="v">
+                  {project.instructions
+                    ? messagePlain(messageHtml(project.instructions))
+                        .replace(/^\s*(?:-|\d+\.)\s+/gm, "")
+                        .replace(/\s+/g, " ")
+                        .trim()
+                    : t("project.instructionsEmpty")}
+                </span>
               </span>
-            </div>
+              <span className="act">{t("project.edit")}</span>
+            </button>
             {onAddJob && (
               <div className="setrow">
                 <Icon name="calendar" />

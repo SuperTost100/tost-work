@@ -50,6 +50,10 @@ export function useData(api: TostWorkApi | undefined) {
     (p: Project) => setProjects((list) => (list.some((x) => x.id === p.id) ? list : [...list, p])),
     [],
   );
+  const updateProject = useCallback(
+    (p: Project) => setProjects((list) => list.map((x) => (x.id === p.id ? p : x))),
+    [],
+  );
   // The recent list stops at 50 tasks, so a project page loads its whole history when it opens.
   const loadProject = useCallback(
     async (projectId: string): Promise<void> => {
@@ -63,6 +67,13 @@ export function useData(api: TostWorkApi | undefined) {
     setTasks((list) => list.filter((t) => t.id !== id));
   }, []);
 
+  /** Drops a removed project and its tasks, and keeps a list read before the removal from bringing them back. */
+  const removeProject = useCallback((id: string, taskIds: string[]) => {
+    for (const taskId of taskIds) removed.current.add(taskId);
+    setProjects((list) => list.filter((p) => p.id !== id));
+    setTasks((list) => list.filter((t) => t.projectId !== id));
+  }, []);
+
   /** Loads one task that may not be among the recent ones, such as the one a notification opens. False if it's gone. */
   const loadTask = useCallback(
     async (id: string): Promise<boolean> => {
@@ -73,5 +84,5 @@ export function useData(api: TostWorkApi | undefined) {
     [api, merge],
   );
 
-  return { projects, tasks, addProject, loadProject, loadTask, removeTask };
+  return { projects, tasks, addProject, updateProject, removeProject, loadProject, loadTask, removeTask };
 }

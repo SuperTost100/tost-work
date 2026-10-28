@@ -468,6 +468,78 @@ describe("renaming and deleting tasks", () => {
   });
 });
 
+describe("stopping a project's tasks", () => {
+  it("stops the working and the waiting ones and waits for their runs, so none comes back after the delete", async () => {
+    const { store, runner } = setup();
+    store.saveProject({ id: "p", name: "P", description: "", folder: "/p", instructions: "", createdAt: "2026-10-01" });
+    const mine = runner.create({ projectId: "p", brief: "Write a proposal", workdir: "/p" });
+    const other = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/q" });
+    const runs = [runner.start(mine.id), runner.start(other.id)];
+    await waitFor(() => store.getTask(mine.id)?.status === "needs-you");
+
+    await runner.stopProject("p");
+    expect(runner.isRunning(mine.id)).toBe(false);
+    expect(store.getTask(mine.id)?.status).toBe("stopped");
+    // Another project's task is not touched.
+    expect(runner.isRunning(other.id)).toBe(true);
+
+    store.removeProject("p");
+    runner.stop(other.id);
+    await Promise.all(runs);
+    expect(store.getTask(mine.id)).toBeUndefined();
+    expect(store.getTask(other.id)).toBeDefined();
+  });
+  it("won't remove a project while one of its done tasks puts a file back, and takes tasks again after", async () => {
+    const store = new Store(":memory:");
+    store.saveProject({ id: "p", name: "P", description: "", folder: "/p", instructions: "", createdAt: "2026-10-01" });
+    const gate: { finish: (() => void) | null } = { finish: null };
+    const idle: Engine = {
+      defaults: async () => ({ provider: "codex", model: "m", effort: "low" }),
+      async *run() {},
+      answer: () => false,
+      decide: () => false,
+    };
+    const runner = new TaskRunner(store, idle, () => {}, undefined, {
+      keep: async () => null as never,
+      trash: async () => {},
+      restore: () => new Promise<void>((r) => (gate.finish = r)),
+    });
+    const task = runner.create({ projectId: "p", brief: "Write a proposal", workdir: "/p" });
+    store.saveTask({
+      ...(store.getTask(task.id) as Task),
+      status: "done",
+      kept: [{ path: "/p/a.docx", copy: "/k/a.docx", at: "", reason: "overwrite" }],
+    });
+    const restoring = runner.restore(task.id, "/p/a.docx");
+    await waitFor(() => gate.finish !== null);
+    await expect(runner.stopProject("p")).rejects.toThrow(/saving its files/);
+    // Called off, so the project still takes tasks.
+    expect(runner.create({ projectId: "p", brief: "Another", workdir: "/p" }).id).toBeTruthy();
+    gate.finish?.();
+    await restoring;
+  });
+
+  it("takes no new task for a project while it's being removed", async () => {
+    const { store, runner } = setup();
+    store.saveProject({ id: "p", name: "P", description: "", folder: "/p", instructions: "", createdAt: "2026-10-01" });
+    const done = runner.create({ projectId: "p", brief: "Write a proposal", workdir: "/p" });
+    store.saveTask({
+      ...(store.getTask(done.id) as Task),
+      status: "done",
+      kept: [{ path: "/p/a.docx", copy: "/k/a.docx", at: "", reason: "overwrite" }],
+    });
+    await runner.stopProject("p");
+    expect(() => runner.create({ projectId: "p", brief: "Write a proposal", workdir: "/p" })).toThrow(/doesn't exist/);
+    // Another project still takes them.
+    expect(runner.create({ projectId: null, brief: "Write a proposal", workdir: "/q" }).id).toBeTruthy();
+
+    // Nor a file put back, which would save its task again.
+    await expect(runner.restore(done.id, "/p/a.docx")).rejects.toThrow(/being removed/);
+    runner.projectStays("p");
+    expect(runner.create({ projectId: "p", brief: "Write a proposal", workdir: "/p" }).id).toBeTruthy();
+  });
+});
+
 describe("a rename while the run ends", () => {
   it("keeps the new name when the engine ends without a last event", async () => {
     let release: () => void = () => {};

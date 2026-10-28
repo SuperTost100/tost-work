@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Attachments } from "@/components/Composer";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
+import { ProjectInstructionsDialog } from "@/components/ProjectInstructionsDialog";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
@@ -15,7 +16,7 @@ import { Soon } from "@/screens/Soon";
 import { Task } from "@/screens/Task";
 import { RECENT, type Section, Sidebar } from "@/shell/Sidebar";
 import { useData } from "@/state/useData";
-import type { MenuAction, TostWorkApi } from "../../shared/api";
+import type { MenuAction, ProjectMenuAction, TostWorkApi } from "../../shared/api";
 import { DEFAULT_SETTINGS, type Settings, sectionOn } from "../../shared/model";
 
 /** The main process accepts up to 20 attachments per task. */
@@ -45,7 +46,7 @@ export function App({
   const t = useT();
   const current = settings ?? { ...DEFAULT_SETTINGS, name: userName, setupDone: true };
   const quickEdit = sectionOn(current, "quickEdit");
-  const { projects, tasks, addProject, loadProject, loadTask, removeTask } = useData(api);
+  const { projects, tasks, addProject, updateProject, removeProject, loadProject, loadTask, removeTask } = useData(api);
   const [route, setRoute] = useState<Route>({ name: "home" });
   // The project whose "Add job" opened Jobs, so the builder starts in it.
   const [jobFor, setJobFor] = useState<string | null>(null);
@@ -61,9 +62,42 @@ export function App({
   const [error, setError] = useState<string | null>(null);
   const starting = useRef(false);
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [renamingProject, setRenamingProject] = useState<string | null>(null);
+  // The project whose instructions are being edited in the dialog.
+  const [instructionsFor, setInstructionsFor] = useState<string | null>(null);
   const report = useCallback((err: unknown) => setError(errorText(err)), []);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const isMac = api?.platform === "darwin";
+  const renameProject = (id: string, name: string | null) => {
+    setRenamingProject(null);
+    if (name && api) void api.projects.update(id, { name }).then(updateProject, report);
+  };
+  const dropProject = (id: string) => {
+    // Its tasks and jobs go with it, so whatever of them is open, or picked, must not stay.
+    const taskIds = tasks.filter((x) => x.projectId === id).map((x) => x.id);
+    void api?.projects.remove(id).then((gone) => {
+      if (!gone) return;
+      removeProject(id, taskIds);
+      setCounts(({ [id]: _removed, ...rest }) => rest);
+      setProjectId((picked) => (picked === id ? undefined : picked));
+      setJobFor((job) => (job === id ? null : job));
+      setRoute((r) =>
+        (r.name === "project" && r.id === id) || (r.name === "task" && taskIds.includes(r.id)) ? { name: "home" } : r,
+      );
+    }, report);
+  };
+  const openProjectMenu = async (id: string) => {
+    let action: ProjectMenuAction | null = null;
+    try {
+      action = (await api?.projects.menu(id)) ?? null;
+    } catch (err) {
+      report(err);
+    }
+    if (action === "rename") setRenamingProject(id);
+    else if (action === "instructions") setInstructionsFor(id);
+    else if (action === "reveal") void api?.projects.reveal(id).catch(report);
+    else if (action === "remove") dropProject(id);
+  };
   const openTaskMenu = async (id: string) => {
     try {
       return (await api?.tasks.menu(id)) ?? null;
@@ -216,6 +250,7 @@ export function App({
     [api, loadTask, report, t],
   );
 
+  const instructionsProject = projects.find((p) => p.id === instructionsFor);
   let screen: React.ReactNode;
   if (route.name === "home") {
     screen = (
@@ -248,6 +283,9 @@ export function App({
         counts={counts}
         onOpen={(id) => setRoute({ name: "project", id })}
         onNew={() => setDialogOpen(true)}
+        onMenu={(id) => void openProjectMenu(id)}
+        renaming={renamingProject}
+        onRenamed={renameProject}
       />
     );
   } else if (route.name === "project") {
@@ -275,6 +313,10 @@ export function App({
             : undefined
         }
         onBack={() => setRoute({ name: "projects" })}
+        onMenu={() => void openProjectMenu(project.id)}
+        renaming={renamingProject === project.id}
+        onRenamed={(name) => renameProject(project.id, name)}
+        onEditInstructions={() => setInstructionsFor(project.id)}
       />
     ) : null;
   } else if (route.name === "task") {
@@ -367,6 +409,16 @@ export function App({
             <Icon name="close" />
           </button>
         </div>
+      )}
+      {api && instructionsProject && (
+        <ProjectInstructionsDialog
+          key={instructionsProject.id}
+          project={instructionsProject}
+          onSave={async (instructions) =>
+            updateProject(await api.projects.update(instructionsProject.id, { instructions }))
+          }
+          onClose={() => setInstructionsFor(null)}
+        />
       )}
       {api && (
         <NewProjectDialog

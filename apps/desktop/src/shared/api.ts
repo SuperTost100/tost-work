@@ -18,6 +18,11 @@ export interface NewProjectInput {
   folder: string;
 }
 
+export interface ProjectPatch {
+  name?: string;
+  instructions?: string;
+}
+
 export interface NewTaskInput {
   projectId: string | null;
   brief: string;
@@ -108,6 +113,17 @@ export interface TostWorkApi {
     taskCounts(): Promise<Record<string, number>>;
     /** Opens the system folder picker. Resolves to null when the user cancels. */
     pickFolder(): Promise<string | null>;
+    /** Shows the project's menu where the pointer is, and resolves with what the user picked, or null. */
+    menu(id: string): Promise<ProjectMenuAction | null>;
+    /** Saves the fields given, the name or the instructions the AI reads in every task. */
+    update(id: string, patch: ProjectPatch): Promise<Project>;
+    /** Opens the project's folder. */
+    reveal(id: string): Promise<void>;
+    /**
+     * Asks first, then removes the project with its tasks and jobs from the app, after stopping the ones working.
+     * The folder and its files stay. Resolves false when the user changes their mind.
+     */
+    remove(id: string): Promise<boolean>;
   };
   tasks: {
     /** The 50 most recently updated tasks. */
@@ -201,6 +217,9 @@ export interface TostWorkApi {
 /** What the task menu offers. The skill menu offers the same. */
 export type TaskMenuAction = "rename" | "reveal" | "delete";
 
+/** What the project menu offers. */
+export type ProjectMenuAction = "rename" | "instructions" | "reveal" | "remove";
+
 /** IPC channel names, kept in one place so main and preload can't drift apart. */
 export const IPC = {
   settingsGet: "settings:get",
@@ -244,6 +263,10 @@ export const IPC = {
   projectsCreate: "projects:create",
   projectsTaskCounts: "projects:task-counts",
   projectsPickFolder: "projects:pick-folder",
+  projectsMenu: "projects:menu",
+  projectsUpdate: "projects:update",
+  projectsReveal: "projects:reveal",
+  projectsRemove: "projects:remove",
   tasksList: "tasks:list",
   tasksListForProject: "tasks:list-for-project",
   tasksGet: "tasks:get",

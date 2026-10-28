@@ -258,6 +258,8 @@ app.whenReady().then(async () => {
       const project = store.getProject(job.projectId);
       if (!project) throw new Error(translate(language(), "jobs.projectGone"));
       const { provider, auth, model, effort } = await runner.defaults();
+      // The project may have been removed while the account was being read.
+      if (!store.getProject(job.projectId)) throw new Error(translate(language(), "jobs.projectGone"));
       const day = new Intl.DateTimeFormat(language(), { day: "numeric", month: "short" }).format(at);
       const task = runner.create({
         projectId: project.id,

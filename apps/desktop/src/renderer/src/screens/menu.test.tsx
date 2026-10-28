@@ -70,7 +70,7 @@ describe("the menu bar", () => {
     for (let i = 1; i <= 9; i++) await api.tasks.start({ projectId: project.id, brief: `Draft ${i}`, attachments: [] });
     render(<Root api={api} />);
     fireEvent.click(await screen.findByRole("button", { name: "Projects" }));
-    fireEvent.click(await screen.findByRole("button", { name: /Proposals/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Proposals/ }));
     fireEvent.click(await screen.findByRole("button", { name: /^Draft 1(?!\d)/ }));
     await press(api, "rename");
     const field = screen.getByRole("textbox", { name: "Rename" });

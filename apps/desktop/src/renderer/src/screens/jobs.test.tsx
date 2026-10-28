@@ -108,7 +108,7 @@ describe("jobs", () => {
     const second = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
     render(<App userName="Giulia" api={api} settings={settings} />);
     await click("Projects");
-    await click(/Courses/);
+    await click(/^Courses/);
     await click("Add");
     const dialog = await screen.findByRole("dialog");
     expect((within(dialog).getByLabelText("Project") as HTMLSelectElement).value).toBe(second.id);

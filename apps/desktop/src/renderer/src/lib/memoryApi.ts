@@ -5,6 +5,7 @@ import type {
   MenuState,
   NewProjectInput,
   NewTaskInput,
+  ProjectMenuAction,
   SignInEvent,
   TaskMenuAction,
   TostWorkApi,
@@ -50,6 +51,10 @@ const WORD_GUIDE: Skill = {
 export type MemoryApi = TostWorkApi & {
   emit(id: string, e: EngineEvent): void;
   pickInMenu(action: TaskMenuAction | null): void;
+  /** What the next project menu returns, as if the user had picked it. */
+  pickInProjectMenu(action: ProjectMenuAction | null): void;
+  /** Whether the next "Remove from Tost Work" is confirmed. It is, unless told otherwise. */
+  confirmRemoval(yes: boolean): void;
   /** Picks an item in the menu bar, as the user would. */
   pressMenu(action: MenuAction): void;
   /** As a click on a notification does. */
@@ -61,7 +66,9 @@ export type MemoryApi = TostWorkApi & {
 };
 
 export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", setupDone: true }): MemoryApi {
-  const projects: Project[] = [];
+  let projects: Project[] = [];
+  // Ids never come back after a removal, as the app's random ones don't.
+  let projectCount = 0;
   const jobs = new Map<string, Job>();
   // Ids never come back after a removal, as the app's random ones don't.
   let jobCount = 0;
@@ -138,11 +145,21 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   // What the next task menu returns, as if the user had picked it.
   let menuPick: TaskMenuAction | null = null;
   let menuState: MenuState = { task: false, running: false };
+  let projectMenuPick: ProjectMenuAction | null = null;
+  let removalConfirmed = true;
 
+  // Ids never come back, even after a task is removed.
+  let taskCount = 0;
   const api: MemoryApi = {
     platform: "linux",
     pickInMenu: (action) => {
       menuPick = action;
+    },
+    pickInProjectMenu: (action) => {
+      projectMenuPick = action;
+    },
+    confirmRemoval: (yes) => {
+      removalConfirmed = yes;
     },
     versions: { app: "0.0.1", electron: "test" },
     onMenu: (l) => {
@@ -223,7 +240,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       list: async () => [...projects],
       create: async (input: NewProjectInput) => {
         const p: Project = {
-          id: `p${projects.length + 1}`,
+          id: `p${++projectCount}`,
           name: input.name,
           description: input.description ?? "",
           folder: input.folder,
@@ -239,6 +256,29 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         return counts;
       },
       pickFolder: async () => "/Users/giulia/Documents/Proposals",
+      menu: async () => projectMenuPick,
+      update: async (id, patch) => {
+        const project = projects.find((p) => p.id === id);
+        if (!project) throw new Error("That project doesn't exist");
+        const name = patch.name?.trim();
+        if (patch.name !== undefined && !name) throw new Error("A project needs a name");
+        const next = { ...project, ...patch, ...(name ? { name } : {}) };
+        projects = projects.map((p) => (p.id === id ? next : p));
+        return next;
+      },
+      reveal: async () => {},
+      remove: async (id) => {
+        if (!projects.some((p) => p.id === id)) throw new Error("That project doesn't exist");
+        if (!removalConfirmed) return false;
+        projects = projects.filter((p) => p.id !== id);
+        for (const t of [...tasks.values()]) if (t.projectId === id) tasks.delete(t.id);
+        for (const j of [...jobs.values()]) {
+          if (j.projectId !== id) continue;
+          jobs.delete(j.id);
+          for (const l of jobListeners) l({ id: j.id, removed: true });
+        }
+        return true;
+      },
     },
     tasks: {
       list: async () => [...tasks.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
@@ -247,7 +287,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       start: async (input: NewTaskInput) => {
         const at = now();
         const t = save({
-          id: `t${tasks.size + 1}`,
+          id: `t${++taskCount}`,
           projectId: input.projectId,
           title: input.brief.split("\n")[0] ?? "",
           brief: input.brief,

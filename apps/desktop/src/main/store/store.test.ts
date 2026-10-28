@@ -120,6 +120,49 @@ describe("Store", () => {
     expect(store.listJobs()).toHaveLength(1);
   });
 
+  it("removes a project with its tasks and jobs, and leaves the other projects alone", () => {
+    const store = new Store(":memory:");
+    const project = (id: string) => ({
+      id,
+      name: id,
+      description: "",
+      folder: `/${id}`,
+      instructions: "",
+      createdAt: "2026-10-01",
+    });
+    const job = (id: string, projectId: string) =>
+      ({
+        id,
+        projectId,
+        title: id,
+        createdAt: "2026-10-28T10:00:00Z",
+        schedule: { repeat: "daily", time: "09:00" },
+      }) as Job;
+    store.saveProject(project("a"));
+    store.saveProject(project("b"));
+    store.saveTask({ ...task("a1", "done", "2026-10-01T00:00:00Z"), projectId: "a" });
+    store.saveTask({ ...task("a2", "running", "2026-10-02T00:00:00Z"), projectId: "a" });
+    store.saveTask({ ...task("b1", "done", "2026-10-03T00:00:00Z"), projectId: "b" });
+    store.saveTask(task("quick", "done", "2026-10-04T00:00:00Z"));
+    store.saveJob(job("ja", "a"));
+    store.saveJob(job("jb", "b"));
+
+    expect(store.projectUsage("a")).toEqual({ tasks: 2, jobs: 1 });
+    expect(store.removeProject("a")).toEqual(["ja"]);
+
+    expect(store.getProject("a")).toBeUndefined();
+    expect(store.listProjectTasks("a")).toEqual([]);
+    expect(store.getJob("ja")).toBeUndefined();
+    expect(store.listProjects().map((p) => p.id)).toEqual(["b"]);
+    expect(
+      store
+        .listTasks()
+        .map((t) => t.id)
+        .sort(),
+    ).toEqual(["b1", "quick"]);
+    expect(store.listJobs().map((j) => j.id)).toEqual(["jb"]);
+  });
+
   it("says whether any run of a job still needs the user or is working", () => {
     const store = new Store(":memory:");
     store.saveTask({ ...task("a", "needs-you", "2026-10-28T09:00:00Z"), jobId: "j" });

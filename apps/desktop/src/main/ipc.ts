@@ -3,7 +3,14 @@ import { mkdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { app, type BrowserWindow, dialog, ipcMain, Menu, type OpenDialogOptions, shell } from "electron";
-import { IPC, type NewProjectInput, type NewTaskInput, type SaveResult, type TaskMenuAction } from "../shared/api";
+import {
+  IPC,
+  type NewProjectInput,
+  type NewTaskInput,
+  type ProjectMenuAction,
+  type SaveResult,
+  type TaskMenuAction,
+} from "../shared/api";
 import { languageFrom, type MessageKey, translate } from "../shared/i18n";
 import { type AgentProvider, BRIEF_MAX, MAX_QUESTIONS, type Project, type Settings } from "../shared/model";
 import type { Accounts } from "./accounts";
@@ -12,6 +19,7 @@ import { type Conflict, copyInto, describe, readablePath, savablePaths, saveCopi
 import type { Installer } from "./installer";
 import { type Jobs, jobDraft } from "./jobs";
 import type { KeyStore } from "./keys";
+import { removalText } from "./projects";
 import type { SkillFolder } from "./skills";
 import type { Store } from "./store/store";
 import { absolutePath, paths, settingsPatch, text } from "./validate";
@@ -186,24 +194,35 @@ export function registerIpc(
     return task;
   };
   // A native menu, as Finder's and Mail's are. It only says what was picked; the window carries it out.
-  const itemMenu = (canDelete: boolean) =>
-    new Promise<TaskMenuAction | null>((resolve) => {
+  const popup = <A>(items: ({ label: string; action: A; enabled?: boolean } | "separator")[]) =>
+    new Promise<A | null>((resolve) => {
       let picked = false;
-      const pick = (action: TaskMenuAction) => () => {
-        picked = true;
-        resolve(action);
-      };
-      const menu = Menu.buildFromTemplate([
-        { label: t("menu.rename"), click: pick("rename") },
-        { label: t("menu.reveal"), click: pick("reveal") },
-        { type: "separator" },
-        { label: t("menu.delete"), enabled: canDelete, click: pick("delete") },
-      ]);
+      const menu = Menu.buildFromTemplate(
+        items.map((item) =>
+          item === "separator"
+            ? { type: "separator" as const }
+            : {
+                label: item.label,
+                enabled: item.enabled,
+                click: () => {
+                  picked = true;
+                  resolve(item.action);
+                },
+              },
+        ),
+      );
       // The menu closes before its click arrives on some systems, so a close with no pick waits a moment.
       const closed = () => setTimeout(() => picked || resolve(null), 100);
       const win = window();
       menu.popup(win ? { window: win, callback: closed } : { callback: closed });
     });
+  const itemMenu = (canDelete: boolean) =>
+    popup<TaskMenuAction>([
+      { label: t("menu.rename"), action: "rename" },
+      { label: t("menu.reveal"), action: "reveal" },
+      "separator",
+      { label: t("menu.delete"), action: "delete", enabled: canDelete },
+    ]);
   ipcMain.handle(IPC.tasksMenu, (_e, id: unknown) => itemMenu(!runner.isRunning(taskOf(id).id)));
   ipcMain.handle(IPC.tasksRename, (_e, id: unknown, title: unknown) =>
     runner.rename(text(id, "id", 100), text(title, "title", 200)),
@@ -226,6 +245,67 @@ export function registerIpc(
     const { response } = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options);
     if (response !== 0) return false;
     runner.remove(task.id);
+    return true;
+  });
+
+  const projectOf = (id: unknown) => {
+    const project = store.getProject(text(id, "id", 100));
+    if (!project) throw new Error("That project doesn't exist");
+    return project;
+  };
+  ipcMain.handle(IPC.projectsMenu, (_e, id: unknown) => {
+    projectOf(id);
+    return popup<ProjectMenuAction>([
+      { label: t("menu.rename"), action: "rename" },
+      { label: t("menu.editInstructions"), action: "instructions" },
+      { label: t("menu.reveal"), action: "reveal" },
+      "separator",
+      { label: t("menu.removeProject"), action: "remove" },
+    ]);
+  });
+  ipcMain.handle(IPC.projectsUpdate, (_e, id: unknown, patch: unknown) => {
+    const project = projectOf(id);
+    if (typeof patch !== "object" || patch === null || Array.isArray(patch)) throw new Error("patch must be an object");
+    const input = patch as Record<string, unknown>;
+    const next = { ...project };
+    for (const key of Object.keys(input)) {
+      if (key === "name") {
+        next.name = text(input.name, "name", 200).trim();
+        if (!next.name) throw new Error("A project needs a name");
+      } else if (key === "instructions") next.instructions = text(input.instructions, "instructions");
+      else throw new Error(`Unknown project field: ${key}`);
+    }
+    store.saveProject(next);
+    return next;
+  });
+  ipcMain.handle(IPC.projectsReveal, async (_e, id: unknown) => {
+    const error = await shell.openPath(projectOf(id).folder);
+    if (error) throw new Error(error);
+  });
+  ipcMain.handle(IPC.projectsRemove, async (_e, id: unknown) => {
+    const project = projectOf(id);
+    const lang = store.getSettings().language ?? languageFrom(app.getLocale());
+    const { message, detail } = removalText(lang, project.name, store.projectUsage(project.id));
+    const options = {
+      type: "warning" as const,
+      message,
+      detail,
+      buttons: [t("project.removeYes"), t("save.cancel")],
+      defaultId: 1,
+      cancelId: 1,
+    };
+    const win = window();
+    const { response } = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options);
+    if (response !== 0) return false;
+    // Working tasks end first: a run still ending would save its task back after the project is gone. Only the
+    // app's records go. The folder is never touched.
+    await runner.stopProject(project.id);
+    try {
+      jobs.removeProject(project.id);
+    } catch (err) {
+      runner.projectStays(project.id);
+      throw err;
+    }
     return true;
   });
 

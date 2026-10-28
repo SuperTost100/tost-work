@@ -628,7 +628,7 @@ describe("projects", () => {
       fireEvent.click(screen.getByRole("button", { name: "Create project" }));
     });
     await act(async () => {
-      fireEvent.click(await screen.findByRole("button", { name: /Proposals/ }));
+      fireEvent.click(await screen.findByRole("button", { name: /^Proposals/ }));
     });
     expect((await screen.findByRole("alert")).textContent).toMatch(/Couldn't read the tasks/);
   });

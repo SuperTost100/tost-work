@@ -78,6 +78,8 @@ export interface JobsDeps {
     saveJob(job: Job): void;
     deleteJob(id: string): void;
     getProject(id: string): unknown;
+    /** Removes the project with its tasks and jobs, and gives the ids of the jobs. */
+    removeProject(id: string): string[];
   };
   /** Whether a run of the job, any of them, still needs the user or is still working. */
   busy(jobId: string): boolean;
@@ -157,6 +159,11 @@ export class Jobs {
     this.deps.changed({ id, removed: true });
   }
 
+  /** Removes a project with its tasks and jobs, and tells the window which jobs went. */
+  removeProject(projectId: string): void {
+    for (const id of this.deps.store.removeProject(projectId)) this.deps.changed({ id, removed: true });
+  }
+
   /** Runs the job now, outside its times, as Try it does. Its schedule carries on as before. */
   async runNow(id: string): Promise<string> {
     const job = this.must(id);
@@ -177,7 +184,11 @@ export class Jobs {
 
   private async look(): Promise<void> {
     const now = this.now();
-    for (const job of this.deps.store.listJobs()) {
+    for (const listed of this.deps.store.listJobs()) {
+      // Read again: an earlier job's start may have removed this one, with its project, and saving it would bring it
+      // back.
+      const job = this.deps.store.getJob(listed.id);
+      if (!job) continue;
       const decision = decide(job, now, this.deps.busy(job.id));
       if (!decision) continue;
       const due = "run" in decision ? decision.run : decision.skip;

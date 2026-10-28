@@ -1242,6 +1242,21 @@ textarea {
   background: var(--hover);
   color: var(--ink);
 }
+/* A row that is one button, such as the project's instructions. */
+.setrow.press {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line-2);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.setrow.press:hover .act {
+  background: var(--hover);
+  color: var(--ink);
+}
 /* ===== Board, Craft style list ===== */
 .bhead {
   padding: 22px 32px 18px;
@@ -1384,19 +1399,82 @@ textarea {
   gap: 14px;
 }
 .pcard {
-  display: grid;
-  gap: 10px;
-  padding: 18px 18px 16px;
+  position: relative;
   border-radius: 14px;
   background: var(--panel);
 }
 .pcard:hover {
   box-shadow: 0 0 0 1px var(--line);
 }
+/* The card is a div holding the open button and the … button, which can't nest. */
+.pcard .open {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  padding: 18px 18px 16px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pcard div.open {
+  cursor: default;
+}
+.pcard .more {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--t3);
+  cursor: pointer;
+  opacity: 0;
+}
+.pcard:hover .more,
+.pcard .more:focus-visible {
+  opacity: 1;
+}
+.pcard .more:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
 .pcard h3 {
+  padding-right: 30px;
   font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.01em;
+}
+.pcard .rename,
+.proj .rename {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--canvas);
+  font: inherit;
+  color: var(--ink);
+}
+.pcard .rename {
+  margin-right: 30px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.proj .rename {
+  width: 100%;
+  height: 44px;
+  margin-bottom: 4px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 .pcard p {
   font-size: 13.5px;
@@ -2259,6 +2337,26 @@ ol.editable li::before {
   color: var(--t2);
   font-size: 14px;
 }
+/* The project's instructions: a page of formatted text in a dialog. */
+.modal.instrmodal {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  width: min(680px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+}
+.instrmodal .ib {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-height: 280px;
+  padding: 16px 20px;
+  overflow: auto;
+  font-size: 13.5px;
+}
+.instrmodal .md-tools {
+  top: -16px;
+}
 /* The builder: the mockup's modal, fixed over the window like the other dialogs. */
 .modal.jobmodal {
   position: fixed;
@@ -2926,7 +3024,6 @@ textarea:focus-visible {
 /* ===== App controls that the mockup only drew ===== */
 button.item,
 button.notice,
-button.pcard,
 button.rec {
   width: 100%;
   text-align: left;

@@ -60,6 +60,36 @@ export class Store {
     return row ? (JSON.parse(row.data) as Project) : undefined;
   }
 
+  /** How much goes with a project when it's removed, for the confirmation. */
+  projectUsage(id: string): { tasks: number; jobs: number } {
+    const count = (sql: string) => Number((this.db.prepare(sql).get(id) as { n: number }).n);
+    return {
+      tasks: count("select count(*) as n from tasks where project_id = ?"),
+      jobs: count("select count(*) as n from jobs where json_extract(data, '$.projectId') = ?"),
+    };
+  }
+
+  /**
+   * Removes a project with its tasks and jobs, all or nothing. Only the app's records go: nothing here touches the
+   * project's folder. Gives the ids of the jobs removed, so the window can drop them.
+   */
+  removeProject(id: string): string[] {
+    const jobs = this.db.prepare("select id from jobs where json_extract(data, '$.projectId') = ?").all(id) as {
+      id: string;
+    }[];
+    this.db.exec("begin");
+    try {
+      this.db.prepare("delete from tasks where project_id = ?").run(id);
+      this.db.prepare("delete from jobs where json_extract(data, '$.projectId') = ?").run(id);
+      this.db.prepare("delete from projects where id = ?").run(id);
+      this.db.exec("commit");
+    } catch (err) {
+      this.db.exec("rollback");
+      throw err;
+    }
+    return jobs.map((j) => j.id);
+  }
+
   saveTask(task: Task): void {
     this.db
       .prepare(
