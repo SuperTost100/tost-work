@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { createFunnel } from "cli-funnel";
 import { afterAll, describe, expect, it } from "vitest";
 import { type AiId, questionItems, SUBSCRIPTIONS, type Task } from "../../shared/model";
+import { giveAgentsOwnHomes } from "../agentHomes";
 import { fileGuard } from "../guard";
 import { ToolServer } from "../mcp/server";
 import { Store } from "../store/store";
@@ -14,6 +15,9 @@ import { TaskRunner } from "./runner";
 // Runs real tasks on the signed-in Codex and Claude Code. They spend a little of each account's usage, so they run
 // only when asked: TOST_WORK_LIVE=1 for both, or a list such as TOST_WORK_LIVE=claude.
 const asked = process.env.TOST_WORK_LIVE ?? "";
+// TOST_WORK_LIVE_HOMES=<folder> runs the CLIs in their own homes there, as the app does, so the tester's own
+// instructions, skills and MCP servers stay out. The folder needs a copy of each CLI's sign-in.
+if (process.env.TOST_WORK_LIVE_HOMES) giveAgentsOwnHomes(process.env.TOST_WORK_LIVE_HOMES);
 const runs = (ai: AiId) => asked === "1" || asked.split(",").includes(ai);
 const funnel = createFunnel();
 afterAll(() => funnel.close());
@@ -172,6 +176,61 @@ for (const ai of SUBSCRIPTIONS) {
       } finally {
         await tools.stop();
         await rm(outside, { recursive: true, force: true });
+      }
+    });
+
+    it("answers a request to take stock in the chat, and offers a file instead of making one", {
+      timeout: 600_000,
+    }, async () => {
+      const work = await mkdtemp(join(tmpdir(), "tw-live-chat-"));
+      await writeFile(
+        join(work, "call-filippo.txt"),
+        "Call with Filippo, 27 Oct: he wants the course material by Friday. Next call on Friday at 10.\n",
+      );
+      await writeFile(
+        join(work, "call-engineers.txt"),
+        "Call with the engineers' association, 27 Oct: they propose two dates in November; I must answer by Thursday.\n",
+      );
+      const engine = new AgentEngine(funnel, () => "en", { ai: async () => ai });
+      const tools = new ToolServer(engine);
+      await tools.start();
+      engine.attachTools(tools);
+      const store = new Store(":memory:");
+      const runner = new TaskRunner(store, engine, () => {});
+      try {
+        const { provider, model } = await engine.defaults();
+        store.saveProject({ id: "p", name: "Live", description: "", folder: work, instructions: "", createdAt: "" });
+        const task = runner.create({
+          projectId: "p",
+          workdir: work,
+          provider,
+          model,
+          effort: "low",
+          brief:
+            "Today I had both calls, with Filippo and with the engineers' association. Help me sort things out and take stock.",
+        });
+        runner.launch(task.id);
+        const final = await settle(runner, store, task.id, async (t) => {
+          if (t.approval) await runner.decide(task.id, false);
+          else if (t.question)
+            runner.answer(
+              task.id,
+              questionItems(t.question).map((q) => q.options[0] ?? "Nothing else"),
+            );
+        });
+        console.log(
+          JSON.stringify(
+            { status: final.status, files: final.files, messages: final.messages.map((m) => m.text) },
+            null,
+            2,
+          ),
+        );
+        expect(final.status).toBe("done");
+        expect(final.files.filter((f) => f.role === "made")).toEqual([]);
+        expect(final.messages.at(-1)?.text).toMatch(/Friday/);
+        expect(final.messages.at(-1)?.text).toMatch(/Word|Excel|file|document/i);
+      } finally {
+        await tools.stop();
       }
     });
 

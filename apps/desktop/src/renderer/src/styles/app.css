@@ -1594,6 +1594,31 @@ h3 {
 .agent li + li {
   margin-top: 4px;
 }
+/* Tables in a message, now that a "take stock" answer comes in the chat. Wide ones scroll sideways. */
+.agent table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.agent th,
+.agent td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--line-2);
+  text-align: left;
+  vertical-align: top;
+}
+.agent th {
+  font-weight: 600;
+  color: var(--t2);
+  border-bottom-color: var(--line);
+}
+.agent tr:last-child td {
+  border-bottom: 0;
+}
 .agent h1,
 .agent h2,
 .agent h3,

@@ -11,8 +11,15 @@ describe("instructionsFor", () => {
     const text = instructionsFor(task, project, "it");
     expect(text).toContain("/Users/giulia/Proposte");
     expect(text).toContain("plain Italian");
-    // The work goes in a file, and the chat stays short; questions go through the card.
-    expect(text).toContain("never in a message");
+    // A request to think or take stock gets an answer in the chat and an offer of a file; questions go through the card.
+    expect(text).toContain("answer in your message");
+    expect(text).toContain("Make the file only if they say yes");
+    // A file named as something to read isn't a request for a new one.
+    expect(text).toContain("is material for the answer, not a request for a new file");
+    // An answer asked for in a file, or a named output file, is a file request, and that comes first.
+    expect(text).toContain("an answer they want in a file");
+    expect(text).toContain("This comes before the rule below.");
+    expect(text).toContain("Questions to the user go through ask_user, never in a message.");
     expect(text).toContain("simple Markdown");
     expect(text).toContain("request_approval with action overwrite");
     expect(text).toContain("The project's instructions:\nUse our template.");
