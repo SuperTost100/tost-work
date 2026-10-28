@@ -14,7 +14,7 @@ import { JOB_REPEATS, type JobRepeat, upcoming } from "../../../shared/schedule"
 /** How often the list works out its groups and next runs again, so "today" doesn't stay today past midnight. */
 const CLOCK_MS = 60_000;
 
-const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
+const fileName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 
 /** The task the job's latest run started, if it's among the ones loaded. */
 function lastTaskOf(job: Job, tasks: Task[]): Task | undefined {
@@ -215,7 +215,7 @@ function JobRow({
           </span>
         )}
         {made[0] && last && "taskId" in last && (
-          <button type="button" className="out" onClick={() => onOpenTask(last.taskId)}>
+          <button type="button" className="out" title={fileName(made[0].path)} onClick={() => onOpenTask(last.taskId)}>
             <Icon name="file" />
             <span className="truncate">{fileName(made[0].path)}</span>
           </button>

@@ -2155,9 +2155,12 @@ ol.editable li::before {
   font-size: 12.5px;
   color: var(--t3);
 }
+/* One column that can't grow past its track, so a long file name shortens instead of running under the switch. */
 .jrow .col2,
 .jrow .col3 {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 5px;
   justify-items: start;
   font-size: 13px;
@@ -2361,7 +2364,8 @@ ol.editable li::before {
   height: 15px;
   color: var(--t3);
 }
-.msteps li span {
+/* The line under a step starts where its name does, past the icon (15px) and the gap (8px). */
+.msteps li b + span {
   font-size: 12.5px;
   color: var(--t3);
   padding-left: 23px;
