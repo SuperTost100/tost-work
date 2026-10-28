@@ -122,8 +122,16 @@ export class Jobs {
     const job = this.must(id);
     if (!this.deps.store.getProject(draft.projectId)) throw new Error("That project doesn't exist");
     const at = this.now().toISOString();
-    // New times count from now, so moving today's time earlier doesn't start a run straight away.
-    return this.save({ ...job, ...draft, skip: null, handled: at, updatedAt: at });
+    // New times count from now, so moving today's time earlier doesn't start a run straight away. A Skip once stays
+    // while the times stay the same, as when Try it saves before it runs.
+    const sameTimes = JSON.stringify(job.schedule) === JSON.stringify(draft.schedule);
+    return this.save({
+      ...job,
+      ...draft,
+      skip: sameTimes ? job.skip : null,
+      handled: sameTimes ? job.handled : at,
+      updatedAt: at,
+    });
   }
 
   /** On or off. Turned back on, it waits for its next time rather than catching up on the ones it was off for. */

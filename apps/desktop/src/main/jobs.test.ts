@@ -149,6 +149,14 @@ describe("Jobs", () => {
     expect(started).toHaveLength(2);
   });
 
+  it("keeps a Skip once when the job is saved with the same times, and drops it when they change", () => {
+    const { service } = setup();
+    const made = service.create(DRAFT);
+    service.skipOnce(made.id);
+    expect(service.update(made.id, { ...DRAFT, title: "Renamed" }).skip).toBe(at(28, 9).toISOString());
+    expect(service.update(made.id, { ...DRAFT, schedule: { repeat: "daily", time: "10:00" } }).skip).toBeNull();
+  });
+
   it("skips one run when asked, and puts it back when asked again", async () => {
     const { service, started, tick } = setup();
     const made = service.create(DRAFT);

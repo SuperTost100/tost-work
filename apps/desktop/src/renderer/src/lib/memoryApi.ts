@@ -347,7 +347,11 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
           updatedAt: at,
         });
       },
-      update: async (id, draft) => saveJob({ ...mustJob(id), ...draft, skip: null, updatedAt: now() }),
+      update: async (id, draft) => {
+        const job = mustJob(id);
+        const sameTimes = JSON.stringify(job.schedule) === JSON.stringify(draft.schedule);
+        return saveJob({ ...job, ...draft, skip: sameTimes ? job.skip : null, updatedAt: now() });
+      },
       setOn: async (id, on) => saveJob({ ...mustJob(id), on, updatedAt: now() }),
       skipOnce: async (id) => {
         const job = mustJob(id);

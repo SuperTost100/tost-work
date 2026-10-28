@@ -234,6 +234,63 @@ for (const ai of SUBSCRIPTIONS) {
       }
     });
 
+    it("runs a job's task without asking, saving a dated file in the job's folder", { timeout: 600_000 }, async () => {
+      const work = await mkdtemp(join(tmpdir(), "tw-live-job-"));
+      await writeFile(join(work, "proposals.txt"), "Rossi: sent 1 Oct, no answer\nBianchi: sent 20 Oct, answered\n");
+      const job = { title: "Follow-up check", output: "Follow-ups" };
+      const engine = new AgentEngine(funnel, () => "en", { ai: async () => ai, job: () => job });
+      const tools = new ToolServer(engine);
+      await tools.start();
+      engine.attachTools(tools);
+      const store = new Store(":memory:");
+      const runner = new TaskRunner(store, engine, () => {});
+      try {
+        const { provider, model } = await engine.defaults();
+        store.saveProject({ id: "p", name: "Live", description: "", folder: work, instructions: "", createdAt: "" });
+        const task = runner.create({
+          projectId: "p",
+          workdir: work,
+          provider,
+          model,
+          effort: "low",
+          jobId: "j",
+          title: "Follow-up check",
+          brief: "List the proposals with no answer in a short plain text file (.txt).",
+        });
+        runner.launch(task.id);
+        const asked: string[] = [];
+        const final = await settle(runner, store, task.id, async (t) => {
+          if (t.question) asked.push(t.question.text);
+          if (t.approval) await runner.decide(task.id, false);
+          else if (t.question)
+            runner.answer(
+              task.id,
+              questionItems(t.question).map((q) => q.options[0] ?? "Go ahead"),
+            );
+        });
+        const made = final.files.filter((f) => f.role === "made").map((f) => f.path);
+        console.log(
+          JSON.stringify({ status: final.status, asked, made, messages: final.messages.map((m) => m.text) }, null, 2),
+        );
+        expect(final.status).toBe("done");
+        expect(asked).toEqual([]);
+        const now = new Date();
+        const today = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+          .map((n) => String(n).padStart(2, "0"))
+          .join("-");
+        const dated = made.find(
+          (p) => p.startsWith(join(work, "Follow-ups")) && p.includes(today) && p.endsWith(".txt"),
+        );
+        expect(dated).toBeDefined();
+        // The list itself: the proposal with no answer, and not the one that was answered.
+        const list = await readFile(dated ?? "", "utf8");
+        expect(list).toMatch(/Rossi/);
+        expect(list).not.toMatch(/Bianchi/);
+      } finally {
+        await tools.stop();
+      }
+    });
+
     it("searches the web and says where the facts came from", { timeout: 600_000 }, async () => {
       const work = await mkdtemp(join(tmpdir(), "tw-live-web-"));
       const engine = new AgentEngine(funnel, () => "en", { ai: async () => ai });
