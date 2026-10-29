@@ -203,6 +203,29 @@ describe("SkillFolder", () => {
     expect((await skills.duplicate("@word", (t) => `${t} (copia)`)).title).toBe("Word documents (copia)");
   });
 
+  it("shows a guide's title and description in the user's language, while its id and file stay as they are", async () => {
+    const { base, root, skills } = await folder();
+    const italian = (name: string) =>
+      name === "word" ? { title: "Documenti Word", description: "Crea un documento Word." } : null;
+    expect(await skills.builtIns(italian)).toMatchObject([
+      { id: "@word", name: "word", title: "Documenti Word", description: "Crea un documento Word.", builtIn: true },
+    ]);
+    // A guide with no translation shows the file's own text.
+    expect(await skills.builtIns(() => null)).toMatchObject([{ title: "Word documents" }]);
+    // A copy made in Italian is titled from the Italian title, but keeps the guide's own description for the agent.
+    const copy = await skills.duplicate("@word", (title) => `${title} (copia)`, italian);
+    expect(copy).toMatchObject({
+      id: "documenti-word-copia",
+      title: "Documenti Word (copia)",
+      description: "Make a Word file.",
+    });
+    expect(parseSkill(await readFile(join(root, "documenti-word-copia", "SKILL.md"), "utf8")).name).toBe(
+      "documenti-word-copia",
+    );
+    // The guide's folder is untouched.
+    expect(await readFile(join(base, "guides", "word", "SKILL.md"), "utf8")).toContain("# Word documents");
+  });
+
   it("keeps a version per save, with its note, and puts an old one back as a new version", async () => {
     const { skills } = await folder();
     const made = await skills.create("Proposal writer", "Proposals.", "1. Read.");
@@ -237,15 +260,38 @@ describe("SkillFolder", () => {
     expect(changed.version).toBe(3);
   });
 
+  it("counts a new skill's first save as version 1, since an empty skill has no version yet", async () => {
+    const { skills } = await folder();
+    const made = await skills.create("Notes");
+    expect(made.version).toBe(0);
+    expect(await skills.history(made.id)).toEqual([]);
+    const saved = await skills.save(made.id, { title: "Notes", description: "", steps: "A" });
+    expect(saved.version).toBe(1);
+    expect((await skills.history(made.id)).map((v) => v.n)).toEqual([1]);
+  });
+
   it("takes the versions along when a new title renames the folder, and a new skill with an old name starts afresh", async () => {
     const { skills } = await folder();
-    const made = await skills.create("Old name");
+    const made = await skills.create("Old name", "", "w");
     const renamed = await skills.save(made.id, { title: "New name", description: "", steps: "x" });
     expect(renamed).toMatchObject({ id: "new-name", version: 2 });
     // v1, kept under the old name, comes back as v1 under the new one, not as a new version.
     expect(await skills.restore("new-name", 1)).toMatchObject({ id: "new-name", name: "new-name", version: 1 });
     expect((await skills.history("new-name")).map((v) => v.n)).toEqual([2, 1]);
-    expect((await skills.create("Old name")).version).toBe(1);
+    expect((await skills.create("Old name", "", "w")).version).toBe(1);
+  });
+
+  it("starts afresh when a blank skill is saved under the name of one that was deleted", async () => {
+    const { root, skills } = await folder();
+    const old = await skills.create("Notes", "Minutes.", "Old steps.");
+    await skills.save(old.id, { title: "Notes", description: "Minutes.", steps: "Older steps." });
+    await skills.remove(old.id);
+    // The test's Trash only notes the path, so the folder goes here, as it does in the real Trash.
+    await rm(join(root, "notes"), { recursive: true });
+    const blank = await skills.create("New skill", "", "");
+    const saved = await skills.save(blank.id, { title: "Notes", description: "", steps: "Fresh." });
+    expect(saved).toMatchObject({ id: "notes", version: 1 });
+    expect((await skills.history("notes")).map((v) => v.n)).toEqual([1]);
   });
 
   it("imports a SKILL.md folder with its subfolders, leaving out links and hidden files", async () => {
@@ -336,7 +382,7 @@ describe("SkillFolder", () => {
       skills.save(made.id, { title: "Notes", description: "", steps: "A" }, "first"),
       skills.save(made.id, { title: "Notes", description: "", steps: "B" }, "second"),
     ]);
-    expect((await skills.history(made.id)).map((v) => v.note)).toEqual(["second", "first", undefined]);
+    expect((await skills.history(made.id)).map((v) => v.note)).toEqual(["second", "first"]);
   });
 
   it("stops unpacking a zip entry at the size limit, and leaves nothing behind", async () => {

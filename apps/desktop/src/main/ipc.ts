@@ -12,7 +12,7 @@ import {
   type SkillMenuAction,
   type TaskMenuAction,
 } from "../shared/api";
-import { languageFrom, type MessageKey, translate } from "../shared/i18n";
+import { guideText, languageFrom, type MessageKey, translate } from "../shared/i18n";
 import {
   type AgentProvider,
   BRIEF_MAX,
@@ -28,7 +28,7 @@ import type { Installer } from "./installer";
 import { type Jobs, jobDraft } from "./jobs";
 import type { KeyStore } from "./keys";
 import { removalText } from "./projects";
-import type { SkillFolder } from "./skills";
+import type { GuideText, SkillFolder } from "./skills";
 import type { Store } from "./store/store";
 import { absolutePath, oneLine, paths, settingsPatch, text } from "./validate";
 
@@ -50,8 +50,10 @@ export function registerIpc(
     return accounts[provider];
   };
   // Native dialogs speak the interface's language: the saved choice, or the system's.
-  const t = (key: MessageKey, vars?: Record<string, string>) =>
-    translate(store.getSettings().language ?? languageFrom(app.getLocale()), key, vars);
+  const language = () => store.getSettings().language ?? languageFrom(app.getLocale());
+  const t = (key: MessageKey, vars?: Record<string, string>) => translate(language(), key, vars);
+  // The built-in guides show their titles in that language too.
+  const guideInLanguage: GuideText = (name) => guideText(language(), name);
   const openDialog = (options: OpenDialogOptions) => {
     const win = window();
     return win ? dialog.showOpenDialog(win, options) : dialog.showOpenDialog(options);
@@ -356,7 +358,7 @@ export function registerIpc(
   ipcMain.handle(IPC.jobsRemove, (_e, id: unknown) => jobs.remove(text(id, "id", 100)));
   ipcMain.handle(IPC.jobsRunNow, (_e, id: unknown) => jobs.runNow(text(id, "id", 100)));
 
-  ipcMain.handle(IPC.skillsList, async () => [...(await skills.list()), ...(await skills.builtIns())]);
+  ipcMain.handle(IPC.skillsList, async () => [...(await skills.list()), ...(await skills.builtIns(guideInLanguage))]);
   ipcMain.handle(IPC.skillsCreate, (_e, title: unknown) => {
     const name = text(title, "title", 200).trim();
     if (!name) throw new Error("A skill needs a name");
@@ -366,7 +368,7 @@ export function registerIpc(
     skills.save(skillId(id), draft(value), note == null ? "" : text(note, "note", 200)),
   );
   ipcMain.handle(IPC.skillsDuplicate, (_e, id: unknown) =>
-    skills.duplicate(skillId(id), (title) => t("skills.copyOf", { title })),
+    skills.duplicate(skillId(id), (title) => t("skills.copyOf", { title }), guideInLanguage),
   );
   ipcMain.handle(IPC.skillsImport, async (_e, dropped: unknown) => {
     if (dropped != null) {

@@ -353,6 +353,7 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
                   className="title-input grow"
                   aria-label={t("skills.name")}
                   value={draft.title}
+                  title={draft.title}
                   maxLength={200}
                   readOnly={open.builtIn}
                   onChange={(e) => setDraft({ ...draft, title: e.target.value })}

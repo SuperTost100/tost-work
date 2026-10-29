@@ -11,6 +11,9 @@ import type { SkillVersions } from "./skillVersions";
 /** The most an imported skill may hold, so a folder or zip picked by mistake can't fill the disk. */
 export const IMPORT_LIMITS = { files: 500, bytes: 50 * 1024 * 1024 };
 
+/** What to show for a built-in guide, by its folder name, such as in the user's language; null shows the file's text. */
+export type GuideText = (name: string) => { title: string; description: string } | null;
+
 /** A YAML scalar as written on one line: double quotes as JSON, single quotes with '' for a quote, else as it is. */
 function scalar(value: string): string {
   if (/^".*"$/.test(value)) {
@@ -128,8 +131,11 @@ export class SkillFolder {
     return run;
   }
 
-  /** The guides Tost Work comes with, read-only, with ids that start with @ so they can't be taken for a folder here. */
-  async builtIns(): Promise<Skill[]> {
+  /**
+   * The guides Tost Work comes with, read-only, with ids that start with @ so they can't be taken for a folder here.
+   * `text` can give the title and description to show; the guide's name and files stay as they are.
+   */
+  async builtIns(text?: GuideText): Promise<Skill[]> {
     const root = this.builtInRoot;
     if (!root) return [];
     const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
@@ -137,14 +143,15 @@ export class SkillFolder {
       entries
         .filter((e) => e.isDirectory())
         .map(async (e) => {
-          const text = await readFile(join(root, e.name, "SKILL.md"), "utf8").catch(() => null);
-          if (text === null) return null;
-          const { name, description, body } = parseSkill(text);
+          const file = await readFile(join(root, e.name, "SKILL.md"), "utf8").catch(() => null);
+          if (file === null) return null;
+          const { name, description, body } = parseSkill(file);
+          const shown = text?.(e.name);
           const skill: Skill = {
             id: `@${e.name}`,
             name: name || e.name,
-            title: titleOf(name || e.name, body),
-            description,
+            title: shown?.title ?? titleOf(name || e.name, body),
+            description: shown?.description ?? description,
             steps: stepsOf(body),
             files: [],
             folder: join(root, e.name),
@@ -159,14 +166,19 @@ export class SkillFolder {
 
   /**
    * A copy of a built-in guide among the user's skills, to change as they like. `titled` names the copy, such as
-   * "Word documents (copy)", so the list never shows two skills with the same name.
+   * "Word documents (copy)", so the list never shows two skills with the same name. The copy is named after the
+   * title `text` shows, so it matches what the user clicked; its description stays the guide's own, which the agent reads.
    */
-  duplicate(id: string, titled: (title: string) => string = (title) => `${title} (copy)`): Promise<Skill> {
-    return this.serial(() => this.duplicateNow(id, titled));
+  duplicate(
+    id: string,
+    titled: (title: string) => string = (title) => `${title} (copy)`,
+    text?: GuideText,
+  ): Promise<Skill> {
+    return this.serial(() => this.duplicateNow(id, titled, text));
   }
 
-  private async duplicateNow(id: string, titled: (title: string) => string): Promise<Skill> {
-    const guide = (await this.builtIns()).find((s) => s.id === id);
+  private async duplicateNow(id: string, titled: (title: string) => string, text?: GuideText): Promise<Skill> {
+    const guide = (await this.builtIns(text)).find((s) => s.id === id);
     if (!guide) throw new Error("That isn't one of Tost Work's guides");
     await mkdir(this.root, { recursive: true });
     const title = titled(guide.title);
@@ -267,7 +279,8 @@ export class SkillFolder {
     await mkdir(join(this.root, id));
     await this.write(id, { title, description, steps });
     await this.versions?.setAside(id, this.now());
-    await this.keep(id);
+    // An empty skill is a blank page, not a version: the first save of what the user writes is version 1.
+    if (description.trim() || steps.trim()) await this.keep(id);
     return (await this.read(id)) as Skill;
   }
 
@@ -296,11 +309,15 @@ export class SkillFolder {
       if (target !== current) await rename(join(this.root, target), join(this.root, current));
       throw err;
     }
-    if (target !== current)
+    if (target !== current) {
+      // A deleted skill's versions may still be under the new name. They aren't this skill's, and a skill without
+      // versions of its own, such as a blank new one, would otherwise take them over.
+      await this.versions?.setAside(target, this.now());
       await this.versions?.rename(current, target, (text) => {
         const { description, body, extra } = parseSkill(text);
         return formatSkill(target, description, body, extra);
       });
+    }
     await this.keep(target, { note });
     return (await this.read(target)) as Skill;
   }

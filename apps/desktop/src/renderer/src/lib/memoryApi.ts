@@ -495,9 +495,9 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
           folder: `/Users/giulia/Documents/Tost Work/Skills/${id}`,
           updatedAt: now(),
         };
-        const kept = keep(skill);
-        skills = [...skills, kept];
-        return kept;
+        // As the app: a blank skill isn't a version yet, so its first save is version 1.
+        skills = [...skills, skill];
+        return skill;
       },
       save: async (id, draft, note) => {
         const current = mustSkill(id);

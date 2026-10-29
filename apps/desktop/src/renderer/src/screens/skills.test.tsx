@@ -62,6 +62,8 @@ describe("skills", () => {
     ]);
     expect(screen.getByRole("button", { name: "Proposal writer" }).getAttribute("aria-current")).toBe("true");
     expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(true);
+    // The blank skill wasn't a version, so the first save is version 1.
+    expect(screen.getByText(/^Version 1/)).toBeTruthy();
   });
 
   it("asks before leaving unsaved changes, and deletes a skill once confirmed", async () => {
@@ -211,7 +213,8 @@ describe("skills", () => {
 
   it("keeps a version on each save, and puts an old one back once confirmed", async () => {
     const api = createMemoryApi();
-    await api.skills.create("Proposal writer");
+    const made = await api.skills.create("Proposal writer");
+    await api.skills.save(made.id, { title: "Proposal writer", description: "", steps: "Read the notes." });
     render(<Root api={api} />);
     await click("Skills");
     await screen.findByLabelText("Skill name");
@@ -228,7 +231,7 @@ describe("skills", () => {
     expect(screen.getByText(/^Version 2/)).toBeTruthy();
     api.answerConfirm(true);
     await click("Restore v1");
-    expect((await stepsBox()).textContent).toBe("");
+    await waitFor(async () => expect((await stepsBox()).textContent).toBe("Read the notes."));
     // v1 is current again, with v2 still there to put back.
     expect(await screen.findByText(/^Version 1/)).toBeTruthy();
     expect(document.querySelector(".vers .current")?.textContent).toMatch(/^v1/);

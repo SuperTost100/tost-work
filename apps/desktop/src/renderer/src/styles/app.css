@@ -1958,7 +1958,9 @@ ins {
   background: transparent;
   color: var(--ink);
   padding: 2px 8px;
-  margin: 0 -8px;
+  /* Pulled out on the left only, to line the text up with the rest; a long name ends in … before the buttons. */
+  margin: 0 0 0 -8px;
+  text-overflow: ellipsis;
   border-radius: 8px;
 }
 .editor .title-input:hover,

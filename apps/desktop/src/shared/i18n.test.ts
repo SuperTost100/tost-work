@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FIRST_TASK, LINES } from "./homeLines";
-import { greeting, homeLine, languageFrom, translate } from "./i18n";
+import { greeting, guideText, homeLine, languageFrom, translate } from "./i18n";
 
 describe("i18n", () => {
   it("picks Italian for any Italian locale", () => {
@@ -13,6 +13,20 @@ describe("i18n", () => {
   it("fills placeholders and keeps unknown ones visible", () => {
     expect(translate("en", "task.questionOf", { n: "1", total: "3" })).toBe("Question 1 of 3");
     expect(translate("it", "task.questionOf", { n: "2" })).toBe("Domanda 2 di {total}");
+  });
+
+  it("names the built-in guides in Italian, and leaves English and unknown guides to their own files", () => {
+    expect(guideText("it", "word")?.title).toBe("Documenti Word");
+    expect(guideText("it", "powerpoint")?.title).toBe("Presentazioni PowerPoint");
+    for (const name of ["excel", "pdf", "powerpoint", "word"]) {
+      const text = guideText("it", name);
+      expect(text?.title).toBeTruthy();
+      expect(text?.description).toMatch(/^Crea /);
+    }
+    expect(guideText("en", "word")).toBeNull();
+    expect(guideText("it", "unknown")).toBeNull();
+    // A name like this one lives on Object.prototype, but isn't a guide.
+    expect(guideText("it", "constructor")).toBeNull();
   });
 
   it("switches greeting at noon and at six", () => {
