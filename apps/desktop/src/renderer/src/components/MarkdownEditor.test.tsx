@@ -220,11 +220,12 @@ describe("MarkdownEditor", () => {
     const box = await started("Steps");
     await type(editor.current, "/");
     expect(screen.getByRole("listbox", { name: "Turn into" })).toBeTruthy();
-    expect(options()).toEqual(["Heading", "Bulleted list", "Numbered list"]);
+    expect(options()).toEqual(["Heading", "Bulleted list", "Numbered list", "Code"]);
     const first = screen.getAllByRole("option")[0];
     expect(box.getAttribute("aria-activedescendant")).toBe(first?.id);
+    // Up from the first wraps round to the last.
     await press(box, "ArrowUp");
-    expect(screen.getByRole("option", { selected: true }).textContent).toBe("Numbered list");
+    expect(screen.getByRole("option", { selected: true }).textContent).toBe("Code");
     await press(box, "Escape");
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(box.getAttribute("aria-activedescendant")).toBeNull();
@@ -274,6 +275,36 @@ describe("MarkdownEditor", () => {
     await press(box, "Enter");
     expect(seen.at(-1)).toBe("## Plan");
     expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("turns the line into a code block, out of a list too, saved as a fenced block", async () => {
+    const seen: string[] = [];
+    const editor = createRef<Editor>();
+    render(<MarkdownEditor value={"- npm test"} label="Steps" editorRef={editor} onChange={(m) => seen.push(m)} />);
+    const box = await started("Steps");
+    await caretAt(editor.current, "npm test");
+    await type(editor.current, "/cod");
+    await press(box, "Enter");
+    expect(seen.at(-1)).toBe("```\nnpm test\n```");
+  });
+
+  it("leaves Code out for a line with an image, a link or bold, which a code block would drop", async () => {
+    const editor = createRef<Editor>();
+    render(
+      <MarkdownEditor
+        value={"Logo ![logo](logo.png)\n\nSee [docs](https://example.com)\n\nBe **careful**"}
+        label="Steps"
+        editorRef={editor}
+        onChange={() => {}}
+      />,
+    );
+    const box = await started("Steps");
+    for (const words of ["Logo", "See", "Be"]) {
+      await caretAt(editor.current, words);
+      await type(editor.current, "/");
+      expect(options()).toEqual(["Heading", "Bulleted list", "Numbered list"]);
+      await press(box, "Escape");
+    }
   });
 
   it("makes a list from the menu, switches it to the other kind, and takes an item out as text", async () => {
@@ -355,19 +386,19 @@ describe("MarkdownEditor", () => {
     const box = await started("Steps");
     await caretAt(editor.current, "Text");
     await type(editor.current, "/");
-    expect(options()).toEqual(["Heading", "Bulleted list", "Numbered list"]);
+    expect(options()).toEqual(["Heading", "Bulleted list", "Numbered list", "Code"]);
     await press(box, "Escape");
     await caretAt(editor.current, "Plan");
     await type(editor.current, "/");
-    expect(options()).toEqual(["Text", "Bulleted list", "Numbered list"]);
+    expect(options()).toEqual(["Text", "Bulleted list", "Numbered list", "Code"]);
     await press(box, "Escape");
     await caretAt(editor.current, "Bullet");
     await type(editor.current, "/");
-    expect(options()).toEqual(["Text", "Heading", "Numbered list"]);
+    expect(options()).toEqual(["Text", "Heading", "Numbered list", "Code"]);
     await press(box, "Escape");
     await caretAt(editor.current, "Number");
     await type(editor.current, "/");
-    expect(options()).toEqual(["Text", "Heading", "Bulleted list"]);
+    expect(options()).toEqual(["Text", "Heading", "Bulleted list", "Code"]);
   });
 
   it("filters over the shortened slash menu, and closes when nothing is left", async () => {

@@ -84,7 +84,7 @@ export function backspaceOutOfList(view: EditorView, event: KeyboardEvent): bool
 }
 
 /** What a line can become from the slash menu. */
-type Block = "paragraph" | "heading" | ListKind;
+type Block = "paragraph" | "heading" | ListKind | "code_block";
 
 /** The slash menu's choices, in the order it shows them. */
 const BLOCKS: { block: Block; icon: string; label: MessageKey }[] = [
@@ -92,15 +92,29 @@ const BLOCKS: { block: Block; icon: string; label: MessageKey }[] = [
   { block: "heading", icon: "heading-2", label: "editor.heading" },
   { block: "bullet_list", icon: "list-check", label: "editor.bullets" },
   { block: "ordered_list", icon: "list-ordered", label: "editor.numbers" },
+  { block: "code_block", icon: "code", label: "editor.code" },
 ];
 
 /** The block the caret's line already is, so the slash menu doesn't offer it. Only level 2 counts as the heading. */
 function blockAt(state: EditorState): Block | null {
   const line = state.selection.$from.parent;
   if (line.type.name === "heading") return line.attrs.level === 2 ? "heading" : null;
+  if (line.type.name === "code_block") return "code_block";
   const list = listAt(state);
   if (list) return list.kind;
   return line.type.name === "paragraph" ? "paragraph" : null;
+}
+
+/**
+ * Whether the caret's line holds only plain text. A code block takes text alone, so an image, a line break, a link or
+ * bold would be lost in one.
+ */
+function textOnly(state: EditorState): boolean {
+  let only = true;
+  state.selection.$from.parent.forEach((node) => {
+    if (!node.isText || node.marks.length > 0) only = false;
+  });
+  return only;
 }
 
 /** Lower case and without accents, so "citta" finds "Città". */
@@ -350,7 +364,10 @@ export function MarkdownEditor({
     // The choices that fit what's typed, without the kind of line the caret is already on.
     const shown = (state: EditorState, query: string) => {
       const here = blockAt(state);
-      return BLOCKS.filter((b) => b.block !== here && matches(latest.current.t(b.label), query));
+      const code = textOnly(state);
+      return BLOCKS.filter(
+        (b) => b.block !== here && (code || b.block !== "code_block") && matches(latest.current.t(b.label), query),
+      );
     };
     // Headings and lists come from typing "/": a menu under the caret, filtered by what follows the "/".
     const slashes = $prose(
