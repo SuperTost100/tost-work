@@ -1,9 +1,10 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
 
-const sections = () => screen.queryByRole("navigation", { name: "Sections" });
+// The sidebar in its place, not the rail nor the sidebar shown over the page from it.
+const sections = () => document.querySelector(".app > aside.side");
 
 // Find first, then act: waiting inside act holds back the updates the wait is for.
 const click = async (name: string) => {
@@ -108,5 +109,152 @@ describe("the sidebar", () => {
       api.pressMenu("toggle-sidebar");
     });
     expect(await screen.findByRole("button", { name: "Expand sidebar" })).toBeTruthy();
+  });
+});
+
+describe("the collapsed sidebar's rail", () => {
+  afterEach(() => vi.useRealTimers());
+  const hidden = () => createMemoryApi({ name: "Giulia", setupDone: true, sidebarHidden: true });
+  const peek = () => document.querySelector(".peek");
+
+  it("keeps the sections as icons, which work on their own", async () => {
+    render(<Root api={hidden()} />);
+    const rail = await screen.findByRole("navigation", { name: "Sections" });
+    expect(rail.classList.contains("rail")).toBe(true);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Projects" }));
+    });
+    expect(await screen.findByRole("heading", { name: "Projects" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Projects" }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("opens the whole sidebar over the page when the pointer rests on it, not when it passes by", async () => {
+    render(<Root api={hidden()} />);
+    const box = (await screen.findByRole("navigation", { name: "Sections" })).parentElement as HTMLElement;
+    vi.useFakeTimers();
+    // Passing by: gone before the wait is over.
+    fireEvent.pointerEnter(box);
+    act(() => vi.advanceTimersByTime(100));
+    fireEvent.pointerLeave(box);
+    act(() => vi.advanceTimersByTime(500));
+    expect(peek()).toBeNull();
+
+    fireEvent.pointerEnter(box);
+    act(() => vi.advanceTimersByTime(200));
+    expect(peek()?.querySelector("aside.side")).toBeTruthy();
+    expect(sections()).toBeNull();
+    // It stays a moment after the pointer leaves, then closes.
+    fireEvent.pointerLeave(box);
+    act(() => vi.advanceTimersByTime(200));
+    expect(peek()).toBeTruthy();
+    act(() => vi.advanceTimersByTime(100));
+    expect(peek()).toBeNull();
+  });
+
+  it("keeps the sidebar open from the one shown over the page", async () => {
+    const api = hidden();
+    render(<Root api={api} />);
+    const box = (await screen.findByRole("navigation", { name: "Sections" })).parentElement as HTMLElement;
+    vi.useFakeTimers();
+    fireEvent.pointerEnter(box);
+    act(() => vi.advanceTimersByTime(200));
+    vi.useRealTimers();
+    await click("Keep the sidebar open");
+    expect(sections()).toBeTruthy();
+    expect(peek()).toBeNull();
+    expect((await api.settings.get()).sidebarHidden).toBe(false);
+  });
+
+  it("opens for the keyboard on the same item, and Escape gives the focus back to the rail", async () => {
+    render(<Root api={hidden()} />);
+    const rail = await screen.findByRole("navigation", { name: "Sections" });
+    const skills = rail.querySelector<HTMLElement>('[data-nav="skills"]') as HTMLElement;
+    // Only the keyboard's focus shows a ring; jsdom can't tell, so the button says it does.
+    const matches = skills.matches.bind(skills);
+    Object.defineProperty(skills, "matches", {
+      value: (selector: string) => selector === ":focus-visible" || matches(selector),
+    });
+    await act(async () => {
+      skills.focus();
+    });
+    expect(peek()).toBeTruthy();
+    expect(document.activeElement?.closest(".peek")).toBeTruthy();
+    expect(document.activeElement?.getAttribute("data-nav")).toBe("skills");
+
+    await act(async () => {
+      fireEvent.keyDown(document.activeElement as Element, { key: "Escape" });
+    });
+    expect(peek()).toBeNull();
+    expect(document.activeElement).toBe(skills);
+  });
+
+  it("stays open when a click on its blank space takes the focus from a button, while the pointer is over it", async () => {
+    render(<Root api={hidden()} />);
+    const box = (await screen.findByRole("navigation", { name: "Sections" })).parentElement as HTMLElement;
+    vi.useFakeTimers();
+    fireEvent.pointerEnter(box);
+    act(() => vi.advanceTimersByTime(200));
+    const inPeek = peek()?.querySelector<HTMLElement>('[data-nav="projects"]') as HTMLElement;
+    act(() => inPeek.focus());
+    act(() => {
+      fireEvent.focusOut(inPeek, { relatedTarget: null });
+      vi.advanceTimersByTime(50);
+    });
+    expect(peek()).toBeTruthy();
+    // With the pointer gone, focus going nowhere closes it.
+    fireEvent.pointerLeave(box);
+    act(() => inPeek.focus());
+    act(() => {
+      fireEvent.focusOut(inPeek, { relatedTarget: null });
+      vi.advanceTimersByTime(50);
+    });
+    expect(peek()).toBeNull();
+  });
+
+  it("opens a task to rename it in its header, when Rename is picked in the sidebar over the page", async () => {
+    const api = hidden();
+    await api.tasks.start({ projectId: null, brief: "Sum up the calls", attachments: [] });
+    render(<Root api={api} />);
+    const box = (await screen.findByRole("navigation", { name: "Sections" })).parentElement as HTMLElement;
+    vi.useFakeTimers();
+    fireEvent.pointerEnter(box);
+    act(() => vi.advanceTimersByTime(200));
+    vi.useRealTimers();
+    api.pickInMenu("rename");
+    await click("More for Sum up the calls");
+    const field = await screen.findByRole("textbox", { name: "Rename" });
+    expect(field.closest(".peek")).toBeNull();
+    expect((field as HTMLInputElement).value).toBe("Sum up the calls");
+  });
+
+  it("still opens for the keyboard after Escape on a rail button that already had the focus", async () => {
+    render(<Root api={hidden()} />);
+    const rail = await screen.findByRole("navigation", { name: "Sections" });
+    const box = rail.parentElement as HTMLElement;
+    const ringed = (el: HTMLElement) => {
+      const matches = el.matches.bind(el);
+      Object.defineProperty(el, "matches", {
+        value: (selector: string) => selector === ":focus-visible" || matches(selector),
+      });
+    };
+    // Clicked, so focused without a ring, then opened by the resting pointer.
+    const projects = rail.querySelector<HTMLElement>('[data-nav="projects"]') as HTMLElement;
+    act(() => projects.focus());
+    vi.useFakeTimers();
+    fireEvent.pointerEnter(box);
+    act(() => vi.advanceTimersByTime(200));
+    vi.useRealTimers();
+    expect(peek()).toBeTruthy();
+    await act(async () => {
+      fireEvent.keyDown(projects, { key: "Escape" });
+    });
+    expect(peek()).toBeNull();
+
+    const skills = rail.querySelector<HTMLElement>('[data-nav="skills"]') as HTMLElement;
+    ringed(skills);
+    await act(async () => {
+      skills.focus();
+    });
+    expect(peek()).toBeTruthy();
   });
 });

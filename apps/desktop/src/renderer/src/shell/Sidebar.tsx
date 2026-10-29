@@ -1,4 +1,4 @@
-import { type MouseEvent, useEffect, useRef, useState } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
 import { withShortcut } from "@/lib/shortcut";
@@ -33,6 +33,7 @@ export function Sidebar({
   userName,
   isMac,
   onCollapse,
+  pinned = true,
   tasks,
   openTaskId,
   onOpenTask,
@@ -49,8 +50,10 @@ export function Sidebar({
   showSection?: (key: SectionKey) => boolean;
   userName: string;
   isMac: boolean;
-  /** Hides the sidebar. */
+  /** Hides the sidebar, or keeps it open when it's shown over the page from the rail. */
   onCollapse: () => void;
+  /** False while it's shown over the page from the rail: its top button then keeps it open. */
+  pinned?: boolean;
   tasks: Task[];
   openTaskId: string | null;
   onOpenTask: (id: string) => void;
@@ -87,18 +90,18 @@ export function Sidebar({
         <button
           type="button"
           className="iconbtn"
-          title={withShortcut(t("nav.collapse"), "B", isMac)}
-          aria-label={t("nav.collapse")}
+          title={withShortcut(pinned ? t("nav.collapse") : t("nav.keepOpen"), "B", isMac)}
+          aria-label={pinned ? t("nav.collapse") : t("nav.keepOpen")}
           onClick={onCollapse}
         >
-          <Icon name="layout-leftbar-close" />
+          <Icon name={pinned ? "layout-leftbar-close" : "layout-leftbar-open"} />
         </button>
       </div>
       <div className="brand">
         <Logo />
         <b>Tost Work</b>
       </div>
-      <button type="button" className="search">
+      <button type="button" className="search" data-nav="search">
         <Icon name="search" />
         {t("nav.search")}
         <kbd>{isMac ? "⌘K" : "Ctrl K"}</kbd>
@@ -108,6 +111,7 @@ export function Sidebar({
           <button
             type="button"
             key={n.id}
+            data-nav={n.id}
             className={current === n.id ? "nav on" : "nav"}
             aria-current={current === n.id ? "page" : undefined}
             title={n.id === "home" ? withShortcut(t(n.key), "N", isMac) : undefined}
@@ -169,6 +173,7 @@ export function Sidebar({
       <div className="me">
         <button
           type="button"
+          data-nav="profile"
           className={`who-btn${current === "profile" ? " on" : ""}`}
           aria-current={current === "profile" ? "page" : undefined}
           title={t("nav.profile")}
@@ -180,6 +185,7 @@ export function Sidebar({
         </button>
         <button
           type="button"
+          data-nav="settings"
           className={`iconbtn${current === "settings" ? " on" : ""}`}
           aria-current={current === "settings" ? "page" : undefined}
           title={withShortcut(t("nav.settings"), ",", isMac)}
@@ -190,6 +196,147 @@ export function Sidebar({
         </button>
       </div>
     </aside>
+  );
+}
+
+/** How long the pointer rests on the rail before the sidebar opens over the page, and stays once it's gone. */
+const PEEK_OPEN_MS = 200;
+const PEEK_CLOSE_MS = 300;
+
+/**
+ * The collapsed sidebar: a rail of the sections' icons, which opens the whole sidebar over the page when the pointer
+ * rests on it or the keyboard reaches it, without moving the page. The wait keeps a pointer passing by from opening
+ * it. `children` is that whole sidebar.
+ */
+export function SidebarRail({
+  current,
+  onNavigate,
+  showSection = () => true,
+  userName,
+  children,
+}: {
+  current: Section | null;
+  onNavigate: (s: Section) => void;
+  showSection?: (key: SectionKey) => boolean;
+  userName: string;
+  children: ReactNode;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // The item the keyboard was on in the rail, which takes the focus in the sidebar once it's open.
+  const focusNext = useRef<string | null>(null);
+  // Set while Escape hands the focus back to the rail, so that focus doesn't open the sidebar again.
+  const quiet = useRef(false);
+  // Listened to on the box itself, which only times the opening: its buttons are what the user acts on.
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const later = (ms: number, next: boolean) => {
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setOpen(next), ms);
+    };
+    // Whether the pointer is over the rail or the sidebar, which then closes only once it leaves.
+    let over = false;
+    const enter = () => {
+      over = true;
+      later(PEEK_OPEN_MS, true);
+    };
+    const leave = () => {
+      over = false;
+      later(PEEK_CLOSE_MS, false);
+    };
+    const focusIn = (e: Event) => {
+      // A click focuses its button too, but only the keyboard's focus shows a ring; the pointer has its own timing.
+      const target = e.target as HTMLElement;
+      if (quiet.current) {
+        quiet.current = false;
+        return;
+      }
+      if (el.querySelector(".peek") || !target.matches(":focus-visible")) return;
+      clearTimeout(timer.current);
+      focusNext.current = target.getAttribute("data-nav");
+      setOpen(true);
+    };
+    // Focus going elsewhere closes it, but not focus going nowhere, as a click on the sidebar's blank space does.
+    const focusOut = (e: FocusEvent) => {
+      const to = e.relatedTarget as Node | null;
+      if (to ? !el.contains(to) : !over) later(0, false);
+    };
+    // Escape closes it and puts the focus back on the same item in the rail, where the keyboard came in.
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || !el.querySelector(".peek")) return;
+      clearTimeout(timer.current);
+      const id = (e.target as HTMLElement).closest("[data-nav]")?.getAttribute("data-nav");
+      setOpen(false);
+      const back = el.querySelector<HTMLElement>(`.rail [data-nav="${id ?? "home"}"]`);
+      // The focus event comes during focus(), so the flag covers only that one; on a button that already has the
+      // focus, none comes, and the flag mustn't wait for the next.
+      quiet.current = true;
+      back?.focus();
+      quiet.current = false;
+    };
+    el.addEventListener("pointerenter", enter);
+    el.addEventListener("pointerleave", leave);
+    el.addEventListener("focusin", focusIn);
+    el.addEventListener("focusout", focusOut);
+    el.addEventListener("keydown", key);
+    return () => {
+      clearTimeout(timer.current);
+      el.removeEventListener("pointerenter", enter);
+      el.removeEventListener("pointerleave", leave);
+      el.removeEventListener("focusin", focusIn);
+      el.removeEventListener("focusout", focusOut);
+      el.removeEventListener("keydown", key);
+    };
+  }, []);
+  useEffect(() => {
+    if (!open || !focusNext.current) return;
+    box.current?.querySelector<HTMLElement>(`.peek [data-nav="${focusNext.current}"]`)?.focus();
+    focusNext.current = null;
+  }, [open]);
+  const item = (id: Section | "search", icon: string, label: string, onClick?: () => void) => (
+    <button
+      type="button"
+      key={id}
+      data-nav={id}
+      className={current === id ? "railbtn on" : "railbtn"}
+      aria-current={current === id ? "page" : undefined}
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+    >
+      <Icon name={icon} />
+    </button>
+  );
+  return (
+    <div className="railbox" ref={box}>
+      <nav className="rail" aria-label="Sections">
+        <span className="rail-chrome" />
+        <span className="rail-logo">
+          <Logo />
+        </span>
+        {item("search", "search", t("nav.search"))}
+        {NAV.filter((n) => !n.section || showSection(n.section)).map((n) =>
+          item(n.id, n.icon, t(n.key), () => onNavigate(n.id)),
+        )}
+        <span className="spacer" />
+        <button
+          type="button"
+          data-nav="profile"
+          className={current === "profile" ? "railbtn on" : "railbtn"}
+          aria-current={current === "profile" ? "page" : undefined}
+          aria-label={`${userName}, ${t("nav.profile")}`}
+          title={t("nav.profile")}
+          onClick={() => onNavigate("profile")}
+        >
+          <span className="avatar">{userName.slice(0, 1).toUpperCase()}</span>
+        </button>
+        {item("settings", "settings-3", t("nav.settings"), () => onNavigate("settings"))}
+      </nav>
+      {open && <div className="peek">{children}</div>}
+    </div>
   );
 }
 

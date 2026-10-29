@@ -15,7 +15,7 @@ import { Settings as SettingsScreen } from "@/screens/Settings";
 import { Skills } from "@/screens/Skills";
 import { Soon } from "@/screens/Soon";
 import { Task } from "@/screens/Task";
-import { RECENT, type Section, Sidebar } from "@/shell/Sidebar";
+import { RECENT, type Section, Sidebar, SidebarRail } from "@/shell/Sidebar";
 import { useData } from "@/state/useData";
 import type { MenuAction, ProjectMenuAction, TostWorkApi } from "../../shared/api";
 import { DEFAULT_SETTINGS, type ProjectOverview, type Settings, sectionOn } from "../../shared/model";
@@ -429,6 +429,38 @@ export function App({
     screen = <Soon section={sectionTitle[route.section]} />;
   }
 
+  // The sidebar, in place or, from the rail, over the page.
+  const sidebar = (pinned: boolean) => (
+    <Sidebar
+      onCollapse={toggleSidebar}
+      pinned={pinned}
+      current={section}
+      onNavigate={navigate}
+      showSection={(key) => sectionOn(current, key)}
+      userName={userName}
+      isMac={isMac}
+      tasks={tasks}
+      openTaskId={route.name === "task" ? route.id : null}
+      onOpenTask={(id) => setRoute({ name: "task", id })}
+      onTaskMenu={openTaskMenu}
+      onRenameTask={(id, title) => void api?.tasks.rename(id, title).catch(report)}
+      onRevealTask={(id) => void api?.tasks.reveal(id).catch(report)}
+      // Over the page, a task is renamed in its header, as with the sidebar hidden: the sidebar may close meanwhile.
+      renaming={pinned ? renaming : null}
+      // So the task opens first, to be renamed in its header.
+      onRenamingChange={(id) => {
+        if (id && !pinned) setRoute({ name: "task", id });
+        setRenaming(id);
+      }}
+      onDeleteTask={(id) =>
+        void api?.tasks.remove(id).then((gone) => {
+          if (!gone) return;
+          removeTask(id);
+          setRoute((r) => (r.name === "task" && r.id === id ? { name: "home" } : r));
+        }, report)
+      }
+    />
+  );
   return (
     <div className={`app${sidebarHidden ? " side-hidden" : ""}${isMac ? " mac" : ""}`}>
       {sidebarHidden && (
@@ -441,34 +473,21 @@ export function App({
             aria-label={t("nav.expand")}
             onClick={toggleSidebar}
           >
-            <Icon name="layout-leftbar-close" />
+            <Icon name="layout-leftbar-open" />
           </button>
         </div>
       )}
-      {!sidebarHidden && (
-        <Sidebar
-          onCollapse={toggleSidebar}
+      {sidebarHidden ? (
+        <SidebarRail
           current={section}
           onNavigate={navigate}
           showSection={(key) => sectionOn(current, key)}
           userName={userName}
-          isMac={isMac}
-          tasks={tasks}
-          openTaskId={route.name === "task" ? route.id : null}
-          onOpenTask={(id) => setRoute({ name: "task", id })}
-          onTaskMenu={openTaskMenu}
-          onRenameTask={(id, title) => void api?.tasks.rename(id, title).catch(report)}
-          onRevealTask={(id) => void api?.tasks.reveal(id).catch(report)}
-          renaming={renaming}
-          onRenamingChange={setRenaming}
-          onDeleteTask={(id) =>
-            void api?.tasks.remove(id).then((gone) => {
-              if (!gone) return;
-              removeTask(id);
-              setRoute((r) => (r.name === "task" && r.id === id ? { name: "home" } : r));
-            }, report)
-          }
-        />
+        >
+          {sidebar(false)}
+        </SidebarRail>
+      ) : (
+        sidebar(true)
       )}
       {screen ?? <div className="main" />}
       {error && (
