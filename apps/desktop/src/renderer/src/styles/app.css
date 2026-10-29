@@ -29,6 +29,7 @@
   --btn: #1b1712;
   --on-btn: #faf8f4;
   --need: #9a5b0b;
+  --danger: #b23a2b;
   --page-shadow: 0 1px 2px rgba(27, 23, 18, 0.06), 0 6px 18px rgba(27, 23, 18, 0.07);
   --bubble: #24211d;
   color-scheme: light;
@@ -50,6 +51,7 @@
   --btn: #eeeae3;
   --on-btn: #1b1712;
   --need: #e3a452;
+  --danger: #ec8a7a;
   --page-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.35);
   --bubble: #3b3732;
   color-scheme: dark;
@@ -72,6 +74,7 @@
     --btn: #eeeae3;
     --on-btn: #1b1712;
     --need: #e3a452;
+    --danger: #ec8a7a;
     --page-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.35);
     --bubble: #3b3732;
     color-scheme: dark;
@@ -345,7 +348,6 @@ h3 {
 .rec.on .more,
 .rec .more:focus-visible,
 .sitem:hover .more,
-.sitem.on .more,
 .sitem .more:focus-visible {
   opacity: 1;
 }
@@ -507,6 +509,14 @@ h3 {
 }
 .btn:hover {
   border-color: var(--t3);
+}
+/* A button that deletes: red words, so it doesn't read like the buttons beside it. */
+.btn.danger {
+  color: var(--danger);
+}
+.btn.danger:hover {
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--line));
+  background: color-mix(in srgb, var(--danger) 8%, var(--paper));
 }
 .btn.dark {
   background: var(--btn);
@@ -1881,11 +1891,12 @@ ins {
   padding: 6px 10px 16px;
 }
 .slist .sitem {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
   height: 34px;
-  padding: 0 4px 0 10px;
+  padding: 0 10px;
   border-radius: 8px;
   font-size: 14px;
 }
@@ -2309,10 +2320,14 @@ ol.editable li::before {
 .jrow .col2 .tbtn {
   margin-left: -10px;
 }
+/* The tag and the time stay whole: in a narrow column the time moves under the tag rather than breaking in two. */
 .jrow .jlast {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
+  max-width: 100%;
+  white-space: nowrap;
   padding: 0;
   border: 0;
   background: none;
@@ -2355,8 +2370,20 @@ ol.editable li::before {
   overflow: auto;
   font-size: 13.5px;
 }
-.instrmodal .md-tools {
-  top: -16px;
+/* The instructions sit in a field, as other inputs do, so the example inside reads apart from the hint above it. */
+.instrmodal .md-editor .ProseMirror {
+  min-height: 12lh;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+.instrmodal .md-editor .ProseMirror:focus {
+  border-color: var(--ink);
+}
+.instrmodal .md-placeholder {
+  top: 11px;
+  left: 13px;
+  right: 13px;
 }
 /* The builder: the mockup's modal, fixed over the window like the other dialogs. */
 .modal.jobmodal {
@@ -3643,12 +3670,20 @@ label.opt:has(input:focus-visible) {
   flex: none;
   margin-left: 8px;
 }
-/* What changed, under the title while there are changes to save. */
-.editor .note-input {
-  width: 100%;
-  margin-top: 12px;
+/* The … takes the version's place on hover, as a Finder row's actions do, so the list stays quiet at rest. */
+.slist .sitem .more {
+  position: absolute;
+  top: 5px;
+  right: 4px;
 }
-
+.slist .sitem:hover .open .v,
+.slist .sitem:has(.more:focus-visible) .open .v {
+  visibility: hidden;
+}
+/* A long name ends before the …, not under it. */
+.slist .sitem:is(:hover, :has(.more:focus-visible)):has(.more) .open {
+  padding-right: 18px;
+}
 /* A message with its copy button underneath, shown on hover or keyboard focus, like T3 Code. */
 .msg {
   display: flex;
@@ -3718,14 +3753,14 @@ html:has(.panel) body {
   font-size: 13px;
   gap: 5px;
 }
-.pcard {
+.panel .psec {
   display: grid;
   padding: 8px 6px 6px;
   border-radius: 12px;
   background: var(--paper);
   border: 1px solid var(--line);
 }
-.pcard h3 {
+.panel .psec h3 {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3735,7 +3770,7 @@ html:has(.panel) body {
   font-weight: 600;
   color: var(--t2);
 }
-.pcard h3 .count {
+.panel .psec h3 .count {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
@@ -3809,7 +3844,7 @@ html:has(.panel) body {
   font-size: 12.5px;
   color: var(--t2);
 }
-.pcard.quiet p {
+.panel .psec.quiet p {
   margin: 0;
   padding: 6px 8px 8px;
   font-size: 13px;

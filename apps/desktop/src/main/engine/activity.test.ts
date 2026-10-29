@@ -67,6 +67,23 @@ describe("activity", () => {
       target: "Proposta.docx",
     });
     expect(commandActivity("officecli view Proposta.docx")).toEqual({ kind: "read", target: "Proposta.docx" });
+    // A name with spaces is quoted or escaped in the command, and the whole name counts, not its last word.
+    const name = "Preventivo 2026-10-28 Ferrari & Figli.docx";
+    expect(commandActivity(`officecli set "/w/clienti/${name}" /body/p[1] --text Ciao`)).toEqual({
+      kind: "edit",
+      target: name,
+    });
+    expect(commandActivity(`/bin/bash -lc "officecli view '/w/${name}'"`)).toEqual({ kind: "read", target: name });
+    expect(commandActivity("cat Note\\ di\\ Giulia.txt")).toEqual({ kind: "read", target: "Note di Giulia.txt" });
+    expect(commandActivity(`python3 -c "open('dati.xlsx')"`)).toEqual({ kind: "work", target: "dati.xlsx" });
+    expect(commandActivity("cat O\\'Brien.txt")).toEqual({ kind: "read", target: "O'Brien.txt" });
+    expect(commandActivity("cd /w&&cat note.txt>out.md")).toEqual({ kind: "read", target: "note.txt" });
+    // The first document named is the one the command works on.
+    expect(commandActivity(`officecli view a.docx "B c.docx"`)).toEqual({ kind: "read", target: "a.docx" });
+    expect(commandActivity(`officecli view "Offerta dell'Acqua.docx"`)).toEqual({
+      kind: "read",
+      target: "Offerta dell'Acqua.docx",
+    });
     expect(commandActivity("python3 make_table.py prezzi.xlsx")).toEqual({ kind: "work", target: "prezzi.xlsx" });
     expect(commandActivity("pwd && ls")).toEqual({ kind: "folder" });
     expect(commandActivity("npm --version")).toEqual({ kind: "command" });

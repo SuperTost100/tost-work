@@ -36,7 +36,6 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
   const [skills, setSkills] = useState<Skill[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState<SkillDraft | null>(null);
-  const [note, setNote] = useState("");
   const [versions, setVersions] = useState<SkillVersion[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -48,7 +47,6 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
   const show = useCallback((skill: Skill | null) => {
     setOpenId(skill?.id ?? null);
     setDraft(skill ? draftOf(skill) : null);
-    setNote("");
   }, []);
 
   useEffect(() => {
@@ -85,7 +83,8 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
   }, [api, openId, version]);
 
   // Unsaved changes ask first, so switching skills can't lose them without a word.
-  const leave = () => !dirty || window.confirm(t("skills.discard"));
+  const leave = async () =>
+    !dirty || (await api.confirm({ message: t("skills.discard"), yes: t("skills.discardYes") }));
   const put = (skill: Skill, replacing = openId) => {
     setSkills((list) => {
       const rest = (list ?? []).filter((s) => s.id !== replacing && s.id !== skill.id);
@@ -102,8 +101,8 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
   };
 
   const create = () =>
-    leave() &&
     void run(async () => {
+      if (!(await leave())) return;
       const skill = await api.skills.create(t("skills.untitled"));
       put(skill, null);
       show(skill);
@@ -112,7 +111,7 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
     if (!open || !draft?.title.trim()) return;
     setSaving(true);
     void run(async () => {
-      const saved = await api.skills.save(open.id, draft, note.trim() || undefined);
+      const saved = await api.skills.save(open.id, draft);
       put(saved);
       show(saved);
     }).finally(() => setSaving(false));
@@ -134,8 +133,8 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
     });
   };
   const importSkill = (dropped: File[] = []) =>
-    leave() &&
     void run(async () => {
+      if (!(await leave())) return;
       // One at a time, as the folder takes them one at a time; the last one in opens. One that can't come in doesn't
       // stop the others: the error names it.
       let last: Skill | null = null;
@@ -175,8 +174,11 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
     },
   };
   const restore = (n: number) => {
-    if (!open || !leave() || !window.confirm(t("skills.restoreConfirm", { n: String(n) }))) return;
+    if (!open) return;
     void run(async () => {
+      if (!(await leave())) return;
+      if (!(await api.confirm({ message: t("skills.restoreConfirm", { n: String(n) }), yes: t("skills.restore") })))
+        return;
       const back = await api.skills.restore(open.id, n);
       put(back);
       show(back);
@@ -195,8 +197,9 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
     current.current = { skills, openId };
   });
   const remove = (skill: Skill) => {
-    if (!window.confirm(t("skills.removeConfirm", { title: skill.title }))) return;
     void run(async () => {
+      if (!(await api.confirm({ message: t("skills.removeConfirm", { title: skill.title }), yes: t("delete.yes") })))
+        return;
       await api.skills.remove(skill.id);
       const rest = (current.current.skills ?? []).filter((s) => s.id !== skill.id);
       // The user may have opened the skill while it was going: then the editor moves to another one.
@@ -230,7 +233,7 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
       if (skill.id === openId) {
         nameField.current?.focus();
         nameField.current?.select();
-      } else if (leave()) {
+      } else if (await leave()) {
         renameNext.current = true;
         show(skill);
       }
@@ -252,7 +255,7 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
         type="button"
         className="open"
         aria-current={s.id === openId ? "true" : undefined}
-        onClick={() => s.id !== openId && leave() && show(s)}
+        onClick={() => void (async () => s.id !== openId && (await leave()) && show(s))()}
         onContextMenu={s.builtIn ? undefined : contextMenu(s)}
       >
         <span className="truncate grow">{s.title}</span>
@@ -380,16 +383,6 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
                       .filter(Boolean)
                       .join(" · ")}
               </p>
-              {dirty && (
-                <input
-                  className="input note-input"
-                  aria-label={t("skills.note")}
-                  placeholder={t("skills.note")}
-                  value={note}
-                  maxLength={200}
-                  onChange={(e) => setNote(e.target.value)}
-                />
-              )}
               <label className="doc-h" htmlFor="skill-when">
                 {t("skills.when")}
               </label>

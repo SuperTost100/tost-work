@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { messageHtml, messagePlain } from "./AgentMessage";
+import { messageHtml, messagePlain, typingRate } from "./AgentMessage";
 
 describe("messageHtml", () => {
   it("keeps paragraphs, line breaks, lists and bold", () => {
@@ -42,5 +42,20 @@ describe("messagePlain", () => {
     expect(messagePlain(messageHtml("> Prima.\n>\n> Seconda."))).toBe("Prima.\n\nSeconda.");
     expect(messagePlain(messageHtml("```\n  indented\nnot\n```"))).toBe("  indented\nnot");
     expect(messagePlain("loose <strong>text</strong><p>Then a paragraph.</p>")).toBe("loose text\n\nThen a paragraph.");
+  });
+});
+
+describe("typingRate", () => {
+  it("types an answer that came all at once at about the pace an AI writes, not in a flash", () => {
+    // Shows a 1,500-character recap the way the window does, a tenth of a second at a time.
+    let shown = 0;
+    let seconds = 0;
+    while (shown < 1500) {
+      shown += typingRate(1500 - shown) / 10;
+      seconds += 0.1;
+    }
+    expect(seconds).toBeGreaterThan(5);
+    expect(typingRate(20)).toBe(120);
+    expect(typingRate(100_000)).toBe(300);
   });
 });

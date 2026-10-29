@@ -34,6 +34,7 @@ const api: TostWorkApi = {
       ipcRenderer.removeListener(IPC.menuAction, handler);
     };
   },
+  confirm: (question) => ipcRenderer.invoke(IPC.confirm, question),
   panel: {
     open: (target) => ipcRenderer.send(IPC.panelOpen, target),
     quit: () => ipcRenderer.send(IPC.panelQuit),

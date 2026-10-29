@@ -76,6 +76,13 @@ export type MenuAction =
   | "reveal"
   | "toggle-sidebar";
 
+/** A question before something that can't be undone: what will happen, more detail if needed, and the button's word. */
+export interface Confirmation {
+  message: string;
+  detail?: string;
+  yes: string;
+}
+
 /** What the preload exposes to the interface as `window.tostWork`. */
 export type JobChange = Job | { id: string; removed: true };
 
@@ -103,6 +110,11 @@ export interface TostWorkApi {
   };
   /** Tells the menu bar whether a task is open and working, so its Task items turn on and off with it. */
   menuState(state: MenuState): void;
+  /**
+   * Asks before something that can't be undone, in the system's own dialog with Cancel as the default button, as
+   * deleting a task does. Resolves true when the user picks `yes`.
+   */
+  confirm(question: Confirmation): Promise<boolean>;
   /** The subscriptions, one per agent CLI. */
   account: {
     status(provider: AgentProvider): Promise<AgentAccount>;
@@ -260,6 +272,7 @@ export const IPC = {
   takePendingMenu: "window:take-pending-menu",
   panelOpen: "panel:open",
   panelQuit: "panel:quit",
+  confirm: "dialog:confirm",
   panelFit: "panel:fit",
   fullScreen: "window:full-screen",
   jobsList: "jobs:list",

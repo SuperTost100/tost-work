@@ -19,7 +19,10 @@ const click = async (name: string | RegExp, role: "button" | "switch" | "radio" 
 // The result step lists its choice again in the step list, so the field is read on its own.
 const folderField = (dialog: HTMLElement) => within(within(dialog).getByRole("group", { name: "Where the files go" }));
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
 
 describe("jobs", () => {
   it("asks for a project before the first job", async () => {
@@ -31,6 +34,8 @@ describe("jobs", () => {
   });
 
   it("makes a weekly job through the four steps, then skips it once and turns it off", async () => {
+    // The screen's clock, set to the memory API's day: a skip is dated by that clock, and only one still ahead shows.
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(Date.UTC(2026, 9, 26, 9)) });
     const api = createMemoryApi();
     await api.projects.create({ name: "Newsletter", folder: "/home/giulia/Newsletter" });
     render(<App userName="Giulia" api={api} settings={settings} />);
@@ -144,7 +149,6 @@ describe("jobs", () => {
   it("refuses a job without a name, runs one to try it, and deletes it", async () => {
     const api = createMemoryApi();
     await api.projects.create({ name: "Clients", folder: "/home/giulia/Clients" });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<App userName="Giulia" api={api} settings={settings} />);
     await click("Jobs");
     await click("New job");
@@ -171,6 +175,7 @@ describe("jobs", () => {
     await click("Jobs");
     await click("Edit job: Follow-up check");
     await click("Delete job");
+    expect(api.confirmCalls.at(-1)?.yes).toBe("Delete job");
     expect(await api.jobs.list()).toEqual([]);
   });
 

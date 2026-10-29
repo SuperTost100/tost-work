@@ -37,8 +37,15 @@ function PanelBody({ api, lang }: { api: TostWorkApi; lang: Language }) {
   // Every working or waiting task, however old, kept up to date as tasks change.
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  // The panel is hidden, not closed, between clicks, so it reads the projects again each time it opens: one may have
+  // been added or renamed meanwhile.
   useEffect(() => {
-    void api.projects.list().then(setProjects);
+    const load = () => void api.projects.list().then(setProjects);
+    load();
+    window.addEventListener("focus", load);
+    return () => window.removeEventListener("focus", load);
+  }, [api]);
+  useEffect(() => {
     void api.tasks.listActive().then((active) =>
       // A change that came while the list loaded is newer than the list's copy.
       setTasks((seen) => [...seen, ...active.filter((t) => !seen.some((s) => s.id === t.id))]),
@@ -98,7 +105,7 @@ function PanelBody({ api, lang }: { api: TostWorkApi; lang: Language }) {
       </header>
 
       {needs.length > 0 && (
-        <section className="pcard">
+        <section className="psec">
           <h3>
             {t("panel.needsYou")}
             <span className="count">{needs.length}</span>
@@ -117,7 +124,7 @@ function PanelBody({ api, lang }: { api: TostWorkApi; lang: Language }) {
       )}
 
       {working.length > 0 && (
-        <section className="pcard">
+        <section className="psec">
           <h3>{t("panel.working")}</h3>
           {working.map((task) => (
             <button key={task.id} type="button" className="prow" onClick={() => api.panel.open({ taskId: task.id })}>
@@ -133,7 +140,7 @@ function PanelBody({ api, lang }: { api: TostWorkApi; lang: Language }) {
       )}
 
       {next.length > 0 && (
-        <section className="pcard">
+        <section className="psec">
           <h3>{t("panel.next")}</h3>
           {next.map(({ job, at }) => (
             <div key={job.id} className="prow still">
@@ -149,7 +156,7 @@ function PanelBody({ api, lang }: { api: TostWorkApi; lang: Language }) {
       )}
 
       {needs.length === 0 && working.length === 0 && (
-        <section className="pcard quiet">
+        <section className="psec quiet">
           <p>{t("panel.quiet")}</p>
         </section>
       )}

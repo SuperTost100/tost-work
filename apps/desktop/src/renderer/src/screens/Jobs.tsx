@@ -357,8 +357,9 @@ function JobBuilder({
     }
   };
   const remove = async () => {
-    if (!job || !window.confirm(t("jobs.deleteConfirm"))) return;
+    if (!job) return;
     try {
+      if (!(await api.confirm({ message: t("jobs.deleteConfirm"), yes: t("jobs.delete") }))) return;
       await api.jobs.remove(job.id);
       onClose();
     } catch (err) {
@@ -576,7 +577,7 @@ function JobBuilder({
           </div>
           <div className="mf">
             {job ? (
-              <button type="button" className="btn" onClick={() => void remove()}>
+              <button type="button" className="btn danger" onClick={() => void remove()}>
                 {t("jobs.delete")}
               </button>
             ) : (

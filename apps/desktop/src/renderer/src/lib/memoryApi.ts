@@ -1,5 +1,6 @@
 import type {
   AgentAccount,
+  Confirmation,
   JobChange,
   MenuAction,
   MenuState,
@@ -57,6 +58,10 @@ export type MemoryApi = TostWorkApi & {
   pickInProjectMenu(action: ProjectMenuAction | null): void;
   /** Whether the next "Remove from Tost Work" is confirmed. It is, unless told otherwise. */
   confirmRemoval(yes: boolean): void;
+  /** What the next `confirm` answers: yes, unless told otherwise. */
+  answerConfirm(yes: boolean): void;
+  /** Every question `confirm` asked. */
+  confirmCalls: Confirmation[];
   /** Picks an item in the menu bar, as the user would. */
   pressMenu(action: MenuAction): void;
   /** As a click on a notification does. */
@@ -151,6 +156,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   let menuState: MenuState = { task: false, running: false };
   let projectMenuPick: ProjectMenuAction | null = null;
   let removalConfirmed = true;
+  let confirmAnswer = true;
 
   // Ids never come back, even after a task is removed.
   let taskCount = 0;
@@ -165,6 +171,14 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
     },
     confirmRemoval: (yes) => {
       removalConfirmed = yes;
+    },
+    answerConfirm: (yes) => {
+      confirmAnswer = yes;
+    },
+    confirmCalls: [],
+    confirm: async (question) => {
+      api.confirmCalls.push(question);
+      return confirmAnswer;
     },
     versions: { app: "0.0.1", electron: "test" },
     onMenu: (l) => {

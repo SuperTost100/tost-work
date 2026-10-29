@@ -49,6 +49,19 @@ describe("the menu-bar panel", () => {
     expect(api.panelCalls.quit).toBe(1);
   });
 
+  it("shows a project's new name the next time it opens", async () => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    await api.tasks.start({ projectId: project.id, brief: "Write the quote", attachments: [] });
+    render(<Panel api={api} />);
+    expect(await screen.findByText("Courses")).toBeTruthy();
+    await api.projects.update(project.id, { name: "AI courses" });
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    expect(await screen.findByText("AI courses")).toBeTruthy();
+  });
+
   it("lists a waiting task even when it's older than the recent list", async () => {
     const api = createMemoryApi();
     await api.tasks.start({ projectId: null, brief: "An old quote", attachments: [] });

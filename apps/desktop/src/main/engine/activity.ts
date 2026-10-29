@@ -9,7 +9,20 @@ export interface ActivityLine {
 const fileName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 
 /** Files a person would recognise, so a command that touches one names it. */
-const DOCUMENT = /[^\s"'`/\\]+\.(docx|xlsx|pptx|pdf|txt|md|csv|json|html|doc|xls|ppt|odt|ods|png|jpe?g)\b/i;
+const EXTENSIONS = "docx|xlsx|pptx|pdf|txt|md|csv|json|html|doc|xls|ppt|odt|ods|png|jpe?g";
+/** A path in quotes, which may hold spaces: everything up to the closing quote is the path. */
+const QUOTED_DOCUMENT = new RegExp(`"([^"\\n]*\\.(?:${EXTENSIONS}))"|'([^'\\n]*\\.(?:${EXTENSIONS}))'`, "i");
+/** A bare path, whose spaces or quotes, if any, are escaped with a backslash. It ends at a shell operator. */
+const DOCUMENT = new RegExp(`(?:[^\\s"'\`\\\\;&|<>()]|\\\\.)+\\.(?:${EXTENSIONS})\\b`, "i");
+
+/** The first document a command names, quoted or not, by its file name, or undefined. */
+function documentIn(command: string): string | undefined {
+  const quoted = QUOTED_DOCUMENT.exec(command);
+  const bare = DOCUMENT.exec(command);
+  const path =
+    quoted && (!bare || quoted.index <= bare.index) ? (quoted[1] ?? quoted[2]) : bare?.[0].replace(/\\(.)/g, "$1");
+  return path === undefined ? undefined : fileName(path);
+}
 /** A skill or guide being read: its folder names it. */
 const SKILL_FILE = /([^\s"'`/\\]+)[/\\]SKILL\.md\b/;
 
@@ -41,7 +54,7 @@ export function commandActivity(command: string, builtIns?: string): ActivityLin
   const inner = innerCommand(command);
   const skill = skillRead(inner, builtIns);
   if (skill) return { kind: "skill", target: skill };
-  const doc = DOCUMENT.exec(inner)?.[0];
+  const doc = documentIn(inner);
   if (doc && OFFICE_WRITES.test(inner)) return { kind: "edit", target: doc };
   if (doc && (OFFICE_READS.test(inner) || READS.test(` ${inner}`))) return { kind: "read", target: doc };
   if (LISTS.test(inner)) return { kind: "folder" };

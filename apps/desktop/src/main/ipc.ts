@@ -235,19 +235,32 @@ export function registerIpc(
     const error = await shell.openPath(taskOf(id).workdir);
     if (error) throw new Error(error);
   });
-  ipcMain.handle(IPC.tasksRemove, async (_e, id: unknown) => {
-    const task = taskOf(id);
+  // Before anything that can't be undone: the system's dialog, with Cancel the default so Return can't delete.
+  const askFirst = async (message: string, detail: string | undefined, yes: string) => {
     const options = {
       type: "warning" as const,
-      message: t("delete.confirm", { name: task.title }),
-      detail: t("delete.detail"),
-      buttons: [t("delete.yes"), t("save.cancel")],
+      message,
+      ...(detail ? { detail } : {}),
+      buttons: [yes, t("save.cancel")],
       defaultId: 1,
       cancelId: 1,
     };
     const win = window();
     const { response } = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options);
-    if (response !== 0) return false;
+    return response === 0;
+  };
+  ipcMain.handle(IPC.confirm, (_e, question: unknown) => {
+    if (typeof question !== "object" || question === null) throw new Error("question must be an object");
+    const q = question as Record<string, unknown>;
+    return askFirst(
+      text(q.message, "message", 500),
+      q.detail === undefined ? undefined : text(q.detail, "detail", 1000),
+      text(q.yes, "yes", 60),
+    );
+  });
+  ipcMain.handle(IPC.tasksRemove, async (_e, id: unknown) => {
+    const task = taskOf(id);
+    if (!(await askFirst(t("delete.confirm", { name: task.title }), t("delete.detail"), t("delete.yes")))) return false;
     runner.remove(task.id);
     return true;
   });
@@ -290,17 +303,7 @@ export function registerIpc(
     const project = projectOf(id);
     const lang = store.getSettings().language ?? languageFrom(app.getLocale());
     const { message, detail } = removalText(lang, project.name, store.projectUsage(project.id));
-    const options = {
-      type: "warning" as const,
-      message,
-      detail,
-      buttons: [t("project.removeYes"), t("save.cancel")],
-      defaultId: 1,
-      cancelId: 1,
-    };
-    const win = window();
-    const { response } = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options);
-    if (response !== 0) return false;
+    if (!(await askFirst(message, detail, t("project.removeYes")))) return false;
     // Working tasks end first: a run still ending would save its task back after the project is gone. Only the
     // app's records go. The folder is never touched.
     await runner.stopProject(project.id);

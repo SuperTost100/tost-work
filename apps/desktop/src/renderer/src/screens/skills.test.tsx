@@ -68,7 +68,7 @@ describe("skills", () => {
     const api = createMemoryApi();
     await api.skills.create("Brand voice");
     await api.skills.create("Price table");
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    api.answerConfirm(false);
     render(<Root api={api} />);
     await click("Skills");
     await screen.findByLabelText("Skill name");
@@ -76,10 +76,10 @@ describe("skills", () => {
     fireEvent.change(screen.getByLabelText("When to use it"), { target: { value: "Changed" } });
     await click("Price table");
     // Refused: the edit stays on screen.
-    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(api.confirmCalls.map((q) => q.yes)).toEqual(["Leave without saving"]);
     expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Brand voice");
 
-    confirm.mockReturnValue(true);
+    api.answerConfirm(true);
     await click("Price table");
     expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Price table");
 
@@ -89,7 +89,13 @@ describe("skills", () => {
     // Delete is in the skill's … menu, as for a task.
     api.pickInMenu("delete");
     await click("More for Price table");
-    expect((await api.skills.list()).filter((s) => !s.builtIn).map((s) => s.title)).toEqual(["Brand voice"]);
+    await waitFor(async () =>
+      expect((await api.skills.list()).filter((s) => !s.builtIn).map((s) => s.title)).toEqual(["Brand voice"]),
+    );
+    expect(api.confirmCalls.at(-1)).toEqual({
+      message: 'Delete "Price table"? Its folder goes to the Trash.',
+      yes: "Delete",
+    });
     expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Brand voice");
   });
 
@@ -111,7 +117,6 @@ describe("skills", () => {
     expect(document.activeElement).toBe(name);
 
     // Deleting a skill that isn't open leaves the open one on screen.
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     api.pickInMenu("delete");
     await act(async () => {
       fireEvent.contextMenu(screen.getByRole("button", { name: "Brand voice" }));
@@ -124,7 +129,6 @@ describe("skills", () => {
     const api = createMemoryApi();
     await api.skills.create("Brand voice");
     await api.skills.create("Price table");
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const realRemove = api.skills.remove;
     let finish = () => {};
     api.skills.remove = (id) =>
@@ -149,7 +153,6 @@ describe("skills", () => {
     await api.skills.create("Brand voice");
     await api.skills.create("Price table");
     await api.skills.create("Zoom notes");
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const realRemove = api.skills.remove;
     const pending: (() => Promise<void>)[] = [];
     api.skills.remove = (id) =>
@@ -184,19 +187,24 @@ describe("skills", () => {
     expect((await api.skills.list()).filter((s) => !s.builtIn).map((s) => s.id)).toEqual(["word-documents-copy"]);
   });
 
-  it("keeps a version with its note on each save, and puts an old one back", async () => {
+  it("keeps a version on each save, and puts an old one back once confirmed", async () => {
     const api = createMemoryApi();
     await api.skills.create("Proposal writer");
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<Root api={api} />);
     await click("Skills");
     await screen.findByLabelText("Skill name");
     await typeSteps("<p>Round prices.</p>");
-    fireEvent.change(screen.getByLabelText("What changed, if you like"), { target: { value: "price rounding" } });
+    // Versions save on their own: there's no note to write.
+    expect(screen.queryByLabelText("What changed, if you like")).toBeNull();
     await click("Save");
-    expect(await screen.findByText("v2 · price rounding")).toBeTruthy();
+    await waitFor(() => expect(document.querySelector(".vers .current")?.textContent).toMatch(/^v2/));
     expect(screen.getByText(/^Version 2/)).toBeTruthy();
 
+    api.answerConfirm(false);
+    await click("Restore v1");
+    expect(api.confirmCalls.at(-1)?.yes).toBe("Restore");
+    expect(screen.getByText(/^Version 2/)).toBeTruthy();
+    api.answerConfirm(true);
     await click("Restore v1");
     expect((await stepsBox()).textContent).toBe("");
     // v1 is current again, with v2 still there to put back.

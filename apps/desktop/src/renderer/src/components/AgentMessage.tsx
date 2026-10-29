@@ -162,8 +162,11 @@ export function AgentMessage({ text }: { text: string }) {
   );
 }
 
-/** Characters added per frame: a few, more when far behind, so an answer that came all at once still types quickly. */
-const typingStep = (behind: number) => Math.min(24, Math.max(2, Math.ceil(behind / 20)));
+/**
+ * Characters shown per second: about the pace the AIs write at, a little faster when far behind, so an answer that
+ * came all at once types like one being written. By the clock, not per frame, since a Mac's screen may draw 120.
+ */
+export const typingRate = (behind: number) => Math.min(300, Math.max(120, behind / 3));
 
 /**
  * An answer appearing as it's written, at an even pace whether the words come one at a time or a paragraph at once.
@@ -182,11 +185,34 @@ export function TypedMessage({
   const still = useMemo(() => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false, []);
   const [shown, setShown] = useState(() => Math.min(from, text.length));
   const end = still ? text.length : shown;
+  // Read by the running loop, so words arriving don't restart it and lose its clock.
+  const latest = useRef({ shown, length: text.length });
+  latest.current = { shown, length: text.length };
+  const done = shown >= text.length;
   useEffect(() => {
-    if (still || shown >= text.length) return;
-    const frame = requestAnimationFrame(() => setShown((n) => Math.min(text.length, n + typingStep(text.length - n))));
+    if (still || done) return;
+    let frame = 0;
+    let last: number | null = null;
+    // The fraction of a character a short frame leaves over, carried to the next.
+    let carry = 0;
+    const step = (now: number) => {
+      const { shown: at, length } = latest.current;
+      if (at >= length) return;
+      // A long pause, such as a hidden window, doesn't pour out the backlog at once.
+      const seconds = last === null ? 0 : Math.min(0.1, (now - last) / 1000);
+      last = now;
+      const due = carry + seconds * typingRate(length - at);
+      const whole = Math.floor(due);
+      carry = due - whole;
+      if (whole > 0) {
+        latest.current = { shown: Math.min(length, at + whole), length };
+        setShown(latest.current.shown);
+      }
+      frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
-  }, [still, shown, text.length]);
+  }, [still, done]);
   useEffect(() => onShown?.(end), [end, onShown]);
   // Whole words only, so none shows half typed.
   const cut = end >= text.length ? end : text.slice(0, end).search(/\S*$/);
