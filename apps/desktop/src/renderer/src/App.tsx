@@ -4,7 +4,6 @@ import { NewProjectDialog } from "@/components/NewProjectDialog";
 import { ProjectInstructionsDialog } from "@/components/ProjectInstructionsDialog";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
-import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
 import { Home } from "@/screens/Home";
 import { Jobs } from "@/screens/Jobs";
@@ -463,26 +462,14 @@ export function App({
   );
   return (
     <div className={`app${sidebarHidden ? " side-hidden" : ""}${isMac ? " mac" : ""}`}>
-      {sidebarHidden && (
-        <div className="reveal">
-          {isMac && <span className="lights-space" />}
-          <button
-            type="button"
-            className="iconbtn"
-            title={withShortcut(t("nav.expand"), "B", isMac)}
-            aria-label={t("nav.expand")}
-            onClick={toggleSidebar}
-          >
-            <Icon name="layout-leftbar-open" />
-          </button>
-        </div>
-      )}
       {sidebarHidden ? (
         <SidebarRail
           current={section}
           onNavigate={navigate}
           showSection={(key) => sectionOn(current, key)}
           userName={userName}
+          isMac={isMac}
+          onExpand={toggleSidebar}
         >
           {sidebar(false)}
         </SidebarRail>

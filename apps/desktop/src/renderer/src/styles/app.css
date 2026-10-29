@@ -3107,26 +3107,15 @@ ol.editable li::before {
 }
 .side .chrome button,
 .top button,
-.top a,
-.reveal button {
+.top a {
   -webkit-app-region: no-drag;
 }
 .lights-space {
   width: 64px;
 }
-/* With the sidebar collapsed, its button waits at the top of the rail, after the window buttons on a Mac. */
-.reveal {
-  position: absolute;
-  top: 0;
-  left: 14px;
-  z-index: 1;
-  height: 44px;
-  display: flex;
-  align-items: center;
-}
-/* On a Mac the window buttons and that button run past the rail, so the page's top bar leaves room for them. */
+/* The window buttons run past the rail, so the top bar starts after them. */
 .side-hidden.mac .top {
-  padding-left: 58px;
+  padding-left: 34px;
 }
 :focus-visible {
   outline: 2px solid var(--ink);
@@ -3633,6 +3622,10 @@ label.opt:has(input:focus-visible) {
 [data-full-screen] .side .brand {
   padding-top: 16px;
 }
+/* The rail's logo stays level with the sidebar's. */
+[data-full-screen] .rail-chrome {
+  height: 10px;
+}
 [data-full-screen] .side-hidden.mac .top {
   padding-left: 22px;
 }
@@ -3964,11 +3957,46 @@ html:has(.panel) body {
 }
 .rail-logo {
   display: grid;
-  padding: 6px 0 14px;
+  padding: 2px 0 10px;
 }
-.rail-logo svg {
+/* The logo turns into the sidebar button under the pointer. Its 32px box sits 4px out, so the logo stays in place. */
+.logo-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin: -4px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--t2);
+  cursor: pointer;
+}
+.rail-logo .logo-btn {
+  margin: 0;
+}
+.logo-btn > * {
+  grid-area: 1 / 1;
+  transition: opacity 120ms;
+}
+.logo-btn svg {
   width: 24px;
   height: 24px;
+}
+.logo-btn .ic {
+  opacity: 0;
+}
+.logo-btn:is(:hover, :focus-visible) {
+  background: var(--hover);
+  color: var(--ink);
+}
+.logo-btn:is(:hover, :focus-visible) svg {
+  opacity: 0;
+}
+.logo-btn:is(:hover, :focus-visible) .ic {
+  opacity: 1;
 }
 .railbtn {
   display: grid;
@@ -3996,6 +4024,8 @@ html:has(.panel) body {
   height: 36px;
   margin-bottom: 2px;
 }
+/* Over the page, the rail grows into the whole sidebar: the same items at the same heights, revealed left to right.
+   A transition, so reopening while it folds carries on from the width it has reached. */
 .peek {
   position: absolute;
   top: 0;
@@ -4003,10 +4033,26 @@ html:has(.panel) body {
   left: 0;
   z-index: 20;
   display: flex;
+  width: 248px;
+  overflow: hidden;
   box-shadow:
     0 0 0 1px var(--line-2),
     0 16px 48px rgba(27, 23, 18, 0.18);
-  animation: peek-in 140ms ease-out;
+  transition: width 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@starting-style {
+  .peek {
+    width: 56px;
+  }
+}
+/* It still takes the pointer while it folds, so coming back over any part of it opens it again. */
+.peek.folding {
+  width: 56px;
+  transition: width 120ms ease-in;
+}
+/* Its top bar doesn't drag the window there, or the pointer would leave the sidebar on the way to its buttons. */
+.peek .side .chrome {
+  -webkit-app-region: no-drag;
 }
 :root[data-theme="dark"] .peek {
   box-shadow:
@@ -4017,14 +4063,9 @@ html:has(.panel) body {
   height: 100%;
   border-right: 0;
 }
-@keyframes peek-in {
-  from {
-    opacity: 0;
-    transform: translateX(-10px);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .peek {
-    animation: none;
+  .peek,
+  .peek.folding {
+    transition: none;
   }
 }

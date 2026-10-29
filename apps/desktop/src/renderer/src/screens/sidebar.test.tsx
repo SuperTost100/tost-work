@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
+import { PEEK_FOLD_MS } from "@/shell/Sidebar";
 
 // The sidebar in its place, not the rail nor the sidebar shown over the page from it.
 const sections = () => document.querySelector(".app > aside.side");
@@ -116,10 +117,16 @@ describe("the collapsed sidebar's rail", () => {
   afterEach(() => vi.useRealTimers());
   const hidden = () => createMemoryApi({ name: "Giulia", setupDone: true, sidebarHidden: true });
   const peek = () => document.querySelector(".peek");
+  // The rail's listeners are attached in an effect, which may run just after the rail shows: let it run first.
+  const findRail = async () => {
+    const rail = await screen.findByRole("navigation", { name: "Sections" });
+    await act(async () => {});
+    return rail;
+  };
 
   it("keeps the sections as icons, which work on their own", async () => {
     render(<Root api={hidden()} />);
-    const rail = await screen.findByRole("navigation", { name: "Sections" });
+    const rail = await findRail();
     expect(rail.classList.contains("rail")).toBe(true);
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Projects" }));
@@ -130,7 +137,7 @@ describe("the collapsed sidebar's rail", () => {
 
   it("opens the whole sidebar over the page when the pointer rests on it, not when it passes by", async () => {
     render(<Root api={hidden()} />);
-    const box = (await screen.findByRole("navigation", { name: "Sections" })).parentElement as HTMLElement;
+    const box = (await findRail()).parentElement as HTMLElement;
     vi.useFakeTimers();
     // Passing by: gone before the wait is over.
     fireEvent.pointerEnter(box);
@@ -143,18 +150,37 @@ describe("the collapsed sidebar's rail", () => {
     act(() => vi.advanceTimersByTime(200));
     expect(peek()?.querySelector("aside.side")).toBeTruthy();
     expect(sections()).toBeNull();
-    // It stays a moment after the pointer leaves, then closes.
+    // It stays a moment after the pointer leaves, then folds back into the rail and goes.
     fireEvent.pointerLeave(box);
     act(() => vi.advanceTimersByTime(200));
-    expect(peek()).toBeTruthy();
+    expect(peek()?.classList.contains("folding")).toBe(false);
     act(() => vi.advanceTimersByTime(100));
+    expect(peek()?.classList.contains("folding")).toBe(true);
+    // The pointer coming back while it folds opens it again, at once.
+    fireEvent.pointerEnter(box);
+    act(() => vi.advanceTimersByTime(0));
+    expect(peek()?.classList.contains("folding")).toBe(false);
+    fireEvent.pointerLeave(box);
+    act(() => vi.advanceTimersByTime(300));
+    act(() => vi.advanceTimersByTime(PEEK_FOLD_MS));
     expect(peek()).toBeNull();
+  });
+
+  it("expands the sidebar from the logo on the rail", async () => {
+    const api = hidden();
+    render(<Root api={api} />);
+    const rail = await findRail();
+    await act(async () => {
+      fireEvent.click(rail.querySelector(".logo-btn") as Element);
+    });
+    expect(sections()).toBeTruthy();
+    expect((await api.settings.get()).sidebarHidden).toBe(false);
   });
 
   it("keeps the sidebar open from the one shown over the page", async () => {
     const api = hidden();
     render(<Root api={api} />);
-    const box = (await screen.findByRole("navigation", { name: "Sections" })).parentElement as HTMLElement;
+    const box = (await findRail()).parentElement as HTMLElement;
     vi.useFakeTimers();
     fireEvent.pointerEnter(box);
     act(() => vi.advanceTimersByTime(200));
@@ -167,7 +193,7 @@ describe("the collapsed sidebar's rail", () => {
 
   it("opens for the keyboard on the same item, and Escape gives the focus back to the rail", async () => {
     render(<Root api={hidden()} />);
-    const rail = await screen.findByRole("navigation", { name: "Sections" });
+    const rail = await findRail();
     const skills = rail.querySelector<HTMLElement>('[data-nav="skills"]') as HTMLElement;
     // Only the keyboard's focus shows a ring; jsdom can't tell, so the button says it does.
     const matches = skills.matches.bind(skills);
@@ -190,7 +216,7 @@ describe("the collapsed sidebar's rail", () => {
 
   it("stays open when a click on its blank space takes the focus from a button, while the pointer is over it", async () => {
     render(<Root api={hidden()} />);
-    const box = (await screen.findByRole("navigation", { name: "Sections" })).parentElement as HTMLElement;
+    const box = (await findRail()).parentElement as HTMLElement;
     vi.useFakeTimers();
     fireEvent.pointerEnter(box);
     act(() => vi.advanceTimersByTime(200));
@@ -208,6 +234,7 @@ describe("the collapsed sidebar's rail", () => {
       fireEvent.focusOut(inPeek, { relatedTarget: null });
       vi.advanceTimersByTime(50);
     });
+    act(() => vi.advanceTimersByTime(PEEK_FOLD_MS));
     expect(peek()).toBeNull();
   });
 
@@ -215,7 +242,7 @@ describe("the collapsed sidebar's rail", () => {
     const api = hidden();
     await api.tasks.start({ projectId: null, brief: "Sum up the calls", attachments: [] });
     render(<Root api={api} />);
-    const box = (await screen.findByRole("navigation", { name: "Sections" })).parentElement as HTMLElement;
+    const box = (await findRail()).parentElement as HTMLElement;
     vi.useFakeTimers();
     fireEvent.pointerEnter(box);
     act(() => vi.advanceTimersByTime(200));
@@ -229,7 +256,7 @@ describe("the collapsed sidebar's rail", () => {
 
   it("still opens for the keyboard after Escape on a rail button that already had the focus", async () => {
     render(<Root api={hidden()} />);
-    const rail = await screen.findByRole("navigation", { name: "Sections" });
+    const rail = await findRail();
     const box = rail.parentElement as HTMLElement;
     const ringed = (el: HTMLElement) => {
       const matches = el.matches.bind(el);

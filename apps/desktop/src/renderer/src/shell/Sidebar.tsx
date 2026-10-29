@@ -87,18 +87,21 @@ export function Sidebar({
       <div className="chrome">
         {isMac && <span className="lights-space" />}
         <span className="grow" />
-        <button
-          type="button"
-          className="iconbtn"
-          title={withShortcut(pinned ? t("nav.collapse") : t("nav.keepOpen"), "B", isMac)}
-          aria-label={pinned ? t("nav.collapse") : t("nav.keepOpen")}
-          onClick={onCollapse}
-        >
-          <Icon name={pinned ? "layout-leftbar-close" : "layout-leftbar-open"} />
-        </button>
+        {/* Over the page, the logo keeps it open, as it does on the rail. */}
+        {pinned && (
+          <button
+            type="button"
+            className="iconbtn"
+            title={withShortcut(t("nav.collapse"), "B", isMac)}
+            aria-label={t("nav.collapse")}
+            onClick={onCollapse}
+          >
+            <Icon name="layout-leftbar-close" />
+          </button>
+        )}
       </div>
       <div className="brand">
-        <Logo />
+        {pinned ? <Logo /> : <LogoButton label={t("nav.keepOpen")} isMac={isMac} onClick={onCollapse} />}
         <b>Tost Work</b>
       </div>
       <button type="button" className="search" data-nav="search">
@@ -199,9 +202,31 @@ export function Sidebar({
   );
 }
 
+/** The logo, which turns into the sidebar button under the pointer or the keyboard's focus. */
+function LogoButton({ label, isMac, onClick }: { label: string; isMac: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className="logo-btn"
+      data-nav="logo"
+      title={withShortcut(label, "B", isMac)}
+      aria-label={label}
+      onClick={onClick}
+    >
+      <Logo />
+      <Icon name="layout-leftbar-open" />
+    </button>
+  );
+}
+
+/** Whether the user asked for less motion, so the sidebar goes without folding. */
+const stillMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+
 /** How long the pointer rests on the rail before the sidebar opens over the page, and stays once it's gone. */
 const PEEK_OPEN_MS = 200;
 const PEEK_CLOSE_MS = 300;
+/** How long the sidebar takes to fold back into the rail, as in the CSS. */
+export const PEEK_FOLD_MS = 120;
 
 /**
  * The collapsed sidebar: a rail of the sections' icons, which opens the whole sidebar over the page when the pointer
@@ -213,16 +238,23 @@ export function SidebarRail({
   onNavigate,
   showSection = () => true,
   userName,
+  isMac,
+  onExpand,
   children,
 }: {
   current: Section | null;
   onNavigate: (s: Section) => void;
   showSection?: (key: SectionKey) => boolean;
   userName: string;
+  isMac: boolean;
+  /** Brings the sidebar back in its place. */
+  onExpand: () => void;
   children: ReactNode;
 }) {
   const t = useT();
-  const [open, setOpen] = useState(false);
+  // Open grows the rail into the whole sidebar over the page; folding shrinks it back before it goes.
+  const [phase, setPhase] = useState<"closed" | "open" | "folding">("closed");
+  const open = phase === "open";
   const box = useRef<HTMLDivElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The item the keyboard was on in the rail, which takes the focus in the sidebar once it's open.
@@ -233,6 +265,8 @@ export function SidebarRail({
   useEffect(() => {
     const el = box.current;
     if (!el) return;
+    const setOpen = (next: boolean) =>
+      setPhase((now) => (next ? "open" : now === "open" ? (stillMotion() ? "closed" : "folding") : now));
     const later = (ms: number, next: boolean) => {
       clearTimeout(timer.current);
       timer.current = setTimeout(() => setOpen(next), ms);
@@ -241,7 +275,8 @@ export function SidebarRail({
     let over = false;
     const enter = () => {
       over = true;
-      later(PEEK_OPEN_MS, true);
+      // Back while it folds: it opens again at once, rather than vanishing and growing anew.
+      later(el.querySelector(".peek.folding") ? 0 : PEEK_OPEN_MS, true);
     };
     const leave = () => {
       over = false;
@@ -254,7 +289,7 @@ export function SidebarRail({
         quiet.current = false;
         return;
       }
-      if (el.querySelector(".peek") || !target.matches(":focus-visible")) return;
+      if (el.querySelector(".peek:not(.folding)") || !target.matches(":focus-visible")) return;
       clearTimeout(timer.current);
       focusNext.current = target.getAttribute("data-nav");
       setOpen(true);
@@ -269,7 +304,8 @@ export function SidebarRail({
       if (e.key !== "Escape" || !el.querySelector(".peek")) return;
       clearTimeout(timer.current);
       const id = (e.target as HTMLElement).closest("[data-nav]")?.getAttribute("data-nav");
-      setOpen(false);
+      // At once: the focus goes back to the rail, which the folding sidebar would still cover.
+      setPhase("closed");
       const back = el.querySelector<HTMLElement>(`.rail [data-nav="${id ?? "home"}"]`);
       // The focus event comes during focus(), so the flag covers only that one; on a button that already has the
       // focus, none comes, and the flag mustn't wait for the next.
@@ -291,6 +327,11 @@ export function SidebarRail({
       el.removeEventListener("keydown", key);
     };
   }, []);
+  useEffect(() => {
+    if (phase !== "folding") return;
+    const done = setTimeout(() => setPhase("closed"), PEEK_FOLD_MS);
+    return () => clearTimeout(done);
+  }, [phase]);
   useEffect(() => {
     if (!open || !focusNext.current) return;
     box.current?.querySelector<HTMLElement>(`.peek [data-nav="${focusNext.current}"]`)?.focus();
@@ -315,7 +356,7 @@ export function SidebarRail({
       <nav className="rail" aria-label="Sections">
         <span className="rail-chrome" />
         <span className="rail-logo">
-          <Logo />
+          <LogoButton label={t("nav.expand")} isMac={isMac} onClick={onExpand} />
         </span>
         {item("search", "search", t("nav.search"))}
         {NAV.filter((n) => !n.section || showSection(n.section)).map((n) =>
@@ -335,7 +376,7 @@ export function SidebarRail({
         </button>
         {item("settings", "settings-3", t("nav.settings"), () => onNavigate("settings"))}
       </nav>
-      {open && <div className="peek">{children}</div>}
+      {phase !== "closed" && <div className={open ? "peek" : "peek folding"}>{children}</div>}
     </div>
   );
 }
