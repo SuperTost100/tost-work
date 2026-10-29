@@ -1404,13 +1404,16 @@ textarea {
 }
 
 /* Projects */
+/* Two cards a row, one when the window is too narrow for two. */
 .pgrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(max(280px, calc(50% - 7px)), 1fr));
   gap: 14px;
 }
+/* A long last result shortens with "…" instead of widening the card past its column. */
 .pcard {
   position: relative;
+  min-width: 0;
   border-radius: 14px;
   background: var(--panel);
 }
@@ -1420,6 +1423,7 @@ textarea {
 /* The card is a div holding the open button and the … button, which can't nest. */
 .pcard .open {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   width: 100%;
   padding: 18px 18px 16px;
@@ -1524,6 +1528,10 @@ textarea {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.pcard .meta > :not(.grow) {
+  flex: none;
+  white-space: nowrap;
 }
 .pcard.new {
   background: transparent;

@@ -48,7 +48,8 @@ export function ProjectInstructionsDialog({
             </Dialog.Title>
           </div>
           <div className="ib">
-            <p className="t3">{t("project.instructionsHint")}</p>
+            {/* In the title's ink, so it reads as the explanation and the grey example in the field below as the example. */}
+            <p>{t("project.instructionsHint")}</p>
             <MarkdownEditor
               label={t("project.instructions")}
               placeholder={t("project.instructionsExample")}
