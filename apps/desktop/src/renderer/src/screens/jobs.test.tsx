@@ -16,6 +16,9 @@ const click = async (name: string | RegExp, role: "button" | "switch" | "radio" 
   });
 };
 
+// The result step lists its choice again in the step list, so the field is read on its own.
+const folderField = (dialog: HTMLElement) => within(within(dialog).getByRole("group", { name: "Where the files go" }));
+
 afterEach(() => vi.restoreAllMocks());
 
 describe("jobs", () => {
@@ -44,14 +47,19 @@ describe("jobs", () => {
     fireEvent.change(within(dialog).getByLabelText("At"), { target: { value: "08:00" } });
     expect(within(dialog).getByText("Every Monday and Thursday at 08:00, in Newsletter: This week.")).toBeTruthy();
     await click("Next");
-    await click("In a folder of the project you choose", "radio");
+    // The project folder is the start.
+    expect(folderField(dialog).getByText("Project folder")).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: "Use the project folder" })).toBeNull();
     const pick = vi.fn(async (_start?: string) => "/home/giulia/Newsletter/Drafts/Weekly");
     api.projects.pickFolder = pick;
-    await click("Choose…");
+    await click("Change…");
     // The picker opens in the project's folder, and the job keeps the way from there.
     expect(pick).toHaveBeenCalledWith("/home/giulia/Newsletter");
-    // It shows beside the button and in the step list.
+    // It shows in the field and in the step list.
     expect(within(dialog).getAllByText("Drafts/Weekly")).toHaveLength(2);
+    // The next time the picker opens in that subfolder.
+    await click("Change…");
+    expect(pick).toHaveBeenLastCalledWith("/home/giulia/Newsletter/Drafts/Weekly");
     await click("Next");
     await click("Save job");
 
@@ -74,7 +82,7 @@ describe("jobs", () => {
     expect(screen.getByRole("region", { name: "Off" })).toBeTruthy();
   });
 
-  it("saves the project folder as an empty result folder, and refuses a folder outside the project", async () => {
+  it("saves the project folder as an empty result folder, refuses a folder outside it, and goes back to it", async () => {
     const api = createMemoryApi();
     await api.projects.create({ name: "Clients", folder: "/home/giulia/Clients" });
     render(<App userName="Giulia" api={api} settings={settings} />);
@@ -84,25 +92,24 @@ describe("jobs", () => {
     fireEvent.change(within(dialog).getByLabelText("Name"), { target: { value: "Late answers" } });
     fireEvent.change(within(dialog).getByLabelText("What to do each time"), { target: { value: "List them." } });
     await click(/^Result/);
-    expect(within(dialog).getByRole("radio", { name: "In the project folder" })).toHaveProperty("checked", true);
-    expect(within(dialog).getByText("The AI picks where, or makes a subfolder.")).toBeTruthy();
+    expect(folderField(dialog).getByText("Project folder")).toBeTruthy();
 
-    await click("In a folder of the project you choose", "radio");
     // A folder that only starts with the project's name is not inside it.
     api.projects.pickFolder = async () => "/home/giulia/Clients-old/Reports";
-    await click("Choose…");
+    await click("Change…");
     expect((await screen.findByRole("alert")).textContent).toBe("That folder isn't inside the project.");
     expect(within(dialog).queryByText("Clients-old/Reports")).toBeNull();
-    // Saving without a folder doesn't go through either.
-    await click("Next");
-    await click("Save job");
-    expect((await screen.findByText("Choose a folder, or keep the project folder.")).getAttribute("role")).toBe(
-      "alert",
-    );
-    expect(await api.jobs.list()).toEqual([]);
+    expect(folderField(dialog).getByText("Project folder")).toBeTruthy();
 
-    await click(/^Result/);
-    await click("In the project folder", "radio");
+    // A folder inside it is kept, and the cross goes back to the project folder.
+    api.projects.pickFolder = async () => "/home/giulia/Clients/Reports/2026";
+    await click("Change…");
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+    expect(within(dialog).getAllByText("Reports/2026")).toHaveLength(2);
+    await click("Use the project folder");
+    expect(folderField(dialog).getByText("Project folder")).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: "Use the project folder" })).toBeNull();
+
     await click("Next");
     await click("Save job");
     expect((await api.jobs.list())[0]).toMatchObject({ title: "Late answers", output: "" });
@@ -120,10 +127,9 @@ describe("jobs", () => {
       target: { value: (await api.projects.list())[0]?.id },
     });
     await click(/^Result/);
-    await click("In a folder of the project you choose", "radio");
     api.projects.pickFolder = async () => "/home/giulia/Clients/Reports";
-    await click("Choose…");
-    // In the step list and next to the button.
+    await click("Change…");
+    // In the step list and in the field.
     expect(await within(dialog).findAllByText("Reports")).toHaveLength(2);
 
     await click(/^What/);
@@ -131,7 +137,7 @@ describe("jobs", () => {
       target: { value: (await api.projects.list())[1]?.id },
     });
     await click(/^Result/);
-    expect(within(dialog).getByRole("radio", { name: "In the project folder" })).toHaveProperty("checked", true);
+    expect(folderField(dialog).getByText("Project folder")).toBeTruthy();
     expect(within(dialog).queryAllByText("Reports")).toHaveLength(0);
   });
 

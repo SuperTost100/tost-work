@@ -29,6 +29,9 @@ export function insideProject(project: string, folder: string): string | null {
   return same(picked.slice(0, root.length + 1), `${root}/`) ? picked.slice(root.length + 1) : null;
 }
 
+/** Where the picker should open: the project's folder, or the subfolder already chosen in it. */
+const joinPath = (project: string, sub: string) => (sub ? `${project.replace(/[\\/]+$/, "")}/${sub}` : project);
+
 /** The task the job's latest run started, if it's among the ones loaded. */
 function lastTaskOf(job: Job, tasks: Task[]): Task | undefined {
   const last = job.last;
@@ -270,7 +273,6 @@ function JobBuilder({
       output: "",
     },
   );
-  const [ownFolder, setOwnFolder] = useState(Boolean(job?.output));
   const [error, setError] = useState<string | null>(null);
   const [folderError, setFolderError] = useState<string | null>(null);
   const [started, setStarted] = useState<string | null>(null);
@@ -299,15 +301,13 @@ function JobBuilder({
       ? t("jobs.missingFields")
       : s.repeat === "weekly" && !s.days?.length
         ? t("jobs.noDays")
-        : ownFolder && !draft.output
-          ? t("jobs.noFolder")
-          : null;
+        : null;
 
   const projectFolder = projects.find((p) => p.id === draft.projectId)?.folder;
   const chooseFolder = async () => {
     if (!projectFolder) return;
     try {
-      const picked = await api.projects.pickFolder(projectFolder);
+      const picked = await api.projects.pickFolder(joinPath(projectFolder, draft.output));
       if (!picked) return;
       const inside = insideProject(projectFolder, picked);
       if (inside === null) {
@@ -315,9 +315,8 @@ function JobBuilder({
         return;
       }
       setFolderError(null);
-      // The project folder itself is the first option.
-      if (inside) set({ output: inside });
-      setOwnFolder(Boolean(inside));
+      // The project folder itself is the empty output.
+      set({ output: inside });
     } catch (err) {
       setFolderError(errorText(err));
     }
@@ -334,8 +333,7 @@ function JobBuilder({
     setBusy(true);
     setError(null);
     try {
-      const clean = { ...draft, output: ownFolder ? draft.output : "" };
-      const next = saved.current ? await api.jobs.update(saved.current.id, clean) : await api.jobs.create(clean);
+      const next = saved.current ? await api.jobs.update(saved.current.id, draft) : await api.jobs.create(draft);
       saved.current = next;
       return next;
     } catch (err) {
@@ -374,7 +372,7 @@ function JobBuilder({
     {
       icon: "folder",
       name: "jobs.step.result",
-      sub: ownFolder && draft.output ? draft.output : t("jobs.output.project"),
+      sub: draft.output || t("jobs.output.project"),
     },
     { icon: "play", name: "jobs.step.try", sub: t("jobs.step.try.d") },
   ];
@@ -429,7 +427,6 @@ function JobBuilder({
                       // A folder picked in the old project isn't one of the new project's: the choice starts over.
                       onChange={(e) => {
                         set({ projectId: e.target.value, output: "" });
-                        setOwnFolder(false);
                         setFolderError(null);
                       }}
                     >
@@ -520,25 +517,30 @@ function JobBuilder({
               {step === 2 && (
                 <fieldset className="fld">
                   <legend>{t("jobs.output")}</legend>
-                  <label className="radio">
-                    <input type="radio" name="output" checked={!ownFolder} onChange={() => setOwnFolder(false)} />
-                    {t("jobs.output.project")}
-                  </label>
-                  <p className="t3 note indent">{t("jobs.output.project.d")}</p>
-                  <label className="radio">
-                    <input type="radio" name="output" checked={ownFolder} onChange={() => setOwnFolder(true)} />
-                    {t("jobs.output.pick")}
-                  </label>
-                  {ownFolder && (
-                    <div className="row indent pick">
-                      <button type="button" className="btn" onClick={() => void chooseFolder()}>
-                        {t("jobs.output.choose")}
+                  <div className="input outfield">
+                    <Icon name="folder" />
+                    <span className="truncate grow" title={draft.output}>
+                      {draft.output || t("jobs.output.project")}
+                    </span>
+                    {draft.output && (
+                      <button
+                        type="button"
+                        className="iconbtn"
+                        aria-label={t("jobs.output.reset")}
+                        onClick={() => {
+                          set({ output: "" });
+                          setFolderError(null);
+                        }}
+                      >
+                        <Icon name="close" />
                       </button>
-                      {draft.output && <span className="truncate">{draft.output}</span>}
-                    </div>
-                  )}
+                    )}
+                    <button type="button" className="btn" onClick={() => void chooseFolder()}>
+                      {t("jobs.output.choose")}
+                    </button>
+                  </div>
                   {folderError && (
-                    <p className="fld-error indent" role="alert">
+                    <p className="fld-error" role="alert">
                       {folderError}
                     </p>
                   )}

@@ -2423,12 +2423,19 @@ ol.editable li::before {
   font-size: 13px;
   margin: 4px 0 0;
 }
-/* Lines under a radio sit under its text, past the radio itself. */
-.jobmodal .indent {
-  margin-left: 24px;
+/* A field that shows a folder and the buttons to change it, sized like the inputs around it. */
+.jobmodal .outfield {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 4px;
 }
-.jobmodal .pick {
-  margin-top: 8px;
+.jobmodal .outfield .ic {
+  color: var(--t2);
+}
+.jobmodal .outfield .btn {
+  height: 26px;
+  padding: 0 10px;
 }
 .jobmodal .summary {
   margin: 0;
