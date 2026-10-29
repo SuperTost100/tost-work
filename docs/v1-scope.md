@@ -75,6 +75,15 @@ Changed on 2026-10-29, after testing 0.0.8:
 - The notification permission, opening at login and signing out and back in are tested once, on the last dev build before 0.1.0, after a full uninstall.
 - Settings will offer a reset of the app and of a project from 0.1.0. Decoration comes from 0.3.0.
 
+Changed on 2026-10-29, after testing 0.0.9:
+
+- Deleting, discarding and restoring ask in the app's own card, with a red button and Cancel preselected, the same on every system. Quitting with work in progress and replacing a saved copy still ask in the system's dialog.
+- The collapsed rail grows into the sidebar when the pointer rests on it. The T logo turns into the sidebar button on hover.
+- The Skills editor's hint shows only while the editor is empty, and the "/" menu leaves out the kind of line the caret is on. The bubble adds strikethrough, and the "/" menu adds Code.
+- Picking a level puts every section switch back to that level's choice.
+- A job's files carry the date in their name unless its request says how to name them.
+- Which model a task uses becomes clear with the model switcher, which comes later. Help gets real documentation from 0.4.0.
+
 ## From 0.2.0
 
 - AI renames tasks from their brief, so a task from a long paste gets a short title.
