@@ -160,8 +160,10 @@ h3 {
   text-overflow: ellipsis;
 }
 
+/* Its own stacking order, so dialogs, which open outside it, cover everything in it, the composer included. */
 .app {
   position: relative;
+  isolation: isolate;
   display: flex;
   height: 100%;
   background: var(--canvas);
@@ -535,6 +537,17 @@ h3 {
 .btn.danger:hover {
   border-color: color-mix(in srgb, var(--danger) 50%, var(--line));
   background: color-mix(in srgb, var(--danger) 8%, var(--paper));
+}
+/* The same, filled: the button that goes ahead in a confirmation. */
+.btn.danger.fill {
+  background: var(--danger);
+  color: var(--on-btn);
+  border-color: var(--danger);
+}
+.btn.danger.fill:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  opacity: 0.88;
 }
 .btn.dark {
   background: var(--btn);
@@ -2421,6 +2434,26 @@ ol.editable li::before {
   margin: 4px 0 0;
   color: var(--t2);
   font-size: 14px;
+}
+/* A question before something that can't be undone: the message, what follows from it, and two buttons. */
+.modal.confirmmodal {
+  position: fixed;
+  width: min(440px, calc(100vw - 48px));
+}
+.confirmmodal .cb {
+  display: grid;
+  gap: 6px;
+  padding: 20px 20px 18px;
+}
+.confirmmodal .cb b {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.confirmmodal .cb p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
 }
 /* The project's instructions: a page of formatted text in a dialog. */
 .modal.instrmodal {

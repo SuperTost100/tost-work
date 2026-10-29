@@ -78,11 +78,10 @@ export type MenuAction =
   | "reveal"
   | "toggle-sidebar";
 
-/** A question before something that can't be undone: what will happen, more detail if needed, and the button's word. */
-export interface Confirmation {
+/** What the confirmation says before a project is removed: the question, and what goes with it. */
+export interface RemovalText {
   message: string;
-  detail?: string;
-  yes: string;
+  detail: string;
 }
 
 /** What the preload exposes to the interface as `window.tostWork`. */
@@ -112,11 +111,6 @@ export interface TostWorkApi {
   };
   /** Tells the menu bar whether a task is open and working, so its Task items turn on and off with it. */
   menuState(state: MenuState): void;
-  /**
-   * Asks before something that can't be undone, in the system's own dialog with Cancel as the default button, as
-   * deleting a task does. Resolves true when the user picks `yes`.
-   */
-  confirm(question: Confirmation): Promise<boolean>;
   /** The subscriptions, one per agent CLI. */
   account: {
     status(provider: AgentProvider): Promise<AgentAccount>;
@@ -151,11 +145,13 @@ export interface TostWorkApi {
     update(id: string, patch: ProjectPatch): Promise<Project>;
     /** Opens the project's folder. */
     reveal(id: string): Promise<void>;
+    /** What to say before removing the project: the question, and what goes with it and what stays. */
+    removalText(id: string): Promise<RemovalText>;
     /**
-     * Asks first, then removes the project with its tasks and jobs from the app, after stopping the ones working.
-     * The folder and its files stay. Resolves false when the user changes their mind.
+     * Removes the project with its tasks and jobs from the app, after stopping the ones working. The folder and its
+     * files stay. The window asks the user first.
      */
-    remove(id: string): Promise<boolean>;
+    remove(id: string): Promise<void>;
   };
   tasks: {
     /** The 50 most recently updated tasks. */
@@ -183,8 +179,8 @@ export interface TostWorkApi {
     rename(id: string, title: string): Promise<Task>;
     /** Opens the folder the task works in. */
     reveal(id: string): Promise<void>;
-    /** Asks first, then removes the task. The files stay. Resolves false when the user changes their mind. */
-    remove(id: string): Promise<boolean>;
+    /** Removes the task. The files stay. The window asks the user first. */
+    remove(id: string): Promise<void>;
     /** Called with the full task every time it changes. Returns a function that stops listening. */
     onChange(listener: (task: Task) => void): () => void;
     /** What the agent has written of its answer so far, while it writes it. */
@@ -283,7 +279,6 @@ export const IPC = {
   takePendingMenu: "window:take-pending-menu",
   panelOpen: "panel:open",
   panelQuit: "panel:quit",
-  confirm: "dialog:confirm",
   panelFit: "panel:fit",
   fullScreen: "window:full-screen",
   jobsList: "jobs:list",
@@ -317,6 +312,7 @@ export const IPC = {
   projectsMenu: "projects:menu",
   projectsUpdate: "projects:update",
   projectsReveal: "projects:reveal",
+  projectsRemovalText: "projects:removal-text",
   projectsRemove: "projects:remove",
   tasksList: "tasks:list",
   tasksListActive: "tasks:list-active",

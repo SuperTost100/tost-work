@@ -4,6 +4,14 @@ import { App } from "@/App";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { DEFAULT_SETTINGS } from "../../../shared/model";
 
+/** Presses a button in the confirmation card. */
+const answer = async (name: string) => {
+  const card = await screen.findByRole("alertdialog");
+  await act(async () => {
+    fireEvent.click(within(card).getByRole("button", { name }));
+  });
+};
+
 describe("starting and finishing a task", () => {
   it("starts a task from the home, answers its question and shows the review", async () => {
     const api = createMemoryApi();
@@ -863,6 +871,17 @@ describe("the task menu in Recent", () => {
     await act(async () => {
       if (row) fireEvent.contextMenu(row);
     });
+    const card = await screen.findByRole("alertdialog");
+    expect(within(card).getByText('Delete "Write a proposal"?')).toBeTruthy();
+    expect(within(card).getByRole("button", { name: "Delete" }).classList.contains("danger")).toBe(true);
+    // Cancel keeps the task and its screen.
+    await answer("Cancel");
+    expect(await api.tasks.list()).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "More for Write a proposal" })).toBeTruthy();
+    await act(async () => {
+      if (row) fireEvent.contextMenu(row);
+    });
+    await answer("Delete");
     await waitFor(() => expect(screen.queryByRole("button", { name: "More for Write a proposal" })).toBeNull());
     expect(await api.tasks.list()).toEqual([]);
     expect(screen.queryByText("Who pays the insurance?")).toBeNull();

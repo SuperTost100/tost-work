@@ -1,6 +1,5 @@
 import type {
   AgentAccount,
-  Confirmation,
   JobChange,
   MenuAction,
   MenuState,
@@ -33,6 +32,7 @@ import {
   type SkillVersion,
   type Task,
 } from "../../../shared/model";
+import { removalText } from "../../../shared/projectText";
 
 import { applyEvent, resume } from "../../../shared/reduce";
 import { nextRun } from "../../../shared/schedule";
@@ -59,12 +59,6 @@ export type MemoryApi = TostWorkApi & {
   pickInMenu(action: SkillMenuAction | null): void;
   /** What the next project menu returns, as if the user had picked it. */
   pickInProjectMenu(action: ProjectMenuAction | null): void;
-  /** Whether the next "Remove from Tost Work" is confirmed. It is, unless told otherwise. */
-  confirmRemoval(yes: boolean): void;
-  /** What the next `confirm` answers: yes, unless told otherwise. */
-  answerConfirm(yes: boolean): void;
-  /** Every question `confirm` asked. */
-  confirmCalls: Confirmation[];
   /** Picks an item in the menu bar, as the user would. */
   pressMenu(action: MenuAction): void;
   /** As a click on a notification does. */
@@ -163,8 +157,6 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   let menuPick: SkillMenuAction | null = null;
   let menuState: MenuState = { task: false, running: false };
   let projectMenuPick: ProjectMenuAction | null = null;
-  let removalConfirmed = true;
-  let confirmAnswer = true;
 
   // Ids never come back, even after a task is removed.
   let taskCount = 0;
@@ -176,17 +168,6 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
     },
     pickInProjectMenu: (action) => {
       projectMenuPick = action;
-    },
-    confirmRemoval: (yes) => {
-      removalConfirmed = yes;
-    },
-    answerConfirm: (yes) => {
-      confirmAnswer = yes;
-    },
-    confirmCalls: [],
-    confirm: async (question) => {
-      api.confirmCalls.push(question);
-      return confirmAnswer;
     },
     versions: { app: "0.0.1", electron: "test" },
     onMenu: (l) => {
@@ -310,9 +291,17 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         return next;
       },
       reveal: async () => {},
+      removalText: async (id) => {
+        const project = projects.find((p) => p.id === id);
+        if (!project) throw new Error("That project doesn't exist");
+        // The same text as the app's, in the language the settings choose.
+        return removalText(settings.language ?? "en", project.name, {
+          tasks: [...tasks.values()].filter((t) => t.projectId === id).length,
+          jobs: [...jobs.values()].filter((j) => j.projectId === id).length,
+        });
+      },
       remove: async (id) => {
         if (!projects.some((p) => p.id === id)) throw new Error("That project doesn't exist");
-        if (!removalConfirmed) return false;
         projects = projects.filter((p) => p.id !== id);
         for (const t of [...tasks.values()]) if (t.projectId === id) tasks.delete(t.id);
         for (const j of [...jobs.values()]) {
@@ -320,7 +309,6 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
           jobs.delete(j.id);
           for (const l of jobListeners) l({ id: j.id, removed: true });
         }
-        return true;
       },
     },
     tasks: {
@@ -420,7 +408,9 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         return save({ ...t, title: title.trim() });
       },
       reveal: async () => {},
-      remove: async (id) => tasks.delete(id),
+      remove: async (id) => {
+        tasks.delete(id);
+      },
       onChange: (l) => {
         listeners.add(l);
         return () => listeners.delete(l);

@@ -34,7 +34,6 @@ const api: TostWorkApi = {
       ipcRenderer.removeListener(IPC.menuAction, handler);
     };
   },
-  confirm: (question) => ipcRenderer.invoke(IPC.confirm, question),
   panel: {
     open: (target) => ipcRenderer.send(IPC.panelOpen, target),
     quit: () => ipcRenderer.send(IPC.panelQuit),
@@ -86,6 +85,7 @@ const api: TostWorkApi = {
     menu: (id) => ipcRenderer.invoke(IPC.projectsMenu, id),
     update: (id, patch) => ipcRenderer.invoke(IPC.projectsUpdate, id, patch),
     reveal: (id) => ipcRenderer.invoke(IPC.projectsReveal, id),
+    removalText: (id) => ipcRenderer.invoke(IPC.projectsRemovalText, id),
     remove: (id) => ipcRenderer.invoke(IPC.projectsRemove, id),
   },
   tasks: {

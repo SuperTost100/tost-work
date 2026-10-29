@@ -11,6 +11,7 @@ import {
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
+import { useConfirm } from "@/lib/useConfirm";
 import { LanguageContext, useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { Skill, SkillDraft, SkillVersion, Task } from "../../../shared/model";
@@ -32,6 +33,7 @@ export const usedName = (s: Skill) => s.id;
  */
 export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }) {
   const t = useT();
+  const confirm = useConfirm();
   const lang = useContext(LanguageContext);
   const [skills, setSkills] = useState<Skill[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -84,7 +86,13 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
 
   // Unsaved changes ask first, so switching skills can't lose them without a word.
   const leave = async () =>
-    !dirty || (await api.confirm({ message: t("skills.discard"), yes: t("skills.discardYes") }));
+    !dirty ||
+    (await confirm({
+      message: t("skills.discard"),
+      detail: t("skills.discardDetail"),
+      yes: t("skills.discardYes"),
+      danger: true,
+    }));
   const put = (skill: Skill, replacing = openId) => {
     setSkills((list) => {
       const rest = (list ?? []).filter((s) => s.id !== replacing && s.id !== skill.id);
@@ -177,8 +185,13 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
     if (!open) return;
     void run(async () => {
       if (!(await leave())) return;
-      if (!(await api.confirm({ message: t("skills.restoreConfirm", { n: String(n) }), yes: t("skills.restore") })))
-        return;
+      const sure = await confirm({
+        message: t("skills.restoreConfirm", { n: String(n) }),
+        detail: t("skills.restoreDetail"),
+        yes: t("skills.restore"),
+        danger: true,
+      });
+      if (!sure) return;
       const back = await api.skills.restore(open.id, n);
       put(back);
       show(back);
@@ -198,8 +211,13 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
   });
   const remove = (skill: Skill) => {
     void run(async () => {
-      if (!(await api.confirm({ message: t("skills.removeConfirm", { title: skill.title }), yes: t("delete.yes") })))
-        return;
+      const sure = await confirm({
+        message: t("skills.removeConfirm", { title: skill.title }),
+        detail: t("skills.removeDetail"),
+        yes: t("delete.yes"),
+        danger: true,
+      });
+      if (!sure) return;
       await api.skills.remove(skill.id);
       const rest = (current.current.skills ?? []).filter((s) => s.id !== skill.id);
       // The user may have opened the skill while it was going: then the editor moves to another one.

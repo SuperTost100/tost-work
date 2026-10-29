@@ -1,4 +1,4 @@
-import { type Language, translate } from "../shared/i18n";
+import { type Language, translate } from "./i18n";
 
 /** What the confirmation says before a project is removed: what goes with it, and that its folder stays. */
 export function removalText(

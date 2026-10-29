@@ -1,5 +1,6 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
 import { Skills } from "./Skills";
@@ -9,6 +10,14 @@ const click = async (name: string | RegExp) => {
   const target = await screen.findByRole("button", { name });
   await act(async () => {
     fireEvent.click(target);
+  });
+};
+
+/** Presses a button in the confirmation card. */
+const answer = async (name: string) => {
+  const card = await screen.findByRole("alertdialog");
+  await act(async () => {
+    fireEvent.click(within(card).getByRole("button", { name }));
   });
 };
 
@@ -70,19 +79,25 @@ describe("skills", () => {
     const api = createMemoryApi();
     await api.skills.create("Brand voice");
     await api.skills.create("Price table");
-    api.answerConfirm(false);
     render(<Root api={api} />);
     await click("Skills");
     await screen.findByLabelText("Skill name");
 
     fireEvent.change(screen.getByLabelText("When to use it"), { target: { value: "Changed" } });
     await click("Price table");
+    const card = await screen.findByRole("alertdialog");
+    expect(within(card).getByText("Leave without saving?")).toBeTruthy();
+    expect(within(card).getByText("This skill has changes you haven't saved.")).toBeTruthy();
+    // Discarding is destructive, so its button is red.
+    expect(within(card).getByRole("button", { name: "Leave without saving" }).classList.contains("danger")).toBe(true);
     // Refused: the edit stays on screen.
-    expect(api.confirmCalls.map((q) => q.yes)).toEqual(["Leave without saving"]);
+    await answer("Cancel");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Brand voice");
+    expect((screen.getByLabelText("When to use it") as HTMLInputElement).value).toBe("Changed");
 
-    api.answerConfirm(true);
     await click("Price table");
+    await answer("Leave without saving");
     expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Price table");
 
     await click("Add a file");
@@ -91,13 +106,17 @@ describe("skills", () => {
     // Delete is in the skill's … menu, as for a task.
     api.pickInMenu("delete");
     await click("More for Price table");
+    const ask = await screen.findByRole("alertdialog");
+    expect(within(ask).getByText('Delete "Price table"?')).toBeTruthy();
+    expect(within(ask).getByText("Its folder goes to the Trash.")).toBeTruthy();
+    // Cancel keeps it.
+    await answer("Cancel");
+    expect((await api.skills.list()).filter((s) => !s.builtIn)).toHaveLength(2);
+    await click("More for Price table");
+    await answer("Delete");
     await waitFor(async () =>
       expect((await api.skills.list()).filter((s) => !s.builtIn).map((s) => s.title)).toEqual(["Brand voice"]),
     );
-    expect(api.confirmCalls.at(-1)).toEqual({
-      message: 'Delete "Price table"? Its folder goes to the Trash.',
-      yes: "Delete",
-    });
     expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Brand voice");
   });
 
@@ -123,6 +142,7 @@ describe("skills", () => {
     await act(async () => {
       fireEvent.contextMenu(screen.getByRole("button", { name: "Brand voice" }));
     });
+    await answer("Delete");
     expect((await api.skills.list()).filter((s) => !s.builtIn).map((s) => s.title)).toEqual(["Price table"]);
     expect(name.value).toBe("Price table");
   });
@@ -165,6 +185,7 @@ describe("skills", () => {
 
     api.pickInMenu("delete");
     await click("More for Price table");
+    await answer("Delete");
     await click("Price table");
     expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Price table");
     await act(async () => finish());
@@ -189,7 +210,9 @@ describe("skills", () => {
     // Brand voice is open; delete it and the next one, then let both finish at once.
     api.pickInMenu("delete");
     await click("More for Brand voice");
+    await answer("Delete");
     await click("More for Price table");
+    await answer("Delete");
     await act(async () => {
       await Promise.all(pending.map((finish) => finish()));
     });
@@ -225,12 +248,14 @@ describe("skills", () => {
     await waitFor(() => expect(document.querySelector(".vers .current")?.textContent).toMatch(/^v2/));
     expect(screen.getByText(/^Version 2/)).toBeTruthy();
 
-    api.answerConfirm(false);
     await click("Restore v1");
-    expect(api.confirmCalls.at(-1)?.yes).toBe("Restore");
+    const card = await screen.findByRole("alertdialog");
+    expect(within(card).getByText("Put version 1 back?")).toBeTruthy();
+    expect(within(card).getByRole("button", { name: "Restore" }).classList.contains("danger")).toBe(true);
+    await answer("Cancel");
     expect(screen.getByText(/^Version 2/)).toBeTruthy();
-    api.answerConfirm(true);
     await click("Restore v1");
+    await answer("Restore");
     await waitFor(async () => expect((await stepsBox()).textContent).toBe("Read the notes."));
     // v1 is current again, with v2 still there to put back.
     expect(await screen.findByText(/^Version 1/)).toBeTruthy();
@@ -242,7 +267,11 @@ describe("skills", () => {
   it("imports a skill, and says how many tasks used it", async () => {
     const api = createMemoryApi();
     const tasks = [{ skillsUsed: ["meeting-notes"] }, { skillsUsed: ["meeting-notes", "@word", "word"] }] as never[];
-    render(<Skills api={api} tasks={tasks} />);
+    render(
+      <ConfirmProvider>
+        <Skills api={api} tasks={tasks} />
+      </ConfirmProvider>,
+    );
     await click("Import a skill");
     expect(((await screen.findByLabelText("Skill name")) as HTMLInputElement).value).toBe("Meeting notes");
     expect(screen.getByText("Version 1 · used 2 times · Available in every project")).toBeTruthy();
@@ -256,7 +285,11 @@ describe("skills", () => {
       imported.push(dropped);
       return realImport(dropped);
     };
-    render(<Skills api={api} />);
+    render(
+      <ConfirmProvider>
+        <Skills api={api} />
+      </ConfirmProvider>,
+    );
     const page = (await screen.findByRole("button", { name: "Import a skill" })).closest(".main") as HTMLElement;
     const files = [new File(["zip"], "brief.zip"), new File([""], "quotes")];
     const dataTransfer = { types: ["Files"], files, dropEffect: "none" };
@@ -276,7 +309,11 @@ describe("skills", () => {
     const realImport = api.skills.import;
     api.skills.import = (dropped) =>
       dropped?.name === "notes.txt" ? Promise.reject(new Error("That folder has no SKILL.md")) : realImport(dropped);
-    render(<Skills api={api} />);
+    render(
+      <ConfirmProvider>
+        <Skills api={api} />
+      </ConfirmProvider>,
+    );
     const page = (await screen.findByRole("button", { name: "Import a skill" })).closest(".main") as HTMLElement;
     const files = [new File([""], "notes.txt"), new File(["zip"], "quotes.zip")];
     await act(async () => {

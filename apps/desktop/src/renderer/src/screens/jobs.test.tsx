@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "@/App";
 import { createMemoryApi } from "@/lib/memoryApi";
@@ -18,6 +18,14 @@ const click = async (name: string | RegExp, role: "button" | "switch" | "radio" 
 
 // The result step lists its choice again in the step list, so the field is read on its own.
 const folderField = (dialog: HTMLElement) => within(within(dialog).getByRole("group", { name: "Where the files go" }));
+
+/** Presses a button in the confirmation card. */
+const answer = async (name: string) => {
+  const card = await screen.findByRole("alertdialog");
+  await act(async () => {
+    fireEvent.click(within(card).getByRole("button", { name }));
+  });
+};
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -175,8 +183,23 @@ describe("jobs", () => {
     await click("Jobs");
     await click("Edit job: Follow-up check");
     await click("Delete job");
-    expect(api.confirmCalls.at(-1)?.yes).toBe("Delete job");
-    expect(await api.jobs.list()).toEqual([]);
+    const card = await screen.findByRole("alertdialog");
+    expect(within(card).getByText("Delete this job?")).toBeTruthy();
+    expect(within(card).getByText("The tasks it already ran stay.")).toBeTruthy();
+    // Escape closes only the card: the builder stays open behind it.
+    await act(async () => {
+      fireEvent.keyDown(document.activeElement ?? card, { key: "Escape" });
+    });
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(await api.jobs.list()).toHaveLength(1);
+    // Cancel keeps the job.
+    await click("Delete job");
+    await answer("Cancel");
+    expect(await api.jobs.list()).toHaveLength(1);
+    await click("Delete job");
+    await answer("Delete job");
+    await waitFor(async () => expect(await api.jobs.list()).toEqual([]));
   });
 
   it("starts the builder in the project whose Add job was clicked", async () => {

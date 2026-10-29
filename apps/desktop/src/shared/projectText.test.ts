@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { removalText } from "./projects";
+import { removalText } from "./projectText";
 
 describe("removalText", () => {
   it("names the tasks and jobs that go, in the user's language", () => {

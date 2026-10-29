@@ -4,6 +4,7 @@ import { Switch } from "@/components/Switch";
 import { TaskTag } from "@/components/TaskTag";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
+import { useConfirm } from "@/lib/useConfirm";
 import { LanguageContext, useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
@@ -261,6 +262,7 @@ function JobBuilder({
   onOpenTask: (id: string) => void;
 }) {
   const t = useT();
+  const confirm = useConfirm();
   const lang = useContext(LanguageContext);
   const [step, setStep] = useState<Step>(0);
   const [draft, setDraft] = useState<JobDraft>(
@@ -359,7 +361,13 @@ function JobBuilder({
   const remove = async () => {
     if (!job) return;
     try {
-      if (!(await api.confirm({ message: t("jobs.deleteConfirm"), yes: t("jobs.delete") }))) return;
+      const sure = await confirm({
+        message: t("jobs.deleteConfirm"),
+        detail: t("jobs.deleteDetail"),
+        yes: t("jobs.delete"),
+        danger: true,
+      });
+      if (!sure) return;
       await api.jobs.remove(job.id);
       onClose();
     } catch (err) {

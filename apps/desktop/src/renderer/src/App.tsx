@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Attachments } from "@/components/Composer";
+import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
 import { ProjectInstructionsDialog } from "@/components/ProjectInstructionsDialog";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
+import { useConfirm } from "@/lib/useConfirm";
 import { useT } from "@/lib/useT";
 import { Home } from "@/screens/Home";
 import { Jobs } from "@/screens/Jobs";
@@ -34,19 +36,26 @@ type Route =
   | { name: "settings" }
   | { name: "soon"; section: "skills" | "jobs" | "board" };
 
-export function App({
-  userName = "Giulia",
-  api = window.tostWork,
-  settings,
-  onSettings,
-}: {
+interface AppProps {
   userName?: string;
   api?: TostWorkApi;
   /** The saved settings. Without them the app uses the defaults with this user's name. */
   settings?: Settings;
   onSettings?: (settings: Settings) => void;
-}) {
+}
+
+/** The app, with the card that asks before anything that can't be undone mounted once above it. */
+export function App(props: AppProps) {
+  return (
+    <ConfirmProvider>
+      <AppScreens {...props} />
+    </ConfirmProvider>
+  );
+}
+
+function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSettings }: AppProps) {
   const t = useT();
+  const confirm = useConfirm();
   const current = settings ?? { ...DEFAULT_SETTINGS, name: userName, setupDone: true };
   const quickEdit = sectionOn(current, "quickEdit");
   const { projects, tasks, addProject, updateProject, removeProject, loadProject, loadTask, removeTask } = useData(api);
@@ -84,8 +93,11 @@ export function App({
   const dropProject = (id: string) => {
     // Its tasks and jobs go with it, so whatever of them is open, or picked, must not stay.
     const taskIds = tasks.filter((x) => x.projectId === id).map((x) => x.id);
-    void api?.projects.remove(id).then((gone) => {
-      if (!gone) return;
+    void (async () => {
+      if (!api) return;
+      const { message, detail } = await api.projects.removalText(id);
+      if (!(await confirm({ message, detail, yes: t("project.removeYes"), danger: true }))) return;
+      await api.projects.remove(id);
       removeProject(id, taskIds);
       setOverviews(({ [id]: _removed, ...rest }) => rest);
       setProjectId((picked) => (picked === id ? undefined : picked));
@@ -93,7 +105,25 @@ export function App({
       setRoute((r) =>
         (r.name === "project" && r.id === id) || (r.name === "task" && taskIds.includes(r.id)) ? { name: "home" } : r,
       );
-    }, report);
+    })().catch(report);
+  };
+  const deleteTask = async (id: string) => {
+    const task = tasks.find((x) => x.id === id);
+    if (!api || !task) return;
+    try {
+      const sure = await confirm({
+        message: t("delete.confirm", { name: task.title }),
+        detail: t("delete.detail"),
+        yes: t("delete.yes"),
+        danger: true,
+      });
+      if (!sure) return;
+      await api.tasks.remove(id);
+      removeTask(id);
+      setRoute((r) => (r.name === "task" && r.id === id ? { name: "home" } : r));
+    } catch (err) {
+      report(err);
+    }
   };
   const openProjectMenu = async (id: string) => {
     let action: ProjectMenuAction | null = null;
@@ -451,13 +481,7 @@ export function App({
         if (id && !pinned) setRoute({ name: "task", id });
         setRenaming(id);
       }}
-      onDeleteTask={(id) =>
-        void api?.tasks.remove(id).then((gone) => {
-          if (!gone) return;
-          removeTask(id);
-          setRoute((r) => (r.name === "task" && r.id === id ? { name: "home" } : r));
-        }, report)
-      }
+      onDeleteTask={(id) => void deleteTask(id)}
     />
   );
   return (

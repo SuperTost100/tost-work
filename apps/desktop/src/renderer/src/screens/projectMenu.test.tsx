@@ -23,6 +23,14 @@ const click = async (name: string | RegExp) => {
   });
 };
 
+/** Presses a button in the confirmation card. */
+const answer = async (name: string) => {
+  const card = await screen.findByRole("alertdialog");
+  await act(async () => {
+    fireEvent.click(within(card).getByRole("button", { name }));
+  });
+};
+
 /** A project page or the Projects screen, with a project named Alpi in it. */
 const setup = async (open: "projects" | "project" = "projects") => {
   const api = createMemoryApi();
@@ -212,9 +220,14 @@ describe("the project menu: remove", () => {
 
   it("keeps everything when the user doesn't confirm", async () => {
     const { api, project } = await withWork();
-    api.confirmRemoval(false);
     api.pickInProjectMenu("remove");
     await click("More for Alpi");
+    const card = await screen.findByRole("alertdialog");
+    expect(within(card).getByText('Remove "Alpi" from Tost Work?')).toBeTruthy();
+    expect(within(card).getByText(/The folder and its files stay where they are\./)).toBeTruthy();
+    expect(within(card).getByRole("button", { name: "Remove" }).classList.contains("danger")).toBe(true);
+    await answer("Cancel");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     expect((await api.projects.list()).map((p) => p.id)).toContain(project.id);
     expect(await api.tasks.listForProject(project.id)).toHaveLength(2);
     expect(await api.jobs.list()).toHaveLength(1);
@@ -227,6 +240,7 @@ describe("the project menu: remove", () => {
     await act(async () => {
       fireEvent.contextMenu(screen.getByRole("heading", { name: "Alpi" }));
     });
+    await answer("Remove");
     await waitFor(() => expect(screen.queryByRole("heading", { name: "Alpi" })).toBeNull());
     expect((await api.projects.list()).map((p) => p.name)).toEqual(["Courses"]);
     expect(await api.tasks.listForProject(project.id)).toEqual([]);
@@ -241,6 +255,7 @@ describe("the project menu: remove", () => {
     const { api } = await setup("project");
     api.pickInProjectMenu("remove");
     await click("More for Alpi");
+    await answer("Remove");
     expect(await screen.findByRole("button", { name: "Start task" })).toBeTruthy();
     expect(await api.projects.list()).toEqual([]);
   });
