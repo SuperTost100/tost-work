@@ -99,6 +99,54 @@ for (const ai of SUBSCRIPTIONS) {
       expect(await readFile(final.kept?.[0]?.copy ?? "", "utf8")).toBe("draft\n");
     });
 
+    it("writes a new review after a follow-up that changes a file", { timeout: 600_000 }, async () => {
+      const work = await mkdtemp(join(tmpdir(), "tw-live-r-"));
+      const kept = await mkdtemp(join(tmpdir(), "tw-live-r-kept-"));
+      const engine = new AgentEngine(funnel, () => "en", { ai: async () => ai });
+      const tools = new ToolServer(engine);
+      await tools.start();
+      engine.attachTools(tools);
+      const store = new Store(":memory:");
+      // An agent that asks before changing hello.md gets a yes, and the guard keeps a copy as the app does.
+      const runner = new TaskRunner(
+        store,
+        engine,
+        () => {},
+        undefined,
+        fileGuard(kept, async () => {}),
+      );
+      const { provider, model } = await engine.defaults();
+      store.saveProject({ id: "p", name: "Live", description: "", folder: work, instructions: "", createdAt: "" });
+      const task = runner.create({
+        projectId: "p",
+        workdir: work,
+        provider,
+        model,
+        effort: "low",
+        brief: "Create hello.md with the single line 'hello'.",
+      });
+      const go = async (t: Task) => {
+        if (t.approval) await runner.decide(task.id, true);
+        else if (t.question)
+          runner.answer(
+            task.id,
+            questionItems(t.question).map((q) => q.options[0] ?? "Go ahead"),
+          );
+      };
+      runner.launch(task.id);
+      const first = await settle(runner, store, task.id, go);
+      expect(first.review).not.toBeNull();
+      const text = "Add a second line 'world' to hello.md.";
+      runner.followUp(task.id, text);
+      runner.launch(task.id, text);
+      const final = await settle(runner, store, task.id, go);
+      await tools.stop();
+      console.log(JSON.stringify({ status: final.status, review: final.review }, null, 2));
+      expect(final.status).toBe("done");
+      expect(await readFile(join(work, "hello.md"), "utf8")).toMatch(/world/);
+      expect(final.review).not.toBeNull();
+    });
+
     it("waits for an answer as long as it takes, then carries on with it", { timeout: 600_000 }, async () => {
       const work = await mkdtemp(join(tmpdir(), "tw-live-q-"));
       const engine = new AgentEngine(funnel, () => "en", { ai: async () => ai });

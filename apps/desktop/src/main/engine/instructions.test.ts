@@ -30,6 +30,8 @@ describe("instructionsFor", () => {
     expect(text).toContain("every question you need answered at that point, up to 16");
     expect(text).toContain("put the file where it belongs");
     expect(text).toContain("Leave out warnings from tools");
+    // A follow-up clears the review, so a turn that changes files has to write a new one.
+    expect(text).toContain("Do this again at the end of every later turn in which you made, changed or deleted a file");
   });
 
   it("explains the quick edit's copies and lists the attachments", () => {
