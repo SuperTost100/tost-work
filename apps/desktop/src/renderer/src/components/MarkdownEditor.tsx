@@ -9,12 +9,12 @@ import {
 } from "@milkdown/kit/core";
 import { history } from "@milkdown/kit/plugin/history";
 import { commonmark, toggleEmphasisCommand, toggleStrongCommand } from "@milkdown/kit/preset/commonmark";
-import { gfm } from "@milkdown/kit/preset/gfm";
+import { gfm, toggleStrikethroughCommand } from "@milkdown/kit/preset/gfm";
 import { setBlockType } from "@milkdown/kit/prose/commands";
 import type { Node as ProseNode, ResolvedPos } from "@milkdown/kit/prose/model";
 import { liftListItem, wrapInList } from "@milkdown/kit/prose/schema-list";
 import { type Command, type EditorState, Plugin, PluginKey } from "@milkdown/kit/prose/state";
-import { Decoration, DecorationSet, type EditorView } from "@milkdown/kit/prose/view";
+import type { EditorView } from "@milkdown/kit/prose/view";
 import { $prose, callCommand, replaceAll } from "@milkdown/kit/utils";
 import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/lib/Icon";
@@ -93,6 +93,15 @@ const BLOCKS: { block: Block; icon: string; label: MessageKey }[] = [
   { block: "bullet_list", icon: "list-check", label: "editor.bullets" },
   { block: "ordered_list", icon: "list-ordered", label: "editor.numbers" },
 ];
+
+/** The block the caret's line already is, so the slash menu doesn't offer it. Only level 2 counts as the heading. */
+function blockAt(state: EditorState): Block | null {
+  const line = state.selection.$from.parent;
+  if (line.type.name === "heading") return line.attrs.level === 2 ? "heading" : null;
+  const list = listAt(state);
+  if (list) return list.kind;
+  return line.type.name === "paragraph" ? "paragraph" : null;
+}
 
 /** Lower case and without accents, so "citta" finds "Città". */
 const fold = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
@@ -180,6 +189,7 @@ interface Bubble {
   below: boolean;
   strong: boolean;
   emphasis: boolean;
+  strike: boolean;
 }
 
 function bubbleFor(view: EditorView, box: HTMLElement): Bubble | null {
@@ -193,7 +203,7 @@ function bubbleFor(view: EditorView, box: HTMLElement): Bubble | null {
   const frame = box.getBoundingClientRect();
   // Over the middle of the selection when it's on one line, over its start when it runs onto more.
   const middle = start.top === end.top ? (start.left + end.right) / 2 : start.left;
-  const { strong, emphasis } = state.schema.marks;
+  const { strong, emphasis, strike_through: strike } = state.schema.marks;
   const below = start.top - frame.top < BUBBLE_ROOM;
   return {
     left: Math.min(Math.max(middle - frame.left, 70), Math.max(frame.width - 70, 70)),
@@ -201,6 +211,7 @@ function bubbleFor(view: EditorView, box: HTMLElement): Bubble | null {
     below,
     strong: Boolean(strong && state.doc.rangeHasMark(from, to, strong)),
     emphasis: Boolean(emphasis && state.doc.rangeHasMark(from, to, emphasis)),
+    strike: Boolean(strike && state.doc.rangeHasMark(from, to, strike)),
   };
 }
 
@@ -229,10 +240,14 @@ function roomBottom(el: HTMLElement): number {
   return window.innerHeight;
 }
 
-function slashFor(view: EditorView, box: HTMLElement, shown: (query: string) => typeof BLOCKS): SlashMenu | null {
+function slashFor(
+  view: EditorView,
+  box: HTMLElement,
+  shown: (state: EditorState, query: string) => typeof BLOCKS,
+): SlashMenu | null {
   const open = slashKey.getState(view.state);
   if (!open) return null;
-  const blocks = shown(open.query);
+  const blocks = shown(view.state, open.query);
   const at = view.coordsAtPos(open.from);
   const frame = box.getBoundingClientRect();
   const height = blocks.length * MENU_ITEM + MENU_EDGES;
@@ -332,7 +347,11 @@ export function MarkdownEditor({
           },
         }),
     );
-    const shown = (query: string) => BLOCKS.filter((b) => matches(latest.current.t(b.label), query));
+    // The choices that fit what's typed, without the kind of line the caret is already on.
+    const shown = (state: EditorState, query: string) => {
+      const here = blockAt(state);
+      return BLOCKS.filter((b) => b.block !== here && matches(latest.current.t(b.label), query));
+    };
     // Headings and lists come from typing "/": a menu under the caret, filtered by what follows the "/".
     const slashes = $prose(
       () =>
@@ -347,7 +366,7 @@ export function MarkdownEditor({
               const from = tr.mapping.map(prev.from);
               const query = queryAt(state, from);
               // Typing something no choice starts with closes the menu, and the text stays as typed.
-              if (query === null || shown(query).length === 0) return null;
+              if (query === null || shown(state, query).length === 0) return null;
               return { from, query, active: query === prev.query ? prev.active : 0 };
             },
           },
@@ -368,23 +387,9 @@ export function MarkdownEditor({
             // Focus stays in the text, so the highlighted choice is announced from there.
             attributes: (state): Record<string, string> => {
               const open = slashKey.getState(state);
-              const block = open && shown(open.query)[open.active]?.block;
+              const block = open && shown(state, open.query)[open.active]?.block;
               const menu = latest.current.menuId;
               return block ? { "aria-controls": menu, "aria-activedescendant": `${menu}-${block}` } : {};
-            },
-            // A hint on the empty line being written; an empty text shows the placeholder instead.
-            decorations: (state) => {
-              const { empty, $from } = state.selection;
-              const line = $from.parent;
-              if (latest.current.readOnly || !empty || line.type.name !== "paragraph" || line.content.size > 0)
-                return null;
-              if (!plainLine($from) || blank(state.doc)) return null;
-              return DecorationSet.create(state.doc, [
-                Decoration.node($from.before(), $from.after(), {
-                  class: "md-hint",
-                  "data-hint": latest.current.t("editor.slashHint"),
-                }),
-              ]);
             },
           },
         }),
@@ -393,7 +398,7 @@ export function MarkdownEditor({
     const slashKeys = (view: EditorView, event: KeyboardEvent): boolean => {
       const open = slashKey.getState(view.state);
       if (!open || event.isComposing) return false;
-      const blocks = shown(open.query);
+      const blocks = shown(view.state, open.query);
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         const step = event.key === "ArrowDown" ? 1 : blocks.length - 1;
         view.dispatch(view.state.tr.setMeta(slashKey, { ...open, active: (open.active + step) % blocks.length }));
@@ -489,6 +494,7 @@ export function MarkdownEditor({
     ? [
         ["bold", t("editor.bold"), run(toggleStrongCommand.key), bubble.strong],
         ["italic", t("editor.italic"), run(toggleEmphasisCommand.key), bubble.emphasis],
+        ["strikethrough", t("editor.strike"), run(toggleStrikethroughCommand.key), bubble.strike],
       ]
     : [];
 

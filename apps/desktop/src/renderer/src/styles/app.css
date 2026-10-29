@@ -2029,15 +2029,6 @@ ins {
   font-size: 13px;
   opacity: 0.75;
 }
-/* The same hint on the empty line being written. Floated with no height, it lets the caret sit at the line's start. */
-.md-editor .ProseMirror:focus .md-hint::before {
-  content: attr(data-hint);
-  float: left;
-  height: 0;
-  color: var(--t3);
-  opacity: 0.75;
-  pointer-events: none;
-}
 /* The slash menu: the app's menu, under the "/" or over it when there's no room below. */
 .md-slash {
   position: absolute;

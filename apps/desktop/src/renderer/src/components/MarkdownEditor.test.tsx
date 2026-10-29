@@ -124,6 +124,20 @@ describe("MarkdownEditor", () => {
     expect(screen.getByRole("button", { name: "Bold" }).getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("strikes the selected text through, saved as ~~text~~", async () => {
+    const seen: string[] = [];
+    const editor = createRef<Editor>();
+    render(<MarkdownEditor value="Be careful" label="Steps" editorRef={editor} onChange={(m) => seen.push(m)} />);
+    const box = await started("Steps");
+    await select(editor.current, "careful");
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: "Strikethrough" }));
+    });
+    expect(seen.at(-1)).toBe("Be ~~careful~~");
+    expect(box.querySelector("del")?.textContent).toBe("careful");
+    expect(screen.getByRole("button", { name: "Strikethrough" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("keeps the bubble when focus moves onto it, and puts it under a selection with no room above", async () => {
     const editor = createRef<Editor>();
     render(<MarkdownEditor value="Be careful" label="Steps" editorRef={editor} onChange={() => {}} />);
@@ -142,14 +156,18 @@ describe("MarkdownEditor", () => {
     expect(screen.queryByRole("toolbar")).toBeNull();
   });
 
-  it("keeps the bubble when a button is used from the keyboard, with bold and italic only", async () => {
+  it("keeps the bubble when a button is used from the keyboard, with bold, italic and strikethrough", async () => {
     const seen: string[] = [];
     const editor = createRef<Editor>();
     render(<MarkdownEditor value="- Read" label="Steps" editorRef={editor} onChange={(m) => seen.push(m)} />);
     await started("Steps");
     await select(editor.current, "Read");
     const italic = await screen.findByRole("button", { name: "Italic" });
-    expect(screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["Bold", "Italic"]);
+    expect(screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
+      "Bold",
+      "Italic",
+      "Strikethrough",
+    ]);
     italic.focus();
     await act(async () => {
       fireEvent.click(italic);
@@ -202,7 +220,7 @@ describe("MarkdownEditor", () => {
     const box = await started("Steps");
     await type(editor.current, "/");
     expect(screen.getByRole("listbox", { name: "Turn into" })).toBeTruthy();
-    expect(options()).toEqual(["Text", "Heading", "Bulleted list", "Numbered list"]);
+    expect(options()).toEqual(["Heading", "Bulleted list", "Numbered list"]);
     const first = screen.getAllByRole("option")[0];
     expect(box.getAttribute("aria-activedescendant")).toBe(first?.id);
     await press(box, "ArrowUp");
@@ -291,19 +309,90 @@ describe("MarkdownEditor", () => {
     expect(options()).toEqual(["Elenco numerato"]);
   });
 
-  it("hides the placeholder once a list starts, and hints at the slash on its empty line", async () => {
+  it("hints at the slash only while the whole editor is empty", async () => {
     const editor = createRef<Editor>();
     const { container } = render(
       <MarkdownEditor value="" label="Steps" placeholder="The steps" editorRef={editor} onChange={() => {}} />,
     );
     const box = await started("Steps");
     expect(container.querySelector(".md-placeholder")?.textContent).toBe("The stepsType / for headings and lists");
-    expect(box.querySelector(".md-hint")).toBeNull();
     await type(editor.current, "- ");
     expect(box.querySelector("li")).toBeTruthy();
     expect(container.querySelector(".md-placeholder")).toBeNull();
-    expect(box.querySelector("li > p.md-hint")?.getAttribute("data-hint")).toBe("Type / for headings and lists");
+    expect(box.querySelector("[data-hint]")).toBeNull();
     await type(editor.current, "a");
-    expect(box.querySelector(".md-hint")).toBeNull();
+    expect(box.querySelector("[data-hint]")).toBeNull();
+  });
+
+  it("has no hint on an empty line in a text that has more", async () => {
+    const editor = createRef<Editor>();
+    const { container } = render(<MarkdownEditor value="Read" label="Steps" editorRef={editor} onChange={() => {}} />);
+    const box = await started("Steps");
+    await caretAt(editor.current, "Read");
+    await act(async () => {
+      editor.current?.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        view.dispatch(view.state.tr.split(view.state.selection.from + 4));
+        // The caret goes down to the new, empty line.
+        view.dispatch(view.state.tr.setSelection(TextSelection.atEnd(view.state.doc)));
+      });
+    });
+    expect(box.querySelectorAll("p")).toHaveLength(2);
+    expect(box.querySelector("[data-hint]")).toBeNull();
+    expect(container.querySelector(".md-placeholder")).toBeNull();
+  });
+
+  it("leaves out of the slash menu the kind of line the caret is already on", async () => {
+    const editor = createRef<Editor>();
+    render(
+      <MarkdownEditor
+        value={"Text\n\n## Plan\n\n- Bullet\n\n1. Number"}
+        label="Steps"
+        editorRef={editor}
+        onChange={() => {}}
+      />,
+    );
+    const box = await started("Steps");
+    await caretAt(editor.current, "Text");
+    await type(editor.current, "/");
+    expect(options()).toEqual(["Heading", "Bulleted list", "Numbered list"]);
+    await press(box, "Escape");
+    await caretAt(editor.current, "Plan");
+    await type(editor.current, "/");
+    expect(options()).toEqual(["Text", "Bulleted list", "Numbered list"]);
+    await press(box, "Escape");
+    await caretAt(editor.current, "Bullet");
+    await type(editor.current, "/");
+    expect(options()).toEqual(["Text", "Heading", "Numbered list"]);
+    await press(box, "Escape");
+    await caretAt(editor.current, "Number");
+    await type(editor.current, "/");
+    expect(options()).toEqual(["Text", "Heading", "Bulleted list"]);
+  });
+
+  it("filters over the shortened slash menu, and closes when nothing is left", async () => {
+    const editor = createRef<Editor>();
+    render(<MarkdownEditor value="- Read" label="Steps" editorRef={editor} onChange={() => {}} />);
+    await started("Steps");
+    await caretAt(editor.current, "Read");
+    await type(editor.current, "/LIS");
+    expect(options()).toEqual(["Numbered list"]);
+    await type(editor.current, "x");
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("moves through the shortened slash menu with the arrows and picks with Enter", async () => {
+    const seen: string[] = [];
+    const editor = createRef<Editor>();
+    render(<MarkdownEditor value="- Read" label="Steps" editorRef={editor} onChange={(m) => seen.push(m)} />);
+    const box = await started("Steps");
+    await caretAt(editor.current, "Read");
+    await type(editor.current, "/");
+    await press(box, "ArrowDown");
+    expect(screen.getByRole("option", { selected: true }).textContent).toBe("Heading");
+    await press(box, "ArrowDown");
+    expect(screen.getByRole("option", { selected: true }).textContent).toBe("Numbered list");
+    await press(box, "Enter");
+    expect(seen.at(-1)).toBe("1. Read");
   });
 });
