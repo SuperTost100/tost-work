@@ -8,22 +8,18 @@ import {
   serializerCtx,
 } from "@milkdown/kit/core";
 import { history } from "@milkdown/kit/plugin/history";
-import {
-  commonmark,
-  liftListItemCommand,
-  toggleEmphasisCommand,
-  toggleStrongCommand,
-  turnIntoTextCommand,
-  wrapInHeadingCommand,
-} from "@milkdown/kit/preset/commonmark";
+import { commonmark, toggleEmphasisCommand, toggleStrongCommand } from "@milkdown/kit/preset/commonmark";
 import { gfm } from "@milkdown/kit/preset/gfm";
-import { liftListItem } from "@milkdown/kit/prose/schema-list";
-import { type EditorState, Plugin } from "@milkdown/kit/prose/state";
-import type { EditorView } from "@milkdown/kit/prose/view";
+import { setBlockType } from "@milkdown/kit/prose/commands";
+import type { Node as ProseNode, ResolvedPos } from "@milkdown/kit/prose/model";
+import { liftListItem, wrapInList } from "@milkdown/kit/prose/schema-list";
+import { type Command, type EditorState, Plugin, PluginKey } from "@milkdown/kit/prose/state";
+import { Decoration, DecorationSet, type EditorView } from "@milkdown/kit/prose/view";
 import { $prose, callCommand, replaceAll } from "@milkdown/kit/utils";
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
+import type { MessageKey } from "../../../shared/i18n";
 
 /** Puts a new text in the editor without it counting as the user's edit. */
 function replaceQuietly(made: Editor, text: string, replacing: { current: boolean }): void {
@@ -87,6 +83,92 @@ export function backspaceOutOfList(view: EditorView, event: KeyboardEvent): bool
   return liftListItem(item)(view.state, view.dispatch);
 }
 
+/** What a line can become from the slash menu. */
+type Block = "paragraph" | "heading" | ListKind;
+
+/** The slash menu's choices, in the order it shows them. */
+const BLOCKS: { block: Block; icon: string; label: MessageKey }[] = [
+  { block: "paragraph", icon: "font-size", label: "editor.text" },
+  { block: "heading", icon: "heading-2", label: "editor.heading" },
+  { block: "bullet_list", icon: "list-check", label: "editor.bullets" },
+  { block: "ordered_list", icon: "list-ordered", label: "editor.numbers" },
+];
+
+/** Lower case and without accents, so "citta" finds "Città". */
+const fold = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+
+/** Whether what's typed after "/" starts one of the label's words, as "num" does in "Numbered list". */
+export function matches(label: string, query: string): boolean {
+  return ` ${fold(label)}`.includes(` ${fold(query)}`);
+}
+
+/** The open slash menu: where its "/" is, what's typed after it, and the choice it has highlighted. */
+interface Slash {
+  from: number;
+  query: string;
+  active: number;
+}
+
+const slashKey = new PluginKey<Slash | null>("slash");
+
+/** Lines the slash menu and its hint work on: text at the top level or in a list, not in a table or code. */
+function plainLine($pos: ResolvedPos): boolean {
+  if ($pos.depth < 1 || $pos.parent.type.spec.code || !$pos.parent.isTextblock) return false;
+  const holder = $pos.node($pos.depth - 1).type.name;
+  return holder === "doc" || holder === "list_item";
+}
+
+/** "/" typed at the start of a line or after a space opens the slash menu. */
+function openSlash(view: EditorView, from: number, to: number, text: string): boolean {
+  const $from = view.state.doc.resolve(from);
+  if (text !== "/" || !plainLine($from)) return false;
+  const before = $from.parent.textBetween(0, $from.parentOffset);
+  if (before !== "" && !/\s$/.test(before)) return false;
+  view.dispatch(view.state.tr.insertText("/", from, to).setMeta(slashKey, { from, query: "", active: 0 }));
+  return true;
+}
+
+/** What's typed after the menu's "/", or null once the caret has left it, the "/" is gone or a space follows it. */
+function queryAt(state: EditorState, from: number): string | null {
+  const { empty, head, $head } = state.selection;
+  if (!empty || from < $head.start() || head <= from) return null;
+  const typed = state.doc.textBetween(from, head);
+  return typed.startsWith("/") && !typed.startsWith("/ ") ? typed.slice(1) : null;
+}
+
+/** Turns the caret's line into text, a heading or a list, taking out the slash menu's "/…" first. */
+export function turnInto(view: EditorView, block: Block): void {
+  const open = slashKey.getState(view.state);
+  if (open) view.dispatch(view.state.tr.delete(open.from, view.state.selection.head).setMeta(slashKey, null));
+  const { nodes } = view.state.schema;
+  const run = (command: Command) => command(view.state, view.dispatch);
+  const list = listAt(view.state);
+  if (block === "bullet_list" || block === "ordered_list") {
+    if (list) {
+      if (list.kind !== block) switchList(view);
+      return;
+    }
+    const type = nodes[block];
+    const paragraph = nodes.paragraph;
+    if (!type || !paragraph) return;
+    if (view.state.selection.$from.parent.type !== paragraph) run(setBlockType(paragraph));
+    run(wrapInList(type, block === "ordered_list" ? { order: 1 } : null));
+    return;
+  }
+  const type = nodes[block];
+  const item = nodes.list_item;
+  if (!type || !item) return;
+  // Text and headings stand on their own: out of the list, nested ones too.
+  for (let i = 0; i < 8 && listAt(view.state); i++) if (!run(liftListItem(item))) break;
+  run(setBlockType(type, block === "heading" ? { level: 2 } : null));
+}
+
+/** Only one paragraph, with nothing in it: what shows the placeholder. A list with an empty item isn't empty. */
+function blank(doc: ProseNode): boolean {
+  const only = doc.childCount === 1 ? doc.firstChild : null;
+  return only?.type.name === "paragraph" && only.content.size === 0;
+}
+
 /** The bubble's height and its gap: with less than this above the selection, it goes under it. */
 const BUBBLE_ROOM = 48;
 
@@ -96,15 +178,13 @@ interface Bubble {
   top: number;
   /** Under the selection, when there's no room above it inside the box. */
   below: boolean;
-  heading: boolean;
   strong: boolean;
   emphasis: boolean;
-  list: ListKind | null;
 }
 
 function bubbleFor(view: EditorView, box: HTMLElement): Bubble | null {
   const { state } = view;
-  const { from, to, empty, $from } = state.selection;
+  const { from, to, empty } = state.selection;
   // Focus on the bubble's own buttons, from the keyboard, still counts as being in the text.
   const focused = view.hasFocus() || Boolean(box.querySelector(".md-bubble")?.contains(document.activeElement));
   if (empty || !focused || !state.doc.textBetween(from, to).trim()) return null;
@@ -119,10 +199,50 @@ function bubbleFor(view: EditorView, box: HTMLElement): Bubble | null {
     left: Math.min(Math.max(middle - frame.left, 70), Math.max(frame.width - 70, 70)),
     top: below ? end.bottom - frame.top : start.top - frame.top,
     below,
-    heading: $from.parent.type.name === "heading",
     strong: Boolean(strong && state.doc.rangeHasMark(from, to, strong)),
     emphasis: Boolean(emphasis && state.doc.rangeHasMark(from, to, emphasis)),
-    list: listAt(state)?.kind ?? null,
+  };
+}
+
+/** The slash menu's width and the height of one choice, as app.css draws them, plus its padding and gap. */
+const MENU_WIDTH = 220;
+const MENU_ITEM = 32;
+const MENU_EDGES = 16;
+
+/** Where the slash menu sits, and what it offers. */
+interface SlashMenu {
+  left: number;
+  top: number;
+  /** Over the line, when there's no room for it below inside the window or the panel that scrolls. */
+  above: boolean;
+  blocks: typeof BLOCKS;
+  active: number;
+}
+
+/** The lowest point the slash menu can reach without being cut off: the window's edge, or the scrolling panel's. */
+function roomBottom(el: HTMLElement): number {
+  for (let up = el.parentElement; up; up = up.parentElement) {
+    const { overflowY } = getComputedStyle(up);
+    if (overflowY === "auto" || overflowY === "scroll")
+      return Math.min(up.getBoundingClientRect().bottom, window.innerHeight);
+  }
+  return window.innerHeight;
+}
+
+function slashFor(view: EditorView, box: HTMLElement, shown: (query: string) => typeof BLOCKS): SlashMenu | null {
+  const open = slashKey.getState(view.state);
+  if (!open) return null;
+  const blocks = shown(open.query);
+  const at = view.coordsAtPos(open.from);
+  const frame = box.getBoundingClientRect();
+  const height = blocks.length * MENU_ITEM + MENU_EDGES;
+  const above = at.bottom + height > roomBottom(box) && at.top - height > 0;
+  return {
+    left: Math.max(0, Math.min(at.left - frame.left, frame.width - MENU_WIDTH)),
+    top: above ? at.top - frame.top : at.bottom - frame.top,
+    above,
+    blocks,
+    active: open.active,
   };
 }
 
@@ -150,18 +270,20 @@ export function MarkdownEditor({
   editorRef?: RefObject<Editor | null>;
 }) {
   const t = useT();
+  const menuId = useId();
   const root = useRef<HTMLDivElement>(null);
   const editor = useRef<Editor | null>(null);
   // The Markdown the editor holds, so a value the editor itself sent isn't put back, which would move the caret.
   const last = useRef(value);
-  const latest = useRef({ onChange, readOnly, label, id, editorRef, value });
-  latest.current = { onChange, readOnly, label, id, editorRef, value };
+  const latest = useRef({ onChange, readOnly, label, id, editorRef, value, t, menuId });
+  latest.current = { onChange, readOnly, label, id, editorRef, value, t, menuId };
   // Set while the editor puts in a new value itself: its own tidying of that text, such as "*" bullets becoming "-",
   // isn't an edit, so the draft keeps the text as it came.
   const replacing = useRef(false);
   const [empty, setEmpty] = useState(value.trim() === "");
   const body = useRef<HTMLDivElement>(null);
   const [bubble, setBubble] = useState<Bubble | null>(null);
+  const [slash, setSlash] = useState<SlashMenu | null>(null);
 
   // Made once: changes to the value and to read-only reach it through the effects below.
   useEffect(() => {
@@ -176,8 +298,9 @@ export function MarkdownEditor({
           view: () => ({
             update: (view, prev) => {
               const doc = view.state.doc;
-              if (doc.eq(prev.doc) || replacing.current) return;
-              setEmpty(doc.textContent.trim() === "" && doc.childCount <= 1);
+              if (doc.eq(prev.doc)) return;
+              setEmpty(blank(doc));
+              if (replacing.current) return;
               // The file keeps its own ending: the editor's closing newline isn't a change.
               const markdown = ctx.get(serializerCtx)(doc).replace(/\n+$/, "");
               if (markdown === last.current) return;
@@ -209,6 +332,86 @@ export function MarkdownEditor({
           },
         }),
     );
+    const shown = (query: string) => BLOCKS.filter((b) => matches(latest.current.t(b.label), query));
+    // Headings and lists come from typing "/": a menu under the caret, filtered by what follows the "/".
+    const slashes = $prose(
+      () =>
+        new Plugin<Slash | null>({
+          key: slashKey,
+          state: {
+            init: () => null,
+            apply: (tr, prev, _old, state) => {
+              const meta = tr.getMeta(slashKey) as Slash | null | undefined;
+              if (meta !== undefined) return meta;
+              if (!prev || (!tr.docChanged && !tr.selectionSet)) return prev;
+              const from = tr.mapping.map(prev.from);
+              const query = queryAt(state, from);
+              // Typing something no choice starts with closes the menu, and the text stays as typed.
+              if (query === null || shown(query).length === 0) return null;
+              return { from, query, active: query === prev.query ? prev.active : 0 };
+            },
+          },
+          view: () => ({
+            update: (view) => {
+              const box = body.current;
+              setSlash(box && !latest.current.readOnly ? slashFor(view, box, shown) : null);
+            },
+          }),
+          props: {
+            handleTextInput: (view, from, to, text) => !latest.current.readOnly && openSlash(view, from, to, text),
+            handleDOMEvents: {
+              blur: (view) => {
+                if (slashKey.getState(view.state)) view.dispatch(view.state.tr.setMeta(slashKey, null));
+                return false;
+              },
+            },
+            // Focus stays in the text, so the highlighted choice is announced from there.
+            attributes: (state): Record<string, string> => {
+              const open = slashKey.getState(state);
+              const block = open && shown(open.query)[open.active]?.block;
+              const menu = latest.current.menuId;
+              return block ? { "aria-controls": menu, "aria-activedescendant": `${menu}-${block}` } : {};
+            },
+            // A hint on the empty line being written; an empty text shows the placeholder instead.
+            decorations: (state) => {
+              const { empty, $from } = state.selection;
+              const line = $from.parent;
+              if (latest.current.readOnly || !empty || line.type.name !== "paragraph" || line.content.size > 0)
+                return null;
+              if (!plainLine($from) || blank(state.doc)) return null;
+              return DecorationSet.create(state.doc, [
+                Decoration.node($from.before(), $from.after(), {
+                  class: "md-hint",
+                  "data-hint": latest.current.t("editor.slashHint"),
+                }),
+              ]);
+            },
+          },
+        }),
+    );
+    // Up and Down move through the slash menu, Enter picks, Escape closes it and leaves the text as typed.
+    const slashKeys = (view: EditorView, event: KeyboardEvent): boolean => {
+      const open = slashKey.getState(view.state);
+      if (!open || event.isComposing) return false;
+      const blocks = shown(open.query);
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        const step = event.key === "ArrowDown" ? 1 : blocks.length - 1;
+        view.dispatch(view.state.tr.setMeta(slashKey, { ...open, active: (open.active + step) % blocks.length }));
+        return true;
+      }
+      const chosen = blocks[open.active];
+      if (event.key === "Enter" && chosen) {
+        turnInto(view, chosen.block);
+        return true;
+      }
+      if (event.key === "Escape") {
+        // Only the menu closes, not a dialog the editor is in.
+        event.stopPropagation();
+        view.dispatch(view.state.tr.setMeta(slashKey, null));
+        return true;
+      }
+      return false;
+    };
     const made = Editor.make()
       .config((ctx) => {
         ctx.set(rootCtx, el);
@@ -218,8 +421,9 @@ export function MarkdownEditor({
         ctx.update(editorViewOptionsCtx, (o) => ({
           ...o,
           editable: () => !latest.current.readOnly,
-          // The view's own handler comes before the presets' keymaps, which would join the item to the one above.
-          handleKeyDown: backspaceOutOfList,
+          // The view's own handler comes before the presets' keymaps, which would split the line on Enter or join the
+          // item to the one above on Backspace.
+          handleKeyDown: (view, event) => slashKeys(view, event) || backspaceOutOfList(view, event),
           attributes: {
             role: "textbox",
             "aria-multiline": "true",
@@ -232,7 +436,8 @@ export function MarkdownEditor({
       .use(gfm)
       .use(history)
       .use(changes)
-      .use(bubbles);
+      .use(bubbles)
+      .use(slashes);
     made.create().then(
       () => {
         if (!alive) return void made.destroy();
@@ -242,7 +447,6 @@ export function MarkdownEditor({
         const now = latest.current.value;
         if (now !== last.current) {
           last.current = now;
-          setEmpty(now.trim() === "");
           replaceQuietly(made, now, replacing);
         }
       },
@@ -263,7 +467,6 @@ export function MarkdownEditor({
     const made = editor.current;
     if (!made || value === last.current) return;
     last.current = value;
-    setEmpty(value.trim() === "");
     replaceQuietly(made, value, replacing);
   }, [value]);
 
@@ -271,40 +474,21 @@ export function MarkdownEditor({
     editor.current?.action((ctx) => ctx.get(editorViewCtx).setProps({ editable: () => !readOnly }));
   }, [readOnly]);
 
-  const run = (command: Parameters<typeof callCommand>[0], payload?: unknown) => () => {
-    editor.current?.action(callCommand(command, payload));
+  const run = (command: Parameters<typeof callCommand>[0]) => () => {
+    editor.current?.action(callCommand(command));
     editor.current?.action((ctx) => ctx.get(editorViewCtx).focus());
   };
-  const inside = (name: string) =>
+  const pick = (block: Block) =>
     editor.current?.action((ctx) => {
-      const { $from } = ctx.get(editorViewCtx).state.selection;
-      for (let d = $from.depth; d > 0; d--) if ($from.node(d).type.name === name) return true;
-      return false;
-    }) ?? false;
-  // A heading goes back to text. A list item becomes a heading of its own, out of the list.
-  const heading = () => {
-    if (inside("heading")) return run(turnIntoTextCommand.key)();
-    for (let i = 0; i < 8 && inside("list_item"); i++) editor.current?.action(callCommand(liftListItemCommand.key));
-    run(wrapInHeadingCommand.key, 2)();
-  };
-  const otherList = () => {
-    editor.current?.action((ctx) => switchList(ctx.get(editorViewCtx)));
-    editor.current?.action((ctx) => ctx.get(editorViewCtx).focus());
-  };
+      const view = ctx.get(editorViewCtx);
+      turnInto(view, block);
+      view.focus();
+    });
 
-  type Tool = [icon: string, name: string, act: () => void, on: boolean];
-  const switchTool: Tool | null =
-    bubble?.list === "bullet_list"
-      ? ["list-ordered", t("editor.toNumbers"), otherList, false]
-      : bubble?.list === "ordered_list"
-        ? ["list-check", t("editor.toBullets"), otherList, false]
-        : null;
-  const tools: Tool[] = bubble
+  const tools: [icon: string, name: string, act: () => void, on: boolean][] = bubble
     ? [
-        ["heading-2", t("editor.heading"), heading, bubble.heading],
         ["bold", t("editor.bold"), run(toggleStrongCommand.key), bubble.strong],
         ["italic", t("editor.italic"), run(toggleEmphasisCommand.key), bubble.emphasis],
-        ...(switchTool ? [switchTool] : []),
       ]
     : [];
 
@@ -340,9 +524,40 @@ export function MarkdownEditor({
             ))}
           </div>
         )}
-        {empty && placeholder && !readOnly && (
+        {slash && (
+          <div
+            id={menuId}
+            className={slash.above ? "menu md-slash above" : "menu md-slash"}
+            role="listbox"
+            aria-label={t("editor.turnInto")}
+            style={{ left: slash.left, top: slash.top }}
+          >
+            {slash.blocks.map(({ block, icon, label }, i) => (
+              <div
+                key={block}
+                id={`${menuId}-${block}`}
+                className="menu-item"
+                role="option"
+                aria-selected={i === slash.active}
+                data-highlighted={i === slash.active ? "" : undefined}
+                // Out of the Tab order: the keys work the menu from the text, through aria-activedescendant.
+                tabIndex={-1}
+                // Picked on press, which keeps the caret in the text instead of moving focus to the menu.
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pick(block);
+                }}
+              >
+                <Icon name={icon} />
+                {t(label)}
+              </div>
+            ))}
+          </div>
+        )}
+        {empty && !readOnly && (
           <span className="md-placeholder" aria-hidden="true">
             {placeholder}
+            <span className="md-placeholder-hint">{t("editor.slashHint")}</span>
           </span>
         )}
         <div ref={root} />
