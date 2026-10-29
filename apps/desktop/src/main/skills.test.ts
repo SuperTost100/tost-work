@@ -1,5 +1,5 @@
 /** @vitest-environment node */
-import { chmod, mkdir, mkdtemp, readdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import JSZip from "jszip";
@@ -289,6 +289,44 @@ describe("SkillFolder", () => {
     // Nothing was left behind by the refused import.
     expect((await readdir(root)).filter((n) => !n.startsWith(".")).sort()).toEqual(["brand-voice"]);
     expect((await readdir(root)).some((n) => n.startsWith(".import-"))).toBe(false);
+  });
+
+  it("exports a skill as a zip with its folder on top, and imports it back as the same skill", async () => {
+    const { base, root, skills } = await folder();
+    const source = join(base, "downloads", "Meeting Notes");
+    await mkdir(join(source, "templates"), { recursive: true });
+    await writeFile(
+      join(source, "SKILL.md"),
+      "---\nname: notes\ndescription: Minutes.\nlicense: MIT\n---\n# Notes\n\nDo it.",
+    );
+    await writeFile(join(source, "templates", "minutes.docx"), "x");
+    await writeFile(join(source, ".DS_Store"), "x");
+    await skills.import(source);
+
+    const { name, data } = await skills.zip("notes");
+    expect(name).toBe("notes");
+    const zip = await JSZip.loadAsync(data);
+    expect(
+      Object.keys(zip.files)
+        .filter((n) => !zip.files[n]?.dir)
+        .sort(),
+    ).toEqual(["notes/SKILL.md", "notes/templates/minutes.docx"]);
+
+    // Another computer's Skills folder: the zip imports as it is.
+    const other = await folder();
+    await writeFile(join(other.base, "notes.zip"), data);
+    const back = await other.skills.import(join(other.base, "notes.zip"));
+    expect(back).toMatchObject({ id: "notes", title: "Notes" });
+    expect(await readFile(join(other.root, "notes", "SKILL.md"), "utf8")).toBe(
+      await readFile(join(root, "notes", "SKILL.md"), "utf8"),
+    );
+    expect(await readFile(join(other.root, "notes", "templates", "minutes.docx"), "utf8")).toBe("x");
+
+    await expect(skills.zip("missing")).rejects.toThrow();
+    await expect(skills.zip("@word")).rejects.toThrow(/isn't a skill/);
+    // A skill whose SKILL.md went after the list was read.
+    await rm(join(root, "notes", "SKILL.md"));
+    await expect(skills.zip("notes")).rejects.toThrow(/no SKILL.md/);
   });
 
   it("keeps every version when two saves of one skill come at once", async () => {

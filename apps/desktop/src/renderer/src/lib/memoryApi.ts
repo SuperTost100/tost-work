@@ -9,7 +9,7 @@ import type {
   PanelTarget,
   ProjectMenuAction,
   SignInEvent,
-  TaskMenuAction,
+  SkillMenuAction,
   TostWorkApi,
 } from "../../../shared/api";
 import {
@@ -53,7 +53,7 @@ const WORD_GUIDE: Skill = {
  */
 export type MemoryApi = TostWorkApi & {
   emit(id: string, e: EngineEvent): void;
-  pickInMenu(action: TaskMenuAction | null): void;
+  pickInMenu(action: SkillMenuAction | null): void;
   /** What the next project menu returns, as if the user had picked it. */
   pickInProjectMenu(action: ProjectMenuAction | null): void;
   /** Whether the next "Remove from Tost Work" is confirmed. It is, unless told otherwise. */
@@ -152,7 +152,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   };
 
   // What the next task menu returns, as if the user had picked it.
-  let menuPick: TaskMenuAction | null = null;
+  let menuPick: SkillMenuAction | null = null;
   let menuState: MenuState = { task: false, running: false };
   let projectMenuPick: ProjectMenuAction | null = null;
   let removalConfirmed = true;
@@ -400,7 +400,8 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         if (!t?.interrupted) throw new Error("Only a task stopped by closing Tost Work can be resumed");
         return save({ ...t, status: "running", interrupted: undefined });
       },
-      menu: async () => menuPick,
+      // Export is only in the skill menu.
+      menu: async () => (menuPick === "export" ? null : menuPick),
       rename: async (id, title) => {
         const t = tasks.get(id);
         if (!t) throw new Error("That task doesn't exist");
@@ -505,6 +506,9 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       remove: async (id) => {
         mustSkill(id);
         skills = skills.filter((s) => s.id !== id);
+      },
+      exportZip: async (id) => {
+        mustSkill(id);
       },
       menu: async () => menuPick,
       duplicate: async (id) => {

@@ -149,6 +149,7 @@ const api: TostWorkApi = {
     addFiles: (id) => ipcRenderer.invoke(IPC.skillsAddFiles, id),
     reveal: (id) => ipcRenderer.invoke(IPC.skillsReveal, id),
     remove: (id) => ipcRenderer.invoke(IPC.skillsRemove, id),
+    exportZip: (id) => ipcRenderer.invoke(IPC.skillsExport, id),
     menu: (id) => ipcRenderer.invoke(IPC.skillsMenu, id),
   },
 };

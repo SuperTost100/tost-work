@@ -228,6 +228,7 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
   const menu = async (skill: Skill) => {
     const action = await api.skills.menu(skill.id);
     if (action === "reveal") void run(() => api.skills.reveal(skill.id));
+    else if (action === "export") void run(() => api.skills.exportZip(skill.id));
     else if (action === "delete") remove(skill);
     else if (action === "rename") {
       if (skill.id === openId) {

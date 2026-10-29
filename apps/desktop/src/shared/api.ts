@@ -240,13 +240,18 @@ export interface TostWorkApi {
     reveal(id: string): Promise<void>;
     /** Moves the skill's folder to the Trash. */
     remove(id: string): Promise<void>;
-    /** Shows the native skill menu, the same as a task's, and resolves with the pick. */
-    menu(id: string): Promise<TaskMenuAction | null>;
+    /** Asks where to save the skill as a .zip, writes it and shows it in Finder. Does nothing if the user cancels. */
+    exportZip(id: string): Promise<void>;
+    /** Shows the native skill menu, the same as a task's plus Export, and resolves with the pick. */
+    menu(id: string): Promise<SkillMenuAction | null>;
   };
 }
 
-/** What the task menu offers. The skill menu offers the same. */
+/** What the task menu offers. */
 export type TaskMenuAction = "rename" | "reveal" | "delete";
+
+/** What the skill menu offers: the task menu's, and Export as .zip. */
+export type SkillMenuAction = TaskMenuAction | "export";
 
 /** What the project menu offers. */
 export type ProjectMenuAction = "rename" | "instructions" | "reveal" | "remove";
@@ -290,6 +295,7 @@ export const IPC = {
   skillsReveal: "skills:reveal",
   skillsRemove: "skills:remove",
   skillsMenu: "skills:menu",
+  skillsExport: "skills:export",
   skillsDuplicate: "skills:duplicate",
   skillsImport: "skills:import",
   skillsHistory: "skills:history",

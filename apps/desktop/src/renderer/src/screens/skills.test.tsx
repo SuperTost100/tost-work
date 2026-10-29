@@ -125,6 +125,28 @@ describe("skills", () => {
     expect(name.value).toBe("Price table");
   });
 
+  it("exports a skill as a .zip from its menu, and shows an error the way other actions do", async () => {
+    const api = createMemoryApi();
+    const brand = await api.skills.create("Brand voice");
+    await api.skills.create("Price table");
+    const exported = vi.fn(async (_id: string) => {});
+    api.skills.exportZip = exported;
+    render(<Root api={api} />);
+    await click("Skills");
+    await screen.findByLabelText("Skill name");
+
+    api.pickInMenu("export");
+    await click("More for Brand voice");
+    expect(exported).toHaveBeenCalledTimes(1);
+    expect(exported).toHaveBeenCalledWith(brand.id);
+
+    api.skills.exportZip = async () => {
+      throw new Error("The disk is full");
+    };
+    await click("More for Brand voice");
+    expect(await screen.findByText(/The disk is full/)).toBeTruthy();
+  });
+
   it("moves the editor off a skill that was opened while it was being deleted", async () => {
     const api = createMemoryApi();
     await api.skills.create("Brand voice");

@@ -321,6 +321,39 @@ export class SkillFolder {
     await this.trash(join(this.root, await this.checked(id)));
   }
 
+  /**
+   * The skill as a .zip with its folder as the top level, so importing it gives the same skill back. Links and hidden
+   * files stay out, as in an import, and the same size limits apply so the zip can be imported again.
+   */
+  async zip(id: string): Promise<{ name: string; data: Buffer }> {
+    const name = await this.checked(id);
+    const zip = new JSZip();
+    let files = 0;
+    let bytes = 0;
+    const walk = async (dir: string, inZip: string) => {
+      for (const e of await readdir(dir, { withFileTypes: true })) {
+        if (e.name.startsWith(".")) continue;
+        if (e.isDirectory()) await walk(join(dir, e.name), `${inZip}/${e.name}`);
+        else if (e.isFile()) {
+          const path = join(dir, e.name);
+          // Sized before it's read, so a huge file stops the export without filling memory first.
+          const tooBig = (more: number) => files + 1 > IMPORT_LIMITS.files || bytes + more > IMPORT_LIMITS.bytes;
+          if (tooBig((await stat(path)).size)) throw new Error("That skill is too big to export");
+          const data = await readFile(path);
+          // It may have grown since.
+          if (tooBig(data.length)) throw new Error("That skill is too big to export");
+          files++;
+          bytes += data.length;
+          zip.file(`${inZip}/${e.name}`, data);
+        }
+      }
+    };
+    await walk(join(this.root, name), name);
+    // Its SKILL.md may have gone since the list was read: a zip without one wouldn't import, so it fails here instead.
+    if (!zip.file(`${name}/SKILL.md`)) throw new Error("That skill has no SKILL.md to export");
+    return { name, data: await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }) };
+  }
+
   async folderOf(id: string): Promise<string> {
     return join(this.root, await this.checked(id));
   }

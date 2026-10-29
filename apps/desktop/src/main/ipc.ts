@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { app, type BrowserWindow, dialog, ipcMain, Menu, type OpenDialogOptions, shell } from "electron";
@@ -9,6 +9,7 @@ import {
   type NewTaskInput,
   type ProjectMenuAction,
   type SaveResult,
+  type SkillMenuAction,
   type TaskMenuAction,
 } from "../shared/api";
 import { languageFrom, type MessageKey, translate } from "../shared/i18n";
@@ -227,6 +228,14 @@ export function registerIpc(
       "separator",
       { label: t("menu.delete"), action: "delete", enabled: canDelete },
     ]);
+  const skillMenu = () =>
+    popup<SkillMenuAction>([
+      { label: t("menu.rename"), action: "rename" },
+      { label: t("menu.reveal"), action: "reveal" },
+      { label: t("menu.exportZip"), action: "export" },
+      "separator",
+      { label: t("menu.delete"), action: "delete" },
+    ]);
   ipcMain.handle(IPC.tasksMenu, (_e, id: unknown) => itemMenu(!runner.isRunning(taskOf(id).id)));
   ipcMain.handle(IPC.tasksRename, (_e, id: unknown, title: unknown) =>
     runner.rename(text(id, "id", 100), text(title, "title", 200)),
@@ -395,9 +404,29 @@ export function registerIpc(
     if (error) throw new Error(error);
   });
   ipcMain.handle(IPC.skillsRemove, (_e, id: unknown) => skills.remove(skillId(id)));
+  ipcMain.handle(IPC.skillsExport, async (_e, id: unknown) => {
+    // Built before the dialog, so a skill that is gone or too big fails before the user picks a place.
+    const { name, data } = await skills.zip(skillId(id));
+    const options = { title: t("menu.exportZip"), defaultPath: join(app.getPath("downloads"), `${name}.zip`) };
+    const win = window();
+    const { canceled, filePath } = win
+      ? await dialog.showSaveDialog(win, options)
+      : await dialog.showSaveDialog(options);
+    if (canceled || !filePath) return;
+    // Written beside it first and then moved over it, so a write that fails leaves a zip that was there untouched.
+    const part = `${filePath}.${randomUUID()}.part`;
+    try {
+      await writeFile(part, data);
+      await rename(part, filePath);
+    } catch (err) {
+      await rm(part, { force: true });
+      throw err;
+    }
+    shell.showItemInFolder(filePath);
+  });
   ipcMain.handle(IPC.skillsMenu, (_e, id: unknown) => {
     skillId(id);
-    return itemMenu(true);
+    return skillMenu();
   });
 
   ipcMain.handle(IPC.filesPick, async () => {
