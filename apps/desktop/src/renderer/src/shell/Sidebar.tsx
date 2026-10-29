@@ -199,10 +199,20 @@ export function RenameField({
   title,
   label,
   onDone,
+  className = "rename",
+  placeholder,
+  allowEmpty = false,
+  maxLength = 200,
 }: {
   title: string;
   label: string;
+  /** The new text, or null when the user kept the old one with Escape (or, unless `allowEmpty`, emptied it). */
   onDone: (title: string | null) => void;
+  className?: string;
+  placeholder?: string;
+  /** Whether an empty field counts, as for a description that can be cleared. */
+  allowEmpty?: boolean;
+  maxLength?: number;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const done = useRef(false);
@@ -213,15 +223,17 @@ export function RenameField({
   const finish = (value: string | null) => {
     if (done.current) return;
     done.current = true;
-    onDone(value?.trim() || null);
+    const trimmed = value?.trim() ?? null;
+    onDone(trimmed === null ? null : trimmed || (allowEmpty ? "" : null));
   };
   return (
     <input
       ref={ref}
-      className="rename"
+      className={className}
       aria-label={label}
+      placeholder={placeholder}
       defaultValue={title}
-      maxLength={200}
+      maxLength={maxLength}
       onKeyDown={(e) => {
         if (e.key === "Enter") finish(e.currentTarget.value);
         if (e.key === "Escape") finish(null);

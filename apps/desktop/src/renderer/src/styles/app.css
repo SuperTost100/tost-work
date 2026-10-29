@@ -1474,6 +1474,25 @@ textarea {
   font: inherit;
   color: var(--ink);
 }
+/* A description edited in place: the same field, at the size of the text it replaces. */
+.describe {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--canvas);
+  font: inherit;
+  color: var(--ink);
+}
+.pcard .describe {
+  margin-right: 30px;
+  font-size: 13.5px;
+}
+.proj .describe {
+  width: 100%;
+  height: 34px;
+  margin-bottom: 22px;
+}
 .pcard .rename {
   margin-right: 30px;
   font-size: 16px;

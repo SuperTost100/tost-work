@@ -5,7 +5,7 @@ import { TaskTag } from "@/components/TaskTag";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
 import { RenameField } from "@/shell/Sidebar";
-import type { Project as ProjectT, Task } from "../../../shared/model";
+import { DESCRIPTION_MAX, type Project as ProjectT, type Task } from "../../../shared/model";
 
 export function Project({
   project,
@@ -20,6 +20,8 @@ export function Project({
   onMenu,
   renaming,
   onRenamed,
+  describing,
+  onDescribed,
   onEditInstructions,
 }: {
   project: ProjectT;
@@ -38,6 +40,10 @@ export function Project({
   renaming: boolean;
   /** The new name, or null when the user kept the old one. */
   onRenamed: (name: string | null) => void;
+  /** Whether the description is being edited. */
+  describing: boolean;
+  /** The new description, possibly empty, or null when the user kept the old one. */
+  onDescribed: (description: string | null) => void;
   onEditInstructions: () => void;
 }) {
   const t = useT();
@@ -81,7 +87,19 @@ export function Project({
             ) : (
               <h1 onContextMenu={contextMenu}>{project.name}</h1>
             )}
-            {project.description && <p className="lede">{project.description}</p>}
+            {describing ? (
+              <RenameField
+                title={project.description}
+                label={t("project.description")}
+                placeholder={t("project.describeHint")}
+                className="describe"
+                allowEmpty
+                maxLength={DESCRIPTION_MAX}
+                onDone={(text) => onDescribed(text !== null && text !== project.description ? text : null)}
+              />
+            ) : (
+              project.description && <p className="lede">{project.description}</p>
+            )}
             <Composer
               value={brief}
               onChange={onBriefChange}

@@ -1,5 +1,13 @@
 import { DatabaseSync } from "node:sqlite";
-import { DEFAULT_SETTINGS, type Job, type Project, type Settings, type Task } from "../../shared/model";
+import {
+  DEFAULT_SETTINGS,
+  type Job,
+  lastMade,
+  type Project,
+  type ProjectOverview,
+  type Settings,
+  type Task,
+} from "../../shared/model";
 
 /**
  * Projects and tasks, in SQLite through Node's built-in driver, so there is no native module to rebuild for Electron.
@@ -166,11 +174,32 @@ export class Store {
   }
 
   /** How many tasks each project has, for the project cards. */
-  taskCounts(): Record<string, number> {
-    const rows = this.db
-      .prepare("select project_id as id, count(*) as n from tasks where project_id is not null group by project_id")
-      .all() as { id: string; n: number }[];
-    return Object.fromEntries(rows.map((r) => [r.id, Number(r.n)]));
+  /** Each project's tasks in a few numbers, and its newest file, for the projects page. */
+  projectOverviews(): Record<string, ProjectOverview> {
+    const counts = this.db
+      .prepare(
+        `select project_id as id, count(*) as n, sum(status = 'running') as working, sum(status = 'needs-you') as needs
+         from tasks where project_id is not null group by project_id`,
+      )
+      .all() as { id: string; n: number; working: number; needs: number }[];
+    const overviews: Record<string, ProjectOverview> = {};
+    for (const r of counts)
+      overviews[r.id] = { tasks: Number(r.n), working: Number(r.working), needsYou: Number(r.needs), lastResult: null };
+    // Newest first, and only tasks that made something, so each project's first hit is its last result.
+    const made = this.db
+      .prepare(
+        `select project_id as id, data from tasks where project_id is not null and data like '%"role":"made"%'
+         order by updated_at desc`,
+      )
+      .iterate() as Iterable<{ id: string; data: string }>;
+    let left = counts.length;
+    for (const row of made) {
+      const overview = overviews[row.id];
+      if (!overview || overview.lastResult) continue;
+      overview.lastResult = lastMade(JSON.parse(row.data) as Task);
+      if (overview.lastResult && --left === 0) break;
+    }
+    return overviews;
   }
 
   /** Tasks that were running when the app quit can't continue, so they are marked stopped on the next start. */

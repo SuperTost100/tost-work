@@ -18,7 +18,7 @@ import { Task } from "@/screens/Task";
 import { RECENT, type Section, Sidebar } from "@/shell/Sidebar";
 import { useData } from "@/state/useData";
 import type { MenuAction, ProjectMenuAction, TostWorkApi } from "../../shared/api";
-import { DEFAULT_SETTINGS, type Settings, sectionOn } from "../../shared/model";
+import { DEFAULT_SETTINGS, type ProjectOverview, type Settings, sectionOn } from "../../shared/model";
 
 /** The main process accepts up to 20 attachments per task. */
 const MAX_FILES = 20;
@@ -67,14 +67,20 @@ export function App({
   const starting = useRef(false);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renamingProject, setRenamingProject] = useState<string | null>(null);
+  // The project whose description is being edited in place.
+  const [describingProject, setDescribingProject] = useState<string | null>(null);
   // The project whose instructions are being edited in the dialog.
   const [instructionsFor, setInstructionsFor] = useState<string | null>(null);
   const report = useCallback((err: unknown) => setError(errorText(err)), []);
-  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [overviews, setOverviews] = useState<Record<string, ProjectOverview>>({});
   const isMac = api?.platform === "darwin";
   const renameProject = (id: string, name: string | null) => {
     setRenamingProject(null);
     if (name && api) void api.projects.update(id, { name }).then(updateProject, report);
+  };
+  const describeProject = (id: string, description: string | null) => {
+    setDescribingProject(null);
+    if (description !== null && api) void api.projects.update(id, { description }).then(updateProject, report);
   };
   const dropProject = (id: string) => {
     // Its tasks and jobs go with it, so whatever of them is open, or picked, must not stay.
@@ -82,7 +88,7 @@ export function App({
     void api?.projects.remove(id).then((gone) => {
       if (!gone) return;
       removeProject(id, taskIds);
-      setCounts(({ [id]: _removed, ...rest }) => rest);
+      setOverviews(({ [id]: _removed, ...rest }) => rest);
       setProjectId((picked) => (picked === id ? undefined : picked));
       setJobFor((job) => (job === id ? null : job));
       setRoute((r) =>
@@ -98,6 +104,7 @@ export function App({
       report(err);
     }
     if (action === "rename") setRenamingProject(id);
+    else if (action === "describe") setDescribingProject(id);
     else if (action === "instructions") setInstructionsFor(id);
     else if (action === "reveal") void api?.projects.reveal(id).catch(report);
     else if (action === "remove") dropProject(id);
@@ -115,10 +122,11 @@ export function App({
   useEffect(() => {
     if (openProjectId) loadProject(openProjectId).catch(report);
   }, [openProjectId, loadProject, report]);
-  // Counted in the store, because the task list here holds only the recent ones.
+  // Counted in the store, because the task list here holds only the recent ones. Asked again as tasks change, so a
+  // card's tag follows its tasks while the page is open.
   useEffect(() => {
-    if (route.name === "projects") void api?.projects.taskCounts().then(setCounts, report);
-  }, [route.name, api, report]);
+    if (route.name === "projects" && tasks) void api?.projects.overviews().then(setOverviews, report);
+  }, [route.name, api, report, tasks]);
 
   const section: Section | null = useMemo(() => {
     switch (route.name) {
@@ -321,12 +329,14 @@ export function App({
     screen = (
       <Projects
         projects={projects}
-        counts={counts}
+        overviews={overviews}
         onOpen={(id) => setRoute({ name: "project", id })}
         onNew={() => setDialogOpen(true)}
         onMenu={(id) => void openProjectMenu(id)}
         renaming={renamingProject}
         onRenamed={renameProject}
+        describing={describingProject}
+        onDescribed={describeProject}
       />
     );
   } else if (route.name === "project") {
@@ -357,6 +367,8 @@ export function App({
         onMenu={() => void openProjectMenu(project.id)}
         renaming={renamingProject === project.id}
         onRenamed={(name) => renameProject(project.id, name)}
+        describing={describingProject === project.id}
+        onDescribed={(description) => describeProject(project.id, description)}
         onEditInstructions={() => setInstructionsFor(project.id)}
       />
     ) : null;
@@ -453,8 +465,6 @@ export function App({
             void api?.tasks.remove(id).then((gone) => {
               if (!gone) return;
               removeTask(id);
-              // Project cards count tasks in the store, so they ask again.
-              void api.projects.taskCounts().then(setCounts, report);
               setRoute((r) => (r.name === "task" && r.id === id ? { name: "home" } : r));
             }, report)
           }

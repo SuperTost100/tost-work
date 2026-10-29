@@ -5,6 +5,7 @@ import type {
   Job,
   JobDraft,
   Project,
+  ProjectOverview,
   Settings,
   Skill,
   SkillDraft,
@@ -20,6 +21,7 @@ export interface NewProjectInput {
 
 export interface ProjectPatch {
   name?: string;
+  description?: string;
   instructions?: string;
 }
 
@@ -139,7 +141,8 @@ export interface TostWorkApi {
     list(): Promise<Project[]>;
     create(input: NewProjectInput): Promise<Project>;
     /** How many tasks each project has, by project id. */
-    taskCounts(): Promise<Record<string, number>>;
+    /** Each project's task numbers and newest file, by project id. */
+    overviews(): Promise<Record<string, ProjectOverview>>;
     /** Opens the system folder picker, in `defaultPath` when given. Resolves to null when the user cancels. */
     pickFolder(defaultPath?: string): Promise<string | null>;
     /** Shows the project's menu where the pointer is, and resolves with what the user picked, or null. */
@@ -254,7 +257,7 @@ export type TaskMenuAction = "rename" | "reveal" | "delete";
 export type SkillMenuAction = TaskMenuAction | "export";
 
 /** What the project menu offers. */
-export type ProjectMenuAction = "rename" | "instructions" | "reveal" | "remove";
+export type ProjectMenuAction = "rename" | "describe" | "instructions" | "reveal" | "remove";
 
 /** Where the panel's buttons take the main window. */
 export type PanelTarget = { taskId: string } | { action: "new-task" | "settings" };
@@ -306,7 +309,7 @@ export const IPC = {
   accountSignInEvent: "account:sign-in-event",
   projectsList: "projects:list",
   projectsCreate: "projects:create",
-  projectsTaskCounts: "projects:task-counts",
+  projectsOverviews: "projects:overviews",
   projectsPickFolder: "projects:pick-folder",
   projectsMenu: "projects:menu",
   projectsUpdate: "projects:update",

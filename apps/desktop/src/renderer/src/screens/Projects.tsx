@@ -1,21 +1,24 @@
-import type { MouseEvent } from "react";
+import { type MouseEvent, useContext } from "react";
 import { Icon } from "@/lib/Icon";
-import { useT } from "@/lib/useT";
+import { LanguageContext, useT } from "@/lib/useT";
 import { RenameField } from "@/shell/Sidebar";
-import type { Project } from "../../../shared/model";
+import { DESCRIPTION_MAX, type Project, type ProjectOverview } from "../../../shared/model";
+import { WorkingDots } from "../components/TaskTag";
 
 export function Projects({
   projects,
-  counts,
+  overviews,
   onOpen,
   onNew,
   onMenu,
   renaming,
   onRenamed,
+  describing,
+  onDescribed,
 }: {
   projects: Project[];
-  /** Tasks per project id. */
-  counts: Record<string, number>;
+  /** Each project's tasks in numbers, by project id. */
+  overviews: Record<string, ProjectOverview>;
   onOpen: (id: string) => void;
   onNew: () => void;
   /** Shows the project's menu. */
@@ -24,8 +27,14 @@ export function Projects({
   renaming: string | null;
   /** The new name, or null when the user kept the old one. */
   onRenamed: (id: string, name: string | null) => void;
+  /** The project whose description is being edited. */
+  describing: string | null;
+  /** The new description, possibly empty, or null when the user kept the old one. */
+  onDescribed: (id: string, description: string | null) => void;
 }) {
   const t = useT();
+  const lang = useContext(LanguageContext);
+  const day = (at: string) => new Date(at).toLocaleDateString(lang, { day: "numeric", month: "short" });
   // Right-click opens the same menu as the … button, as in Finder.
   const contextMenu = (id: string) => (e: MouseEvent) => {
     e.preventDefault();
@@ -46,7 +55,8 @@ export function Projects({
           {projects.length === 0 && <p className="t2">{t("projects.empty")}</p>}
           <div className="pgrid" style={{ marginTop: 16 }}>
             {projects.map((p) => {
-              const count = counts[p.id] ?? 0;
+              const o = overviews[p.id];
+              const count = o?.tasks ?? 0;
               const body = (
                 <>
                   {renaming === p.id ? (
@@ -58,9 +68,33 @@ export function Projects({
                   ) : (
                     <h3>{p.name}</h3>
                   )}
-                  {p.description && <p>{p.description}</p>}
+                  {describing === p.id ? (
+                    <RenameField
+                      title={p.description}
+                      label={t("project.description")}
+                      placeholder={t("project.describeHint")}
+                      className="describe"
+                      allowEmpty
+                      maxLength={DESCRIPTION_MAX}
+                      onDone={(text) => onDescribed(p.id, text !== null && text !== p.description ? text : null)}
+                    />
+                  ) : (
+                    p.description && <p>{p.description}</p>
+                  )}
                   <div className="meta">
-                    <span className="grow">{p.folder}</span>
+                    {/* What needs the user comes first, as in the sidebar; then what's working. */}
+                    {o?.needsYou ? (
+                      <span className="tag mine">{t("tag.needsYou")}</span>
+                    ) : o?.working ? (
+                      <span className="tag">
+                        <WorkingDots />
+                        {t("projects.working", { n: String(o.working) })}
+                      </span>
+                    ) : null}
+                    <span className="grow">
+                      {o?.lastResult &&
+                        t("projects.lastResult", { name: o.lastResult.name, when: day(o.lastResult.at) })}
+                    </span>
                     <span>{count === 1 ? t("projects.oneTask") : t("projects.tasks", { n: String(count) })}</span>
                   </div>
                 </>
@@ -68,12 +102,13 @@ export function Projects({
               return (
                 // The card is a div holding the open button and the … button, which can't nest.
                 <div key={p.id} className="pcard">
-                  {renaming === p.id ? (
+                  {renaming === p.id || describing === p.id ? (
                     <div className="open">{body}</div>
                   ) : (
                     <button
                       type="button"
                       className="open"
+                      title={p.folder}
                       onClick={() => onOpen(p.id)}
                       onContextMenu={contextMenu(p.id)}
                     >

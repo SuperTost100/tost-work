@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { absolutePath, paths, settingsPatch, text } from "./validate";
+import { absolutePath, oneLine, paths, settingsPatch, text } from "./validate";
 
 describe("IPC validation", () => {
   it("accepts absolute paths and rejects empty or relative ones", () => {
@@ -25,6 +25,13 @@ describe("IPC validation", () => {
 
   it("limits text length", () => {
     expect(() => text("x".repeat(11), "name", 10)).toThrow(/too long/);
+  });
+});
+
+describe("oneLine", () => {
+  it("puts a description's lines on one line, so editing it in a field changes nothing by itself", () => {
+    expect(oneLine("  Quotes for\n\nthe Alpine   clients \t")).toBe("Quotes for the Alpine clients");
+    expect(oneLine("   ")).toBe("");
   });
 });
 

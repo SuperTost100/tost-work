@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "@/App";
 import { createMemoryApi } from "@/lib/memoryApi";
@@ -88,6 +88,59 @@ describe("the project menu: rename", () => {
     });
     expect(await screen.findByRole("heading", { level: 1, name: "Alpi Logistica" })).toBeTruthy();
     expect((await api.projects.list())[0]?.name).toBe("Alpi Logistica");
+  });
+});
+
+describe("the project menu: description", () => {
+  it("writes a description in place on the card, and clears it", async () => {
+    const { api } = await setup();
+    api.pickInProjectMenu("describe");
+    await click("More for Alpi");
+    const field = screen.getByRole("textbox", { name: "Description" });
+    fireEvent.change(field, { target: { value: "Quotes for the Alpine clients" } });
+    await act(async () => {
+      fireEvent.keyDown(field, { key: "Enter" });
+    });
+    expect(await screen.findByText("Quotes for the Alpine clients")).toBeTruthy();
+    expect((await api.projects.list())[0]?.description).toBe("Quotes for the Alpine clients");
+
+    await click("More for Alpi");
+    fireEvent.change(screen.getByRole("textbox", { name: "Description" }), { target: { value: "  " } });
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole("textbox", { name: "Description" }), { key: "Enter" });
+    });
+    await waitFor(async () => expect((await api.projects.list())[0]?.description).toBe(""));
+    expect(screen.queryByText("Quotes for the Alpine clients")).toBeNull();
+  });
+
+  it("edits the description from the project page", async () => {
+    const { api } = await setup("project");
+    api.pickInProjectMenu("describe");
+    await click("More for Alpi");
+    const field = screen.getByRole("textbox", { name: "Description" });
+    fireEvent.change(field, { target: { value: "Alpine quotes" } });
+    fireEvent.blur(field);
+    expect(await screen.findByText("Alpine quotes")).toBeTruthy();
+  });
+});
+
+describe("the project cards", () => {
+  it("say what needs the user, the newest file made, and the number of tasks", async () => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Alpi", folder: "/home/giulia/Alpi" });
+    // The memory API's tasks stop at a question: the answered one makes Proposta.docx, the other needs the user.
+    const answered = await api.tasks.start({ projectId: project.id, brief: "Write the quote", attachments: [] });
+    await api.tasks.answer(answered.id, ["The client"]);
+    await api.tasks.start({ projectId: project.id, brief: "Write the letter", attachments: [] });
+    render(<App userName="Giulia" api={api} settings={settings} />);
+    await click("Projects");
+    await screen.findByText(/^Last result: Proposta\.docx, /);
+    const card = document.querySelector(".pcard") as HTMLElement;
+    expect(within(card).getByText("needs you")).toBeTruthy();
+    expect(within(card).getByText("2 tasks")).toBeTruthy();
+    // The folder shows on hover, not on the card.
+    expect(screen.queryByText("/home/giulia/Alpi")).toBeNull();
+    expect(screen.getByRole("button", { name: /^Alpi/ }).getAttribute("title")).toBe("/home/giulia/Alpi");
   });
 });
 

@@ -28,6 +28,9 @@ export const text = (v: unknown, field: string, max = 20_000): string => {
 };
 
 /** Absolute paths only: a relative or empty path would resolve against wherever the app happens to run. */
+/** Text kept on one line, such as a project's description, which shows and is edited as a single line. */
+export const oneLine = (v: string): string => v.replace(/\s+/g, " ").trim();
+
 export const absolutePath = (v: unknown, field: string): string => {
   const path = text(v, field, 4096);
   if (!isAbsolute(path)) throw new Error(`${field} must be an absolute path`);

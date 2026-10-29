@@ -78,7 +78,42 @@ describe("Store", () => {
     }
     expect(s.listTasks().some((t) => t.id === "first")).toBe(false);
     expect(s.listProjectTasks("p1").map((t) => t.id)).toEqual(["first"]);
-    expect(s.taskCounts()).toEqual({ p1: 1, p2: 30 });
+    expect(s.projectOverviews()).toEqual({
+      p1: { tasks: 1, working: 0, needsYou: 0, lastResult: null },
+      p2: { tasks: 30, working: 0, needsYou: 0, lastResult: null },
+    });
+  });
+
+  it("gives each project what's working, what needs the user, and the newest file made", () => {
+    const s = new Store(":memory:");
+    const made = (path: string, kind: "add" | "delete" = "add") => ({ path, kind, role: "made" as const });
+    s.saveTask({ ...task("a", "done", "2026-10-01T00:00:00Z"), projectId: "p1", files: [made("/p1/Old.docx")] });
+    s.saveTask({
+      ...task("b", "done", "2026-10-02T00:00:00Z"),
+      projectId: "p1",
+      files: [made("/p1/Bozza.docx"), made("/p1/Preventivo Ferrari & Figli.docx")],
+    });
+    // A newer task that only read files, or deleted the one it made, has no result.
+    s.saveTask({
+      ...task("c", "running", "2026-10-03T00:00:00Z"),
+      projectId: "p1",
+      files: [{ path: "/p1/note.txt", kind: "add", role: "used" }],
+    });
+    s.saveTask({
+      ...task("d", "needs-you", "2026-10-04T00:00:00Z"),
+      projectId: "p1",
+      files: [made("/p1/x.md", "delete")],
+    });
+    s.saveTask({ ...task("e", "running", "2026-10-05T00:00:00Z"), projectId: "p2" });
+    expect(s.projectOverviews()).toEqual({
+      p1: {
+        tasks: 4,
+        working: 1,
+        needsYou: 1,
+        lastResult: { name: "Preventivo Ferrari & Figli.docx", at: "2026-10-02T00:00:00Z" },
+      },
+      p2: { tasks: 1, working: 1, needsYou: 0, lastResult: null },
+    });
   });
 
   it("returns default settings until some are saved, and keeps defaults for new fields", () => {

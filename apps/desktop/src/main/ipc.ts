@@ -13,7 +13,14 @@ import {
   type TaskMenuAction,
 } from "../shared/api";
 import { languageFrom, type MessageKey, translate } from "../shared/i18n";
-import { type AgentProvider, BRIEF_MAX, MAX_QUESTIONS, type Project, type Settings } from "../shared/model";
+import {
+  type AgentProvider,
+  BRIEF_MAX,
+  DESCRIPTION_MAX,
+  MAX_QUESTIONS,
+  type Project,
+  type Settings,
+} from "../shared/model";
 import type { Accounts } from "./accounts";
 import type { TaskRunner } from "./engine/runner";
 import { type Conflict, copyInto, describe, readablePath, savablePaths, saveCopies } from "./files";
@@ -23,7 +30,7 @@ import type { KeyStore } from "./keys";
 import { removalText } from "./projects";
 import type { SkillFolder } from "./skills";
 import type { Store } from "./store/store";
-import { absolutePath, paths, settingsPatch, text } from "./validate";
+import { absolutePath, oneLine, paths, settingsPatch, text } from "./validate";
 
 /** Validates everything that comes from the interface, because IPC is a trust boundary. */
 export function registerIpc(
@@ -93,7 +100,7 @@ export function registerIpc(
     const project: Project = {
       id: randomUUID(),
       name,
-      description: text(input?.description ?? "", "description", 2000),
+      description: oneLine(text(input?.description ?? "", "description", DESCRIPTION_MAX)),
       folder,
       instructions: "",
       createdAt: new Date().toISOString(),
@@ -115,7 +122,7 @@ export function registerIpc(
   ipcMain.handle(IPC.tasksListForProject, (_e, projectId: unknown) =>
     store.listProjectTasks(text(projectId, "projectId", 100)),
   );
-  ipcMain.handle(IPC.projectsTaskCounts, () => store.taskCounts());
+  ipcMain.handle(IPC.projectsOverviews, () => store.projectOverviews());
   ipcMain.handle(IPC.tasksGet, (_e, id: unknown) => store.getTask(text(id, "id", 100)) ?? null);
   ipcMain.handle(IPC.tasksDraft, (_e, id: unknown) => runner.draft(text(id, "id", 100)));
 
@@ -283,6 +290,7 @@ export function registerIpc(
     projectOf(id);
     return popup<ProjectMenuAction>([
       { label: t("menu.rename"), action: "rename" },
+      { label: t("menu.editDescription"), action: "describe" },
       { label: t("menu.editInstructions"), action: "instructions" },
       { label: t("menu.reveal"), action: "reveal" },
       "separator",
@@ -298,7 +306,9 @@ export function registerIpc(
       if (key === "name") {
         next.name = text(input.name, "name", 200).trim();
         if (!next.name) throw new Error("A project needs a name");
-      } else if (key === "instructions") next.instructions = text(input.instructions, "instructions");
+      } else if (key === "description")
+        next.description = oneLine(text(input.description, "description", DESCRIPTION_MAX));
+      else if (key === "instructions") next.instructions = text(input.instructions, "instructions");
       else throw new Error(`Unknown project field: ${key}`);
     }
     store.saveProject(next);

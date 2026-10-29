@@ -22,7 +22,9 @@ import {
   type EngineEvent,
   type Job,
   keyVendor,
+  lastMade,
   type Project,
+  type ProjectOverview,
   questionItems,
   type Settings,
   type Skill,
@@ -281,10 +283,19 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         projects.push(p);
         return p;
       },
-      taskCounts: async () => {
-        const counts: Record<string, number> = {};
-        for (const t of tasks.values()) if (t.projectId) counts[t.projectId] = (counts[t.projectId] ?? 0) + 1;
-        return counts;
+      overviews: async () => {
+        const overviews: Record<string, ProjectOverview> = {};
+        const newestFirst = [...tasks.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        for (const t of newestFirst) {
+          if (!t.projectId) continue;
+          const o = overviews[t.projectId] ?? { tasks: 0, working: 0, needsYou: 0, lastResult: null };
+          overviews[t.projectId] = o;
+          o.tasks++;
+          if (t.status === "running") o.working++;
+          if (t.status === "needs-you") o.needsYou++;
+          o.lastResult ??= lastMade(t);
+        }
+        return overviews;
       },
       pickFolder: async () => "/Users/giulia/Documents/Proposals",
       menu: async () => projectMenuPick,

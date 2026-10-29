@@ -298,6 +298,9 @@ export const DEFAULT_SETTINGS: Settings = {
 export const NOTES_MAX = 4000;
 
 /** The longest message a task takes, about 25 pages: a longer text goes in as an attached file. */
+/** The longest project description, as created and as edited. */
+export const DESCRIPTION_MAX = 2000;
+
 export const BRIEF_MAX = 100_000;
 
 /** One of the user's skills: a SKILL.md folder in Documents/Tost Work/Skills. */
@@ -375,3 +378,19 @@ export type JobDraft = Pick<Job, "projectId" | "title" | "brief" | "schedule" | 
 
 /** A job runs again only if the run before it is over: one that needs the user waits for them. */
 export const busyStatus = (status: TaskStatus | undefined): boolean => status === "running" || status === "needs-you";
+
+/** What a project's card says about its tasks: how many, which need the user or are working, and the last file made. */
+export interface ProjectOverview {
+  tasks: number;
+  working: number;
+  needsYou: number;
+  /** The newest file a task made, by its name, and when that task last changed. */
+  lastResult: { name: string; at: string } | null;
+}
+
+/** The newest file a task made and still has, or null. */
+export function lastMade(task: Pick<Task, "files" | "updatedAt">): { name: string; at: string } | null {
+  const file = task.files.findLast((f) => f.role === "made" && f.kind !== "delete");
+  const name = file?.path.split(/[\\/]/).filter(Boolean).pop();
+  return name ? { name, at: task.updatedAt } : null;
+}
