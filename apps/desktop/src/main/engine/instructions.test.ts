@@ -92,6 +92,8 @@ describe("instructionsFor", () => {
     expect(text).toContain('a run of the job "Follow-up check"');
     expect(text).toContain("The user isn't watching");
     expect(text).toMatch(/carry today's date, \d{4}-\d{2}-\d{2}/);
+    // A request that names its files, or keeps one file up to date, wins over the date.
+    expect(text).toContain("When the job's request says how to name its files");
     expect(text).toContain("Put them in /Users/giulia/Proposte/Follow-up.");
     expect(instructionsFor(task, project, "it")).not.toContain("a run of the job");
   });

@@ -251,7 +251,7 @@ const en = {
   "jobs.output.reset": "Use the project folder",
   "jobs.output.outside": "That folder isn't inside the project.",
   "jobs.output.d":
-    "Each run saves new files with the date in their name, so the ones from earlier runs stay as they are.",
+    'Each run saves new files with the date in their name, so the ones from earlier runs stay as they are, unless you say how to name them in "What to do each time".',
   "jobs.try.body": "Run it once now and look at what it makes. Its schedule stays as it is.",
   "jobs.try.run": "Save and run once",
   "jobs.try.started": "It's running. It shows in Recent like any task.",
@@ -729,7 +729,8 @@ const it: Record<MessageKey, string> = {
   "jobs.output.choose": "Cambia…",
   "jobs.output.reset": "Usa la cartella del progetto",
   "jobs.output.outside": "Quella cartella non è dentro il progetto.",
-  "jobs.output.d": "Ogni volta salva file nuovi con la data nel nome, così quelli delle volte prima restano come sono.",
+  "jobs.output.d":
+    'Ogni volta salva file nuovi con la data nel nome, così quelli delle volte prima restano come sono, a meno che tu non dica come chiamarli in "Cosa fare ogni volta".',
   "jobs.try.body": "Fallo girare una volta adesso e guarda cosa produce. Gli orari restano come sono.",
   "jobs.try.run": "Salva ed esegui ora",
   "jobs.try.started": "È partito. Lo trovi tra le Recenti come ogni attività.",

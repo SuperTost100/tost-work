@@ -276,6 +276,20 @@ export type SectionKey = keyof typeof SECTION_LEVEL;
 export const sectionOn = (settings: Pick<Settings, "level" | "sections">, key: SectionKey): boolean =>
   settings.sections[key] ?? LEVELS.indexOf(settings.level) >= LEVELS.indexOf(SECTION_LEVEL[key]);
 
+/**
+ * Settings with a change applied. A change names only the switches and notifications it touches, so two quick toggles
+ * can't undo each other. A new level puts every section back to what it shows, and a switch set to its level's own
+ * choice stops being the user's, so later levels move it again.
+ */
+export function mergeSettings(current: Settings, changes: Partial<Settings>): Settings {
+  const level = changes.level ?? current.level;
+  const kept = level === current.level ? current.sections : {};
+  const sections: Settings["sections"] = {};
+  for (const [key, on] of Object.entries({ ...kept, ...changes.sections }) as [SectionKey, boolean][])
+    if (on !== sectionOn({ level, sections: {} }, key)) sections[key] = on;
+  return { ...current, ...changes, sections, notify: { ...current.notify, ...changes.notify } };
+}
+
 export const DEFAULT_SETTINGS: Settings = {
   name: "",
   work: "",

@@ -81,7 +81,7 @@ export function instructionsFor(
     parts.push(
       [
         `This task is a run of the job "${job.title}", which Tost Work starts by itself on a schedule. The user isn't watching: do the work from start to end without asking, unless you truly can't go on without an answer. A question waits for them and they get a notification.`,
-        `Save this run's files under new names that carry today's date, ${today}, for example "${job.title} ${today}.docx", so each run keeps its own and nothing from an earlier run is replaced.${job.output ? ` Put them in ${join(task.workdir, job.output)}.` : ""}`,
+        `Save this run's files under new names that carry today's date, ${today}, for example "${job.title} ${today}.docx", so each run keeps its own and nothing from an earlier run is replaced. When the job's request says how to name its files, or to update the same file each time, do as it says instead.${job.output ? ` Put them in ${join(task.workdir, job.output)}.` : ""}`,
         "Files from earlier runs are there to read when the work needs them, such as last week's list to compare with. Changing one still asks first.",
       ].join("\n"),
     );

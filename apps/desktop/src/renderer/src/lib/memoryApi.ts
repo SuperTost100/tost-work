@@ -23,6 +23,7 @@ import {
   type Job,
   keyVendor,
   lastMade,
+  mergeSettings,
   type Project,
   type ProjectOverview,
   questionItems,
@@ -230,13 +231,8 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         return () => settingsListeners.delete(l);
       },
       update: async (patch) => {
-        // Sections are merged as in the main process: a patch names only the switches it changes.
-        settings = {
-          ...settings,
-          ...patch,
-          sections: { ...settings.sections, ...patch.sections },
-          notify: { ...settings.notify, ...patch.notify },
-        };
+        // Merged as in the main process.
+        settings = mergeSettings(settings, patch);
         return settings;
       },
     },

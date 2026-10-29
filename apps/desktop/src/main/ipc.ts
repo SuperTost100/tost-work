@@ -18,6 +18,7 @@ import {
   BRIEF_MAX,
   DESCRIPTION_MAX,
   MAX_QUESTIONS,
+  mergeSettings,
   type Project,
   type Settings,
 } from "../shared/model";
@@ -61,15 +62,7 @@ export function registerIpc(
 
   ipcMain.handle(IPC.settingsGet, () => store.getSettings());
   ipcMain.handle(IPC.settingsUpdate, (_e, patch: unknown) => {
-    const current = store.getSettings();
-    const changes = settingsPatch(patch);
-    // A patch names only the section switches and notifications it changes, so two quick toggles can't undo each other.
-    const settings = {
-      ...current,
-      ...changes,
-      sections: { ...current.sections, ...changes.sections },
-      notify: { ...current.notify, ...changes.notify },
-    };
+    const settings = mergeSettings(store.getSettings(), settingsPatch(patch));
     store.saveSettings(settings);
     settingsSaved(settings);
     return settings;
