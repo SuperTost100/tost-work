@@ -249,6 +249,7 @@ const ACTIVITY_ICON: Record<ActivityKind, string> = {
   work: "file",
   skill: "magic-2",
   pdf: "file",
+  note: "chat-3",
 };
 /** Kinds whose line names a file, search or site, and has a plainer line when it doesn't. */
 const HAS_TARGET = new Set<ActivityKind>(["read", "write", "edit", "web", "page", "work", "skill"]);
@@ -292,7 +293,8 @@ function useDraft(api: TostWorkApi, taskId: string, messages: number, running: b
   const [draft, setDraft] = useState("");
   useEffect(() => {
     let alive = true;
-    const off = api.tasks.onText((id, text) => id === taskId && setDraft((d) => d + text));
+    // Through the same channel as the words, so the words after a note can't arrive before the clearing.
+    const off = api.tasks.onText((id, text, restart) => id === taskId && setDraft((d) => (restart ? text : d + text)));
     void api.tasks.draft(taskId).then((d) => alive && setDraft(d));
     return () => {
       alive = false;
@@ -345,7 +347,13 @@ function ActivityLog({
           {keyed(lines, (a) => `${a.kind} ${a.target ?? ""} ${a.at}`).map(([key, a]) => (
             <li key={key}>
               <Icon name={ACTIVITY_ICON[a.kind]} />
-              <span className="truncate">{say(a)}</span>
+              {a.kind === "note" ? (
+                <span className="note" title={a.target}>
+                  {a.target}
+                </span>
+              ) : (
+                <span className="truncate">{say(a)}</span>
+              )}
             </li>
           ))}
           {/* Screen readers hear this from the announcement above the composer, so once is enough. */}

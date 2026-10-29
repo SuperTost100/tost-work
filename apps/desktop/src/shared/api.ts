@@ -189,8 +189,11 @@ export interface TostWorkApi {
     onChange(listener: (task: Task) => void): () => void;
     /** What the agent has written of its answer so far, while it writes it. */
     draft(id: string): Promise<string>;
-    /** Called with each piece of an answer as the agent writes it. Returns a function that stops listening. */
-    onText(listener: (taskId: string, text: string) => void): () => void;
+    /**
+     * Called with each piece of an answer as the agent writes it, and with `restart` when the words so far became a
+     * note in the activity, so the next piece starts a new draft. Returns a function that stops listening.
+     */
+    onText(listener: (taskId: string, text: string, restart?: boolean) => void): () => void;
   };
   files: {
     /** Opens the system file picker. Resolves to the chosen paths, empty when the user cancels. */

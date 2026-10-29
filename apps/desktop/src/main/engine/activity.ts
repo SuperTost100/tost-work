@@ -62,6 +62,16 @@ export function commandActivity(command: string, builtIns?: string): ActivityLin
   return { kind: "command" };
 }
 
+/** The longest note kept in the activity: a note is a line or two, and the log isn't the place for a whole answer. */
+export const NOTE_MAX = 400;
+
+/** What the agent wrote between two steps, on one line, or undefined when it wrote nothing. */
+export function noteText(said: string): string | undefined {
+  const line = said.replace(/\s+/g, " ").trim();
+  if (!line) return undefined;
+  return line.length > NOTE_MAX ? `${line.slice(0, NOTE_MAX - 1).trimEnd()}…` : line;
+}
+
 /** The host of a web address, which is how people name a site. */
 const host = (url: unknown) => {
   try {

@@ -179,6 +179,44 @@ describe("TaskRunner with an answer as it's written", () => {
   });
 });
 
+describe("TaskRunner with a note between steps", () => {
+  it("keeps the note in the activity and starts the next words as a new draft, in the window too", async () => {
+    const store = new Store(":memory:");
+    const heard: [string, boolean | undefined][] = [];
+    let draftAfterNote = "";
+    let runner: TaskRunner;
+    const engine = {
+      defaults: async () => ({ provider: "claude", model: "m", effort: "e" }),
+      async *run(ctx: RunContext): AsyncIterable<EngineEvent> {
+        yield { type: "text", text: "Reading the notes." };
+        yield { type: "activity", kind: "note", target: "Reading the notes." };
+        yield { type: "text", text: "Done." };
+        draftAfterNote = runner.draft(ctx.task.id);
+        yield { type: "message", text: "Done." };
+      },
+      answer: () => false,
+      decide: () => false,
+    } as unknown as Engine;
+    runner = new TaskRunner(
+      store,
+      engine,
+      () => {},
+      undefined,
+      undefined,
+      (_id, text, restart) => heard.push([text, restart]),
+    );
+    const task = runner.create({ projectId: null, brief: "Sum up", workdir: "/tmp/p", attachments: [] });
+    const final = await runner.start(task.id);
+    expect(heard).toEqual([
+      ["Reading the notes.", undefined],
+      ["", true],
+      ["Done.", undefined],
+    ]);
+    expect(draftAfterNote).toBe("Done.");
+    expect(final.activity?.map((a) => [a.kind, a.target])).toEqual([["note", "Reading the notes."]]);
+  });
+});
+
 describe("TaskRunner when passing on words fails", () => {
   it("still finishes the task with the whole answer", async () => {
     const store = new Store(":memory:");

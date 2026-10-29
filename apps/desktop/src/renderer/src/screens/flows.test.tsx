@@ -679,6 +679,38 @@ describe("an answer as it's written", () => {
     expect(screen.queryByText("Both calls went well.")).toBeNull();
   });
 
+  it("moves the words written before a step into the activity as a note, and starts the answer afresh", async () => {
+    const { api, task } = await started("Write the quote");
+    render(<App userName="Giulia" api={api} />);
+    await open("Write the quote");
+    act(() => api.emit(task.id, { type: "text", text: "The table rows came out of order, I'm fixing them." }));
+    expect(await screen.findByText("The table rows came out of order, I'm fixing them.")).toBeTruthy();
+    act(() => {
+      api.emit(task.id, {
+        type: "activity",
+        kind: "note",
+        target: "The table rows came out of order, I'm fixing them.",
+      });
+      api.emit(task.id, { type: "activity", kind: "edit", target: "Quote.docx" });
+      api.emit(task.id, { type: "text", text: "The quote is ready." });
+    });
+    expect(await screen.findByText("The quote is ready.")).toBeTruthy();
+    // Once, in the activity, and no longer as the start of the answer.
+    const note = screen.getByText("The table rows came out of order, I'm fixing them.");
+    expect(note.closest(".activity")).toBeTruthy();
+
+    act(() => {
+      api.emit(task.id, { type: "message", text: "The quote is ready." });
+      api.emit(task.id, { type: "done" });
+    });
+    // The note stays in what it did, after the end.
+    const folded = await screen.findByRole("button", { name: /What it did \(2\)/ });
+    await act(async () => {
+      fireEvent.click(folded);
+    });
+    expect(screen.getByText("The table rows came out of order, I'm fixing them.").closest(".activity")).toBeTruthy();
+  });
+
   it("leaves out the brief check when the answer stayed in the chat", async () => {
     const { api, task } = await started("Take stock of the calls");
     act(() => {

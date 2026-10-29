@@ -7,7 +7,7 @@ import type { AgentProvider, AiId, EngineEvent, Job, KeyVendor, Review, Skill } 
 import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
 import { freeName, inside } from "../files";
 import type { ToolHandler } from "../mcp/server";
-import { activityOf } from "./activity";
+import { activityOf, noteText } from "./activity";
 import type { Engine, RunContext } from "./engine";
 import { instructionsFor } from "./instructions";
 
@@ -367,13 +367,21 @@ export class AgentEngine implements Engine, ToolHandler {
       },
     });
 
+    // What the agent wrote since its last tool call. Words followed by a tool call were a note between steps, such as
+    // "the table is nearly done", not the answer: they go into the activity, and only the last words are the answer.
+    let said = "";
     const pump = (async () => {
       try {
         for await (const event of stream) {
           if (event.type === "session") channel.push({ type: "session", sessionId: event.sessionId });
-          else if (event.type === "text.delta") channel.push({ type: "text", text: event.text });
-          else if (event.type === "plan") channel.push({ type: "plan", steps: event.steps });
+          else if (event.type === "text.delta") {
+            said += event.text;
+            channel.push({ type: "text", text: event.text });
+          } else if (event.type === "plan") channel.push({ type: "plan", steps: event.steps });
           else if (event.type === "tool.start") {
+            const note = noteText(said);
+            said = "";
+            if (note) channel.push({ type: "activity", kind: "note", target: note });
             const line = activityOf(event.name, event.input, this.documents?.skills);
             if (line) channel.push({ type: "activity", ...line });
           } else if (event.type === "file.change" && event.status === "done") {

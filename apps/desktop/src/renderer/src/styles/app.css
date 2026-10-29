@@ -3688,6 +3688,20 @@ label.opt:has(input:focus-visible) {
 .activity li:last-child {
   color: var(--ink);
 }
+/* A note the agent wrote between steps: its own words, so up to three lines of them, with the icon on the first. */
+.activity li:has(.note) {
+  align-items: flex-start;
+}
+.activity li:has(.note) .ic {
+  margin-top: 2px;
+}
+.activity .note {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  line-height: 1.45;
+}
 /* Skills list: the built-in guides under their own heading, and Import at the end. */
 .slist .sgroup {
   margin: 14px 10px 4px;

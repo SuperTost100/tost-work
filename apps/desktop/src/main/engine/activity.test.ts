@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { activityOf, commandActivity } from "./activity";
+import { activityOf, commandActivity, NOTE_MAX, noteText } from "./activity";
 
 describe("activity", () => {
   it("words Claude Code's tools, from what a real run sent", () => {
@@ -94,5 +94,18 @@ describe("activity", () => {
     expect(activityOf("update_plan", {})).toBeNull();
     expect(activityOf("mcp__tost_work__ask_user", {})).toBeNull();
     expect(activityOf("mcp__tost_work__make_pdf", {})).toEqual({ kind: "pdf" });
+  });
+});
+
+describe("noteText", () => {
+  it("puts what the agent wrote between steps on one line, and cuts a long one short", () => {
+    expect(noteText("  \n ")).toBeUndefined();
+    expect(noteText("Il preventivo è quasi pronto:\n\nsistemo la tabella.")).toBe(
+      "Il preventivo è quasi pronto: sistemo la tabella.",
+    );
+    const long = noteText("parola ".repeat(200)) ?? "";
+    expect(long.length).toBeLessThanOrEqual(NOTE_MAX);
+    expect(long.length).toBeGreaterThan(NOTE_MAX - 10);
+    expect(long.endsWith("…")).toBe(true);
   });
 });

@@ -138,7 +138,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
     for (const l of listeners) l(t);
     return t;
   };
-  const textListeners = new Set<(taskId: string, text: string) => void>();
+  const textListeners = new Set<(taskId: string, text: string, restart?: boolean) => void>();
   // As the runner does: words go to the window and add up to the draft, and the message ends it.
   const drafts = new Map<string, string>();
   const emit = (id: string, e: EngineEvent) => {
@@ -150,6 +150,11 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       return;
     }
     if (e.type === "message" || e.type === "done" || e.type === "failed" || e.type === "stopped") drafts.delete(id);
+    // As the runner does: the words so far became a note, so the next ones start a new draft.
+    if (e.type === "activity" && e.kind === "note") {
+      drafts.delete(id);
+      for (const l of textListeners) l(id, "", true);
+    }
     save(applyEvent(t, e, now()));
   };
 

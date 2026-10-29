@@ -145,6 +145,29 @@ describe("AgentEngine", () => {
     expect(closed).toEqual(["tok"]);
   });
 
+  it("keeps the words the agent wrote between steps as notes in the activity, and only its last words as the answer", async () => {
+    const { seen, run } = setup(async (_input, emit) => {
+      emit({ type: "text.delta", text: "Leggo le note " });
+      emit({ type: "text.delta", text: "della chiamata." });
+      emit({ type: "tool.start", id: "t1", name: "Read", input: { file_path: "/w/note.txt" } });
+      // A tool call with nothing written before it adds no note.
+      emit({ type: "tool.start", id: "t2", name: "Read", input: { file_path: "/w/prezzi.xlsx" } });
+      emit({ type: "text.delta", text: "Il preventivo è pronto." });
+      return { text: "Il preventivo è pronto." };
+    });
+    await run();
+    expect(seen).toEqual([
+      { type: "text", text: "Leggo le note " },
+      { type: "text", text: "della chiamata." },
+      { type: "activity", kind: "note", target: "Leggo le note della chiamata." },
+      { type: "activity", kind: "read", target: "note.txt" },
+      { type: "activity", kind: "read", target: "prezzi.xlsx" },
+      { type: "text", text: "Il preventivo è pronto." },
+      { type: "message", text: "Il preventivo è pronto." },
+      { type: "done" },
+    ]);
+  });
+
   it("continues the same conversation on a follow-up", async () => {
     const { inputs, run } = setup(async () => ({ text: "ok" }));
     await run(task({ sessionId: "s1" }), "Make it shorter");

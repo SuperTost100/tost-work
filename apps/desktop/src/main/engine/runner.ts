@@ -73,7 +73,7 @@ export class TaskRunner {
     private onChange: (task: Task) => void,
     private now: () => string = () => new Date().toISOString(),
     private guard: Guard = REFUSE,
-    private onText: (taskId: string, text: string) => void = () => {},
+    private onText: (taskId: string, text: string, restart?: boolean) => void = () => {},
   ) {}
 
   /** What the running task's agent has written of its answer so far, or "" between answers. */
@@ -148,6 +148,15 @@ export class TaskRunner {
           continue;
         }
         if (event.type === "message") this.drafts.delete(taskId);
+        // The words so far were a note between steps: the window starts the next words afresh, as the draft does.
+        if (event.type === "activity" && event.kind === "note") {
+          this.drafts.delete(taskId);
+          try {
+            this.onText(taskId, "", true);
+          } catch (err) {
+            console.error(`Task ${taskId}: couldn't pass on the note`, err);
+          }
+        }
         // Read the stored task each time, so an answer saved meanwhile isn't overwritten.
         task = this.save(applyEvent({ ...this.mustGet(taskId), interrupted: undefined }, event, this.now()));
       }

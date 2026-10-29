@@ -111,7 +111,9 @@ export type ActivityKind =
   | "command"
   | "work"
   | "skill"
-  | "pdf";
+  | "pdf"
+  /** A few words the agent wrote to the user between its steps, such as "the table is nearly done". */
+  | "note";
 
 export interface Activity {
   kind: ActivityKind;
