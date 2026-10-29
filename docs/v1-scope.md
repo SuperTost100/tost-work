@@ -64,6 +64,17 @@ Changed on 2026-10-28, after testing 0.0.7:
 - Projects get a menu: rename, edit instructions, show the folder, remove from Tost Work (its folder and files stay).
 - A job's files go in the project folder, or in a folder of the project the user picks.
 
+Changed on 2026-10-29, after testing 0.0.8:
+
+- The collapsed sidebar is a rail of icons. Resting the pointer on it opens the whole sidebar over the page.
+- Headings and lists in the Skills editor come from typing "/". The bubble over a selection keeps bold and italic.
+- Notes the AI writes between its steps stay in "What it did" instead of vanishing.
+- A skill can be exported as a .zip from its menu, to share with a colleague.
+- Project cards show what needs the user or is working, the last file made and the task count, as in the mockup. Projects get a description that can be edited from their menu.
+- Deleting or discarding asks in the system's dialog, with Cancel preselected.
+- The notification permission, opening at login and signing out and back in are tested once, on the last dev build before 0.1.0, after a full uninstall.
+- Settings will offer a reset of the app and of a project from 0.1.0. Decoration comes from 0.3.0.
+
 ## From 0.2.0
 
 - AI renames tasks from their brief, so a task from a long paste gets a short title.
