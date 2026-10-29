@@ -307,6 +307,7 @@ h3 {
   flex: none;
 }
 .rec.split {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -345,7 +346,6 @@ h3 {
   opacity: 0;
 }
 .rec:hover .more,
-.rec.on .more,
 .rec .more:focus-visible,
 .sitem:hover .more,
 .sitem .more:focus-visible {
@@ -355,6 +355,24 @@ h3 {
 .sitem .more:hover {
   background: var(--hover);
   color: var(--ink);
+}
+/* The … floats over the end of the row, so a title uses the whole width until the pointer comes for the menu. */
+.rec .more {
+  position: absolute;
+  top: 3px;
+  right: 2px;
+}
+.rec:is(:hover, :has(.more:focus-visible)) .open {
+  padding-right: 26px;
+}
+/* While a title is renamed, the field has the whole row. */
+.rec:has(.rename) .more {
+  display: none;
+}
+/* On a hovered or open row the tag's grey sits too close to the row's own, so its text turns ink and it gets an edge. */
+.rec:is(:hover, .on) .tag:not(.mine) {
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .rec .rename {
   flex: 1;
