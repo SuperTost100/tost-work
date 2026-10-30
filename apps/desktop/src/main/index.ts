@@ -90,7 +90,11 @@ function createPanel(width: number, height: number): BrowserWindow {
       : { backgroundColor: nativeTheme.shouldUseDarkColors ? "#22201D" : "#FAF8F4" }),
     webPreferences: { preload: PRELOAD(), contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
-  if (isMac) win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // Without skipping it, this turns the whole app into a menu-bar app and back, which hides it for a moment: the first
+  // click on the icon, with the window open, left the app without its menu and deaf to clicks until the Dock icon
+  // was clicked. shortcut: with the window open, the panel may not show over another app in full screen; switch to
+  // `type: "panel"` if that turns out to matter.
+  if (isMac) win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   loadPage(win, "panel");
   return win;
