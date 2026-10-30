@@ -3988,6 +3988,17 @@ html:has(.panel) body {
   height: 44px;
   -webkit-app-region: drag;
 }
+/* On a Mac the window buttons are wider than the rail, so the rail starts under them: they sit in a strip across the
+   window, in the page's colour like the top bar next to it. Full screen has no buttons, and the rail goes to the top. */
+:root:not([data-full-screen]) .mac .rail {
+  background: linear-gradient(var(--canvas) 44px, var(--side) 44px);
+}
+:root:not([data-full-screen]) .mac .rail-chrome {
+  align-self: stretch;
+  width: auto;
+  margin-right: -1px;
+  background: var(--canvas);
+}
 .rail-logo {
   display: grid;
   padding: 2px 0 10px;
