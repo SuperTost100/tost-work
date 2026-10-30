@@ -1,7 +1,7 @@
 {
   "name": "@tost-work/desktop",
   "productName": "Tost Work",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "private": true,
   "type": "module",
   "main": "out/main/index.js",
@@ -15,7 +15,7 @@
   "dependencies": {
     "@milkdown/kit": "7.22.3",
     "@modelcontextprotocol/sdk": "1.32.2",
-    "cli-funnel": "0.6.1",
+    "cli-funnel": "0.6.2",
     "jszip": "3.10.2",
     "zod": "^4.6.7"
   },

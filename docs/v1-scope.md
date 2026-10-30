@@ -92,6 +92,13 @@ Changed on 2026-10-30, after testing 0.0.10:
 - A cut title ends with "…" right after its last letter.
 - The built-in guides show their steps in Italian too. The files the AI reads stay English.
 
+Changed on 2026-10-30, after testing 0.0.11:
+
+- The roadmap also has a board, [Tost Work roadmap](https://github.com/users/SuperTost100/projects/2), with a Version field for each issue. Ideas sent with the issue form are added to it.
+- On a Mac the collapsed rail is 80px wide, and the window buttons sit on it instead of in a strip above it. Its icons are 20px.
+- A task's side panel is a card as tall as what it lists. The page scrolls under it, so its scrollbar sits at the window's edge.
+- With cli-funnel 0.6.2, Codex's short notes between steps show in the task as Claude's do.
+
 ## From 0.2.0
 
 - The Skills parts above.
