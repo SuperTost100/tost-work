@@ -112,7 +112,7 @@ function createWindow(store: Store): BrowserWindow {
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#22201D" : "#FAF8F4",
     // On Mac the traffic lights sit inside the sidebar, as in the mockup.
     // shortcut: Windows and Linux keep the system frame, switch to titleBarOverlay when we style those builds.
-    ...(isMac ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 18, y: 16 } } : {}),
+    ...(isMac ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 14, y: 16 } } : {}),
     webPreferences: {
       preload: PRELOAD(),
       contextIsolation: true,
