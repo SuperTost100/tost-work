@@ -942,8 +942,9 @@ textarea {
 
 /* ===== Task ===== */
 .task {
+  --panel-w: clamp(200px, 30%, 292px);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(200px, 30%, 292px);
+  grid-template-columns: minmax(0, 1fr) var(--panel-w);
   flex: 1;
   min-height: 0;
 }
@@ -1137,8 +1138,30 @@ textarea {
 .asking .o.own {
   color: var(--t3);
 }
+/* The side panels float as a card, like the composer, so no line runs up against the top bar. The card is as tall as
+   what it lists. The page runs under it to the window's edge, so its scrollbar sits there and not beside the card. */
+:is(.task, .qe) > .mid {
+  grid-area: 1 / 1 / 2 / -1;
+}
+:is(.task, .qe) > .mid > .scroll {
+  padding-right: var(--panel-w);
+}
+:is(.task, .qe) > .mid > .foot {
+  padding-right: calc(var(--panel-w) + 32px);
+}
+.rp,
+.wc {
+  grid-area: 1 / 2;
+  z-index: 2;
+  align-self: start;
+  max-height: calc(100% - 16px);
+  margin: 0 14px 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+  overflow: hidden;
+}
 .rp {
-  border-left: 1px solid var(--line-2);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1743,8 +1766,9 @@ textarea {
 
 /* Quick edit: one panel lists what changed. 360px while it lists files; the change cards will need the mockup's 440px. */
 .qe {
+  --panel-w: clamp(200px, 30%, 360px);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(200px, 30%, 360px);
+  grid-template-columns: minmax(0, 1fr) var(--panel-w);
   flex: 1;
   min-height: 0;
 }
@@ -1821,7 +1845,6 @@ textarea {
   color: var(--t2);
 }
 .wc {
-  border-left: 1px solid var(--line-2);
   display: flex;
   flex-direction: column;
   min-height: 0;
