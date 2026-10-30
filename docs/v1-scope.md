@@ -84,9 +84,16 @@ Changed on 2026-10-29, after testing 0.0.9:
 - A job's files carry the date in their name unless its request says how to name them.
 - Which model a task uses becomes clear with the model switcher, which comes later. Help gets real documentation from 0.4.0.
 
+Changed on 2026-10-30, after testing 0.0.10:
+
+- The roadmap is the repository's issues labelled `roadmap`, with a milestone for the version each one comes in (0.1.0 to 0.4.0). Tost adds an idea with the Roadmap idea issue form. Renaming tasks with AI moved to 0.3.0.
+- On a Mac the collapsed rail starts under the window buttons. The sidebar opens over the page only once the pointer rests on the rail, and a click on the rail keeps it shut.
+- A round of questions steps back and forth with two arrows at the card's top right.
+- A cut title ends with "…" right after its last letter.
+- The built-in guides show their steps in Italian too. The files the AI reads stay English.
+
 ## From 0.2.0
 
-- AI renames tasks from their brief, so a task from a long paste gets a short title.
 - The Skills parts above.
 
 ## After 0.2.0

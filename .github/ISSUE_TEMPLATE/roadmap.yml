@@ -1,0 +1,23 @@
+name: Roadmap idea
+description: Something for a later version of Tost Work.
+labels: [roadmap]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What it should do, in a sentence or two.
+    validations:
+      required: true
+  - type: dropdown
+    id: version
+    attributes:
+      label: Target version
+      description: The agent who picks it up sets the matching milestone.
+      options:
+        - "0.1.0"
+        - "0.2.0"
+        - "0.3.0"
+        - "0.4.0"
+        - Later
+        - Not sure
