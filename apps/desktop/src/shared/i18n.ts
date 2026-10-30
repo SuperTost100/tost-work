@@ -1,3 +1,4 @@
+import { GUIDES_IT, type GuideIt } from "./guidesIt";
 import { FIRST_TASK, GREETINGS, LINES } from "./homeLines";
 
 /** Interface strings in English and Italian. The language comes from the system until setup lets the user choose. */
@@ -998,34 +999,11 @@ export function homeLine(lang: Language, pick: number, firstTask = false): strin
   return lines[Math.min(lines.length - 1, Math.floor(pick * lines.length))] ?? "";
 }
 
-/** The built-in guides' titles and descriptions in Italian, by the guide's folder name. The guides' files are English. */
-const GUIDES_IT: Record<string, { title: string; description: string }> = {
-  excel: {
-    title: "Fogli Excel",
-    description:
-      "Crea o modifica un file Excel (.xlsx) con formule che funzionano, una formattazione leggibile e nessun errore. Serve per budget, listini, preventivi, calendari, schede di controllo e ogni altra tabella di numeri.",
-  },
-  pdf: {
-    title: "File PDF",
-    description:
-      "Crea un PDF che si può inviare o stampare. Serve quando l'utente chiede un PDF, una copia definitiva, qualcosa da inviare che non deve essere modificato, o la versione stampabile di un file Word, Excel o PowerPoint.",
-  },
-  powerpoint: {
-    title: "Presentazioni PowerPoint",
-    description:
-      "Crea o modifica una presentazione PowerPoint (.pptx) con diapositive chiare, che si apre in PowerPoint senza richieste di riparazione. Serve per presentazioni commerciali, slide di un corso, riunioni e ogni altra presentazione di lavoro.",
-  },
-  word: {
-    title: "Documenti Word",
-    description:
-      "Crea o modifica un documento Word (.docx) dall'aspetto professionale, che si apre in Word senza avvisi. Serve per relazioni, proposte, lettere, appunti, verbali, scalette e ogni altro documento di lavoro.",
-  },
-};
-
 /**
- * What the app shows for a built-in guide in `lang`, or null to show the guide's own English file text, as for English
- * and for a guide with no translation. Only what is shown changes: the guide's folder name and file stay as they are.
+ * What the app shows for a built-in guide in `lang` (title, description and steps), or null to show the guide's own
+ * English file text, as for English and for a guide with no translation. Only what is shown changes: the guide's
+ * folder name and file stay as they are.
  */
-export function guideText(lang: Language, name: string): { title: string; description: string } | null {
+export function guideText(lang: Language, name: string): GuideIt | null {
   return lang === "it" && Object.hasOwn(GUIDES_IT, name) ? (GUIDES_IT[name] ?? null) : null;
 }

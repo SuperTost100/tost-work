@@ -22,6 +22,7 @@ describe("i18n", () => {
       const text = guideText("it", name);
       expect(text?.title).toBeTruthy();
       expect(text?.description).toMatch(/^Crea /);
+      expect(text?.steps).toBeTruthy();
     }
     expect(guideText("en", "word")).toBeNull();
     expect(guideText("it", "unknown")).toBeNull();

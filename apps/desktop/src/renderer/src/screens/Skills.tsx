@@ -52,11 +52,14 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
     setDraft(skill ? draftOf(skill) : null);
   }, []);
 
+  // Each list asked for takes the next number, so one that comes back after a newer one is dropped.
+  const listing = useRef(0);
   useEffect(() => {
     let alive = true;
+    const mine = ++listing.current;
     api.skills.list().then(
       (list) => {
-        if (!alive) return;
+        if (!alive || mine !== listing.current) return;
         setSkills(list);
         // The user's own first; with none yet, the page invites them to make one.
         show(list.find((s) => !s.builtIn) ?? null);
@@ -210,6 +213,33 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
   useLayoutEffect(() => {
     current.current = { skills, openId };
   });
+  // The guides come in the app's language, so a language changed in Settings lists them again. The user's own skills and
+  // whatever is typed in the open one stay as they are; an open guide is read-only, so showing it again loses nothing.
+  const listedIn = useRef(lang);
+  useEffect(() => {
+    if (listedIn.current === lang) return;
+    listedIn.current = lang;
+    let alive = true;
+    const mine = ++listing.current;
+    api.skills.list().then(
+      (list) => {
+        if (!alive || mine !== listing.current) return;
+        // The first list never came, as this one overtook it: this one is the first.
+        if (!current.current.skills) {
+          setSkills(list);
+          return show(list.find((s) => !s.builtIn) ?? null);
+        }
+        const guides = list.filter((s) => s.builtIn);
+        setSkills((before) => before && [...before.filter((s) => !s.builtIn), ...guides]);
+        const open = guides.find((s) => s.id === current.current.openId);
+        if (open) show(open);
+      },
+      (err: unknown) => alive && setError(errorText(err)),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [api, lang, show]);
   const remove = (skill: Skill) => {
     void run(async () => {
       const sure = await confirm({

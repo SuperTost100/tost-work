@@ -11,6 +11,7 @@ import type {
   SkillMenuAction,
   TostWorkApi,
 } from "../../../shared/api";
+import { guideText, translate } from "../../../shared/i18n";
 import {
   type AgentProvider,
   answersText,
@@ -117,6 +118,8 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   const tasks = new Map<string, Task>();
   const listeners = new Set<(t: Task) => void>();
   let settings: Settings = { ...DEFAULT_SETTINGS, ...initial };
+  // The guide as the real app lists it: with its title, description and steps in the settings' language.
+  const wordGuide = (): Skill => ({ ...WORD_GUIDE, ...guideText(settings.language ?? "en", "word") });
   const accounts: Record<AgentProvider, AgentAccount> = {
     codex: { installed: true, version: "0.164.0", loggedIn: false },
     claude: { installed: true, version: "2.1.310", loggedIn: false },
@@ -467,7 +470,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       },
     },
     skills: {
-      list: async () => [...[...skills].sort((a, b) => a.title.localeCompare(b.title)), WORD_GUIDE],
+      list: async () => [...[...skills].sort((a, b) => a.title.localeCompare(b.title)), wordGuide()],
       create: async (title) => {
         let id = skillId(title);
         for (let n = 2; skills.some((s) => s.id === id); n++) id = `${skillId(title)}-${n}`;
@@ -515,13 +518,10 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       menu: async () => menuPick,
       duplicate: async (id) => {
         if (id !== WORD_GUIDE.id) throw new Error("That isn't one of Tost Work's guides");
-        const { builtIn: _b, ...guide } = WORD_GUIDE;
-        const copy = keep({
-          ...guide,
-          id: "word-documents-copy",
-          name: "word-documents-copy",
-          title: "Word documents (copy)",
-        });
+        const { builtIn: _b, ...guide } = wordGuide();
+        // Named and written in the app's language, as the real Duplicate does.
+        const title = translate(settings.language ?? "en", "skills.copyOf", { title: guide.title });
+        const copy = keep({ ...guide, id: skillId(title), name: skillId(title), title });
         skills = [...skills, copy];
         return copy;
       },

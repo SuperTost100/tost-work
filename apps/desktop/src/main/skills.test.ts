@@ -226,6 +226,36 @@ describe("SkillFolder", () => {
     expect(await readFile(join(base, "guides", "word", "SKILL.md"), "utf8")).toContain("# Word documents");
   });
 
+  it("shows a guide's steps in the user's language, and copies them into a duplicate made in that language", async () => {
+    const { base, root, skills } = await folder();
+    const italian = (name: string) =>
+      name === "word"
+        ? {
+            title: "Documenti Word",
+            description: "Crea un documento Word.",
+            steps: "Usa officecli.\n\n## Prima di finire\n\n1. Esegui `officecli validate <file>`.",
+          }
+        : null;
+    const [word] = await skills.builtIns(italian);
+    expect(word?.steps).toBe("Usa officecli.\n\n## Prima di finire\n\n1. Esegui `officecli validate <file>`.");
+    // Without steps from the language, or in English, the file's own steps show.
+    expect((await skills.builtIns(() => ({ title: "Word", description: "x" })))[0]?.steps).toBe("Use officecli.");
+    expect((await skills.builtIns())[0]?.steps).toBe("Use officecli.");
+
+    const copy = await skills.duplicate("@word", (title) => `${title} (copia)`, italian);
+    expect(copy.steps).toBe("Usa officecli.\n\n## Prima di finire\n\n1. Esegui `officecli validate <file>`.");
+    // The copy's file has the title as its heading, then the Italian steps, and the guide's own description.
+    const saved = parseSkill(await readFile(join(root, copy.id, "SKILL.md"), "utf8"));
+    expect(saved.body.trim()).toBe(
+      "# Documenti Word (copia)\n\nUsa officecli.\n\n## Prima di finire\n\n1. Esegui `officecli validate <file>`.",
+    );
+    expect(saved.description).toBe("Make a Word file.");
+    // The guide's file stays English.
+    expect(await readFile(join(base, "guides", "word", "SKILL.md"), "utf8")).toContain("Use officecli.");
+    // A copy made in English still has the English steps.
+    expect((await skills.duplicate("@word")).steps).toBe("Use officecli.");
+  });
+
   it("keeps a version per save, with its note, and puts an old one back as a new version", async () => {
     const { skills } = await folder();
     const made = await skills.create("Proposal writer", "Proposals.", "1. Read.");

@@ -234,6 +234,78 @@ describe("skills", () => {
     expect((await api.skills.list()).filter((s) => !s.builtIn).map((s) => s.id)).toEqual(["word-documents-copy"]);
   });
 
+  it("lists the guides again in the new language when it changes while Skills is open", async () => {
+    const api = createMemoryApi();
+    render(<Root api={api} />);
+    await click("Skills");
+    await click("Word documents");
+    expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Word documents");
+
+    await act(async () => api.changeSettings({ language: "it" }));
+    // The open guide changes too: its name, its description and its steps.
+    await click("Documenti Word");
+    expect(screen.queryByRole("button", { name: "Word documents" })).toBeNull();
+    await waitFor(() =>
+      expect((screen.getByLabelText("Nome della skill") as HTMLInputElement).value).toBe("Documenti Word"),
+    );
+    expect((screen.getByLabelText("Quando usarla") as HTMLTextAreaElement).value).toMatch(/^Crea o modifica/);
+    expect((await stepsBox()).textContent).toMatch(/^Chi lavora in azienda/);
+
+    await act(async () => api.changeSettings({ language: "en" }));
+    await click("Word documents");
+    expect((screen.getByLabelText("Skill name") as HTMLInputElement).value).toBe("Word documents");
+  });
+
+  it("keeps the newest language when the first list comes back after the one for a language change", async () => {
+    const api = createMemoryApi();
+    const list = api.skills.list;
+    let hold = true;
+    let release = () => {};
+    api.skills.list = async () => {
+      const result = await list();
+      if (hold) {
+        hold = false;
+        await new Promise<void>((done) => {
+          release = done;
+        });
+      }
+      return result;
+    };
+    render(<Root api={api} />);
+    await click("Skills");
+    await act(async () => api.changeSettings({ language: "it" }));
+    await screen.findByRole("button", { name: "Documenti Word" });
+    // The English list, asked for first, comes back last.
+    await act(async () => release());
+    expect(screen.getByRole("button", { name: "Documenti Word" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Word documents" })).toBeNull();
+  });
+
+  it("keeps the user's own skills, and what is typed in the open one, when the language changes", async () => {
+    const api = createMemoryApi();
+    await api.skills.create("Brand voice");
+    render(<Root api={api} />);
+    await click("Skills");
+    fireEvent.change(await screen.findByLabelText("Skill name"), { target: { value: "Brand voice 2" } });
+
+    await act(async () => api.changeSettings({ language: "it" }));
+    await screen.findByRole("button", { name: "Documenti Word" });
+    expect((screen.getByLabelText("Nome della skill") as HTMLInputElement).value).toBe("Brand voice 2");
+    expect(screen.getByRole("button", { name: "Salva" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("makes a copy of a guide in Italian with the Italian steps", async () => {
+    const api = createMemoryApi({ name: "Giulia", setupDone: true, language: "it" });
+    render(<Root api={api} />);
+    await click("Skill");
+    expect(await screen.findByText("Ancora nessuna skill.")).toBeTruthy();
+    await click("Documenti Word");
+    await click("Duplica per modificarla");
+    const [copy] = (await api.skills.list()).filter((s) => !s.builtIn);
+    expect(copy).toMatchObject({ id: "documenti-word-copia", title: "Documenti Word (copia)" });
+    expect(copy?.steps).toMatch(/^Chi lavora in azienda/);
+  });
+
   it("keeps a version on each save, and puts an old one back once confirmed", async () => {
     const api = createMemoryApi();
     const made = await api.skills.create("Proposal writer");

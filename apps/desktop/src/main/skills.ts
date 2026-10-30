@@ -12,7 +12,7 @@ import type { SkillVersions } from "./skillVersions";
 export const IMPORT_LIMITS = { files: 500, bytes: 50 * 1024 * 1024 };
 
 /** What to show for a built-in guide, by its folder name, such as in the user's language; null shows the file's text. */
-export type GuideText = (name: string) => { title: string; description: string } | null;
+export type GuideText = (name: string) => { title: string; description: string; steps?: string } | null;
 
 /** A YAML scalar as written on one line: double quotes as JSON, single quotes with '' for a quote, else as it is. */
 function scalar(value: string): string {
@@ -133,7 +133,7 @@ export class SkillFolder {
 
   /**
    * The guides Tost Work comes with, read-only, with ids that start with @ so they can't be taken for a folder here.
-   * `text` can give the title and description to show; the guide's name and files stay as they are.
+   * `text` can give the title, description and steps to show; the guide's name and files stay as they are.
    */
   async builtIns(text?: GuideText): Promise<Skill[]> {
     const root = this.builtInRoot;
@@ -152,7 +152,7 @@ export class SkillFolder {
             name: name || e.name,
             title: shown?.title ?? titleOf(name || e.name, body),
             description: shown?.description ?? description,
-            steps: stepsOf(body),
+            steps: shown?.steps ?? stepsOf(body),
             files: [],
             folder: join(root, e.name),
             updatedAt: "",
@@ -167,7 +167,8 @@ export class SkillFolder {
   /**
    * A copy of a built-in guide among the user's skills, to change as they like. `titled` names the copy, such as
    * "Word documents (copy)", so the list never shows two skills with the same name. The copy is named after the
-   * title `text` shows, so it matches what the user clicked; its description stays the guide's own, which the agent reads.
+   * title `text` shows, so it matches what the user clicked, and gets the steps `text` shows, so it reads in the same
+   * language; its description stays the guide's own, which the agent reads.
    */
   duplicate(
     id: string,
@@ -184,8 +185,8 @@ export class SkillFolder {
     const title = titled(guide.title);
     const copy = await this.freeName(skillName(title));
     await this.copyFolder(guide.folder, join(this.root, copy));
-    const { description, body, extra } = parseSkill(await readFile(join(this.root, copy, "SKILL.md"), "utf8"));
-    await this.writeText(copy, formatSkill(copy, description, `# ${title}\n\n${stepsOf(body)}`, extra));
+    const { description, extra } = parseSkill(await readFile(join(this.root, copy, "SKILL.md"), "utf8"));
+    await this.writeText(copy, formatSkill(copy, description, `# ${title}\n\n${guide.steps}`, extra));
     await this.versions?.setAside(copy, this.now());
     await this.keep(copy);
     return (await this.read(copy)) as Skill;
