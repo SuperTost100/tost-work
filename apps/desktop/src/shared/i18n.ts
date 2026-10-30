@@ -312,6 +312,8 @@ const en = {
   "task.answered": "You answered {n} questions",
   "task.answeredOne": "You answered 1 question",
   "task.nextQuestion": "Next question",
+  "task.questionBack": "Back",
+  "task.questionForward": "Forward",
   "task.roundTooLong":
     "Your answers together are longer than one message can hold ({max} characters). Shorten one, or attach the long text as a file.",
   "quit.title": "A task is still working.",
@@ -796,6 +798,8 @@ const it: Record<MessageKey, string> = {
   "task.answered": "Hai risposto a {n} domande",
   "task.answeredOne": "Hai risposto a 1 domanda",
   "task.nextQuestion": "Domanda successiva",
+  "task.questionBack": "Indietro",
+  "task.questionForward": "Avanti",
   "task.roundTooLong":
     "Le risposte insieme superano quello che un messaggio può contenere ({max} caratteri). Accorciane una, oppure allega il testo lungo come file.",
   "quit.title": "Un'attività è ancora in corso.",

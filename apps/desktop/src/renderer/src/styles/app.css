@@ -1095,6 +1095,20 @@ textarea {
   color: var(--t3);
   font-size: 13px;
 }
+/* The count of a round, with the arrows that step through it at the card's top right. */
+.asking .q .qnav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: -6px -8px 3px 0;
+}
+.asking .q .qnav .grow {
+  margin: 0;
+}
+.asking .q .qnav .iconbtn:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
 .asking .q .d {
   margin: 4px 0 0;
 }

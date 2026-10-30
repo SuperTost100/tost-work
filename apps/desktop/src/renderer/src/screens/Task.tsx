@@ -444,6 +444,16 @@ function QuestionCard({
     const before = given[to] ?? "";
     onDraft(kept[to] ?? (items[to]?.options.includes(before) ? "" : before));
   };
+  // Stepping away with new words in the box makes them that question's answer, as the send button would, so a changed
+  // answer is never left behind in the box while the old one goes.
+  const step = (to: number) => {
+    const typed = draft.trim();
+    if (!typed || typed === answers[at]) return go(to, answers);
+    const next = [...answers];
+    next[at] = typed;
+    setAnswers(next);
+    go(to, next);
+  };
   const answer = (text: string, picked = false) => {
     const next = [...answers];
     next[at] = text;
@@ -469,13 +479,29 @@ function QuestionCard({
     >
       <div className="q" key={at} ref={takeFocus} tabIndex={-1}>
         {items.length > 1 && (
-          <span className="row">
+          <span className="qnav">
             <span className="grow">{t("task.questionOf", { n: String(at + 1), total: String(items.length) })}</span>
-            {at > 0 && (
-              <button type="button" className="link" onClick={() => go(at - 1, answers)}>
-                {t("setup.back")}
-              </button>
-            )}
+            <button
+              type="button"
+              className="iconbtn"
+              aria-label={t("task.questionBack")}
+              title={t("task.questionBack")}
+              disabled={at === 0}
+              onClick={() => step(at - 1)}
+            >
+              <Icon name="left" />
+            </button>
+            {/* Forward only over questions already answered: an open one is answered with the box or an option. */}
+            <button
+              type="button"
+              className="iconbtn"
+              aria-label={t("task.questionForward")}
+              title={t("task.questionForward")}
+              disabled={at === items.length - 1 || answers[at] === undefined}
+              onClick={() => step(at + 1)}
+            >
+              <Icon name="right" />
+            </button>
           </span>
         )}
         {item.text}

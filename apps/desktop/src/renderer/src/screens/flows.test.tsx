@@ -437,6 +437,18 @@ describe("a round of questions", () => {
     // Back to the second, and the first answer in the user's own words this time.
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByRole("button", { name: /Half a day/ }).getAttribute("aria-pressed")).toBe("true");
+    // Forward steps over answered questions only: the third is still open, so it stops there.
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect((screen.getByRole("button", { name: "Back" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Forward" }));
+    fireEvent.click(screen.getByRole("button", { name: "Forward" }));
+    expect(screen.getByText("Question 3 of 3")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Forward" }) as HTMLButtonElement).disabled).toBe(true);
+    // New words for the first question, then Forward: they become its answer.
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Engineers and managers" } });
+    fireEvent.click(screen.getByRole("button", { name: "Forward" }));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "Two hours" } });
     fireEvent.click(screen.getByRole("button", { name: "Next question" }));
     expect(screen.getByText("Question 3 of 3")).toBeTruthy();
@@ -444,7 +456,7 @@ describe("a round of questions", () => {
       fireEvent.click(screen.getByRole("button", { name: /Online/ }));
     });
     const sent = (await api.tasks.get(task.id))?.messages.at(-1)?.text;
-    expect(sent).toBe("Who is it for?\n→ Engineers\n\nHow long?\n→ Two hours\n\nWhere?\n→ Online");
+    expect(sent).toBe("Who is it for?\n→ Engineers and managers\n\nHow long?\n→ Two hours\n\nWhere?\n→ Online");
 
     // The answered round is one folded line that opens onto each question and its answer.
     const line = await screen.findByRole("button", { name: "You answered 3 questions" });
