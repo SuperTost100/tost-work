@@ -222,8 +222,11 @@ function LogoButton({ label, isMac, onClick }: { label: string; isMac: boolean; 
 /** Whether the user asked for less motion, so the sidebar goes without folding. */
 const stillMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
-/** How long the pointer rests on the rail before the sidebar opens over the page, and stays once it's gone. */
-const PEEK_OPEN_MS = 200;
+/**
+ * How long the pointer rests on the rail before the sidebar opens over the page, and stays once it's gone. Long enough
+ * that a pointer heading for an icon gets there, and clicks, with the rail still in place.
+ */
+export const PEEK_OPEN_MS = 400;
 const PEEK_CLOSE_MS = 300;
 /** How long the sidebar takes to fold back into the rail, as in the CSS. */
 export const PEEK_FOLD_MS = 120;
@@ -273,13 +276,28 @@ export function SidebarRail({
     };
     // Whether the pointer is over the rail or the sidebar, which then closes only once it leaves.
     let over = false;
-    const enter = () => {
+    // Set by a click on the rail, which says where the user is going: the sidebar stays shut until the pointer leaves.
+    let clicked = false;
+    const enter = (e: PointerEvent) => {
       over = true;
+      // A press that started elsewhere and comes back held is a click on its way: the rail stays as it is under it.
+      if (e.buttons) return;
+      clicked = false;
       // Back while it folds: it opens again at once, rather than vanishing and growing anew.
       later(el.querySelector(".peek.folding") ? 0 : PEEK_OPEN_MS, true);
     };
+    // Moving over the shut rail starts the wait again, so only a pointer that rests opens it.
+    const move = (e: PointerEvent) => {
+      if (!clicked && !e.buttons && !el.querySelector(".peek")) later(PEEK_OPEN_MS, true);
+    };
+    const down = (e: PointerEvent) => {
+      if (!(e.target as HTMLElement).closest(".rail")) return;
+      clicked = true;
+      clearTimeout(timer.current);
+    };
     const leave = () => {
       over = false;
+      clicked = false;
       later(PEEK_CLOSE_MS, false);
     };
     const focusIn = (e: Event) => {
@@ -315,6 +333,8 @@ export function SidebarRail({
     };
     el.addEventListener("pointerenter", enter);
     el.addEventListener("pointerleave", leave);
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerdown", down);
     el.addEventListener("focusin", focusIn);
     el.addEventListener("focusout", focusOut);
     el.addEventListener("keydown", key);
@@ -322,6 +342,8 @@ export function SidebarRail({
       clearTimeout(timer.current);
       el.removeEventListener("pointerenter", enter);
       el.removeEventListener("pointerleave", leave);
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerdown", down);
       el.removeEventListener("focusin", focusIn);
       el.removeEventListener("focusout", focusOut);
       el.removeEventListener("keydown", key);

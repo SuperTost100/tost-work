@@ -4108,8 +4108,10 @@ html:has(.panel) body {
   width: 56px;
   transition: width 120ms ease-in;
 }
-/* Its top bar doesn't drag the window there, or the pointer would leave the sidebar on the way to its buttons. */
-.peek .side .chrome {
+/* Its top bar doesn't drag the window there, or the pointer would leave the sidebar on the way to its buttons. The page's
+   top bar comes later in the page, so its drag area would win where the sidebar covers it: it stops while it's open. */
+.peek .side .chrome,
+.app:has(.peek) .top {
   -webkit-app-region: no-drag;
 }
 :root[data-theme="dark"] .peek {

@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
-import { PEEK_FOLD_MS } from "@/shell/Sidebar";
+import { PEEK_FOLD_MS, PEEK_OPEN_MS } from "@/shell/Sidebar";
 
 // The sidebar in its place, not the rail nor the sidebar shown over the page from it.
 const sections = () => document.querySelector(".app > aside.side");
@@ -147,7 +147,7 @@ describe("the collapsed sidebar's rail", () => {
     expect(peek()).toBeNull();
 
     fireEvent.pointerEnter(box);
-    act(() => vi.advanceTimersByTime(200));
+    act(() => vi.advanceTimersByTime(PEEK_OPEN_MS));
     expect(peek()?.querySelector("aside.side")).toBeTruthy();
     expect(sections()).toBeNull();
     // It stays a moment after the pointer leaves, then folds back into the rail and goes.
@@ -164,6 +164,38 @@ describe("the collapsed sidebar's rail", () => {
     act(() => vi.advanceTimersByTime(300));
     act(() => vi.advanceTimersByTime(PEEK_FOLD_MS));
     expect(peek()).toBeNull();
+  });
+
+  it("waits for the pointer to rest, and stays shut after a click on the rail until the pointer leaves", async () => {
+    render(<Root api={hidden()} />);
+    const rail = await findRail();
+    const box = rail.parentElement as HTMLElement;
+    vi.useFakeTimers();
+    // Moving along the icons starts the wait again each time.
+    fireEvent.pointerEnter(box);
+    for (let i = 0; i < 3; i++) {
+      act(() => vi.advanceTimersByTime(PEEK_OPEN_MS - 100));
+      fireEvent.pointerMove(rail);
+    }
+    expect(peek()).toBeNull();
+    // A click on an icon is where the user is going: resting there afterwards doesn't open the sidebar over it.
+    const projects = screen.getByRole("button", { name: "Projects" });
+    fireEvent.pointerDown(projects);
+    act(() => vi.advanceTimersByTime(PEEK_OPEN_MS * 3));
+    fireEvent.pointerMove(rail);
+    act(() => vi.advanceTimersByTime(PEEK_OPEN_MS * 3));
+    expect(peek()).toBeNull();
+    // Nor does coming back with the button still held, a click on its way.
+    fireEvent.pointerLeave(box);
+    fireEvent.pointerEnter(box, { buttons: 1 });
+    fireEvent.pointerMove(rail, { buttons: 1 });
+    act(() => vi.advanceTimersByTime(PEEK_OPEN_MS * 3));
+    expect(peek()).toBeNull();
+    // Once the pointer has left, resting on the rail opens it again.
+    fireEvent.pointerLeave(box);
+    fireEvent.pointerEnter(box);
+    act(() => vi.advanceTimersByTime(PEEK_OPEN_MS));
+    expect(peek()).toBeTruthy();
   });
 
   it("expands the sidebar from the logo on the rail", async () => {
@@ -183,7 +215,7 @@ describe("the collapsed sidebar's rail", () => {
     const box = (await findRail()).parentElement as HTMLElement;
     vi.useFakeTimers();
     fireEvent.pointerEnter(box);
-    act(() => vi.advanceTimersByTime(200));
+    act(() => vi.advanceTimersByTime(PEEK_OPEN_MS));
     vi.useRealTimers();
     await click("Keep the sidebar open");
     expect(sections()).toBeTruthy();
@@ -219,7 +251,7 @@ describe("the collapsed sidebar's rail", () => {
     const box = (await findRail()).parentElement as HTMLElement;
     vi.useFakeTimers();
     fireEvent.pointerEnter(box);
-    act(() => vi.advanceTimersByTime(200));
+    act(() => vi.advanceTimersByTime(PEEK_OPEN_MS));
     const inPeek = peek()?.querySelector<HTMLElement>('[data-nav="projects"]') as HTMLElement;
     act(() => inPeek.focus());
     act(() => {
@@ -245,7 +277,7 @@ describe("the collapsed sidebar's rail", () => {
     const box = (await findRail()).parentElement as HTMLElement;
     vi.useFakeTimers();
     fireEvent.pointerEnter(box);
-    act(() => vi.advanceTimersByTime(200));
+    act(() => vi.advanceTimersByTime(PEEK_OPEN_MS));
     vi.useRealTimers();
     api.pickInMenu("rename");
     await click("More for Sum up the calls");
@@ -269,7 +301,7 @@ describe("the collapsed sidebar's rail", () => {
     act(() => projects.focus());
     vi.useFakeTimers();
     fireEvent.pointerEnter(box);
-    act(() => vi.advanceTimersByTime(200));
+    act(() => vi.advanceTimersByTime(PEEK_OPEN_MS));
     vi.useRealTimers();
     expect(peek()).toBeTruthy();
     await act(async () => {
