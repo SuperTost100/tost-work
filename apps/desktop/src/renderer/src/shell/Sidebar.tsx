@@ -5,6 +5,7 @@ import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
 import type { TaskMenuAction } from "../../../shared/api";
 import type { SectionKey, Task } from "../../../shared/model";
+import { Clipped } from "../components/Clipped";
 import { WorkingDots } from "../components/TaskTag";
 
 /** How many tasks Recent shows. */
@@ -150,7 +151,7 @@ export function Sidebar({
               onClick={() => onOpenTask(task.id)}
               onContextMenu={contextMenu(task.id)}
             >
-              <span className="truncate grow">{task.title}</span>
+              <Clipped className="truncate grow" text={task.title} />
               {task.status === "needs-you" && <span className="tag mine">{t("tag.needsYou")}</span>}
               {task.status === "running" && (
                 <span className="tag">

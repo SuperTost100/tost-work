@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Clipped } from "@/components/Clipped";
 import { MarkdownEditor } from "@/components/MarkdownEditor";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
@@ -277,7 +278,7 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
         onClick={() => void (async () => s.id !== openId && (await leave()) && show(s))()}
         onContextMenu={s.builtIn ? undefined : contextMenu(s)}
       >
-        <span className="truncate grow">{s.title}</span>
+        <Clipped className="truncate grow" text={s.title} />
         {/* The editor says the version in words, so the list's tag is for the eye only. */}
         {!s.builtIn && (s.version ?? 0) > 0 && (
           <span className="v" aria-hidden="true">

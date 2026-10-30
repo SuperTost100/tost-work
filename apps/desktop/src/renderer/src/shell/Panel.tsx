@@ -8,6 +8,7 @@ import { type Language, languageFrom } from "../../../shared/i18n";
 import { whenText } from "../../../shared/jobText";
 import { busyStatus, type Job, type Project, type Settings, type Task } from "../../../shared/model";
 import { upcoming } from "../../../shared/schedule";
+import { Clipped } from "../components/Clipped";
 import { WorkingDots } from "../components/TaskTag";
 
 /** How many upcoming runs the panel lists. */
@@ -114,7 +115,7 @@ function PanelBody({ api, lang }: { api: TostWorkApi; lang: Language }) {
             <button key={task.id} type="button" className="prow" onClick={() => api.panel.open({ taskId: task.id })}>
               <span className="dot need" aria-hidden="true" />
               <span className="ptext">
-                <span className="truncate">{task.title}</span>
+                <Clipped className="truncate" text={task.title} />
                 {projectName(task.projectId) && <span className="pmeta truncate">{projectName(task.projectId)}</span>}
               </span>
               <Icon name="right" className="chev" />
@@ -130,7 +131,7 @@ function PanelBody({ api, lang }: { api: TostWorkApi; lang: Language }) {
             <button key={task.id} type="button" className="prow" onClick={() => api.panel.open({ taskId: task.id })}>
               <WorkingDots />
               <span className="ptext">
-                <span className="truncate">{task.title}</span>
+                <Clipped className="truncate" text={task.title} />
                 {projectName(task.projectId) && <span className="pmeta truncate">{projectName(task.projectId)}</span>}
               </span>
               <Icon name="right" className="chev" />
@@ -146,7 +147,7 @@ function PanelBody({ api, lang }: { api: TostWorkApi; lang: Language }) {
             <div key={job.id} className="prow still">
               <Icon name="time" />
               <span className="ptext">
-                <span className="truncate">{job.title}</span>
+                <Clipped className="truncate" text={job.title} />
                 <span className="pmeta truncate">{projectName(job.projectId)}</span>
               </span>
               <span className="pwhen">{whenText(lang, at, now)}</span>
