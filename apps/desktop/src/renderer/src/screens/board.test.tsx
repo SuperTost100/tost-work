@@ -570,3 +570,68 @@ describe("finished tasks older than a week", () => {
     expect(screen.getAllByRole("button", { name: "Hide older" })).toHaveLength(1);
   });
 });
+
+describe("a running task's line", () => {
+  const at = new Date(Date.UTC(2026, 9, 26, 9)).toISOString();
+  const running = (id: string, steps: Task["steps"]): Task => ({
+    id,
+    projectId: null,
+    title: id,
+    brief: id,
+    attachments: [],
+    workdir: "/tmp",
+    model: "m",
+    effort: "medium",
+    status: "running",
+    steps,
+    files: [],
+    messages: [],
+    question: null,
+    approval: null,
+    review: null,
+    error: null,
+    createdAt: at,
+    updatedAt: at,
+  });
+  const tasks = [
+    running("Quiet one", []),
+    running("Planned one", [
+      { text: "Read the price list", status: "done" },
+      { text: "Write the quote", status: "in_progress" },
+      { text: "Check the totals", status: "pending" },
+    ]),
+  ];
+  const board = (boardView: "list" | "columns") =>
+    render(
+      <Board
+        api={createMemoryApi(intermediate)}
+        tasks={tasks}
+        projects={[]}
+        settings={{ ...DEFAULT_SETTINGS, ...intermediate, boardView }}
+        onSettings={() => {}}
+        allowNoProject
+        onOpenTask={() => {}}
+        onTaskChanged={() => {}}
+        onSavedForLater={() => {}}
+        onTaskMenu={() => {}}
+        onError={() => {}}
+      />,
+    );
+
+  it("on a card, doesn't say again what its working tag says", async () => {
+    board("columns");
+    const column = await group("Running");
+    expect(within(column).getByText("working")).toBeTruthy();
+    expect(within(column).queryByText("Working on it")).toBeNull();
+    expect(within(column).getByText("writing · 2 of 3")).toBeTruthy();
+    expect(within(column).getByText("Write the quote")).toBeTruthy();
+    expect(within(column).queryByText(/Step 2 of 3/)).toBeNull();
+  });
+
+  it("in the list, where the group has no tag, still says it's working and which step", async () => {
+    board("list");
+    const running = await group("Running");
+    expect(within(running).getByText("Working on it")).toBeTruthy();
+    expect(within(running).getByText("Step 2 of 3 · Write the quote")).toBeTruthy();
+  });
+});

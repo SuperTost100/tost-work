@@ -10,6 +10,13 @@ describe("i18n", () => {
     expect(languageFrom(undefined)).toBe("en");
   });
 
+  it("keeps the tags in the sidebar's Recent short in every language, so they leave room for the title", () => {
+    // The ones Sidebar.tsx shows beside a title. "da controllare" (14) left a few letters of the title in Italian.
+    const keys = ["tag.needsYou", "tag.working", "tag.toReview", "tag.draft"] as const;
+    for (const lang of ["en", "it"] as const)
+      for (const key of keys) expect(translate(lang, key).length, `${lang} ${key}`).toBeLessThanOrEqual(10);
+  });
+
   it("fills placeholders and keeps unknown ones visible", () => {
     expect(translate("en", "task.questionOf", { n: "1", total: "3" })).toBe("Question 1 of 3");
     expect(translate("it", "task.questionOf", { n: "2" })).toBe("Domanda 2 di {total}");

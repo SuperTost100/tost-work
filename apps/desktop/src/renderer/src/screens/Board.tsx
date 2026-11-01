@@ -394,10 +394,11 @@ function DisplayMenu({
   );
 }
 
-/** What the task is doing, in one line under its name. */
+/** What the task is doing, in one line under its name. With its status tag beside it, the line leaves out what the tag
+ * already says: that it's working, and which step it's on. */
 function useSummary() {
   const t = useT();
-  return (task: Task): string => {
+  return (task: Task, tagged = false): string => {
     const made = task.files.filter((f) => f.role === "made" && f.kind !== "delete").map((f) => fileName(f.path));
     switch (task.status) {
       case "draft":
@@ -407,9 +408,9 @@ function useSummary() {
         return task.approval ? approvalTitle(t, task.approval) : t("tag.needsYou");
       case "running": {
         const n = task.steps.findIndex((s) => s.status === "in_progress");
-        const step = n >= 0 ? t("task.step", { n: String(n + 1), total: String(task.steps.length) }) : "";
+        const step = n >= 0 && !tagged ? t("task.step", { n: String(n + 1), total: String(task.steps.length) }) : "";
         const last = made.at(-1) ?? task.steps[n]?.text ?? "";
-        return [step, last].filter(Boolean).join(" · ") || t("task.working");
+        return [step, last].filter(Boolean).join(" · ") || (tagged ? "" : t("task.working"));
       }
       case "done":
         return made.length ? made.join(", ") : t("board.chat");
@@ -531,7 +532,7 @@ function Row({
         {titleField || <span className="nm truncate">{task.title}</span>}
         <span className="sn">
           <Tags task={task} status={showTag} />
-          <span className="truncate">{summary(task)}</span>
+          <span className="truncate">{summary(task, showTag)}</span>
         </span>
         <InlineActions task={task} actions={actions} />
       </span>
@@ -612,6 +613,7 @@ function Columns({
             {list.length === 0 && hidden.length === 0 && <p className="bempty t3">{t("board.emptyColumn")}</p>}
             {list.map((task) => {
               const movable = task.status === "draft" || toReview(task);
+              const tagged = place === "stopped" || task.status === "running";
               return (
                 <div
                   key={task.id}
@@ -644,8 +646,8 @@ function Columns({
                   {titleField(task) || <span className="nm">{task.title}</span>}
                   <span className="sn">
                     {/* A running card says it's working, so it doesn't look like one more card to move. */}
-                    <Tags task={task} status={place === "stopped" || task.status === "running"} />
-                    <span className="clip">{summary(task)}</span>
+                    <Tags task={task} status={tagged} />
+                    <span className="clip">{summary(task, tagged)}</span>
                   </span>
                   <InlineActions task={task} actions={actions} />
                   <span className="meta t3">

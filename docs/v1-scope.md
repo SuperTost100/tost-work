@@ -138,6 +138,13 @@ Changed on 2026-11-01, after Tost tried the Board:
 - The side panel is a sidebar on the right, beside the Board rather than over it.
 - The home lists the tasks saved for later under Da fare instead of a Recent of its own, and saving one says "Salvata in Da fare" with a button to open it.
 
+Changed on 2026-11-01, after Tost tried 0.0.17:
+
+- "Da controllare" is now "da vedere", short enough to leave the title room in Recent, with "Segna come vista" and its undo, "Segna come da vedere". The tags beside a title in Recent stay at 10 letters or fewer in every language.
+- The task box sits in the middle of the window on Home, and at the same height on a task saved for later.
+- The message after "Salva per dopo" rises in and sinks out, in the middle of the page beside the sidebar.
+- Hovering a row in Recent or in the skills list moves nothing: a tag keeps the …'s place free beside it, and a title without one fades out under the ….
+
 ## From 0.2.0
 
 - The Skills parts above.

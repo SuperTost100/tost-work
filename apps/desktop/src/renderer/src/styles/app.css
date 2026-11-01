@@ -407,14 +407,18 @@ h3 {
   background: var(--hover);
   color: var(--ink);
 }
-/* The … floats over the end of the row, so a title uses the whole width until the pointer comes for the menu. */
+/* The … comes without moving anything in the row. A row with a tag keeps the …'s place free beside it, so the tag stays
+   where it is; on a row without one, the … covers the end of the title, which fades out under it. */
 .rec .more {
   position: absolute;
   top: 3px;
   right: 2px;
 }
-.rec:is(:hover, :has(.more:focus-visible)) .open {
+.rec:has(.open .tag) .open {
   padding-right: 26px;
+}
+.rec:is(:hover, :has(.more:focus-visible)):not(:has(.open .tag)) .open {
+  mask-image: linear-gradient(to left, transparent 28px, #000 44px);
 }
 /* While a title is renamed, the field has the whole row. */
 .rec:has(.rename) .more {
@@ -544,6 +548,10 @@ h3 {
   overflow: auto;
   min-height: 0;
 }
+/* Where the task box sits in the middle, a scrollbar for a long list under it would push it off centre. */
+.scroll:has(> .home-col, > .draft-col) {
+  scrollbar-gutter: stable both-edges;
+}
 .col {
   width: min(720px, 100% - 64px);
   margin: 0 auto;
@@ -610,7 +618,11 @@ h3 {
 /* Headline in the tost.one manner: ink, then taupe */
 .home-col {
   position: relative;
-  padding-top: 120px;
+  /* The greeting and the task box sit in the middle of the window, a little above it as the eye expects. Lists that
+     follow (questions waiting, saved tasks) go below and scroll, so the box stays put however long they get.
+     shortcut: 186px is half of the greeting, box and project line as they first show (252px), plus the top bar (44px)
+     and 16px above the middle; switch to measuring them if a much taller greeting comes. */
+  padding-top: max(40px, calc(50vh - 186px));
 }
 .hello {
   margin-bottom: 18px;
@@ -1951,9 +1963,10 @@ h2.gh {
   opacity: 0.4;
   cursor: default;
 }
-/* A task saved for later, open to change: the home's task box, a little down the page under a line saying so. */
+/* A task saved for later, open to change: the home's task box at the same height as on Home, under a line saying so.
+   The line and its margin are 33px; on Home the greeting above the box is 84px. */
 .draft-col {
-  padding-top: 72px;
+  padding-top: max(40px, calc(50vh - 186px + 84px - 33px));
 }
 .draft-note {
   margin: 0 4px 12px;
@@ -3977,11 +3990,13 @@ fieldset.fld > legend {
 
 /* Messages at the bottom of the window: an action that failed, until dismissed, and a task saved for later. */
 .toasts {
+  /* In the middle of the page beside the sidebar, under the task box, not in the middle of the whole window. */
+  --beside: 248px;
   position: fixed;
-  left: 50%;
+  left: calc(50% + var(--beside) / 2);
   bottom: 20px;
   transform: translateX(-50%);
-  width: min(520px, calc(100% - 48px));
+  width: min(520px, calc(100% - var(--beside) - 48px));
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -4000,6 +4015,24 @@ fieldset.fld > legend {
     0 0 0 1px var(--line),
     0 12px 32px rgba(27, 23, 18, 0.14);
   font-size: 14px;
+}
+.app.side-hidden .toasts {
+  --beside: var(--rail-w);
+}
+/* It rises into place; SavedToast plays the same in reverse when it goes. */
+.toast {
+  animation: toast-in 220ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
 }
 .toast.saved {
   padding-left: 14px;
@@ -4425,9 +4458,9 @@ label.opt:has(input:focus-visible) {
 .slist .sitem:has(.more:focus-visible) .open .v {
   visibility: hidden;
 }
-/* A long name ends before the …, not under it. */
-.slist .sitem:is(:hover, :has(.more:focus-visible)):has(.more) .open {
-  padding-right: 18px;
+/* Without a version, a long name fades out under the …, so it doesn't move to make room. */
+.slist .sitem:is(:hover, :has(.more:focus-visible)):has(.more):not(:has(.v)) .open {
+  mask-image: linear-gradient(to left, transparent 24px, #000 40px);
 }
 /* A message with its copy button underneath, shown on hover or keyboard focus, like T3 Code. */
 .msg {

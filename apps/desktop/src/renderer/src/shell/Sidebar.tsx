@@ -130,7 +130,8 @@ export function Sidebar({
                   {t("tag.working")}
                 </span>
               )}
-              {/* Work to look at and work not started yet, so both stay findable at every level, Board or not. */}
+              {/* Work to look at and work not started yet, so both stay findable at every level, Board or not.
+                  i18n.test.ts keeps these tags at 10 letters or fewer in every language. */}
               {toReview(task) && <span className="tag mine">{t("tag.toReview")}</span>}
               {task.status === "draft" && <span className="tag">{t("tag.draft")}</span>}
             </button>

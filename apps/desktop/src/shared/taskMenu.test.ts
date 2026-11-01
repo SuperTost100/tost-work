@@ -34,16 +34,16 @@ describe("the task menu", () => {
     expect(labels(undo)).toContain("Mark to check");
   });
 
-  it("says check in Italian too, as the tag, the filter and the column do", () => {
+  it("says vedere in Italian, as the tag, the filter and the column do", () => {
     const it_ = (key: MessageKey) => translate("it", key);
-    expect(labels(taskMenuItems({ status: "done", projectId: "p" }, true, it_))).toContain("Segna come controllata");
+    expect(labels(taskMenuItems({ status: "done", projectId: "p" }, true, it_))).toContain("Segna come vista");
     expect(labels(taskMenuItems({ status: "done", projectId: "p", reviewedAt: "x" }, true, it_))).toContain(
-      "Segna da controllare",
+      "Segna come da vedere",
     );
     expect([it_("tag.toReview"), it_("board.filter.toReview"), it_("board.group.toReview")]).toEqual([
-      "da controllare",
-      "Da controllare",
-      "Da controllare",
+      "da vedere",
+      "Da vedere",
+      "Da vedere",
     ]);
   });
 
