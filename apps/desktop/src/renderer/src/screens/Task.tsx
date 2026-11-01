@@ -921,38 +921,40 @@ export function Task({
                 </>
               )}
             </div>
-          </div>
-          <div className="foot">
-            <div className="col">
-              {task.status === "running" && <Working />}
-              {/* Always there, so a screen reader hears when a question or approval starts waiting, log open or not. */}
-              <span className="sr-only" aria-live="polite">
-                {waiting && t(waiting === "question" ? "activity.asking" : "activity.approval")}
-              </span>
-              {task.question ? (
-                <QuestionCard
-                  key={task.question.id}
-                  question={task.question}
-                  draft={answer}
-                  onDraft={setAnswer}
-                  onSend={send}
-                />
-              ) : task.approval ? (
-                <ApprovalCard approval={task.approval} t={t} onDecide={onDecide} />
-              ) : (
-                <Composer
-                  value={live ? "" : message}
-                  onChange={setMessage}
-                  onSubmit={() => {
-                    onFollowUp(message.trim());
-                    setMessage("");
-                  }}
-                  placeholder={live ? t("composer.busy") : quick ? t("composer.another") : t("composer.followup")}
-                  sendLabel={t("composer.send")}
-                  disabled={live}
-                  minHeight={44}
-                />
-              )}
+            {/* In the scroller, held at its bottom: the page scrolls under the composer, and so does the scrollbar. */}
+            <div className="foot">
+              <div className="col">
+                {task.status === "running" && <Working />}
+                {/* Always there, so a screen reader hears when a question or approval starts waiting, log open or
+                    not. */}
+                <span className="sr-only" aria-live="polite">
+                  {waiting && t(waiting === "question" ? "activity.asking" : "activity.approval")}
+                </span>
+                {task.question ? (
+                  <QuestionCard
+                    key={task.question.id}
+                    question={task.question}
+                    draft={answer}
+                    onDraft={setAnswer}
+                    onSend={send}
+                  />
+                ) : task.approval ? (
+                  <ApprovalCard approval={task.approval} t={t} onDecide={onDecide} />
+                ) : (
+                  <Composer
+                    value={live ? "" : message}
+                    onChange={setMessage}
+                    onSubmit={() => {
+                      onFollowUp(message.trim());
+                      setMessage("");
+                    }}
+                    placeholder={live ? t("composer.busy") : quick ? t("composer.another") : t("composer.followup")}
+                    sendLabel={t("composer.send")}
+                    disabled={live}
+                    minHeight={44}
+                  />
+                )}
+              </div>
             </div>
           </div>
         </div>

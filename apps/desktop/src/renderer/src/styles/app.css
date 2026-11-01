@@ -1144,10 +1144,19 @@ textarea {
   grid-area: 1 / 1 / 2 / -1;
 }
 :is(.task, .qe) > .mid > .scroll {
+  display: flex;
+  flex-direction: column;
   padding-right: var(--panel-w);
 }
-:is(.task, .qe) > .mid > .foot {
-  padding-right: calc(var(--panel-w) + 32px);
+:is(.task, .qe) > .mid > .scroll > .col {
+  flex: none;
+}
+/* The composer stays at the window's bottom, over the page scrolling under it, so the scrollbar runs to the bottom. */
+.scroll > .foot {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  background: var(--canvas);
 }
 .rp,
 .wc {
@@ -1169,6 +1178,10 @@ textarea {
 .rp .body {
   padding: 6px 16px 16px;
   overflow: auto;
+}
+/* The card's padding is the space under the last row, as on its sides, rather than added to the row's own. */
+.rp .body > .setrow:last-child {
+  padding-bottom: 0;
 }
 .rp h3 {
   font-size: 12.5px;
@@ -4002,6 +4015,7 @@ html:has(.panel) body {
   --rail-w: 56px;
 }
 .app.mac {
+  /* As RAIL_WIDTH in main/windowButtons.ts, which centres the window buttons on it. */
   --rail-w: 80px;
 }
 .railbox {
@@ -4108,7 +4122,7 @@ html:has(.panel) body {
   left: 0;
   z-index: 20;
   display: flex;
-  width: 248px;
+  width: var(--peek-w);
   overflow: hidden;
   box-shadow:
     0 0 0 1px var(--line-2),
@@ -4139,6 +4153,27 @@ html:has(.panel) body {
 .peek .side {
   height: 100%;
   border-right: 0;
+}
+/* Its icons sit where the rail's are, at their size, so nothing moves as it opens: the logo, the search and the
+   sections are centred on the rail's middle, inside its border. On a Mac that column is wider, and so is the sidebar
+   by as much. */
+.railbox {
+  --peek-pad: calc((var(--rail-w) - 1px) / 2 - 18px);
+  --peek-w: calc(var(--rail-w) / 2 + 220px);
+}
+.peek .side {
+  width: var(--peek-w);
+  padding-left: var(--peek-pad);
+}
+.peek .side :is(.nav, .search) .ic {
+  width: 20px;
+  height: 20px;
+}
+.peek .side .search {
+  padding-left: 7px;
+}
+.peek .side .me .who-btn {
+  padding-left: 5px;
 }
 @media (prefers-reduced-motion: reduce) {
   .peek,

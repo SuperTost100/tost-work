@@ -42,6 +42,7 @@ import { SkillFolder } from "./skills";
 import { SkillVersions } from "./skillVersions";
 import { Store } from "./store/store";
 import { opensWindow, panelBounds, staysInMenuBar, trayMenu } from "./tray";
+import { buttonsPosition } from "./windowButtons";
 
 const isMac = process.platform === "darwin";
 
@@ -110,9 +111,11 @@ function createWindow(store: Store): BrowserWindow {
     autoHideMenuBar: true,
     title: "Tost Work",
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#22201D" : "#FAF8F4",
-    // On Mac the traffic lights sit inside the sidebar, as in the mockup.
+    // On Mac the traffic lights sit inside the sidebar, as in the mockup, centred on the rail when it's collapsed.
     // shortcut: Windows and Linux keep the system frame, switch to titleBarOverlay when we style those builds.
-    ...(isMac ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 14, y: 16 } } : {}),
+    ...(isMac
+      ? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: buttonsPosition(process.getSystemVersion()) }
+      : {}),
     webPreferences: {
       preload: PRELOAD(),
       contextIsolation: true,
