@@ -124,6 +124,12 @@ Changed on 2026-11-01, after testing 0.0.14:
 - The Board's questions are settled: AI tasks only, "To do" for tasks saved for later, two drags in the columns view (start, and mark reviewed), approvals on the row, the last 7 days of done tasks, and "Mark reviewed" ([#154](https://github.com/SuperTost100/tost-work/issues/154)) with it.
 - Tost moved the versions on the roadmap board, which now has a 0.5.0 column. The board decides the versions, and the milestones follow it.
 
+Changed on 2026-11-01, building the Board:
+
+- The Board lists every AI task, grouped by Tocca a te, In corso, Da fare and the last 7 days of finished tasks, with older ones behind "Mostra più vecchie". Columns is the other view, with its own Da rivedere column.
+- "Salva per dopo" next to Send saves a task without starting it, and "Avvia" starts it later.
+- A finished task stays "da rivedere" until the user marks it reviewed, from the Board or from the task.
+
 ## From 0.2.0
 
 - The Skills parts above.
