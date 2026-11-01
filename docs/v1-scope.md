@@ -107,6 +107,14 @@ Changed on 2026-11-01, after testing 0.0.12:
 - Search works: ⌘K, the sidebar's Search box or the rail's icon opens it. It finds projects, and tasks by title or brief.
 - Each message will show when it was sent ([#139](https://github.com/SuperTost100/tost-work/issues/139), 0.1.0).
 
+Changed on 2026-11-01, after testing 0.0.13:
+
+- In the open sidebar, Search is a field to type into, and its results take the place of the sections while it has words. The rail's icon and ⌘K open the search window.
+- ⌘B shows and hides the sidebar from the task box too. Only the Skills editor keeps it for bold.
+- Rows that light up under the pointer sit 2px apart, so two lit rows never touch.
+- Before 0.1.0, the design gets checked against published guidelines ([#142](https://github.com/SuperTost100/tost-work/issues/142)), and every screen gets fixed for small windows ([#143](https://github.com/SuperTost100/tost-work/issues/143)).
+- Every planned feature is on the roadmap with a version, including ones Tost didn't ask for himself, such as choosing the AI for a task from the task box ([#144](https://github.com/SuperTost100/tost-work/issues/144)). The browser and computer use ([#44](https://github.com/SuperTost100/tost-work/issues/44)) moved to 0.3.0.
+
 ## From 0.2.0
 
 - The Skills parts above.
