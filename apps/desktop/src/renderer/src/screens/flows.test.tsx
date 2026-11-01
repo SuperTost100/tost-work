@@ -779,9 +779,10 @@ describe("projects", () => {
     expect(screen.getByText(`Tost Work ${__APP_VERSION__} · build ${__APP_BUILD__}`)).toBeTruthy();
   });
 
-  it("shows a placeholder for sections that aren't built yet", () => {
+  it("shows a placeholder for a section that can't work without the main process", () => {
     const settings = { ...DEFAULT_SETTINGS, name: "Giulia", level: "intermediate" as const, setupDone: true };
-    render(<App userName="Giulia" api={createMemoryApi()} settings={settings} />);
+    // Every section is built now; without the main process, as in a plain browser, the board has nothing to list.
+    render(<App userName="Giulia" settings={settings} />);
     fireEvent.click(screen.getByRole("button", { name: "Board" }));
     expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/arrives in a later version/);
   });

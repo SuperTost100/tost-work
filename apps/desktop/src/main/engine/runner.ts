@@ -74,6 +74,8 @@ export class TaskRunner {
   private restoring = new Set<string>();
   /** The answer each run is writing, so far: a window opened meanwhile picks it up from here. */
   private drafts = new Map<string, string>();
+  /** Tasks saved for later that are being started, so a double click can't start one twice. */
+  private starting = new Set<string>();
 
   constructor(
     private store: Store,
@@ -207,6 +209,50 @@ export class TaskRunner {
   }
 
   /**
+   * Starts a task the user saved for later, the way a new task starts: on the engine's defaults as they are now, not
+   * as they were when it was saved. `prepare` readies the folder and gives the files the agent works on, such as a
+   * quick edit's copies, which are made only now so a task never started leaves nothing behind.
+   */
+  async startSaved(taskId: string, prepare: (task: Task) => Promise<string[]>): Promise<Task> {
+    const saved = this.mustGet(taskId);
+    if (saved.status !== "draft") throw new Error("This task has already started");
+    if (this.starting.has(taskId)) throw new Error("This task is already starting");
+    this.starting.add(taskId);
+    try {
+      // Before any copying, as for a new task: if the engine can't start, no folder or copies are left behind.
+      const { provider, auth, model, effort } = await this.defaults();
+      const attachments = await prepare(saved);
+      // Read again: the task may have been renamed, or its project removed, while the files were copied.
+      const task = this.mustGet(taskId);
+      if (task.projectId && this.removing.has(task.projectId)) throw new Error("That project doesn't exist");
+      const at = this.now();
+      const { auth: _auth, ...rest } = task;
+      this.save({
+        ...rest,
+        provider,
+        ...(auth === "key" ? { auth: "key" as const } : {}),
+        model,
+        effort,
+        attachments,
+        // The brief is sent now, so that's when the message was written to the agent.
+        messages: task.messages.map((m, i) => (i === 0 ? { ...m, at } : m)),
+        updatedAt: at,
+      });
+      this.launch(taskId);
+      return this.mustGet(taskId);
+    } finally {
+      this.starting.delete(taskId);
+    }
+  }
+
+  /** Marks a finished task's work as looked at, so it's no longer "to review". Its place in Recent stays where it was. */
+  markReviewed(taskId: string): Task {
+    const task = this.mustGet(taskId);
+    if (task.status !== "done") throw new Error("Only a finished task can be marked as reviewed");
+    return task.reviewedAt ? task : this.save({ ...task, reviewedAt: this.now() });
+  }
+
+  /**
    * Takes one answer per question in the round, and keeps each with its question for the task screen. Files attached
    * to the answers join the task's, so the agent may read them.
    */
@@ -270,10 +316,13 @@ export class TaskRunner {
     // A run started now could write to a file the restore is about to put back.
     if (this.restoring.has(taskId)) throw new Error("Wait for the restore to finish");
     if (task.question || task.approval) throw new Error("This task is waiting for an answer");
+    if (task.status === "draft") throw new Error("Start this task first");
     const at = this.now();
-    // The old review checked the old brief, so it goes until the agent writes a new one.
+    // The old review checked the old brief, so it goes until the agent writes a new one. The new run's work hasn't
+    // been looked at yet either.
+    const { reviewedAt: _reviewed, ...rest } = task;
     return this.save({
-      ...task,
+      ...rest,
       review: null,
       error: null,
       attachments: joined(task.attachments, files),
@@ -378,7 +427,12 @@ export class TaskRunner {
   /** Removes the task from Tost Work. The files it made or used stay where they are. */
   remove(taskId: string): void {
     this.mustGet(taskId);
-    if (this.running.has(taskId) || this.deciding.has(taskId) || this.restoring.has(taskId))
+    if (
+      this.running.has(taskId) ||
+      this.deciding.has(taskId) ||
+      this.restoring.has(taskId) ||
+      this.starting.has(taskId)
+    )
       throw new Error("Stop the task before deleting it");
     this.queued.delete(taskId);
     this.store.deleteTask(taskId);

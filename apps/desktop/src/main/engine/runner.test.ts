@@ -634,3 +634,107 @@ describe("a rename while the run ends", () => {
     expect(store.getTask(task.id)?.title).toBe("Call notes");
   });
 });
+
+describe("tasks saved for later", () => {
+  type Defaults = Awaited<ReturnType<Engine["defaults"]>>;
+  const counting = () => {
+    const runs: string[] = [];
+    let defaults: Defaults = { provider: "claude", auth: "key", model: "sonnet", effort: "high" };
+    const engine: Engine = {
+      defaults: async () => defaults,
+      async *run({ task }: RunContext) {
+        runs.push(task.id);
+        yield { type: "done" } satisfies EngineEvent;
+      },
+      answer: () => false,
+      decide: () => false,
+    };
+    const store = new Store(":memory:");
+    let tick = 0;
+    const runner = new TaskRunner(
+      store,
+      engine,
+      () => {},
+      () => new Date(Date.UTC(2026, 9, 26, 9, 0, tick++)).toISOString(),
+    );
+    return { store, runner, runs, setDefaults: (d: Defaults) => (defaults = d) };
+  };
+
+  it("waits as To do without running, then starts on the engine's defaults of that moment", async () => {
+    const { store, runner, runs, setDefaults } = counting();
+    const saved = runner.create({
+      projectId: null,
+      brief: "Sort the invoices",
+      workdir: "/tmp/q",
+      attachments: ["/a.pdf"],
+    });
+    await new Promise((r) => setTimeout(r, 5));
+    expect(store.getTask(saved.id)?.status).toBe("draft");
+    expect(runs).toEqual([]);
+
+    setDefaults({ provider: "claude", auth: "key", model: "opus", effort: "low" });
+    const prepare = vi.fn(async () => ["/tmp/q/a.pdf"]);
+    const started = await runner.startSaved(saved.id, prepare);
+    expect(prepare).toHaveBeenCalledOnce();
+    expect(started).toMatchObject({ status: "running", provider: "claude", auth: "key", model: "opus", effort: "low" });
+    // The files are the ones prepared for the run, such as a quick edit's copies.
+    expect(started.attachments).toEqual(["/tmp/q/a.pdf"]);
+    // The brief counts as sent when it starts.
+    expect((started.messages[0]?.at ?? "") > saved.createdAt).toBe(true);
+    await waitFor(() => store.getTask(saved.id)?.status === "done");
+    expect(runs).toEqual([saved.id]);
+  });
+
+  it("starts once, however fast the clicks, and not again after it started", async () => {
+    const { runner, runs } = counting();
+    const saved = runner.create({ projectId: "p", brief: "Write it", workdir: "/p" });
+    const keep = async (t: Task) => t.attachments;
+    const [first, second] = await Promise.allSettled([
+      runner.startSaved(saved.id, keep),
+      runner.startSaved(saved.id, keep),
+    ]);
+    expect(first.status).toBe("fulfilled");
+    expect(second.status === "rejected" && String(second.reason)).toMatch(/already starting/);
+    await waitFor(() => runs.length === 1);
+    await expect(runner.startSaved(saved.id, keep)).rejects.toThrow(/already started/);
+    expect(runs).toHaveLength(1);
+  });
+
+  it("copies nothing when the engine can't start, and takes no follow-up before it starts", async () => {
+    const store = new Store(":memory:");
+    const engine: Engine = {
+      defaults: () => Promise.reject(new Error("No AI is signed in")),
+      async *run() {},
+      answer: () => false,
+      decide: () => false,
+    };
+    const runner = new TaskRunner(store, engine, () => {});
+    const saved = runner.create({ projectId: null, brief: "Fix the letter", workdir: "/tmp/q2" });
+    const prepare = vi.fn(async () => []);
+    await expect(runner.startSaved(saved.id, prepare)).rejects.toThrow(/signed in/);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(store.getTask(saved.id)?.status).toBe("draft");
+    expect(() => runner.followUp(saved.id, "Also the footer")).toThrow(/Start this task first/);
+  });
+});
+
+describe("marking finished work as reviewed", () => {
+  it("marks a done task once, keeps its place in Recent, and a follow-up makes it to review again", async () => {
+    const { store, runner } = setup();
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
+    expect(() => runner.markReviewed(task.id)).toThrow(/finished/);
+    const run = runner.start(task.id);
+    await waitFor(() => store.getTask(task.id)?.status === "needs-you");
+    runner.answer(task.id, ["The client pays it"]);
+    const done = await run;
+
+    const reviewed = runner.markReviewed(task.id);
+    expect(reviewed.reviewedAt).toBeTruthy();
+    expect(reviewed.updatedAt).toBe(done.updatedAt);
+    expect(store.getTask(task.id)?.reviewedAt).toBe(reviewed.reviewedAt);
+    // A second mark changes nothing.
+    expect(runner.markReviewed(task.id).reviewedAt).toBe(reviewed.reviewedAt);
+
+    expect(runner.followUp(task.id, "Round the prices").reviewedAt).toBeUndefined();
+  });
+});

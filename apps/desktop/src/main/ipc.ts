@@ -6,7 +6,6 @@ import { app, type BrowserWindow, dialog, ipcMain, Menu, type OpenDialogOptions,
 import {
   IPC,
   type NewProjectInput,
-  type NewTaskInput,
   type ProjectMenuAction,
   type SaveResult,
   type SkillMenuAction,
@@ -31,7 +30,7 @@ import { type Jobs, jobDraft } from "./jobs";
 import type { KeyStore } from "./keys";
 import type { GuideText, SkillFolder } from "./skills";
 import type { Store } from "./store/store";
-import { absolutePath, oneLine, paths, settingsPatch, text } from "./validate";
+import { absolutePath, oneLine, paths, settingsPatch, taskInput, text } from "./validate";
 
 /** Validates everything that comes from the interface, because IPC is a trust boundary. */
 export function registerIpc(
@@ -117,32 +116,43 @@ export function registerIpc(
   ipcMain.handle(IPC.tasksListForProject, (_e, projectId: unknown) =>
     store.listProjectTasks(text(projectId, "projectId", 100)),
   );
+  ipcMain.handle(IPC.tasksListAll, () => store.listAllTasks());
   ipcMain.handle(IPC.tasksSearch, (_e, query: unknown) => store.searchTasks(text(query, "query", 200)));
   ipcMain.handle(IPC.projectsOverviews, () => store.projectOverviews());
   ipcMain.handle(IPC.tasksGet, (_e, id: unknown) => store.getTask(text(id, "id", 100)) ?? null);
   ipcMain.handle(IPC.tasksDraft, (_e, id: unknown) => runner.draft(text(id, "id", 100)));
 
-  ipcMain.handle(IPC.tasksStart, async (_e, input: NewTaskInput) => {
-    const brief = text(input?.brief, "brief", BRIEF_MAX).trim();
-    if (!brief) throw new Error("A task needs a brief");
-    const projectId = input?.projectId == null ? null : text(input.projectId, "projectId", 100);
+  // A new task's brief, project and folder. A task without a project works in a temporary folder of its own, as a
+  // quick edit does.
+  const newTask = (input: unknown) => {
+    const { brief, projectId, attachments } = taskInput(input);
     const project = projectId ? store.getProject(projectId) : undefined;
     if (projectId && !project) throw new Error("That project doesn't exist");
-    // A task without a project works in a temporary folder of its own, as a quick edit does.
     const workdir = project?.folder ?? join(tmpdir(), "tost-work", "quick", randomUUID());
-    const given = paths(input?.attachments, "attachments");
+    return { brief, projectId, attachments, workdir };
+  };
+  // The files the agent works on. A quick edit's agent edits copies, so the user's originals stay as they are until
+  // they save a copy.
+  const workFiles = async (projectId: string | null, workdir: string, given: string[]) => {
+    if (projectId) return given;
+    await mkdir(workdir, { recursive: true });
+    return copyInto(given, workdir);
+  };
+  ipcMain.handle(IPC.tasksStart, async (_e, input: unknown) => {
+    const { brief, projectId, attachments: given, workdir } = newTask(input);
     // Before any copying: if the engine can't start a task, no folder or copies are left behind.
     const { provider, auth, model, effort } = await runner.defaults();
-    let attachments = given;
-    if (!project) {
-      await mkdir(workdir, { recursive: true });
-      // The agent edits copies, so the user's originals stay as they are until they save a copy.
-      attachments = await copyInto(given, workdir);
-    }
+    const attachments = await workFiles(projectId, workdir, given);
     const task = runner.create({ projectId, brief, workdir, attachments, provider, auth, model, effort });
     runner.launch(task.id);
     return task;
   });
+  // Saved without starting: no engine, and for a quick edit no folder or copies yet. They're made when it starts.
+  ipcMain.handle(IPC.tasksSaveForLater, (_e, input: unknown) => runner.create(newTask(input)));
+  ipcMain.handle(IPC.tasksStartSaved, (_e, id: unknown) =>
+    runner.startSaved(text(id, "id", 100), (task) => workFiles(task.projectId, task.workdir, task.attachments)),
+  );
+  ipcMain.handle(IPC.tasksMarkReviewed, (_e, id: unknown) => runner.markReviewed(text(id, "id", 100)));
 
   // Files attached after the first message: a quick edit works on copies, as it does with the first ones. If the task
   // then refuses the message, for example because it's working, the copies go again.

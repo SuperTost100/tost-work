@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ApprovalCard } from "@/components/Approval";
 import { type Attachments, Composer } from "@/components/Composer";
+import { FileLine, fileName } from "@/components/FileLine";
 import { Preview } from "@/components/Preview";
 import { TaskTag } from "@/components/TaskTag";
 import { errorText } from "@/lib/errorText";
@@ -24,74 +25,10 @@ import {
   questionItems,
   type ReviewItem,
   type Task as TaskT,
+  toReview,
 } from "../../../shared/model";
 import { AgentMessage, CopyButton, TypedMessage } from "../components/AgentMessage";
 import { WorkingDots } from "../components/TaskTag";
-
-const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
-const isSheet = (path: string) => /\.(xlsx|xls|csv)$/i.test(path);
-const CELLS = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
-
-function Thumb({ path }: { path: string }) {
-  return isSheet(path) ? (
-    <span className="thumb sheet">
-      {CELLS.map((c) => (
-        <i key={c} />
-      ))}
-    </span>
-  ) : (
-    <span className="thumb">
-      <i />
-      <i />
-      <i />
-      <i />
-      <i />
-    </span>
-  );
-}
-
-function FileLine({
-  path,
-  sub,
-  onOpen,
-  onSelect,
-}: {
-  path: string;
-  /** A short line under the name, such as where the file came from. */
-  sub?: string;
-  onOpen?: () => void;
-  onSelect?: () => void;
-}) {
-  const t = useT();
-  const name = (
-    <>
-      <Thumb path={path} />
-      <span className="grow">
-        <span className="nm truncate" style={{ display: "block" }}>
-          {fileName(path)}
-        </span>
-        {sub && <span className="sb">{sub}</span>}
-      </span>
-    </>
-  );
-  return (
-    <div className="fileline" title={path}>
-      {onSelect ? (
-        <button type="button" className="pick-file grow" onClick={onSelect}>
-          {name}
-        </button>
-      ) : (
-        name
-      )}
-      {onOpen && (
-        <button type="button" className="tbtn" onClick={onOpen}>
-          <Icon name="external-link" />
-          {t("preview.open")}
-        </button>
-      )}
-    </div>
-  );
-}
 
 /** Under a file the task replaced: the kept copy and a button to put it back, or to undo that. */
 function KeptRow({
@@ -693,6 +630,8 @@ export function Task({
   onRestore,
   onStop,
   onResume,
+  onStartSaved,
+  onMarkReviewed,
   onOpenProject,
   onError,
   renaming = false,
@@ -711,6 +650,10 @@ export function Task({
   onStop: () => void;
   /** Carries on with a task that stopped when Tost Work closed. */
   onResume: () => void;
+  /** Starts a task the user saved for later. */
+  onStartSaved: () => void;
+  /** Marks the finished work as looked at, so it's no longer "to review". */
+  onMarkReviewed: () => void;
   onOpenProject: () => void;
   /** Shows a failed action, such as a file that was moved before Open, in the app's alert. */
   onError: (err: unknown) => void;
@@ -839,6 +782,16 @@ export function Task({
   }, [live, task.messages.length]);
   const { before, tail, older } = activityByMessage(task.activity ?? [], task.messages.length);
   const waiting = task.question ? "question" : task.approval ? "approval" : undefined;
+  // The check is on finished work: while it runs or waits on the user, it isn't finished. An answer in the chat has
+  // nothing to check against the brief: the check is for files it made.
+  const checked = task.review && !live && made.length > 0 ? task.review : null;
+  // Opening the task doesn't count as looking at it: the user says when they have.
+  const reviewButton = toReview(task) && (
+    <button type="button" className="btn dark" onClick={onMarkReviewed}>
+      <Icon name="check" />
+      {t("review.mark")}
+    </button>
+  );
   // The steps belong to the latest run, so after a follow-up they show under that instruction.
   const runStart = task.messages.findLastIndex((m) => m.followUp);
   const note = (i: number) => {
@@ -968,17 +921,20 @@ export function Task({
                   <p className="agent t3">{t("task.stopped")}</p>
                 ))}
               {task.status === "failed" && <p className="agent">{t("task.failed", { error: task.error ?? "" })}</p>}
-              {/* The check is on finished work: while it runs or waits on the user, it isn't finished. */}
-              {/* An answer in the chat has nothing to check against the brief: the check is for files it made. */}
-              {task.review && !live && made.length > 0 && (
+              {checked ? (
                 <>
                   <div className="check-h">
                     <b>{t("task.review")}</b>
+                    <span className="grow" />
+                    {reviewButton}
                   </div>
-                  <Checks title={t("task.asked")} items={task.review.asked} icon="check" />
-                  <Checks title={t("task.decided")} items={task.review.decided} icon="question" />
-                  <Checks title={t("task.checkYourself")} items={task.review.checkYourself} icon="eye-2" />
+                  <Checks title={t("task.asked")} items={checked.asked} icon="check" />
+                  <Checks title={t("task.decided")} items={checked.decided} icon="question" />
+                  <Checks title={t("task.checkYourself")} items={checked.checkYourself} icon="eye-2" />
                 </>
+              ) : (
+                // Work with no check to read, such as an answer in the chat, is marked reviewed at its end.
+                reviewButton && <div className="agent row reviewed-row">{reviewButton}</div>
               )}
             </div>
             {/* In the scroller, held at its bottom: the page scrolls under the composer, and so does the scrollbar. */}
@@ -1001,6 +957,15 @@ export function Task({
                   />
                 ) : task.approval ? (
                   <ApprovalCard approval={task.approval} t={t} onDecide={onDecide} />
+                ) : task.status === "draft" ? (
+                  // Nothing has run, so there's nothing to follow up on: the brief starts when the user says so.
+                  <div className="composer saved-later">
+                    <span className="grow t2">{t("task.notStarted")}</span>
+                    <button type="button" className="btn dark" onClick={onStartSaved}>
+                      <Icon name="play" />
+                      {t("board.start")}
+                    </button>
+                  </div>
                 ) : (
                   <Composer
                     value={live ? "" : message}
@@ -1058,15 +1023,18 @@ export function Task({
               ))}
               <SkillsFollowed names={task.skillsUsed} titles={skillTitles} />
               <h3>{t("task.settings")}</h3>
-              <div className="setrow">
-                <Icon name="chip" />
-                <span className="grow">
-                  <span className="k">{t("task.model")}</span>
-                  <span className="v">
-                    {task.model} · {task.effort}
+              {/* A task saved for later gets its model when it starts, from the defaults of that moment. */}
+              {task.status !== "draft" && (
+                <div className="setrow">
+                  <Icon name="chip" />
+                  <span className="grow">
+                    <span className="k">{t("task.model")}</span>
+                    <span className="v">
+                      {task.model} · {task.effort}
+                    </span>
                   </span>
-                </span>
-              </div>
+                </div>
+              )}
               <div className="setrow">
                 <Icon name="folder" />
                 <span className="grow">

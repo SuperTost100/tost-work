@@ -1502,6 +1502,303 @@ textarea {
   gap: 6px;
   margin-top: 8px;
 }
+/* The board's page: the list or columns, and the selected task's card beside them, as on the task screen. The page
+   runs under the card to the window's edge, so its scrollbar sits there. */
+.board-page {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.board-page.with-panel {
+  --panel-w: clamp(240px, 32%, 320px);
+  grid-template-columns: minmax(0, 1fr) var(--panel-w);
+}
+.board-page > .scroll {
+  grid-area: 1 / 1 / 2 / -1;
+}
+.board-page.with-panel > .scroll {
+  padding-right: var(--panel-w);
+}
+.board-wrap.wide {
+  max-width: none;
+}
+.bhead {
+  flex-wrap: wrap;
+}
+.seg label > span {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--t2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.seg label > span:hover {
+  color: var(--ink);
+}
+.seg label > span.on {
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 500;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.seg .n,
+.gh .n {
+  color: var(--t3);
+  font-weight: 400;
+}
+.seg label:has(input:focus-visible) > span {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+.top .iconbtn.on {
+  background: var(--sel);
+  color: var(--ink);
+}
+h2.gh {
+  margin: 0;
+  font-weight: 400;
+}
+.board-empty {
+  padding: 8px 32px;
+  font-size: 14px;
+}
+/* A row is one button under its content, so the whole row opens the side panel, and the buttons it answers in place
+   with sit above it. */
+.brow,
+.bcard {
+  position: relative;
+}
+.brow .hit,
+.bcard .hit {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  cursor: pointer;
+}
+.bcard .hit[draggable="true"] {
+  cursor: grab;
+}
+.brow .actions,
+.bcard .actions {
+  position: relative;
+  z-index: 1;
+}
+.brow .main-c {
+  min-width: 0;
+}
+.brow .nm {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.brow .sn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.brow .c {
+  min-width: 0;
+}
+.brow .actions .btn,
+.bcard .actions .btn {
+  height: 28px;
+  padding: 0 11px;
+}
+.board-list .older,
+.bcol .older {
+  margin: 4px 0 0 20px;
+}
+.bcol .older {
+  margin: 2px 0 0;
+}
+/* A narrow board leaves out the project column; the side panel names the project. */
+.board-list {
+  container-type: inline-size;
+}
+@container (max-width: 560px) {
+  .board-list :is(.thead, .brow) {
+    grid-template-columns: 40px 1fr 56px;
+  }
+  .board-list .bproj {
+    display: none;
+  }
+}
+
+/* The columns: a lane per status, scrolling sideways when they don't fit. */
+.bcols {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0 32px 24px;
+  overflow-x: auto;
+}
+/* The lanes share the width, down to a size a card still reads at, and then the row scrolls. */
+.bcol {
+  flex: 1 0 184px;
+  max-width: 300px;
+  min-height: 140px;
+  padding: 2px 8px 10px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+  border: 1px dashed transparent;
+  transition:
+    border-color 120ms,
+    background-color 120ms;
+}
+.bcol .gh {
+  display: flex;
+  gap: 6px;
+  padding: 10px 6px 8px;
+}
+/* While a card is dragged, the column that takes it says so, and lights up under the pointer. */
+.bcol.can-drop {
+  border-color: var(--t3);
+}
+.bcol.over {
+  background: var(--sel);
+}
+.bempty {
+  margin: 0;
+  padding: 4px 6px 8px;
+  font-size: 13px;
+}
+.bcard {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.bcard:hover {
+  border-color: var(--t3);
+}
+.bcard.sel {
+  border-color: var(--ink);
+}
+.bcard.lifted {
+  opacity: 0.45;
+}
+.bcard .nm {
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.bcard .sn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 12.5px;
+  color: var(--t3);
+}
+.bcard .clip {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.bcard .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 3px;
+}
+.bcard .meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+/* The side panel's card: a head with the title, what the task is, and its buttons at the foot. */
+.bpanel .head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 10px 4px 16px;
+}
+.bpanel .head b {
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.bpanel .head .iconbtn {
+  align-self: flex-start;
+}
+.bpanel .bmeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--t2);
+}
+.bpanel .bbrief {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* The buttons stack, the one that acts on the task first, so neither is cut in a narrow card. */
+.bpanel .foot2 {
+  flex: none;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: stretch;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line-2);
+}
+.bpanel .foot2 .btn {
+  justify-content: center;
+}
+/* The display menu's heading and its note on the order. */
+.menu-label {
+  padding: 6px 10px 4px;
+  font-size: 12.5px;
+  color: var(--t3);
+}
+.menu-note {
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  color: var(--t3);
+}
+.menu-item[data-disabled] {
+  opacity: 0.45;
+}
+/* Save for later, beside the send button: a quiet word, as the brief isn't sent. */
+.composer .later {
+  height: 32px;
+}
+.composer .later:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* A task saved for later, where the composer would be. */
+.composer.saved-later {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 12px 16px;
+  font-size: 14.5px;
+}
+.reviewed-row {
+  justify-content: flex-end;
+}
 
 /* ===== Wide pages (projects, skills, jobs, settings) ===== */
 .wcol {

@@ -1,7 +1,13 @@
 import { isAbsolute } from "node:path";
+import type { NewTaskInput } from "../shared/api";
 import {
   AIS,
   type AiId,
+  BOARD_GROUPS,
+  BOARD_VIEWS,
+  type BoardGroup,
+  type BoardView,
+  BRIEF_MAX,
   LEVELS,
   type Level,
   LOGIN_OPENS,
@@ -42,6 +48,15 @@ export const paths = (v: unknown, field: string, max = 20): string[] => {
   if (!Array.isArray(v)) throw new Error(`${field} must be a list`);
   if (v.length > max) throw new Error(`${field} can have at most ${max} files`);
   return v.map((p) => absolutePath(p, field));
+};
+
+/** A new task's brief, project and files, checked the same way whether it starts now or is saved for later. */
+export const taskInput = (v: unknown): Required<NewTaskInput> => {
+  const input = (typeof v === "object" && v !== null ? v : {}) as Record<string, unknown>;
+  const brief = text(input.brief, "brief", BRIEF_MAX).trim();
+  if (!brief) throw new Error("A task needs a brief");
+  const projectId = input.projectId == null ? null : text(input.projectId, "projectId", 100);
+  return { brief, projectId, attachments: paths(input.attachments, "attachments") };
 };
 
 /** Only the known settings, each with the right type. Anything else is refused rather than stored. */
@@ -96,6 +111,12 @@ export const settingsPatch = (v: unknown): Partial<Settings> => {
         notify[kind as NotifyKind] = level as NotifyLevel;
       }
       patch.notify = notify as Settings["notify"];
+    } else if (key === "boardView") {
+      if (!BOARD_VIEWS.includes(value as BoardView)) throw new Error("boardView must be list or columns");
+      patch.boardView = value as BoardView;
+    } else if (key === "boardGroup") {
+      if (!BOARD_GROUPS.includes(value as BoardGroup)) throw new Error("boardGroup must be status or project");
+      patch.boardGroup = value as BoardGroup;
     } else if (key === "setupDone") {
       if (typeof value !== "boolean") throw new Error("setupDone must be true or false");
       patch.setupDone = value;

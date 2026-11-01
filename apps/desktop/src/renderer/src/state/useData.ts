@@ -62,6 +62,13 @@ export function useData(api: TostWorkApi | undefined) {
     },
     [api, merge],
   );
+  // The board lists every task, however old, so it loads them all when it opens.
+  const loadAll = useCallback(async (): Promise<void> => {
+    if (!api) return;
+    merge(await api.tasks.listAll());
+  }, [api, merge]);
+  /** A task the window already has in its newest state, such as one just saved for later or marked reviewed. */
+  const addTask = useCallback((task: Task) => merge([task]), [merge]);
   const removeTask = useCallback((id: string) => {
     removed.current.add(id);
     setTasks((list) => list.filter((t) => t.id !== id));
@@ -84,5 +91,16 @@ export function useData(api: TostWorkApi | undefined) {
     [api, merge],
   );
 
-  return { projects, tasks, addProject, updateProject, removeProject, loadProject, loadTask, removeTask };
+  return {
+    projects,
+    tasks,
+    addProject,
+    updateProject,
+    removeProject,
+    loadProject,
+    loadAll,
+    loadTask,
+    addTask,
+    removeTask,
+  };
 }

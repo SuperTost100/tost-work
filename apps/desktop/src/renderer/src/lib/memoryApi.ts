@@ -164,6 +164,56 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
 
   // Ids never come back, even after a task is removed.
   let taskCount = 0;
+  // A task as the runner makes it, not started yet: saved for later until `run` starts it.
+  const created = (input: NewTaskInput): Task => {
+    const at = now();
+    return save({
+      id: `t${++taskCount}`,
+      projectId: input.projectId,
+      title: input.brief.split("\n")[0] ?? "",
+      brief: input.brief,
+      attachments: input.attachments ?? [],
+      workdir: "/tmp/quick",
+      model: "gpt-5.5",
+      effort: "medium",
+      status: "draft",
+      steps: [],
+      files: [],
+      messages: [
+        {
+          from: "user",
+          text: input.brief,
+          at,
+          ...(input.attachments?.length ? { attachments: input.attachments } : {}),
+        },
+      ],
+      question: null,
+      approval: null,
+      review: null,
+      error: null,
+      createdAt: at,
+      updatedAt: at,
+    });
+  };
+  // The short script every task runs: two steps, then one question that `answer` finishes.
+  const run = (id: string, at = now()): Task => {
+    const t = tasks.get(id);
+    if (!t) throw new Error("That task doesn't exist");
+    save({
+      ...t,
+      status: "running",
+      steps: [
+        { text: "Read the notes", status: "in_progress" },
+        { text: "Write the proposal", status: "pending" },
+      ],
+      updatedAt: at,
+    });
+    emit(id, {
+      type: "question",
+      question: { id: "q1", text: "Who pays the insurance?", options: ["The client", "We do", "Leave it open"] },
+    });
+    return tasks.get(id) ?? t;
+  };
   const panelCalls: MemoryApi["panelCalls"] = { open: [], quit: 0, height: 0 };
   const api: MemoryApi = {
     platform: "linux",
@@ -326,44 +376,27 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
           .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
           .slice(0, SEARCH_LIMIT);
       },
+      listAll: async () => [...tasks.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
       get: async (id) => tasks.get(id) ?? null,
       start: async (input: NewTaskInput) => {
-        const at = now();
-        const t = save({
-          id: `t${++taskCount}`,
-          projectId: input.projectId,
-          title: input.brief.split("\n")[0] ?? "",
-          brief: input.brief,
-          attachments: input.attachments ?? [],
-          workdir: "/tmp/quick",
-          model: "gpt-5.5",
-          effort: "medium",
-          status: "running",
-          steps: [
-            { text: "Read the notes", status: "in_progress" },
-            { text: "Write the proposal", status: "pending" },
-          ],
-          files: [],
-          messages: [
-            {
-              from: "user",
-              text: input.brief,
-              at,
-              ...(input.attachments?.length ? { attachments: input.attachments } : {}),
-            },
-          ],
-          question: null,
-          approval: null,
-          review: null,
-          error: null,
-          createdAt: at,
-          updatedAt: at,
-        });
-        emit(t.id, {
-          type: "question",
-          question: { id: "q1", text: "Who pays the insurance?", options: ["The client", "We do", "Leave it open"] },
-        });
-        return tasks.get(t.id) ?? t;
+        const t = created(input);
+        return run(t.id, t.updatedAt);
+      },
+      saveForLater: async (input: NewTaskInput) => {
+        // The same checks as the main process, so the screen tests meet the real rules.
+        if (!input.brief.trim()) throw new Error("A task needs a brief");
+        if (input.projectId && !projects.some((p) => p.id === input.projectId))
+          throw new Error("That project doesn't exist");
+        return created(input);
+      },
+      startSaved: async (id) => {
+        if (tasks.get(id)?.status !== "draft") throw new Error("This task has already started");
+        return run(id);
+      },
+      markReviewed: async (id) => {
+        const t = tasks.get(id);
+        if (t?.status !== "done") throw new Error("Only a finished task can be marked as reviewed");
+        return t.reviewedAt ? t : save({ ...t, reviewedAt: now() });
       },
       answer: async (id, answers, files = []) => {
         const t = tasks.get(id);
@@ -402,9 +435,11 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       },
       followUp: async (id, text, files = []) => {
         const t = tasks.get(id);
-        if (!t || t.status === "running" || t.question) throw new Error("This task can't take a follow-up now");
+        if (!t || t.status === "running" || t.status === "draft" || t.question)
+          throw new Error("This task can't take a follow-up now");
+        const { reviewedAt: _reviewed, ...rest } = t;
         save({
-          ...t,
+          ...rest,
           status: "running",
           review: null,
           attachments: [...new Set([...t.attachments, ...files])],

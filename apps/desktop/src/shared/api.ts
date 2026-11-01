@@ -160,11 +160,19 @@ export interface TostWorkApi {
     listActive(): Promise<Task[]>;
     /** Every task of one project. */
     listForProject(projectId: string): Promise<Task[]>;
+    /** Every task of every project, newest first, for the board. */
+    listAll(): Promise<Task[]>;
     /** Tasks whose title or brief holds every word of the query, newest first, at most 20. */
     search(query: string): Promise<Task[]>;
     get(id: string): Promise<Task | null>;
     /** Creates the task and starts it right away. */
     start(input: NewTaskInput): Promise<Task>;
+    /** Creates the task without starting it: it waits in the board's To do until `startSaved`. */
+    saveForLater(input: NewTaskInput): Promise<Task>;
+    /** Starts a task saved for later, as `start` starts a new one. */
+    startSaved(id: string): Promise<Task>;
+    /** Marks a finished task as reviewed, so it's no longer "to review". */
+    markReviewed(id: string): Promise<Task>;
     /** One answer per question in the round, in order, with any files the user attached to them. */
     answer(id: string, answers: string[], attachments?: string[]): Promise<Task>;
     /** Allows or refuses the overwrite or delete the task asked for. */
@@ -319,9 +327,13 @@ export const IPC = {
   tasksList: "tasks:list",
   tasksListActive: "tasks:list-active",
   tasksListForProject: "tasks:list-for-project",
+  tasksListAll: "tasks:list-all",
   tasksSearch: "tasks:search",
   tasksGet: "tasks:get",
   tasksStart: "tasks:start",
+  tasksSaveForLater: "tasks:save-for-later",
+  tasksStartSaved: "tasks:start-saved",
+  tasksMarkReviewed: "tasks:mark-reviewed",
   tasksAnswer: "tasks:answer",
   tasksStop: "tasks:stop",
   tasksResume: "tasks:resume",

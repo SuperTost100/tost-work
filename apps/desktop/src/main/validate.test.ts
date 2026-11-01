@@ -1,6 +1,35 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { absolutePath, oneLine, paths, settingsPatch, text } from "./validate";
+import { absolutePath, oneLine, paths, settingsPatch, taskInput, text } from "./validate";
+
+describe("taskInput", () => {
+  it("takes a brief, a project or none, and files, the same for starting now or later", () => {
+    expect(taskInput({ brief: "  Sum up  ", projectId: "p1", attachments: ["/a.docx"] })).toEqual({
+      brief: "Sum up",
+      projectId: "p1",
+      attachments: ["/a.docx"],
+    });
+    expect(taskInput({ brief: "Sum up" })).toEqual({ brief: "Sum up", projectId: null, attachments: [] });
+  });
+
+  it("refuses an empty brief, odd projects and relative files", () => {
+    expect(() => taskInput({ brief: "   " })).toThrow(/needs a brief/);
+    expect(() => taskInput(null)).toThrow(/brief must be text/);
+    expect(() => taskInput({ brief: "x", projectId: 3 })).toThrow(/projectId/);
+    expect(() => taskInput({ brief: "x", attachments: ["notes.txt"] })).toThrow(/absolute/);
+  });
+});
+
+describe("the board's settings", () => {
+  it("keeps the view and the grouping, and refuses anything else", () => {
+    expect(settingsPatch({ boardView: "columns", boardGroup: "project" })).toEqual({
+      boardView: "columns",
+      boardGroup: "project",
+    });
+    expect(() => settingsPatch({ boardView: "grid" })).toThrow(/boardView/);
+    expect(() => settingsPatch({ boardGroup: "date" })).toThrow(/boardGroup/);
+  });
+});
 
 describe("IPC validation", () => {
   it("accepts absolute paths and rejects empty or relative ones", () => {

@@ -13,6 +13,7 @@ export function Project({
   brief,
   onBriefChange,
   onStart,
+  onSaveLater,
   attach,
   onOpenTask,
   onBack,
@@ -29,6 +30,8 @@ export function Project({
   brief: string;
   onBriefChange: (text: string) => void;
   onStart: () => void;
+  /** Saves the brief to start later; missing while the board, where it would wait, is turned off. */
+  onSaveLater?: () => void;
   attach?: Attachments;
   onOpenTask: (id: string) => void;
   onBack: () => void;
@@ -108,6 +111,7 @@ export function Project({
               attach={attach}
               sendLabel={t("composer.start")}
               minHeight={56}
+              onSaveLater={onSaveLater}
             />
             <div className="sec">
               <span>{t("project.tasks")}</span>

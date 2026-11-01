@@ -78,6 +78,11 @@ describe("Store", () => {
     }
     expect(s.listTasks().some((t) => t.id === "first")).toBe(false);
     expect(s.listProjectTasks("p1").map((t) => t.id)).toEqual(["first"]);
+    // The board's list has every task, newest first.
+    const all = s.listAllTasks();
+    expect(all).toHaveLength(61);
+    expect(all[0]?.id).toBe("n59");
+    expect(all.at(-1)?.id).toBe("first");
     expect(s.projectOverviews()).toEqual({
       p1: { tasks: 1, working: 0, needsYou: 0, lastResult: null },
       p2: { tasks: 30, working: 0, needsYou: 0, lastResult: null },
@@ -145,6 +150,8 @@ describe("Store", () => {
       loginOpens: "menuBar",
       stayInMenuBar: true,
       sidebarHidden: false,
+      boardView: "list",
+      boardGroup: "status",
       setupDone: false,
     });
     store.saveSettings({ ...DEFAULT_SETTINGS, name: "Giulia", level: "advanced", language: "it", setupDone: true });

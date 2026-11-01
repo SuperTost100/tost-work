@@ -125,6 +125,15 @@ export class Store {
     return rows.map((r) => JSON.parse(r.data) as Task);
   }
 
+  /**
+   * Every task, newest first, for the board.
+   * shortcut: reads the whole table at once; page it, or leave old finished tasks out, if boards reach thousands.
+   */
+  listAllTasks(): Task[] {
+    const rows = this.db.prepare("select data from tasks order by updated_at desc").all() as { data: string }[];
+    return rows.map((r) => JSON.parse(r.data) as Task);
+  }
+
   /** Tasks whose title or brief holds every word of the query, ignoring case and accents. Newest first. */
   searchTasks(query: string, limit = SEARCH_LIMIT): Task[] {
     const words = searchWords(query);

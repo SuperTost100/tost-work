@@ -1,5 +1,5 @@
 import { useT } from "@/lib/useT";
-import type { Task } from "../../../shared/model";
+import { type Task, toReview } from "../../../shared/model";
 
 /** Three dots that pulse while a task runs. They stand still when the system asks for reduced motion. */
 export function WorkingDots() {
@@ -28,13 +28,14 @@ export function TaskTag({ task }: { task: Task }) {
         </span>
       );
     }
+    // Once the user has looked at the work and marked it reviewed, nothing is left to say about it.
     case "done":
-      return <span className="tag mine">{t("tag.toReview")}</span>;
+      return toReview(task) ? <span className="tag mine">{t("tag.toReview")}</span> : null;
+    case "draft":
+      return <span className="tag">{t("tag.draft")}</span>;
     case "stopped":
       return <span className="tag">{t("tag.stopped")}</span>;
     case "failed":
       return <span className="tag">{t("tag.failed")}</span>;
-    default:
-      return null;
   }
 }

@@ -166,6 +166,11 @@ export interface Task {
   jobId?: string;
   /** The agent's conversation, so a follow-up continues it. Set by the real engine. */
   sessionId?: string;
+  /**
+   * When the user marked the finished work as reviewed. Until then a done task is "to review". A follow-up clears it,
+   * because the next run brings new work to look at.
+   */
+  reviewedAt?: string;
   error: string | null;
   createdAt: string;
   updatedAt: string;
@@ -189,10 +194,21 @@ export type EngineEvent =
   | { type: "failed"; error: string }
   | { type: "stopped" };
 
+/** A finished task the user hasn't marked as reviewed yet. */
+export const toReview = (task: Pick<Task, "status" | "reviewedAt">): boolean =>
+  task.status === "done" && !task.reviewedAt;
+
 export type Level = "beginner" | "intermediate" | "advanced" | "expert";
 
 export type LoginOpens = "menuBar" | "window";
 export const LOGIN_OPENS: LoginOpens[] = ["menuBar", "window"];
+
+/** How the board shows its tasks: one list, or a column per status. */
+export type BoardView = "list" | "columns";
+export const BOARD_VIEWS: BoardView[] = ["list", "columns"];
+/** What the board's list groups its tasks by. */
+export type BoardGroup = "status" | "project";
+export const BOARD_GROUPS: BoardGroup[] = ["status", "project"];
 
 /** The user's choices, kept on this computer. */
 export interface Settings {
@@ -223,6 +239,9 @@ export interface Settings {
   stayInMenuBar: boolean;
   /** The sidebar is hidden, so the main area has the whole window. */
   sidebarHidden: boolean;
+  /** The board's view and grouping, as the user last chose them. */
+  boardView: BoardView;
+  boardGroup: BoardGroup;
   setupDone: boolean;
 }
 
@@ -309,6 +328,8 @@ export const DEFAULT_SETTINGS: Settings = {
   loginOpens: "menuBar",
   stayInMenuBar: true,
   sidebarHidden: false,
+  boardView: "list",
+  boardGroup: "status",
   setupDone: false,
 };
 

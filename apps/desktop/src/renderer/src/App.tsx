@@ -8,6 +8,7 @@ import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { useConfirm } from "@/lib/useConfirm";
 import { useT } from "@/lib/useT";
+import { Board } from "@/screens/Board";
 import { Home } from "@/screens/Home";
 import { Jobs } from "@/screens/Jobs";
 import { Profile } from "@/screens/Profile";
@@ -59,7 +60,19 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
   const confirm = useConfirm();
   const current = settings ?? { ...DEFAULT_SETTINGS, name: userName, setupDone: true };
   const quickEdit = sectionOn(current, "quickEdit");
-  const { projects, tasks, addProject, updateProject, removeProject, loadProject, loadTask, removeTask } = useData(api);
+  const boardOn = sectionOn(current, "board");
+  const {
+    projects,
+    tasks,
+    addProject,
+    updateProject,
+    removeProject,
+    loadProject,
+    loadAll,
+    loadTask,
+    addTask,
+    removeTask,
+  } = useData(api);
   const [route, setRoute] = useState<Route>({ name: "home" });
   // The project whose "Add job" opened Jobs, so the builder starts in it.
   const [jobFor, setJobFor] = useState<string | null>(null);
@@ -158,6 +171,11 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
   useEffect(() => {
     if (route.name === "projects" && tasks) void api?.projects.overviews().then(setOverviews, report);
   }, [route.name, api, report, tasks]);
+  // The board lists every task, past the recent ones the window keeps.
+  const boardOpen = route.name === "soon" && route.section === "board";
+  useEffect(() => {
+    if (boardOpen) loadAll().catch(report);
+  }, [boardOpen, loadAll, report]);
 
   const section: Section | null = useMemo(() => {
     switch (route.name) {
@@ -194,6 +212,20 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
       const task = await api.tasks.start({ projectId: inProject, brief: text.trim(), attachments });
       clear();
       setRoute({ name: "task", id: task.id });
+    } catch (err) {
+      report(err);
+    } finally {
+      starting.current = false;
+    }
+  };
+  // Saved without starting, to wait in the board's To do. The user stays where they are, with an empty box.
+  const saveLater = async (text: string, inProject: string | null, attachments: string[], clear: () => void) => {
+    if (!api || !text.trim() || starting.current) return;
+    starting.current = true;
+    setError(null);
+    try {
+      addTask(await api.tasks.saveForLater({ projectId: inProject, brief: text.trim(), attachments }));
+      clear();
     } catch (err) {
       report(err);
     } finally {
@@ -365,6 +397,17 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
                 setFiles([]);
               })
         }
+        onSaveLater={
+          boardOn
+            ? () =>
+                !quickEdit && homeProjectId === null
+                  ? setDialogOpen(true)
+                  : void saveLater(brief, homeProjectId, files, () => {
+                      setBrief("");
+                      setFiles([]);
+                    })
+            : undefined
+        }
         attach={attach(files, setFiles)}
         onOpenTask={(id) => setRoute({ name: "task", id })}
         onNewProject={() => setDialogOpen(true)}
@@ -397,6 +440,15 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
             setProjectBrief("");
             setProjectFiles([]);
           })
+        }
+        onSaveLater={
+          boardOn
+            ? () =>
+                void saveLater(projectBrief, project.id, projectFiles, () => {
+                  setProjectBrief("");
+                  setProjectFiles([]);
+                })
+            : undefined
         }
         attach={attach(projectFiles, setProjectFiles)}
         onOpenTask={(id) => setRoute({ name: "task", id })}
@@ -450,6 +502,8 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
           onRestore={(path) => api.files.restore(task.id, path)}
           onStop={() => void api.tasks.stop(task.id).catch(report)}
           onResume={() => void api.tasks.resume(task.id).catch(report)}
+          onStartSaved={() => void api.tasks.startSaved(task.id).then(addTask, report)}
+          onMarkReviewed={() => void api.tasks.markReviewed(task.id).then(addTask, report)}
           onOpenProject={() => project && setRoute({ name: "project", id: project.id })}
           onError={report}
           // Recent tasks are renamed in the sidebar; with the sidebar hidden, here.
@@ -475,6 +529,20 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
         newFor={jobFor}
         onNewHandled={clearJobFor}
         onOpenTask={(id) => setRoute({ name: "task", id })}
+        onError={report}
+      />
+    );
+  } else if (route.section === "board" && api && sectionStillOn) {
+    screen = (
+      <Board
+        api={api}
+        tasks={tasks}
+        projects={projects}
+        settings={current}
+        onSettings={(next) => onSettings?.(next)}
+        allowNoProject={quickEdit}
+        onOpenTask={(id) => setRoute({ name: "task", id })}
+        onTaskChanged={addTask}
         onError={report}
       />
     );

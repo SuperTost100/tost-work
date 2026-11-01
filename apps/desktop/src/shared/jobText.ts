@@ -58,6 +58,14 @@ export function whenText(lang: Language, when: Date, now: Date): string {
   return `${date} ${hhmm(when)}`;
 }
 
+/** When something last changed, as a list shows it: the time if it was today, else the day: "09:40", "22 ott". */
+export function updatedText(lang: Language, when: Date, now: Date): string {
+  if (daysBetween(when, now) === 0) return hhmm(when);
+  // Another year's date says which year, so last October doesn't read as this one.
+  const year = when.getFullYear() === now.getFullYear() ? {} : { year: "numeric" as const };
+  return new Intl.DateTimeFormat(locale(lang), { day: "numeric", month: "short", ...year }).format(when);
+}
+
 /** The group a job's card goes in, by its next run. */
 export type JobGroup = "today" | "tomorrow" | "week" | "nextWeek" | "later" | "off";
 export const JOB_GROUPS: JobGroup[] = ["today", "tomorrow", "week", "nextWeek", "later", "off"];

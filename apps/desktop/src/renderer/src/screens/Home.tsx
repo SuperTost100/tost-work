@@ -16,6 +16,7 @@ export function Home({
   projects,
   tasks,
   onStart,
+  onSaveLater,
   attach,
   onOpenTask,
   onNewProject,
@@ -31,6 +32,8 @@ export function Home({
   projects: Project[];
   tasks: Task[];
   onStart: () => void;
+  /** Saves the brief to start later; missing while the board, where it would wait, is turned off. */
+  onSaveLater?: () => void;
   attach?: Attachments;
   onOpenTask: (id: string) => void;
   onNewProject: () => void;
@@ -65,6 +68,7 @@ export function Home({
             placeholder={t("composer.placeholder")}
             attach={attach}
             sendLabel={t("composer.start")}
+            onSaveLater={onSaveLater}
           />
           <div className="under">
             <ProjectPicker
