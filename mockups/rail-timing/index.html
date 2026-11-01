@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rail timing lab · Tost Work</title>
+<style>
+@font-face { font-family: "Schibsted Grotesk"; src: url("schibsted-grotesk.woff2") format("woff2"); font-weight: 400 800; }
+:root {
+  --desk: #ddd8cf; --canvas: #faf8f4; --side: #f3f0ea; --panel: #efebe3; --paper: #fff;
+  --line: #e6e1d8; --line-2: #eeeae3; --hover: rgba(27,23,18,.045); --sel: rgba(27,23,18,.07);
+  --ink: #1b1712; --t2: #57504a; --t3: #807769; --need: #9a5b0b; --accent: #9c8b73;
+}
+:root[data-theme="dark"] {
+  --desk: #0d0c0b; --canvas: #22201d; --side: #1b1917; --panel: #2c2925; --paper: #2a2723;
+  --line: #36322d; --line-2: #2f2b27; --hover: rgba(255,250,240,.045); --sel: rgba(255,250,240,.08);
+  --ink: #eeeae3; --t2: #b7afa4; --t3: #8e8679; --need: #e3a452; --accent: #b9a88f;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { font: 14px/1.4 "Schibsted Grotesk", system-ui, sans-serif; color: var(--ink); background: var(--desk); }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.lab { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; padding: 20px; min-height: 100vh; align-items: start; }
+@media (max-width: 1100px) { .lab { grid-template-columns: 1fr; } }
+
+/* ===== The window ===== */
+.win-wrap { position: sticky; top: 20px; }
+.hint { margin: 0 0 10px; color: var(--t2); font-size: 13px; }
+.hint b { color: var(--ink); }
+.win { position: relative; height: min(640px, calc(100vh - 140px)); min-height: 480px; border-radius: 12px; overflow: hidden; background: var(--canvas);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.08), 0 20px 60px rgba(0,0,0,.18); display: flex; user-select: none; }
+.lights { position: absolute; top: 16px; display: flex; gap: 8px; z-index: 40; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.lights i:nth-child(1) { background: #ff5f57; } .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+.ic { display: inline-block; width: 20px; height: 20px; flex: none; background: currentColor; -webkit-mask: var(--m) center / contain no-repeat; mask: var(--m) center / contain no-repeat; }
+.side-ic { width: 18px; height: 18px; }
+
+.railbox { position: relative; flex: none; width: var(--rail-w); z-index: 10; }
+.rail { display: flex; flex-direction: column; align-items: center; height: 100%; padding-bottom: 10px; background: var(--side); border-right: 1px solid var(--line-2); }
+.rail .chrome { height: 44px; flex: none; }
+.rail .logo { padding: 2px 0 10px; }
+.logo-btn { position: relative; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; color: var(--t2); }
+.logo-btn > * { grid-area: 1 / 1; transition: opacity 120ms; }
+.logo-btn .ic { opacity: 0; }
+.logo-btn:hover { background: var(--hover); }
+.logo-btn:hover svg { opacity: 0; } .logo-btn:hover .ic { opacity: 1; }
+.railbtn { width: 44px; height: 32px; display: grid; place-items: center; border-radius: 8px; color: var(--t2); position: relative; }
+.railbtn:not(.search) + .railbtn { margin-top: 2px; }
+.railbtn.search { margin-bottom: 8px; }
+.railbtn:hover { background: var(--hover); color: var(--ink); }
+.railbtn.on { background: var(--sel); color: var(--ink); }
+.rail .spacer { flex: 1; }
+.avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--paper); font-size: 12px; font-weight: 600; display: grid; place-items: center; }
+.tip { position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%); white-space: nowrap; background: var(--ink); color: var(--canvas);
+  font-size: 12px; padding: 4px 8px; border-radius: 6px; pointer-events: none; opacity: 0; transition: opacity 80ms; z-index: 50; }
+.railbtn.tipping .tip { opacity: 1; }
+.waitbar { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--need); width: 0; z-index: 60; pointer-events: none; }
+
+/* The sidebar over the page */
+.peek { position: absolute; top: 0; bottom: 0; left: 0; z-index: 20; width: var(--peek-w); overflow: hidden; background: var(--side);
+  box-shadow: 0 0 0 1px var(--line-2), 0 16px 48px rgba(27,23,18,var(--shadow)); visibility: hidden; pointer-events: none; }
+.peek.shown { visibility: visible; pointer-events: auto; }
+.peek .side { width: var(--peek-w); height: 100%; display: flex; flex-direction: column; padding: 0 10px 10px var(--peek-pad); }
+.peek .chrome { height: 44px; flex: none; }
+.brand { display: flex; align-items: center; gap: 9px; padding: 2px 0 10px 2px; height: 44px; flex: none; }
+.brand b { font-weight: 800; font-size: 16px; letter-spacing: -.02em; }
+.sbox { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px 0 7px; border-radius: 8px; background: var(--canvas); border: 1px solid var(--line); color: var(--t3); font-size: 13.5px; margin-bottom: 8px; }
+.nav { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 8px; border-radius: 8px; font-size: 14px; width: 100%; text-align: left; }
+.nav + .nav { margin-top: 2px; }
+.nav .ic { color: var(--t2); }
+.nav:hover { background: var(--hover); }
+.nav.on { background: var(--sel); font-weight: 500; }
+.peek h4 { margin: 18px 8px 4px; font-size: 12.5px; font-weight: 500; color: var(--t3); }
+.rec { height: 30px; line-height: 30px; padding: 0 8px; border-radius: 8px; font-size: 13.5px; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rec + .rec { margin-top: 2px; }
+.rec:hover { background: var(--hover); color: var(--ink); }
+.peek .spacer { flex: 1; }
+.me { display: flex; align-items: center; gap: 8px; padding-left: 5px; height: 36px; }
+.me .who { flex: 1; font-size: 14px; }
+.peek .labels { transition-property: opacity; }
+
+/* The page */
+.page { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+.top { height: 44px; display: flex; align-items: center; padding: 0 20px; color: var(--t2); font-size: 13.5px; border-bottom: 1px solid var(--line-2); flex: none; }
+.content { flex: 1; overflow: auto; padding: 28px 40px; }
+.content h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -.02em; }
+.content p { color: var(--t2); max-width: 560px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 18px; }
+.card { background: var(--paper); border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(27,23,18,.06), 0 6px 18px rgba(27,23,18,.07); }
+.card b { display: block; margin-bottom: 4px; } .card span { color: var(--t3); font-size: 13px; }
+.dim { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 15; transition: opacity 160ms; }
+.clicks { position: absolute; right: 14px; bottom: 12px; font-size: 12px; color: var(--t3); }
+
+/* ===== Settings ===== */
+.panel { background: var(--paper); color: var(--ink); border-radius: 14px; box-shadow: 0 0 0 1px var(--line); padding: 6px 16px 16px; }
+.panel h2 { font-size: 17px; margin: 12px 0 2px; }
+.panel .sub { color: var(--t3); font-size: 12.5px; margin: 0 0 8px; }
+details { border-top: 1px solid var(--line-2); padding: 4px 0; }
+summary { cursor: pointer; font-weight: 700; padding: 8px 0; font-size: 14px; list-style: none; display: flex; justify-content: space-between; }
+summary::after { content: "+"; color: var(--t3); } details[open] summary::after { content: "–"; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; padding: 6px 0; }
+.row label { font-size: 13px; }
+.row small { grid-column: 1 / -1; color: var(--t3); font-size: 11.5px; line-height: 1.35; }
+.row output { font: 500 12px/1 ui-monospace, monospace; color: var(--t2); min-width: 64px; text-align: right; }
+.row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--ink); }
+.row select, .row input[type=text] { font: inherit; font-size: 13px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--canvas); color: var(--ink); max-width: 190px; }
+.row input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--ink); }
+.row.off { opacity: .4; pointer-events: none; }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.chip { font-size: 12.5px; padding: 5px 10px; border-radius: 999px; background: var(--panel); }
+.chip:hover { background: var(--sel); }
+.chip.on { background: var(--ink); color: var(--canvas); }
+.actions { display: flex; gap: 8px; margin-top: 12px; }
+.btn { padding: 7px 12px; border-radius: 8px; background: var(--ink); color: var(--canvas); font-size: 13px; font-weight: 600; }
+.btn.ghost { background: var(--panel); color: var(--ink); }
+textarea.out { width: 100%; height: 90px; margin-top: 8px; font: 11px/1.4 ui-monospace, monospace; border-radius: 8px; border: 1px solid var(--line); background: var(--canvas); color: var(--ink); padding: 8px; resize: vertical; }
+.log { margin-top: 12px; height: 150px; overflow: auto; font: 11px/1.5 ui-monospace, monospace; background: var(--canvas); border-radius: 8px; padding: 8px; color: var(--t2); }
+.log .t { color: var(--t3); }
+.speed { font: 500 12px ui-monospace, monospace; color: var(--t2); }
+</style>
+</head>
+<body>
+<div class="lab">
+  <div class="win-wrap">
+    <p class="hint"><b>Try it on the window below.</b> Rest the pointer on the rail, pass over it on the way to the page, click an icon quickly, switch sections fast. Change anything on the right until it feels right, then press <b>Copy settings</b> and paste them to me.</p>
+    <div class="win" id="win">
+      <div class="lights" id="lights"><i></i><i></i><i></i></div>
+      <div class="railbox" id="railbox">
+        <nav class="rail" id="rail">
+          <span class="chrome"></span>
+          <span class="logo"><button class="logo-btn" data-act="pin" title="Expand sidebar"><svg viewBox="0 0 64 64" width="24" height="24"><rect width="64" height="64" rx="14" fill="var(--ink)"/><path d="M14 17h36v6H35v26h-6V23H14z" fill="var(--canvas)"/></svg><span class="ic" style="--m:url(icons/layout-leftbar-open.svg)"></span></button></span>
+          <button class="railbtn search" data-sec="search"><span class="ic" style="--m:url(icons/search.svg)"></span><span class="tip">Search</span></button>
+          <button class="railbtn" data-sec="home"><span class="ic" style="--m:url(icons/edit.svg)"></span><span class="tip">New task</span></button>
+          <button class="railbtn" data-sec="projects"><span class="ic" style="--m:url(icons/folder.svg)"></span><span class="tip">Projects</span></button>
+          <button class="railbtn" data-sec="skills"><span class="ic" style="--m:url(icons/magic-2.svg)"></span><span class="tip">Skills</span></button>
+          <button class="railbtn" data-sec="jobs"><span class="ic" style="--m:url(icons/calendar.svg)"></span><span class="tip">Jobs</span></button>
+          <button class="railbtn" data-sec="board"><span class="ic" style="--m:url(icons/task.svg)"></span><span class="tip">Board</span></button>
+          <span class="spacer"></span>
+          <button class="railbtn" data-sec="profile" style="height:36px;margin-bottom:2px"><span class="avatar">T</span><span class="tip">Profile</span></button>
+          <button class="railbtn" data-sec="settings"><span class="ic" style="--m:url(icons/settings-3.svg)"></span><span class="tip">Settings</span></button>
+        </nav>
+        <div class="peek" id="peek">
+          <aside class="side">
+            <span class="chrome"></span>
+            <div class="brand"><button class="logo-btn" data-act="pin" title="Keep it open"><svg viewBox="0 0 64 64" width="24" height="24"><rect width="64" height="64" rx="14" fill="var(--ink)"/><path d="M14 17h36v6H35v26h-6V23H14z" fill="var(--canvas)"/></svg><span class="ic" style="--m:url(icons/layout-leftbar-open.svg)"></span></button><b class="labels">Tost Work</b></div>
+            <div class="sbox" data-sec="search"><span class="ic" style="--m:url(icons/search.svg)"></span><span class="labels">Cerca</span></div>
+            <button class="nav" data-sec="home"><span class="ic" style="--m:url(icons/edit.svg)"></span><span class="labels">Nuova attività</span></button>
+            <button class="nav" data-sec="projects"><span class="ic" style="--m:url(icons/folder.svg)"></span><span class="labels">Progetti</span></button>
+            <button class="nav" data-sec="skills"><span class="ic" style="--m:url(icons/magic-2.svg)"></span><span class="labels">Skill</span></button>
+            <button class="nav" data-sec="jobs"><span class="ic" style="--m:url(icons/calendar.svg)"></span><span class="labels">Lavori</span></button>
+            <button class="nav" data-sec="board"><span class="ic" style="--m:url(icons/task.svg)"></span><span class="labels">Bacheca</span></button>
+            <h4 class="labels">Recenti</h4>
+            <div class="rec labels">Preventivo per Rossi srl</div>
+            <div class="rec labels">Riunione con Bianchi</div>
+            <div class="rec labels">Perché la fattura Ferrari è ferma</div>
+            <div class="rec labels">Listino 2027 in Excel</div>
+            <span class="spacer"></span>
+            <div class="me"><span class="avatar">T</span><span class="who labels">Tost</span><span class="ic labels" style="--m:url(icons/settings-3.svg);width:18px;height:18px;color:var(--t2);margin-right:6px"></span></div>
+          </aside>
+        </div>
+        <div class="waitbar" id="waitbar"></div>
+      </div>
+      <div class="dim" id="dim"></div>
+      <main class="page" id="page">
+        <div class="top" id="crumb">Nuova attività</div>
+        <div class="content">
+          <h1 id="title">Buon pomeriggio, Tost</h1>
+          <p>The page behind the sidebar. Move between it and the rail as you would while working: open a task, go back, jump to Skills, come back.</p>
+          <div class="cards">
+            <div class="card"><b>Preventivo per Rossi srl</b><span>Agriturismo La Collina · serve te</span></div>
+            <div class="card"><b>Riunione con Bianchi</b><span>Fatto · 2 file</span></div>
+            <div class="card"><b>Listino 2027</b><span>In corso</span></div>
+            <div class="card"><b>Fattura Ferrari</b><span>Fatto</span></div>
+          </div>
+        </div>
+        <div class="clicks" id="clicks"></div>
+      </main>
+    </div>
+  </div>
+
+  <div class="panel" id="panel">
+    <h2>Rail timing lab</h2>
+    <p class="sub">Every choice is saved in this browser. <span class="speed" id="speed"></span></p>
+    <div class="presets" id="presets"></div>
+    <div id="form"></div>
+    <div class="actions">
+      <button class="btn" id="copy">Copy settings</button>
+      <button class="btn ghost" id="reset">Back to 0.0.13</button>
+    </div>
+    <textarea class="out" id="out" readonly></textarea>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script>
+const EASINGS = {
+  "Tost Work now": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+  "ease-out": "cubic-bezier(0, 0, 0.2, 1)",
+  "ease-in": "cubic-bezier(0.4, 0, 1, 1)",
+  "ease-in-out": "cubic-bezier(0.4, 0, 0.2, 1)",
+  "linear": "linear",
+  "Apple default": "cubic-bezier(0.25, 0.1, 0.25, 1)",
+  "Strong out (quint)": "cubic-bezier(0.22, 1, 0.36, 1)",
+  "Overshoot": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+  "Custom": "custom",
+};
+// Each setting: key, label, kind, default, extra. Groups render as sections.
+const GROUPS = [
+  ["What opens it", [
+    ["trigger", "Opens when the pointer…", "select", "rest", { options: { rest: "rests on the rail", enter: "enters the rail", edge: "rests near the window's left edge", logo: "rests on the logo", click: "never: only a click on the logo" },
+      help: "\"Rests\" waits for the pointer to stop. \"Enters\" starts the wait as soon as it's on the rail, moving or not." }],
+    ["openDelay", "Wait before it opens", "range", 400, { min: 0, max: 1500, step: 10, unit: "ms", help: "Tost Work 0.0.13: 400 ms." }],
+    ["restartOnMove", "Moving starts the wait again", "check", true, { help: "On: only a pointer that stops opens it. Off: the wait runs from the moment it arrives." }],
+    ["tolerance", "Moves smaller than this don't count", "range", 0, { min: 0, max: 30, step: 1, unit: "px", help: "Hand tremor on a trackpad. 0.0.13 counts every pixel." }],
+    ["maxSpeed", "Only open when slower than", "range", 0, { min: 0, max: 3000, step: 50, unit: "px/s", zero: "off", help: "A pointer flying over the rail to reach the page never opens it. Watch the speed readout above." }],
+    ["edgeWidth", "Edge strip width (for \"near the left edge\")", "range", 12, { min: 2, max: 80, step: 1, unit: "px" }],
+    ["reopenFolding", "Coming back while it folds reopens it at once", "check", true, {}],
+  ]],
+  ["Clicks", [
+    ["afterClick", "After a click on a rail icon", "select", "shut", { options: { shut: "stay shut until the pointer leaves", wait: "start the wait again", ignore: "carry on as if nothing happened" },
+      help: "0.0.13 keeps it shut, so quick section switching on the rail works without the sidebar popping up." }],
+    ["clickDuringOpen", "A click while it's opening goes to", "select", "target", { options: { target: "what's under the pointer", rail: "the rail icon underneath" } }],
+    ["tooltips", "Show names on rail icons while shut", "check", false, {}],
+    ["tooltipDelay", "Wait before a name shows", "range", 500, { min: 0, max: 1500, step: 50, unit: "ms" }],
+  ]],
+  ["What closes it", [
+    ["closeDelay", "Wait after the pointer leaves", "range", 300, { min: 0, max: 1500, step: 10, unit: "ms", help: "0.0.13: 300 ms." }],
+    ["grace", "Extra room outside its edge", "range", 0, { min: 0, max: 120, step: 2, unit: "px", help: "The pointer can overshoot the edge by this much without it closing." }],
+    ["closeOnLeaveWindow", "Close when the pointer leaves the window", "check", true, {}],
+  ]],
+  ["Opening motion", [
+    ["openStyle", "How it appears", "select", "grow", { options: { grow: "grows out of the rail (0.0.13)", slide: "slides in from the left", fade: "fades in", growfade: "grows and fades", instant: "no motion" } }],
+    ["openMs", "Duration", "range", 160, { min: 0, max: 800, step: 10, unit: "ms" }],
+    ["openEase", "Curve", "select", "Tost Work now", { options: Object.fromEntries(Object.keys(EASINGS).map((k) => [k, k])) }],
+    ["openCustom", "Custom curve", "text", "cubic-bezier(0.2, 0.8, 0.2, 1)", {}],
+    ["labelsFade", "Labels fade in after the icons", "check", false, {}],
+    ["labelsDelay", "Labels wait", "range", 60, { min: 0, max: 400, step: 10, unit: "ms" }],
+  ]],
+  ["Closing motion", [
+    ["closeStyle", "How it goes", "select", "grow", { options: { grow: "folds back into the rail (0.0.13)", slide: "slides out to the left", fade: "fades out", growfade: "folds and fades", instant: "no motion" } }],
+    ["closeMs", "Duration", "range", 120, { min: 0, max: 800, step: 10, unit: "ms" }],
+    ["closeEase", "Curve", "select", "ease-in", { options: Object.fromEntries(Object.keys(EASINGS).map((k) => [k, k])) }],
+    ["closeCustom", "Custom curve", "text", "cubic-bezier(0.4, 0, 1, 1)", {}],
+  ]],
+  ["Look", [
+    ["railW", "Rail width", "range", 80, { min: 48, max: 96, step: 2, unit: "px", help: "0.0.13 on a Mac: 80 px." }],
+    ["sideW", "Sidebar width", "range", 260, { min: 200, max: 340, step: 2, unit: "px" }],
+    ["shadow", "Shadow strength", "range", 18, { min: 0, max: 50, step: 1, unit: "%" }],
+    ["dim", "Dim the page while it's open", "range", 0, { min: 0, max: 40, step: 1, unit: "%" }],
+    ["push", "Push the page aside instead of covering it", "check", false, {}],
+    ["lights", "Show the Mac window buttons", "check", true, {}],
+    ["dark", "Dark theme", "check", false, {}],
+  ]],
+  ["Testing aids", [
+    ["showWait", "Show the wait as a bar under the rail", "check", true, {}],
+    ["slow", "Slow motion (×5)", "check", false, {}],
+    ["reduced", "Pretend \"reduce motion\" is on", "check", false, {}],
+  ]],
+];
+const DEFAULTS = Object.fromEntries(GROUPS.flatMap(([, rows]) => rows.map(([k, , , d]) => [k, d])));
+const PRESETS = {
+  "0.0.13 (now)": {},
+  "Quicker": { openDelay: 250, tolerance: 4, maxSpeed: 800, closeDelay: 200, openMs: 140, closeMs: 100 },
+  "Calmer": { openDelay: 600, tolerance: 6, maxSpeed: 500, closeDelay: 450, grace: 24, openMs: 220, closeMs: 160, openEase: "Strong out (quint)" },
+  "Only when you stop": { openDelay: 300, restartOnMove: true, tolerance: 3, maxSpeed: 150, closeDelay: 300 },
+  "Edge only": { trigger: "edge", edgeWidth: 10, openDelay: 150, closeDelay: 250 },
+  "Logo only": { trigger: "logo", openDelay: 150, tooltips: true },
+  "Click only": { trigger: "click", tooltips: true, tooltipDelay: 300 },
+};
+let S = { ...DEFAULTS, ...JSON.parse(localStorage.getItem("rail-lab") || "{}") };
+
+// ===== Settings form =====
+const form = document.getElementById("form");
+const fmt = (k, v) => {
+  const row = GROUPS.flatMap(([, r]) => r).find((r) => r[0] === k);
+  const x = row[4];
+  if (x.zero && v === 0) return x.zero;
+  return `${v}${x.unit ? " " + x.unit : ""}`;
+};
+for (const [title, rows] of GROUPS) {
+  const d = document.createElement("details");
+  if (["What opens it", "Clicks", "What closes it"].includes(title)) d.open = true;
+  d.innerHTML = `<summary>${title}</summary>`;
+  for (const [k, label, kind, , x] of rows) {
+    const r = document.createElement("div");
+    r.className = "row"; r.dataset.key = k;
+    const id = `f-${k}`;
+    let ctl = "";
+    if (kind === "range") ctl = `<output id="o-${k}"></output><input type="range" id="${id}" min="${x.min}" max="${x.max}" step="${x.step}">`;
+    if (kind === "check") ctl = `<input type="checkbox" id="${id}">`;
+    if (kind === "select") ctl = `<select id="${id}">${Object.entries(x.options).map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>`;
+    if (kind === "text") ctl = `<input type="text" id="${id}">`;
+    r.innerHTML = `<label for="${id}">${label}</label>${ctl}${x.help ? `<small>${x.help}</small>` : ""}`;
+    d.append(r);
+    const el = r.querySelector(`#${id}`);
+    el.addEventListener("input", () => {
+      S[k] = kind === "range" ? Number(el.value) : kind === "check" ? el.checked : el.value;
+      save();
+    });
+  }
+  form.append(d);
+}
+function syncForm() {
+  for (const [k, v] of Object.entries(S)) {
+    const el = document.getElementById(`f-${k}`);
+    if (!el) continue;
+    if (el.type === "checkbox") el.checked = v; else el.value = v;
+    const o = document.getElementById(`o-${k}`);
+    if (o) o.textContent = fmt(k, v);
+  }
+  const off = (k, cond) => document.querySelector(`.row[data-key="${k}"]`).classList.toggle("off", cond);
+  off("edgeWidth", S.trigger !== "edge");
+  off("openCustom", S.openEase !== "Custom");
+  off("closeCustom", S.closeEase !== "Custom");
+  off("labelsDelay", !S.labelsFade);
+  off("tooltipDelay", !S.tooltips);
+  off("openDelay", S.trigger === "click");
+  off("restartOnMove", S.trigger === "click" || S.trigger === "enter");
+  off("tolerance", S.trigger === "click" || S.trigger === "enter" || !S.restartOnMove);
+  off("maxSpeed", S.trigger === "click");
+  const changed = Object.fromEntries(Object.entries(S).filter(([k, v]) => DEFAULTS[k] !== v));
+  document.getElementById("out").value = JSON.stringify({ changedFrom0_0_13: changed, all: S }, null, 1);
+  presets.querySelectorAll(".chip").forEach((c) => {
+    const p = { ...DEFAULTS, ...PRESETS[c.textContent] };
+    c.classList.toggle("on", Object.keys(DEFAULTS).every((k) => p[k] === S[k]));
+  });
+}
+const presets = document.getElementById("presets");
+for (const name of Object.keys(PRESETS)) {
+  const b = document.createElement("button");
+  b.className = "chip"; b.textContent = name;
+  b.onclick = () => { S = { ...DEFAULTS, ...PRESETS[name], dark: S.dark, lights: S.lights, showWait: S.showWait }; save(); };
+  presets.append(b);
+}
+document.getElementById("reset").onclick = () => { S = { ...DEFAULTS, dark: S.dark }; save(); };
+document.getElementById("copy").onclick = async () => {
+  const text = document.getElementById("out").value;
+  try { await navigator.clipboard.writeText(text); log("settings copied"); }
+  catch { document.getElementById("out").select(); document.execCommand("copy"); log("settings copied"); }
+};
+function save() { localStorage.setItem("rail-lab", JSON.stringify(S)); apply(); syncForm(); }
+
+// ===== Applying the look =====
+const win = document.getElementById("win"), railbox = document.getElementById("railbox"), peek = document.getElementById("peek");
+const dim = document.getElementById("dim"), waitbar = document.getElementById("waitbar"), page = document.getElementById("page");
+const ease = (name, custom) => (EASINGS[name] === "custom" ? custom : EASINGS[name]);
+const ms = (v) => (S.reduced ? 0 : v * (S.slow ? 5 : 1));
+function apply() {
+  document.documentElement.dataset.theme = S.dark ? "dark" : "light";
+  const pad = (S.railW - 1) / 2 - 18;
+  win.style.setProperty("--rail-w", `${S.railW}px`);
+  win.style.setProperty("--peek-w", `${S.sideW}px`);
+  win.style.setProperty("--peek-pad", `${pad}px`);
+  win.style.setProperty("--shadow", S.shadow / 100);
+  const lights = document.getElementById("lights");
+  lights.style.display = S.lights ? "flex" : "none";
+  lights.style.left = `${Math.round((S.railW - 52) / 2)}px`;
+  render(true);
+}
+
+// ===== The behaviour =====
+// phase: closed → open → folding → closed. `pinned` puts the sidebar in its place, as Cmd+B does.
+let phase = "closed", pinned = false, timer = 0, waitStart = 0, waitFor = 0;
+let settle = 0, inside = false, anchor = null, clickedShut = false, last = null, speed = 0, current = "home";
+const t0 = performance.now();
+const logEl = document.getElementById("log");
+function log(msg) {
+  const t = ((performance.now() - t0) / 1000).toFixed(2);
+  logEl.insertAdjacentHTML("afterbegin", `<div><span class="t">${t}s</span> ${msg}</div>`);
+  while (logEl.children.length > 80) logEl.lastChild.remove();
+}
+function transitionFor(opening) {
+  const style = opening ? S.openStyle : S.closeStyle;
+  const dur = ms(opening ? S.openMs : S.closeMs);
+  const e = opening ? ease(S.openEase, S.openCustom) : ease(S.closeEase, S.closeCustom);
+  if (style === "instant" || dur === 0) return "none";
+  const parts = [];
+  if (style === "grow" || style === "growfade") parts.push(`width ${dur}ms ${e}`);
+  if (style === "slide") parts.push(`transform ${dur}ms ${e}`);
+  if (style === "fade" || style === "growfade") parts.push(`opacity ${dur}ms ${e}`);
+  return parts.join(", ");
+}
+function shutState(style) {
+  // What the sidebar looks like when it's not there, per style.
+  return {
+    width: style === "grow" || style === "growfade" ? `${S.railW}px` : `${S.sideW}px`,
+    transform: style === "slide" ? `translateX(-${S.sideW}px)` : "none",
+    opacity: style === "fade" || style === "growfade" ? 0 : 1,
+  };
+}
+function render(instant = false) {
+  const open = phase === "open" || pinned;
+  const style = open ? S.openStyle : S.closeStyle;
+  peek.style.transition = instant ? "none" : transitionFor(open);
+  const shut = shutState(style);
+  if (open) Object.assign(peek.style, { width: `${S.sideW}px`, transform: "none", opacity: 1 });
+  else Object.assign(peek.style, shut);
+  peek.classList.toggle("shown", open || phase === "folding");
+  peek.style.boxShadow = pinned ? "none" : "";
+  // Labels
+  peek.querySelectorAll(".labels").forEach((l) => {
+    l.style.transition = S.labelsFade && open && !instant ? `opacity ${ms(S.openMs)}ms ease ${ms(S.labelsDelay)}ms` : "none";
+    l.style.opacity = !S.labelsFade || open ? 1 : 0;
+  });
+  // Page
+  dim.style.transition = `opacity ${ms(open ? S.openMs : S.closeMs)}ms`;
+  dim.style.opacity = open && !pinned ? S.dim / 100 : 0;
+  const push = pinned || S.push;
+  page.style.transition = instant ? "none" : `margin-left ${ms(open ? S.openMs : S.closeMs)}ms ${open ? ease(S.openEase, S.openCustom) : ease(S.closeEase, S.closeCustom)}`;
+  page.style.marginLeft = push && open ? `${S.sideW - S.railW}px` : "0px";
+  railbox.querySelectorAll(".railbtn, .nav, .sbox").forEach((b) => b.classList.toggle("on", b.dataset.sec === current));
+}
+function setPhase(next, why) {
+  if (pinned || next === phase) return;
+  const was = phase;
+  if (next === "closed" && was === "open") {
+    const d = ms(S.closeMs);
+    phase = S.closeStyle === "instant" || d === 0 ? "closed" : "folding";
+    log(`closes (${why})`);
+    render();
+    if (phase === "folding") setTimeout(() => { if (phase === "folding") { phase = "closed"; render(); } }, d + 20);
+    return;
+  }
+  if (next === "open") log(`opens (${why})`);
+  phase = next; render();
+}
+function stopWait() { clearTimeout(timer); timer = 0; waitbar.style.transition = "none"; waitbar.style.width = "0"; }
+function startWait(delay, next, why) {
+  clearTimeout(timer);
+  waitStart = performance.now(); waitFor = delay;
+  if (next === "open" && S.showWait && delay > 0) {
+    waitbar.style.transition = "none"; waitbar.style.width = "0";
+    void waitbar.offsetWidth;
+    waitbar.style.transition = `width ${delay}ms linear`; waitbar.style.width = `${S.railW}px`;
+  }
+  timer = setTimeout(() => { timer = 0; waitbar.style.transition = "none"; waitbar.style.width = "0"; setPhase(next, why); }, delay);
+}
+// Where the pointer counts as "on it": the rail when shut, the sidebar plus the extra room when open.
+function zoneRight() { return phase === "closed" ? S.railW : S.sideW + S.grace; }
+function inTrigger(x, y, target) {
+  if (S.trigger === "edge") return x <= S.edgeWidth;
+  if (S.trigger === "logo") return !!target.closest?.(".rail .logo");
+  return x <= S.railW;
+}
+function onEnter(e, x, y) {
+  inside = true;
+  if (phase === "folding" && S.reopenFolding) { stopWait(); setPhase("open", "back while folding"); return; }
+  clickedShut = false;
+  anchor = { x, y };
+  if (phase === "closed" && S.trigger !== "click" && !e.buttons) maybeWait(e, x, y, true);
+  else if (phase === "open") stopWait();
+}
+function maybeWait(e, x, y, fresh) {
+  if (S.trigger === "click" || clickedShut || e.buttons) return;
+  if (!inTrigger(x, y, e.target)) { if (timer) { stopWait(); } return; }
+  if (S.maxSpeed && speed > S.maxSpeed) { stopWait(); return; }
+  if (fresh || !timer) { startWait(S.trigger === "enter" ? S.openDelay : S.openDelay, "open", `pointer ${S.trigger === "enter" ? "on the rail" : "rested"} ${S.openDelay} ms`); anchor = { x, y }; return; }
+  if (S.trigger === "enter" || !S.restartOnMove) return;
+  const dist = Math.hypot(x - anchor.x, y - anchor.y);
+  if (dist > S.tolerance) { anchor = { x, y }; startWait(S.openDelay, "open", `pointer rested ${S.openDelay} ms`); }
+}
+function onLeave(why) {
+  inside = false; clickedShut = false;
+  if (phase === "closed") { stopWait(); return; }
+  if (phase === "open") startWait(ms(0) + S.closeDelay, "closed", why);
+}
+win.addEventListener("pointermove", (e) => {
+  const r = win.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const now = performance.now();
+  if (last) {
+    const dt = Math.max(1, now - last.t);
+    const v = Math.hypot(e.clientX - last.x, e.clientY - last.y) / dt * 1000;
+    speed = speed * 0.6 + v * 0.4;
+  }
+  last = { x: e.clientX, y: e.clientY, t: now };
+  document.getElementById("speed").textContent = `· pointer ${Math.round(speed)} px/s`;
+  // A pointer that stops sends no more moves: after a moment still, its speed is 0, and the wait can start.
+  clearTimeout(settle);
+  const still = { buttons: 0, target: e.target };
+  settle = setTimeout(() => {
+    speed = 0;
+    document.getElementById("speed").textContent = "· pointer 0 px/s";
+    if (!pinned && inside && phase === "closed" && !timer) maybeWait(still, x, y, true);
+  }, 80);
+  if (pinned) return;
+  const within = x <= zoneRight() || (phase !== "closed" && x <= S.sideW + S.grace);
+  if (within && !inside) { log("pointer on the rail"); onEnter(e, x, y); }
+  else if (!within && inside) onLeave("pointer left");
+  else if (within && phase === "closed") maybeWait(e, x, y, false);
+  else if (within && phase === "open") { if (timer) stopWait(); }
+  // Tooltips
+  railbox.querySelectorAll(".railbtn").forEach((b) => b !== e.target.closest?.(".railbtn") && b.classList.remove("tipping"));
+});
+win.addEventListener("pointerleave", () => { last = null; if (!pinned && inside && S.closeOnLeaveWindow) onLeave("pointer left the window"); else if (!S.closeOnLeaveWindow) inside = false; });
+
+// Tooltips on rail icons while shut
+let tipTimer = 0;
+document.getElementById("rail").addEventListener("pointerover", (e) => {
+  const b = e.target.closest(".railbtn");
+  clearTimeout(tipTimer);
+  railbox.querySelectorAll(".railbtn.tipping").forEach((x) => x !== b && x.classList.remove("tipping"));
+  if (!b || !S.tooltips || phase !== "closed") return;
+  tipTimer = setTimeout(() => phase === "closed" && b.classList.add("tipping"), S.tooltipDelay);
+});
+document.getElementById("rail").addEventListener("pointerout", (e) => { const b = e.target.closest(".railbtn"); if (b && !b.contains(e.relatedTarget)) { clearTimeout(tipTimer); b.classList.remove("tipping"); } });
+
+// Clicks
+const clicksEl = document.getElementById("clicks");
+let clickCount = 0;
+function go(sec, where) {
+  if (!sec) return;
+  current = sec; clickCount++;
+  const names = { search: "Cerca", home: "Nuova attività", projects: "Progetti", skills: "Skill", jobs: "Lavori", board: "Bacheca", profile: "Profilo", settings: "Impostazioni" };
+  document.getElementById("crumb").textContent = names[sec];
+  document.getElementById("title").textContent = names[sec];
+  clicksEl.textContent = `${clickCount} click${clickCount === 1 ? "" : "s"} registered · last: ${names[sec]} (${where})`;
+  log(`click → ${names[sec]} (${where})`);
+  render();
+}
+railbox.addEventListener("pointerdown", (e) => {
+  const pin = e.target.closest('[data-act="pin"]');
+  if (pin) { pinned = !pinned; stopWait(); phase = pinned ? "open" : "closed"; log(pinned ? "kept open (logo)" : "collapsed"); render(); return; }
+  const fromRail = e.target.closest(".rail");
+  const btn = e.target.closest("[data-sec]");
+  // While it's opening, a click may go to the rail underneath.
+  if (!fromRail && btn && phase === "open" && S.clickDuringOpen === "rail" && performance.now() - openedAt < ms(S.openMs)) {
+    const under = document.querySelector(`.rail [data-sec="${btn.dataset.sec}"]`);
+    go(under?.dataset.sec, "rail, during the opening");
+    return;
+  }
+  if (btn) go(btn.dataset.sec, fromRail ? "rail" : "sidebar");
+  if (fromRail && !pinned) {
+    if (S.trigger === "click") return;
+    if (S.afterClick === "shut") { clickedShut = true; stopWait(); }
+    else if (S.afterClick === "wait") { const r = win.getBoundingClientRect(); anchor = { x: e.clientX - r.left, y: e.clientY - r.top }; startWait(S.openDelay, "open", "rested after a click"); }
+  }
+});
+let openedAt = 0;
+const _setPhase = setPhase;
+setPhase = (next, why) => { if (next === "open" && phase !== "open") openedAt = performance.now(); _setPhase(next, why); };
+// Click-only: a click on the logo pins; a click on the rail's blank space opens it over the page.
+document.getElementById("rail").addEventListener("click", (e) => {
+  if (S.trigger !== "click" || pinned || e.target.closest("button")) return;
+  setPhase(phase === "open" ? "closed" : "open", "click on the rail");
+});
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") { e.preventDefault(); pinned = !pinned; stopWait(); phase = pinned ? "open" : "closed"; log(pinned ? "kept open (⌘B)" : "collapsed (⌘B)"); render(); }
+  if (e.key === "Escape" && phase === "open" && !pinned) { stopWait(); setPhase("closed", "Escape"); }
+});
+
+apply(); syncForm();
+log("ready: the settings start from Tost Work 0.0.13");
+</script>
+</body>
+</html>
