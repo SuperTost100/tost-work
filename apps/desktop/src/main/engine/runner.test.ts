@@ -4,7 +4,7 @@ import type { EngineEvent, Task } from "../../shared/model";
 import { Store } from "../store/store";
 import type { Engine, RunContext } from "./engine";
 import { FakeEngine, PROPOSAL_SCRIPT } from "./fake";
-import { RESUME_PROMPT, TaskRunner, titleFrom } from "./runner";
+import { RESUME_PROMPT, TaskRunner, titleFrom, withFiles } from "./runner";
 
 function setup() {
   const store = new Store(":memory:");
@@ -79,6 +79,38 @@ describe("TaskRunner with the fake engine", () => {
     expect(final.status).toBe("done");
     expect(final.messages.at(-1)?.text).toBe("Done, I made the change.");
     expect(final.files.at(-1)).toEqual({ path: "/tmp/p/prezzi.xlsx", kind: "update", role: "made" });
+  });
+
+  it("keeps files attached to answers and follow-ups with their message and the task's files", async () => {
+    const { store, runner } = setup();
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
+    expect(task.messages[0]?.attachments).toBeUndefined();
+    const first = runner.start(task.id);
+    await waitFor(() => store.getTask(task.id)?.status === "needs-you");
+    const answered = runner.answer(task.id, ["The client pays it"], ["/prices.xlsx"]);
+    expect(answered.messages.at(-1)?.attachments).toEqual(["/prices.xlsx"]);
+    expect(answered.attachments).toEqual(["/prices.xlsx"]);
+    await first;
+    // A file sent twice is the task's once.
+    const asked = runner.followUp(task.id, "Use the new logo", ["/logo.png", "/prices.xlsx"]);
+    expect(asked.messages.at(-1)).toMatchObject({ followUp: true, attachments: ["/logo.png", "/prices.xlsx"] });
+    expect(asked.attachments).toEqual(["/prices.xlsx", "/logo.png"]);
+    // Without files, the message carries none.
+    await runner.start(task.id, "Use the new logo");
+    expect(runner.followUp(task.id, "Thanks").messages.at(-1)?.attachments).toBeUndefined();
+  });
+
+  it("keeps the brief's files on the first message", () => {
+    const { runner } = setup();
+    const task = runner.create({ projectId: "p", brief: "Sum it up", workdir: "/tmp/p", attachments: ["/notes.docx"] });
+    expect(task.messages[0]?.attachments).toEqual(["/notes.docx"]);
+  });
+
+  it("tells the agent which files came with a message", () => {
+    expect(withFiles("Use the new logo", [])).toBe("Use the new logo");
+    expect(withFiles("Use the new logo", ["/Users/g/logo.png"])).toBe(
+      "Use the new logo\n\nFiles I attached to this message:\n- /Users/g/logo.png",
+    );
   });
 
   it("refuses a follow-up while the task works or waits", async () => {

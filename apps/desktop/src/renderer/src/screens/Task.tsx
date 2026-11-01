@@ -1,6 +1,6 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ApprovalCard } from "@/components/Approval";
-import { Composer } from "@/components/Composer";
+import { type Attachments, Composer } from "@/components/Composer";
 import { Preview } from "@/components/Preview";
 import { TaskTag } from "@/components/TaskTag";
 import { errorText } from "@/lib/errorText";
@@ -15,6 +15,7 @@ import {
   type Activity,
   type ActivityKind,
   type AnsweredQuestion,
+  ATTACH_MAX,
   answersText,
   BRIEF_MAX,
   type FileChange,
@@ -411,11 +412,14 @@ function QuestionCard({
   draft,
   onDraft,
   onSend,
+  attach,
 }: {
   question: Question;
   draft: string;
   onDraft: (text: string) => void;
   onSend: (answers: string[]) => void;
+  /** Files sent with the round's answers. */
+  attach: Attachments;
 }) {
   const t = useT();
   const items = questionItems(question);
@@ -476,6 +480,7 @@ function QuestionCard({
       placeholder={t("composer.answer")}
       sendLabel={t(at < items.length - 1 ? "task.nextQuestion" : "composer.start")}
       minHeight={44}
+      attach={attach}
     >
       <div className="q" key={at} ref={takeFocus} tabIndex={-1}>
         {items.length > 1 && (
@@ -531,7 +536,29 @@ function QuestionCard({
  * A round of questions the user answered: one grey line between the agent's messages, like the steps, that opens to
  * show each question with its answer.
  */
-function AnswerLine({ answers }: { answers: AnsweredQuestion[] }) {
+/** The files attached to one of the user's messages, under its text. */
+function AttachedFiles({ paths = [] }: { paths?: string[] }) {
+  if (paths.length === 0) return null;
+  return (
+    <div className="outs" style={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
+      {paths.map((path) => (
+        <span className="out" key={path}>
+          <Icon name="file" />
+          {fileName(path)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The files the brief came with, for tasks made before the first message kept its own: the task's, less those
+ * attached to later messages. */
+const firstFiles = (task: TaskT) => {
+  const later = new Set(task.messages.flatMap((m) => m.attachments ?? []));
+  return task.attachments.filter((p) => !later.has(p));
+};
+
+function AnswerLine({ answers, files }: { answers: AnsweredQuestion[]; files?: string[] }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   return (
@@ -553,6 +580,7 @@ function AnswerLine({ answers }: { answers: AnsweredQuestion[] }) {
           ))}
         </ol>
       )}
+      <AttachedFiles paths={files} />
     </div>
   );
 }
@@ -674,8 +702,9 @@ export function Task({
   task: TaskT;
   project: Project | null;
   /** Resolves true once the answer is sent, false when it failed and the draft should stay. */
-  onAnswer: (answers: string[]) => Promise<boolean>;
-  onFollowUp: (text: string) => void;
+  onAnswer: (answers: string[], files: string[]) => Promise<boolean>;
+  /** Resolves true once the instruction is sent, false when it failed and the box should keep it. */
+  onFollowUp: (text: string, files: string[]) => Promise<boolean>;
   onSaveCopy: () => Promise<SaveResult | null>;
   onDecide: (allow: boolean) => Promise<unknown>;
   onRestore: (path: string) => Promise<unknown>;
@@ -691,19 +720,35 @@ export function Task({
 }) {
   const t = useT();
   const [answer, setAnswer] = useState("");
+  // Files for the answers and for the next instruction, each sent with its own message.
+  const [answerFiles, setAnswerFiles] = useState<string[]>([]);
+  const [messageFiles, setMessageFiles] = useState<string[]>([]);
+  const attach = (files: string[], set: (update: (prev: string[]) => string[]) => void): Attachments => ({
+    files,
+    onAdd: () =>
+      void api.files
+        .pick()
+        .then((picked) => set((prev) => [...new Set([...prev, ...picked])].slice(0, ATTACH_MAX)))
+        .catch(onError),
+    onRemove: (path) => set((prev) => prev.filter((p) => p !== path)),
+  });
   // One answer at a time: a second click before the first returns would be refused and shown as an error.
   const sending = useRef(false);
   const send = (answers: string[]) => {
     if (sending.current) return;
     sending.current = true;
-    // Once the answer is in, the draft goes, unless it was edited while the answer was sending.
+    // Once the answer is in, the draft and files go, unless they changed while the answer was sending.
     const draft = answer;
-    void onAnswer(answers).then((sent) => {
+    const files = answerFiles;
+    void onAnswer(answers, files).then((sent) => {
       sending.current = false;
-      if (sent) setAnswer((current) => (current === draft ? "" : current));
+      if (!sent) return;
+      setAnswer((current) => (current === draft ? "" : current));
+      setAnswerFiles((current) => (current === files ? [] : current));
     });
   };
   const [message, setMessage] = useState("");
+  const followSending = useRef(false);
   // A task without a project is a quick edit: it works on copies in a temporary folder until the user saves.
   const quick = task.projectId === null;
   const made = task.files.filter((f) => f.role === "made");
@@ -726,9 +771,11 @@ export function Task({
   // Typing follows the text down the page while the user is at the bottom; scrolling up leaves them there.
   const scroller = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
+  // Set when a run ends with the user at the bottom: the page then holds the start of the last answer at its top.
+  const settled = useRef(false);
   const follow = useCallback(() => {
     const el = scroller.current;
-    if (el && pinned.current) el.scrollTop = el.scrollHeight;
+    if (el && pinned.current && !settled.current) el.scrollTop = el.scrollHeight;
   }, []);
   const followDraft = useCallback(
     (n: number) => {
@@ -769,6 +816,27 @@ export function Task({
   };
   const current = task.steps.findIndex((s) => s.status === "in_progress");
   const live = task.status === "running" || task.status === "needs-you";
+  // When a run ends, its file and review come in under its last answer, and the bottom of the page would show them
+  // first. The answer is what to read first, so its start goes to the top of the page, unless the user scrolled away.
+  // A run can end in the same update that brings its last messages, so either counts.
+  const lastSeen = useRef({ live, messages: task.messages.length });
+  // Before the browser paints, so the file never shows first and then jumps away.
+  useLayoutEffect(() => {
+    const ended = !live && (lastSeen.current.live || task.messages.length > lastSeen.current.messages);
+    lastSeen.current = { live, messages: task.messages.length };
+    settled.current = !live && settled.current;
+    const el = scroller.current;
+    if (!ended || !el) return;
+    const last = [...el.querySelectorAll<HTMLElement>(".col > :is(.msg, .answered:not(.activity))")].at(-1);
+    // A run that ended without an answer has the user's own message or answers last.
+    if (!last || last.matches(".mine, .answered")) return;
+    const top = last.getBoundingClientRect().top;
+    const box = el.getBoundingClientRect();
+    // Only from the end of the page: a user reading further up stays where they are.
+    if (!pinned.current && top > box.bottom) return;
+    settled.current = true;
+    el.scrollTop += top - box.top - 16;
+  }, [live, task.messages.length]);
   const { before, tail, older } = activityByMessage(task.activity ?? [], task.messages.length);
   const waiting = task.question ? "question" : task.approval ? "approval" : undefined;
   // The steps belong to the latest run, so after a follow-up they show under that instruction.
@@ -781,11 +849,12 @@ export function Task({
       <Fragment key={i}>
         {done.length > 0 && <ActivityLog activity={done} live={false} />}
         {m.answers ? (
-          <AnswerLine answers={m.answers} />
+          <AnswerLine answers={m.answers} files={m.attachments} />
         ) : m.from === "user" ? (
           <div className="msg mine" style={{ marginTop: 18 }}>
             <div className="you">
               <LongText text={m.text} />
+              <AttachedFiles paths={m.attachments} />
             </div>
             <CopyButton text={() => m.text} />
           </div>
@@ -850,16 +919,7 @@ export function Task({
               <div className="msg mine">
                 <div className="you">
                   <LongText text={task.brief} />
-                  {task.attachments.length > 0 && (
-                    <div className="outs" style={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
-                      {task.attachments.map((path) => (
-                        <span className="out" key={path}>
-                          <Icon name="file" />
-                          {fileName(path)}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  <AttachedFiles paths={task.messages[0]?.attachments ?? firstFiles(task)} />
                 </div>
                 <CopyButton text={() => task.brief} />
               </div>
@@ -937,6 +997,7 @@ export function Task({
                     draft={answer}
                     onDraft={setAnswer}
                     onSend={send}
+                    attach={attach(answerFiles, setAnswerFiles)}
                   />
                 ) : task.approval ? (
                   <ApprovalCard approval={task.approval} t={t} onDecide={onDecide} />
@@ -945,13 +1006,24 @@ export function Task({
                     value={live ? "" : message}
                     onChange={setMessage}
                     onSubmit={() => {
-                      onFollowUp(message.trim());
-                      setMessage("");
+                      // One at a time: copying the files takes a moment, and a second Send would run it twice.
+                      if (followSending.current) return;
+                      followSending.current = true;
+                      // Cleared once it's sent, unless the user changed them meanwhile, so a failed send keeps both.
+                      const text = message;
+                      const files = messageFiles;
+                      void onFollowUp(text.trim(), files).then((sent) => {
+                        followSending.current = false;
+                        if (!sent) return;
+                        setMessage((current) => (current === text ? "" : current));
+                        setMessageFiles((current) => (current === files ? [] : current));
+                      });
                     }}
                     placeholder={live ? t("composer.busy") : quick ? t("composer.another") : t("composer.followup")}
                     sendLabel={t("composer.send")}
                     disabled={live}
                     minHeight={44}
+                    attach={attach(messageFiles, setMessageFiles)}
                   />
                 )}
               </div>

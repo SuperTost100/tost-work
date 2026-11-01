@@ -37,6 +37,126 @@ describe("starting and finishing a task", () => {
   });
 });
 
+describe("where the page stops when a task finishes", () => {
+  it("puts the start of the last answer at the top, not the file under it", async () => {
+    // jsdom lays nothing out: the agent's answer says it's 400px down the page, and the page's box starts at 100px.
+    const box = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      const top = this.matches(".scroll") ? 100 : this.matches(".msg:not(.mine)") ? 400 : 0;
+      return { top, bottom: top, left: 0, right: 0, width: 0, height: 0, x: 0, y: top, toJSON: () => ({}) };
+    });
+    const api = createMemoryApi();
+    const { container } = render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal for Alpi Logistica" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: /We do/ }));
+    });
+    await screen.findByText("Check it against your brief");
+    const page = container.querySelector(".scroll") as HTMLElement;
+    // That run ended on the user's answers, with no answer of its own: the page stays where it was.
+    expect(page.scrollTop).toBe(0);
+    // The next one ends with an answer, and the page shows its start.
+    fireEvent.change(screen.getAllByRole("textbox").at(-1) as HTMLElement, { target: { value: "Shorter" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    });
+    await screen.findByText("Done, I made the change.");
+    expect(page.scrollTop).toBe(400 - 100 - 16);
+    box.mockRestore();
+  });
+});
+
+describe("attaching files after the first message", () => {
+  it("sends files with the answers and with a follow-up, and shows them under each", async () => {
+    const api = createMemoryApi();
+    const answer = vi.spyOn(api.tasks, "answer");
+    const followUp = vi.spyOn(api.tasks, "followUp");
+    const { container } = render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal for Alpi Logistica" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    await screen.findByText("Who pays the insurance?");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Attach files" }));
+    });
+    expect(screen.getByText("letter-bank.docx")).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /We do/ }));
+    });
+    expect(answer).toHaveBeenCalledWith(expect.any(String), ["We do"], ["/Users/giulia/Documents/letter-bank.docx"]);
+    await screen.findByText("Check it against your brief");
+    expect(container.querySelector(".answered .out")?.textContent).toBe("letter-bank.docx");
+
+    fireEvent.change(screen.getAllByRole("textbox").at(-1) as HTMLElement, { target: { value: "Shorter" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Attach files" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    });
+    expect(followUp).toHaveBeenCalledWith(expect.any(String), "Shorter", ["/Users/giulia/Documents/letter-bank.docx"]);
+    await screen.findByText("Done, I made the change.");
+    expect(container.querySelector(".msg.mine:not(:first-child) .out")?.textContent).toBe("letter-bank.docx");
+    // The box is empty again, files and all.
+    expect(container.querySelector(".foot .attached")).toBeNull();
+  });
+
+  it("sends a follow-up once when Send is pressed twice while it's on its way", async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: /We do/ }));
+    });
+    await screen.findByText("Check it against your brief");
+    // Held until released, as while the files are copied.
+    let release = () => {};
+    const sent = vi.fn(() => new Promise<never>((_, reject) => (release = () => reject(new Error("stopped")))));
+    api.tasks.followUp = sent;
+    fireEvent.change(screen.getAllByRole("textbox").at(-1) as HTMLElement, { target: { value: "Shorter" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Send" }));
+      fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    });
+    expect(sent).toHaveBeenCalledTimes(1);
+    await act(async () => release());
+  });
+
+  it("keeps the follow-up's text and files when sending it fails", async () => {
+    const api = createMemoryApi();
+    const { container } = render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: /We do/ }));
+    });
+    await screen.findByText("Check it against your brief");
+    // As when an attached file was moved before Send.
+    api.tasks.followUp = async () => {
+      throw new Error("letter-bank.docx isn't there any more");
+    };
+    const box = screen.getAllByRole("textbox").at(-1) as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: "Shorter" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Attach files" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    });
+    expect(screen.getByRole("alert").textContent).toMatch(/isn't there any more/);
+    expect(box.value).toBe("Shorter");
+    expect(container.querySelector(".foot .attached")?.textContent).toMatch("letter-bank.docx");
+  });
+});
+
 describe("failures and double clicks", () => {
   it("starts one task when Enter is pressed twice", async () => {
     const api = createMemoryApi();

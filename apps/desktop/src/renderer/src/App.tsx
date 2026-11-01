@@ -20,10 +20,9 @@ import { Task } from "@/screens/Task";
 import { RECENT, type Section, Sidebar, SidebarRail } from "@/shell/Sidebar";
 import { useData } from "@/state/useData";
 import type { MenuAction, ProjectMenuAction, TostWorkApi } from "../../shared/api";
-import { DEFAULT_SETTINGS, type ProjectOverview, type Settings, sectionOn } from "../../shared/model";
+import { ATTACH_MAX, DEFAULT_SETTINGS, type ProjectOverview, type Settings, sectionOn } from "../../shared/model";
 
 /** The main process accepts up to 20 attachments per task. */
-const MAX_FILES = 20;
 
 /** Where typing happens: Cmd+B belongs to the text there, not to the sidebar. */
 // Only an editor that makes text bold keeps Cmd+B; in a plain field, such as the task box, it toggles the sidebar.
@@ -208,7 +207,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
       onAdd: () =>
         void api.files
           .pick()
-          .then((picked) => set((prev) => [...new Set([...prev, ...picked])].slice(0, MAX_FILES)))
+          .then((picked) => set((prev) => [...new Set([...prev, ...picked])].slice(0, ATTACH_MAX)))
           .catch(report),
       onRemove: (path) => set((prev) => prev.filter((p) => p !== path)),
     };
@@ -267,7 +266,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
       if (!api || !quickEdit) return;
       void api.files.pick().then((picked) => {
         if (!picked.length) return;
-        setFiles(picked.slice(0, MAX_FILES));
+        setFiles(picked.slice(0, ATTACH_MAX));
         setProjectId(null);
         setRoute({ name: "home" });
         focusComposer();
@@ -428,8 +427,8 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
           api={api}
           task={task}
           project={project}
-          onAnswer={(answers) =>
-            api.tasks.answer(task.id, answers).then(
+          onAnswer={(answers, files) =>
+            api.tasks.answer(task.id, answers, files).then(
               () => true,
               (err: unknown) => {
                 report(err);
@@ -437,7 +436,15 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
               },
             )
           }
-          onFollowUp={(text) => void api.tasks.followUp(task.id, text).catch(report)}
+          onFollowUp={(text, files) =>
+            api.tasks.followUp(task.id, text, files).then(
+              () => true,
+              (err: unknown) => {
+                report(err);
+                return false;
+              },
+            )
+          }
           onSaveCopy={() => api.tasks.saveCopy(task.id)}
           onDecide={(allow) => api.tasks.decide(task.id, allow)}
           onRestore={(path) => api.files.restore(task.id, path)}

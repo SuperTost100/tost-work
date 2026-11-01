@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { copyFile, lstat, realpath, stat } from "node:fs/promises";
+import { copyFile, lstat, realpath, rm, stat } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
 import type { Task } from "../shared/model";
 
@@ -105,15 +105,24 @@ export async function freeName(folder: string, name: string): Promise<string> {
 /** Copies the user's files into a quick edit's folder, so the agent edits copies and the originals stay untouched. */
 export async function copyInto(paths: string[], folder: string): Promise<string[]> {
   const copies: string[] = [];
-  for (const path of paths) {
-    const info = await stat(path);
-    if (!info.isFile()) throw new Error(`${basename(path)} isn't a file`);
-    const target = await freeName(folder, basename(path));
-    await copyFile(path, target, constants.COPYFILE_EXCL);
-    copies.push(target);
+  try {
+    for (const path of paths) {
+      const info = await stat(path);
+      if (!info.isFile()) throw new Error(`${basename(path)} isn't a file`);
+      const target = await freeName(folder, basename(path));
+      await copyFile(path, target, constants.COPYFILE_EXCL);
+      copies.push(target);
+    }
+  } catch (err) {
+    // A batch that fails part way leaves nothing behind, so a retry doesn't add numbered copies to the folder.
+    await removeCopies(copies);
+    throw err;
   }
   return copies;
 }
+
+/** Removes copies made for a message that was then refused. */
+export const removeCopies = (copies: string[]) => Promise.all(copies.map((copy) => rm(copy, { force: true })));
 
 /** What to do when a file with the same name is already in the folder the user picked. */
 export type Conflict = "replace" | "keep-both" | "cancel";

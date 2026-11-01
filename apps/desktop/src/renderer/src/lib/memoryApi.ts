@@ -344,7 +344,14 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
             { text: "Write the proposal", status: "pending" },
           ],
           files: [],
-          messages: [{ from: "user", text: input.brief, at }],
+          messages: [
+            {
+              from: "user",
+              text: input.brief,
+              at,
+              ...(input.attachments?.length ? { attachments: input.attachments } : {}),
+            },
+          ],
           question: null,
           approval: null,
           review: null,
@@ -358,7 +365,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         });
         return tasks.get(t.id) ?? t;
       },
-      answer: async (id, answers) => {
+      answer: async (id, answers, files = []) => {
         const t = tasks.get(id);
         if (!t?.question) throw new Error("This task isn't waiting for an answer");
         const items = questionItems(t.question);
@@ -367,7 +374,14 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         const text = answersText(t.question, answers);
         if (text.length > BRIEF_MAX) throw new Error("These answers are too long to send together");
         const answered = items.map((item, i) => ({ question: item.text, answer: answers[i] ?? "" }));
-        save({ ...resume(t, now()), messages: [...t.messages, { from: "user", text, at: now(), answers: answered }] });
+        save({
+          ...resume(t, now()),
+          attachments: [...new Set([...t.attachments, ...files])],
+          messages: [
+            ...t.messages,
+            { from: "user", text, at: now(), answers: answered, ...(files.length ? { attachments: files } : {}) },
+          ],
+        });
         emit(id, { type: "file", change: { path: "/tmp/Proposta.docx", kind: "add", role: "made" } });
         emit(id, {
           type: "review",
@@ -386,14 +400,18 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         emit(id, { type: "done" });
         return tasks.get(id) ?? t;
       },
-      followUp: async (id, text) => {
+      followUp: async (id, text, files = []) => {
         const t = tasks.get(id);
         if (!t || t.status === "running" || t.question) throw new Error("This task can't take a follow-up now");
         save({
           ...t,
           status: "running",
           review: null,
-          messages: [...t.messages, { from: "user", text, at: now(), followUp: true }],
+          attachments: [...new Set([...t.attachments, ...files])],
+          messages: [
+            ...t.messages,
+            { from: "user", text, at: now(), followUp: true, ...(files.length ? { attachments: files } : {}) },
+          ],
         });
         emit(id, { type: "plan", steps: [{ text: "Make the change", status: "in_progress" }] });
         emit(id, { type: "message", text: "Done, I made the change." });

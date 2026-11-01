@@ -97,6 +97,8 @@ export interface Message {
   answers?: AnsweredQuestion[];
   /** True for an instruction sent after the task finished, which starts a new run with its own steps. */
   followUp?: boolean;
+  /** Files the user attached to this message, after the first. The first message's are the task's `attachments`. */
+  attachments?: string[];
 }
 
 /** What the agent did, in kinds the task screen words: "Reading note.txt", "Searching the web: …". */
@@ -318,6 +320,8 @@ export const NOTES_MAX = 4000;
 export const DESCRIPTION_MAX = 2000;
 
 export const BRIEF_MAX = 100_000;
+/** How many files one message can carry. */
+export const ATTACH_MAX = 20;
 
 /** One of the user's skills: a SKILL.md folder in Documents/Tost Work/Skills. */
 export interface Skill {

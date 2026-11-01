@@ -41,7 +41,7 @@ function toolsFor(session: Session, handler: ToolHandler): McpServer {
     "ask_user",
     {
       description:
-        "Ask the user what the brief leaves open, all at once: every question you need answered now, up to 16, each with 2 to 4 short answer options. The user can also write their own answer to each. Then end your turn: the answers arrive together as your next message. If they raise new questions, ask another round.",
+        'Ask the user what the brief leaves open, all at once: every question you need answered now, up to 16, each with 2 to 4 short answer options. For each question the user either picks one option or writes their own answer instead, never both, so every option must be a complete answer on its own: never an option like "I\'ll tell you the amount". To get a number, a name or a date, ask for it and offer likely values. Then end your turn: the answers arrive together as your next message. If they raise new questions, ask another round.',
       inputSchema: {
         questions: z
           .array(
@@ -95,7 +95,7 @@ function toolsFor(session: Session, handler: ToolHandler): McpServer {
     "submit_review",
     {
       description:
-        "At the end, check the work against the brief: what the user asked and whether it's done, what you decided on your own, and what the user should check themselves.",
+        "At the end, check the work against the brief: what the user asked and whether it's done, what you decided on your own, and what the user should check themselves. `asked` covers every request in the task, from the user's first message on, not only the latest: when a later message asks for a file, the file usually delivers an earlier request, so name that request too.",
       inputSchema: {
         asked: z.array(item).max(20),
         decided: z.array(item).max(20),

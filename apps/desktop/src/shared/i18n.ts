@@ -689,7 +689,7 @@ const it: Record<MessageKey, string> = {
   "tray.next": "Prossimo: {title}, {when}",
   "tray.noNext": "Nessun lavoro attivo",
   "tray.quit": "Esci da Tost Work",
-  "panel.needsYou": "Serve te",
+  "panel.needsYou": "Tocca a te",
   "panel.working": "In corso",
   "panel.next": "Prossimi lavori",
   "panel.quiet": "Tutto tranquillo: niente al lavoro e niente che aspetta te.",
@@ -819,7 +819,7 @@ const it: Record<MessageKey, string> = {
   "task.failed": "Qualcosa è andato storto: {error}",
   "task.offline":
     "Tost Work non riesce a raggiungere {ai}. Controlla la connessione a internet, poi invia di nuovo l'attività.",
-  "tag.needsYou": "serve te",
+  "tag.needsYou": "tocca a te",
   "tag.writing": "in corso · {n} di {total}",
   "tag.working": "al lavoro",
   "tag.toReview": "da rivedere",

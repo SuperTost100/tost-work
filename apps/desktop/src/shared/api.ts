@@ -165,12 +165,12 @@ export interface TostWorkApi {
     get(id: string): Promise<Task | null>;
     /** Creates the task and starts it right away. */
     start(input: NewTaskInput): Promise<Task>;
-    /** One answer per question in the round, in order. */
-    answer(id: string, answers: string[]): Promise<Task>;
+    /** One answer per question in the round, in order, with any files the user attached to them. */
+    answer(id: string, answers: string[], attachments?: string[]): Promise<Task>;
     /** Allows or refuses the overwrite or delete the task asked for. */
     decide(id: string, allow: boolean): Promise<Task>;
     /** Sends another instruction to a task that finished or stopped, and runs it again. */
-    followUp(id: string, text: string): Promise<Task>;
+    followUp(id: string, text: string, attachments?: string[]): Promise<Task>;
     /** Asks for a folder, every time, and copies the files the task made into it. Null when the user cancels. */
     saveCopy(id: string): Promise<SaveResult | null>;
     stop(id: string): Promise<void>;

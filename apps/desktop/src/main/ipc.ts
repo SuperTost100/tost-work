@@ -24,8 +24,8 @@ import {
 } from "../shared/model";
 import { removalText } from "../shared/projectText";
 import type { Accounts } from "./accounts";
-import type { TaskRunner } from "./engine/runner";
-import { type Conflict, copyInto, describe, readablePath, savablePaths, saveCopies } from "./files";
+import { type TaskRunner, withFiles } from "./engine/runner";
+import { type Conflict, copyInto, describe, readablePath, removeCopies, savablePaths, saveCopies } from "./files";
 import type { Installer } from "./installer";
 import { type Jobs, jobDraft } from "./jobs";
 import type { KeyStore } from "./keys";
@@ -144,12 +144,25 @@ export function registerIpc(
     return task;
   });
 
-  ipcMain.handle(IPC.tasksAnswer, (_e, id: unknown, answers: unknown) => {
+  // Files attached after the first message: a quick edit works on copies, as it does with the first ones. If the task
+  // then refuses the message, for example because it's working, the copies go again.
+  const withAttached = async <T>(taskId: string, given: unknown, use: (files: string[]) => T): Promise<T> => {
+    const files = paths(given, "attachments");
+    const task = store.getTask(taskId);
+    if (!task) throw new Error("That task doesn't exist");
+    const copies = task.projectId === null && files.length ? await copyInto(files, task.workdir) : null;
+    try {
+      return use(copies ?? files);
+    } catch (err) {
+      if (copies) await removeCopies(copies);
+      throw err;
+    }
+  };
+  ipcMain.handle(IPC.tasksAnswer, (_e, id: unknown, answers: unknown, files?: unknown) => {
     if (!Array.isArray(answers) || answers.length > MAX_QUESTIONS) throw new Error("Send one answer per question");
-    return runner.answer(
-      text(id, "id", 100),
-      answers.map((a) => text(a, "answer", BRIEF_MAX)),
-    );
+    const taskId = text(id, "id", 100);
+    const given = answers.map((a) => text(a, "answer", BRIEF_MAX));
+    return withAttached(taskId, files, (attached) => runner.answer(taskId, given, attached));
   });
   ipcMain.handle(IPC.tasksStop, (_e, id: unknown) => runner.stop(text(id, "id", 100)));
   ipcMain.handle(IPC.tasksResume, (_e, id: unknown) => runner.resume(text(id, "id", 100)));
@@ -157,13 +170,15 @@ export function registerIpc(
     if (typeof allow !== "boolean") throw new Error("allow must be true or false");
     return runner.decide(text(id, "id", 100), allow);
   });
-  ipcMain.handle(IPC.tasksFollowUp, (_e, id: unknown, message: unknown) => {
+  ipcMain.handle(IPC.tasksFollowUp, (_e, id: unknown, message: unknown, files?: unknown) => {
     const taskId = text(id, "id", 100);
     const body = text(message, "message", BRIEF_MAX).trim();
     if (!body) throw new Error("Write what to change first");
-    const task = runner.followUp(taskId, body);
-    runner.launch(taskId, body);
-    return task;
+    return withAttached(taskId, files, (attached) => {
+      const task = runner.followUp(taskId, body, attached);
+      runner.launch(taskId, withFiles(body, attached));
+      return task;
+    });
   });
 
   ipcMain.handle(IPC.tasksSaveCopy, async (_e, id: unknown): Promise<SaveResult | null> => {

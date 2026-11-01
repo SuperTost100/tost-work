@@ -119,6 +119,13 @@ describe("saving and copying files", () => {
     expect(await readFile(copies[1] ?? "", "utf8")).toBe("from b");
   });
 
+  it("leaves no copies behind when one file of the batch fails", async () => {
+    const [src, dest] = await Promise.all([folder(), folder()]);
+    await writeFile(join(src, "notes.txt"), "notes");
+    await expect(copyInto([join(src, "notes.txt"), join(src, "gone.txt")], dest)).rejects.toThrow();
+    expect(await readdir(dest)).toEqual([]);
+  });
+
   it("asks before replacing, and sends the old file to the trash", async () => {
     const [src, dest] = await Promise.all([folder(), folder()]);
     await writeFile(join(src, "a.txt"), "new");

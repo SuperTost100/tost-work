@@ -49,6 +49,14 @@ export function decisionNote(approval: Approval, allow: boolean): string {
 
 /** Starts tasks on an engine, keeps each task's state in the store and reports every change. */
 /** What the agent hears when a task resumes after Tost Work closed during its turn. */
+/** The task's files with a message's added, each once. */
+const joined = (had: string[], more: string[]) => [...new Set([...had, ...more])];
+
+/** The user's message to the agent, with the files they attached to it. */
+export function withFiles(text: string, files: string[]): string {
+  return files.length ? `${text}\n\nFiles I attached to this message:\n${files.map((p) => `- ${p}`).join("\n")}` : text;
+}
+
 export const RESUME_PROMPT =
   "Tost Work closed while you were working on this task, so your last turn was cut short. Check what you had already done in the folder, then carry on where you left off.";
 
@@ -104,7 +112,14 @@ export class TaskRunner {
       status: "draft",
       steps: [],
       files: [],
-      messages: [{ from: "user", text: input.brief, at }],
+      messages: [
+        {
+          from: "user",
+          text: input.brief,
+          at,
+          ...(input.attachments?.length ? { attachments: input.attachments } : {}),
+        },
+      ],
       question: null,
       approval: null,
       review: null,
@@ -191,8 +206,11 @@ export class TaskRunner {
     });
   }
 
-  /** Takes one answer per question in the round, and keeps each with its question for the task screen. */
-  answer(taskId: string, answers: string[]): Task {
+  /**
+   * Takes one answer per question in the round, and keeps each with its question for the task screen. Files attached
+   * to the answers join the task's, so the agent may read them.
+   */
+  answer(taskId: string, answers: string[], files: string[] = []): Task {
     const task = this.mustGet(taskId);
     if (!task.question) throw new Error("This task isn't waiting for an answer");
     const items = questionItems(task.question);
@@ -203,14 +221,21 @@ export class TaskRunner {
     const answered = items.map((item, i) => ({ question: item.text, answer: answers[i] ?? "" }));
     const next = this.save({
       ...resume(task, at),
-      messages: [...task.messages, { from: "user", text: answer, at, answers: answered }],
+      attachments: joined(task.attachments, files),
+      messages: [
+        ...task.messages,
+        { from: "user", text: answer, at, answers: answered, ...(files.length ? { attachments: files } : {}) },
+      ],
     });
-    if (!this.engine.answer(taskId, task.question.id, answer))
+    if (!this.engine.answer(taskId, task.question.id, withFiles(answer, files)))
       this.continueWith(
         taskId,
-        task.question.more?.length
-          ? `My answers to your questions, each under its question:\n\n${answer}`
-          : `My answer to your question "${task.question.text}": ${answer}`,
+        withFiles(
+          task.question.more?.length
+            ? `My answers to your questions, each under its question:\n\n${answer}`
+            : `My answer to your question "${task.question.text}": ${answer}`,
+          files,
+        ),
       );
     return next;
   }
@@ -235,8 +260,11 @@ export class TaskRunner {
     return task;
   }
 
-  /** Adds the user's next instruction to a task that isn't working. Call `launch` with the same text to run it. */
-  followUp(taskId: string, text: string): Task {
+  /**
+   * Adds the user's next instruction to a task that isn't working, with any files attached to it. Call `launch` with
+   * `withFiles(text, files)` to run it.
+   */
+  followUp(taskId: string, text: string, files: string[] = []): Task {
     const task = this.mustGet(taskId);
     if (this.running.has(taskId)) throw new Error("This task is still working");
     // A run started now could write to a file the restore is about to put back.
@@ -248,7 +276,11 @@ export class TaskRunner {
       ...task,
       review: null,
       error: null,
-      messages: [...task.messages, { from: "user", text, at, followUp: true }],
+      attachments: joined(task.attachments, files),
+      messages: [
+        ...task.messages,
+        { from: "user", text, at, followUp: true, ...(files.length ? { attachments: files } : {}) },
+      ],
       updatedAt: at,
     });
   }

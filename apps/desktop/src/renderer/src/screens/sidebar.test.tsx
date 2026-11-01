@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
-import { PEEK_FOLD_MS, PEEK_OPEN_MS } from "@/shell/Sidebar";
+import { PEEK_FOLD_MS, PEEK_OPEN_MS, PEEK_TOLERANCE_PX } from "@/shell/Sidebar";
 
 // The sidebar in its place, not the rail nor the sidebar shown over the page from it.
 const sections = () => document.querySelector(".app > aside.side");
@@ -176,9 +176,9 @@ describe("the collapsed sidebar's rail", () => {
     vi.useFakeTimers();
     // Moving along the icons starts the wait again each time.
     fireEvent.pointerEnter(box);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 1; i <= 3; i++) {
       act(() => vi.advanceTimersByTime(PEEK_OPEN_MS - 100));
-      fireEvent.pointerMove(rail);
+      fireEvent.pointerMove(rail, { clientX: 20, clientY: 40 * i });
     }
     expect(peek()).toBeNull();
     // A click on an icon is where the user is going: resting there afterwards doesn't open the sidebar over it.
@@ -198,6 +198,38 @@ describe("the collapsed sidebar's rail", () => {
     fireEvent.pointerLeave(box);
     fireEvent.pointerEnter(box);
     act(() => vi.advanceTimersByTime(PEEK_OPEN_MS));
+    expect(peek()).toBeTruthy();
+  });
+
+  it("doesn't count a small move, and waits for a fast pointer to slow down", async () => {
+    render(<Root api={hidden()} />);
+    const rail = await findRail();
+    const box = rail.parentElement as HTMLElement;
+    vi.useFakeTimers();
+    // A tremor of a few pixels keeps the wait going.
+    fireEvent.pointerEnter(box, { clientX: 20, clientY: 100 });
+    act(() => vi.advanceTimersByTime(PEEK_OPEN_MS - 100));
+    fireEvent.pointerMove(rail, { clientX: 20 + PEEK_TOLERANCE_PX - 5, clientY: 100 });
+    act(() => vi.advanceTimersByTime(100));
+    expect(peek()).toBeTruthy();
+    fireEvent.pointerLeave(box);
+    act(() => vi.advanceTimersByTime(300));
+    act(() => vi.advanceTimersByTime(PEEK_FOLD_MS));
+    expect(peek()).toBeNull();
+
+    // A pointer flying over the rail doesn't start the wait while it moves fast...
+    fireEvent.pointerEnter(box, { clientX: 20, clientY: 0 });
+    for (let i = 1; i <= 20; i++) {
+      act(() => vi.advanceTimersByTime(10));
+      // 40px in 10ms: 4,000 pixels a second.
+      fireEvent.pointerMove(rail, { clientX: 20, clientY: 40 * i });
+    }
+    act(() => vi.advanceTimersByTime(50));
+    expect(peek()).toBeNull();
+    // ...and once it has been still a moment, the wait starts from then.
+    act(() => vi.advanceTimersByTime(PEEK_OPEN_MS));
+    expect(peek()).toBeNull();
+    act(() => vi.advanceTimersByTime(50));
     expect(peek()).toBeTruthy();
   });
 

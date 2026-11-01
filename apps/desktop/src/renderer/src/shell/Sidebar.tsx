@@ -231,15 +231,31 @@ function LogoButton({ label, isMac, onClick }: { label: string; isMac: boolean; 
   );
 }
 
+/** The icon's name beside it on the shut rail, at once: the system's tooltip comes after a second. */
+function Tip({ text }: { text: string }) {
+  return (
+    <span className="tip" aria-hidden="true">
+      {text}
+    </span>
+  );
+}
+
 /** Whether the user asked for less motion, so the sidebar goes without folding. */
 const stillMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
 /**
  * How long the pointer rests on the rail before the sidebar opens over the page, and stays once it's gone. Long enough
- * that a pointer heading for an icon gets there, and clicks, with the rail still in place.
+ * that a pointer heading for an icon gets there, and clicks, with the rail still in place. Tost set these in the rail
+ * timing lab (mockups/rail-timing).
  */
-export const PEEK_OPEN_MS = 400;
+export const PEEK_OPEN_MS = 700;
 const PEEK_CLOSE_MS = 300;
+/** Moves shorter than this, a hand's tremor on a trackpad, don't start the wait again. */
+export const PEEK_TOLERANCE_PX = 20;
+/** A pointer faster than this is on its way somewhere else: the wait starts once it slows down. */
+export const PEEK_MAX_SPEED = 1500;
+/** A pointer that stops sends no more moves: this long after the last one, it counts as still. */
+const PEEK_SETTLE_MS = 80;
 /** How long the sidebar takes to fold back into the rail, as in the CSS. */
 export const PEEK_FOLD_MS = 120;
 
@@ -285,7 +301,10 @@ export function SidebarRail({
     if (!el) return;
     const setOpen = (next: boolean) =>
       setPhase((now) => (next ? "open" : now === "open" ? (stillMotion() ? "closed" : "folding") : now));
+    // Where the pointer was when the wait to open started, or null while no wait runs.
+    let anchor: { x: number; y: number } | null = null;
     const later = (ms: number, next: boolean) => {
+      anchor = null;
       clearTimeout(timer.current);
       timer.current = setTimeout(() => setOpen(next), ms);
     };
@@ -293,29 +312,61 @@ export function SidebarRail({
     let over = false;
     // Set by a click on the rail, which says where the user is going: the sidebar stays shut until the pointer leaves.
     let clicked = false;
+    // How fast the pointer moves, in pixels a second, smoothed over its last moves.
+    let speed = 0;
+    let last: { x: number; y: number; at: number } | null = null;
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    const wait = (x: number, y: number) => {
+      clearTimeout(timer.current);
+      anchor = { x, y };
+      timer.current = setTimeout(() => {
+        anchor = null;
+        setOpen(true);
+      }, PEEK_OPEN_MS);
+    };
+    const stopWaiting = () => {
+      anchor = null;
+      clearTimeout(timer.current);
+    };
     const enter = (e: PointerEvent) => {
       over = true;
+      last = null;
+      speed = 0;
       // A press that started elsewhere and comes back held is a click on its way: the rail stays as it is under it.
       if (e.buttons) return;
       clicked = false;
       // Back while it folds: it opens again at once, rather than vanishing and growing anew.
-      later(el.querySelector(".peek.folding") ? 0 : PEEK_OPEN_MS, true);
+      if (el.querySelector(".peek.folding")) later(0, true);
+      else wait(e.clientX, e.clientY);
     };
-    // Moving over the shut rail starts the wait again, so only a pointer that rests opens it.
+    // Moving over the shut rail starts the wait again, so only a pointer that rests opens it. A small move doesn't count,
+    // and a fast one waits until it slows down.
     const move = (e: PointerEvent) => {
-      if (!clicked && !e.buttons && !el.querySelector(".peek")) later(PEEK_OPEN_MS, true);
+      if (clicked || e.buttons || el.querySelector(".peek")) return;
+      const { clientX: x, clientY: y } = e;
+      const at = Date.now();
+      if (last) speed = speed * 0.6 + (Math.hypot(x - last.x, y - last.y) / Math.max(1, at - last.at)) * 1000 * 0.4;
+      last = { x, y, at };
+      clearTimeout(settle);
+      settle = setTimeout(() => {
+        speed = 0;
+        if (over && !clicked && !anchor && !el.querySelector(".peek")) wait(x, y);
+      }, PEEK_SETTLE_MS);
+      if (speed > PEEK_MAX_SPEED) stopWaiting();
+      else if (!anchor || Math.hypot(x - anchor.x, y - anchor.y) > PEEK_TOLERANCE_PX) wait(x, y);
     };
     const down = (e: PointerEvent) => {
       if (!(e.target as HTMLElement).closest(".rail")) return;
       clicked = true;
-      clearTimeout(timer.current);
+      stopWaiting();
     };
     // The pointer may go while the user types in its search field: it stays until the field loses the focus.
     const typing = () => el.querySelector(".peek .search input") === document.activeElement;
     const leave = () => {
       over = false;
       clicked = false;
-      if (typing()) clearTimeout(timer.current);
+      clearTimeout(settle);
+      if (typing()) stopWaiting();
       else later(PEEK_CLOSE_MS, false);
     };
     const focusIn = (e: Event) => {
@@ -360,6 +411,7 @@ export function SidebarRail({
     el.addEventListener("keydown", key);
     return () => {
       clearTimeout(timer.current);
+      clearTimeout(settle);
       el.removeEventListener("pointerenter", enter);
       el.removeEventListener("pointerleave", leave);
       el.removeEventListener("pointermove", move);
@@ -387,10 +439,10 @@ export function SidebarRail({
       className={current === id ? "railbtn on" : "railbtn"}
       aria-current={current === id ? "page" : undefined}
       aria-label={label}
-      title={id === "search" ? withShortcut(label, "K", isMac) : label}
       onClick={onClick}
     >
       <Icon name={icon} />
+      <Tip text={id === "search" ? withShortcut(label, "K", isMac) : label} />
     </button>
   );
   return (
@@ -411,14 +463,16 @@ export function SidebarRail({
           className={current === "profile" ? "railbtn on" : "railbtn"}
           aria-current={current === "profile" ? "page" : undefined}
           aria-label={`${userName}, ${t("nav.profile")}`}
-          title={t("nav.profile")}
           onClick={() => onNavigate("profile")}
         >
           <span className="avatar">{userName.slice(0, 1).toUpperCase()}</span>
+          <Tip text={t("nav.profile")} />
         </button>
         {item("settings", "settings-3", t("nav.settings"), () => onNavigate("settings"))}
       </nav>
       {phase !== "closed" && <div className={open ? "peek" : "peek folding"}>{children}</div>}
+      {/* A little room past its edge, so a pointer that overshoots it doesn't close it. */}
+      {open && <span className="peek-grace" />}
     </div>
   );
 }
