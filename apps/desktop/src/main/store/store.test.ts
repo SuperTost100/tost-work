@@ -84,6 +84,17 @@ describe("Store", () => {
     });
   });
 
+  it("searches every task's title and brief, past the 50 recent ones, newest first", () => {
+    const s = new Store(":memory:");
+    s.saveTask({ ...task("old", "done", "2026-01-01T00:00:00Z"), title: "Preventivo Rossi", brief: "Perché costa" });
+    s.saveTask({ ...task("brief", "done", "2026-01-02T00:00:00Z"), title: "Offerta", brief: "per Rossi srl" });
+    for (let i = 0; i < 60; i++) s.saveTask(task(`n${i}`, "done", new Date(Date.UTC(2026, 5, 1, 0, i)).toISOString()));
+    expect(s.searchTasks("rossi").map((t) => t.id)).toEqual(["brief", "old"]);
+    expect(s.searchTasks("PERCHE rossi").map((t) => t.id)).toEqual(["old"]);
+    expect(s.searchTasks("  ")).toEqual([]);
+    expect(s.searchTasks("n", 5)).toHaveLength(5);
+  });
+
   it("gives each project what's working, what needs the user, and the newest file made", () => {
     const s = new Store(":memory:");
     const made = (path: string, kind: "add" | "delete" = "add") => ({ path, kind, role: "made" as const });

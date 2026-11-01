@@ -117,6 +117,7 @@ export function registerIpc(
   ipcMain.handle(IPC.tasksListForProject, (_e, projectId: unknown) =>
     store.listProjectTasks(text(projectId, "projectId", 100)),
   );
+  ipcMain.handle(IPC.tasksSearch, (_e, query: unknown) => store.searchTasks(text(query, "query", 200)));
   ipcMain.handle(IPC.projectsOverviews, () => store.projectOverviews());
   ipcMain.handle(IPC.tasksGet, (_e, id: unknown) => store.getTask(text(id, "id", 100)) ?? null);
   ipcMain.handle(IPC.tasksDraft, (_e, id: unknown) => runner.draft(text(id, "id", 100)));

@@ -3,6 +3,7 @@ import type { Attachments } from "@/components/Composer";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
 import { ProjectInstructionsDialog } from "@/components/ProjectInstructionsDialog";
+import { SearchDialog } from "@/components/SearchDialog";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { useConfirm } from "@/lib/useConfirm";
@@ -71,6 +72,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
   // undefined until the user picks: then Home offers the project used last. null is "No project", picked on purpose.
   const [projectId, setProjectId] = useState<string | null | undefined>(undefined);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const starting = useRef(false);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -294,8 +296,15 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
   toggleHandler.current = toggleSidebar;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== "b" || e.shiftKey || e.altKey || e.defaultPrevented) return;
+      const key = e.key.toLowerCase();
+      if ((key !== "b" && key !== "k") || e.shiftKey || e.altKey || e.defaultPrevented) return;
       if (isMac ? !e.metaKey || e.ctrlKey : !e.ctrlKey || e.metaKey) return;
+      // Cmd+K opens the search from anywhere, the composer included, and closes it again.
+      if (key === "k") {
+        e.preventDefault();
+        setSearchOpen((open) => !open);
+        return;
+      }
       if (e.target instanceof Element && e.target.closest(EDITABLE)) return;
       e.preventDefault();
       toggleHandler.current();
@@ -311,22 +320,29 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
     routeNow.current = route;
   }, [route]);
   const opening = useRef(0);
-  useEffect(
-    () =>
-      api?.onOpenTask((id) => {
-        const ticket = ++opening.current;
-        const from = routeNow.current;
-        loadTask(id).then(
-          (found) => {
-            if (ticket !== opening.current || routeNow.current !== from) return;
-            if (found) setRoute({ name: "task", id });
-            else setError(t("task.gone"));
-          },
-          (err: unknown) => ticket === opening.current && report(err),
-        );
-      }),
-    [api, loadTask, report, t],
+  const openLoaded = useCallback(
+    (id: string) => {
+      const ticket = ++opening.current;
+      const from = routeNow.current;
+      loadTask(id).then(
+        (found) => {
+          if (ticket !== opening.current || routeNow.current !== from) return;
+          if (found) setRoute({ name: "task", id });
+          else setError(t("task.gone"));
+        },
+        (err: unknown) => ticket === opening.current && report(err),
+      );
+    },
+    [loadTask, report, t],
   );
+  useEffect(() => api?.onOpenTask(openLoaded), [api, openLoaded]);
+  // A task the search found may be older than the recent list too. One that's in it opens at once, and a click
+  // still loading is dropped.
+  const openFound = (id: string) => {
+    if (!tasks.some((x) => x.id === id)) return openLoaded(id);
+    opening.current++;
+    setRoute({ name: "task", id });
+  };
 
   const instructionsProject = projects.find((p) => p.id === instructionsFor);
   let screen: React.ReactNode;
@@ -482,6 +498,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
         setRenaming(id);
       }}
       onDeleteTask={(id) => void deleteTask(id)}
+      onSearch={() => setSearchOpen(true)}
     />
   );
   return (
@@ -494,6 +511,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
           userName={userName}
           isMac={isMac}
           onExpand={toggleSidebar}
+          onSearch={() => setSearchOpen(true)}
         >
           {sidebar(false)}
         </SidebarRail>
@@ -517,6 +535,17 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
             updateProject(await api.projects.update(instructionsProject.id, { instructions }))
           }
           onClose={() => setInstructionsFor(null)}
+        />
+      )}
+      {api && (
+        <SearchDialog
+          api={api}
+          open={searchOpen}
+          onOpenChange={setSearchOpen}
+          projects={projects}
+          recent={tasks}
+          onOpenTask={openFound}
+          onOpenProject={(id) => setRoute({ name: "project", id })}
         />
       )}
       {api && (

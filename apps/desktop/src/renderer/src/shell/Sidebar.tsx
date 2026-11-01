@@ -44,6 +44,7 @@ export function Sidebar({
   onDeleteTask,
   renaming: renamingProp,
   onRenamingChange,
+  onSearch,
 }: {
   current: Section | null;
   onNavigate: (s: Section) => void;
@@ -66,6 +67,8 @@ export function Sidebar({
   /** The task whose title is being edited, when the parent holds that state. */
   renaming?: string | null;
   onRenamingChange?: (id: string | null) => void;
+  /** Opens the search. */
+  onSearch?: () => void;
 }) {
   const t = useT();
   const [ownRenaming, setOwnRenaming] = useState<string | null>(null);
@@ -105,7 +108,7 @@ export function Sidebar({
         {pinned ? <Logo /> : <LogoButton label={t("nav.keepOpen")} isMac={isMac} onClick={onCollapse} />}
         <b>Tost Work</b>
       </div>
-      <button type="button" className="search" data-nav="search">
+      <button type="button" className="search" data-nav="search" onClick={onSearch}>
         <Icon name="search" />
         {t("nav.search")}
         <kbd>{isMac ? "⌘K" : "Ctrl K"}</kbd>
@@ -244,6 +247,7 @@ export function SidebarRail({
   userName,
   isMac,
   onExpand,
+  onSearch,
   children,
 }: {
   current: Section | null;
@@ -253,6 +257,8 @@ export function SidebarRail({
   isMac: boolean;
   /** Brings the sidebar back in its place. */
   onExpand: () => void;
+  /** Opens the search. */
+  onSearch?: () => void;
   children: ReactNode;
 }) {
   const t = useT();
@@ -368,7 +374,7 @@ export function SidebarRail({
       className={current === id ? "railbtn on" : "railbtn"}
       aria-current={current === id ? "page" : undefined}
       aria-label={label}
-      title={label}
+      title={id === "search" ? withShortcut(label, "K", isMac) : label}
       onClick={onClick}
     >
       <Icon name={icon} />
@@ -381,7 +387,7 @@ export function SidebarRail({
         <span className="rail-logo">
           <LogoButton label={t("nav.expand")} isMac={isMac} onClick={onExpand} />
         </span>
-        {item("search", "search", t("nav.search"))}
+        {item("search", "search", t("nav.search"), onSearch)}
         {NAV.filter((n) => !n.section || showSection(n.section)).map((n) =>
           item(n.id, n.icon, t(n.key), () => onNavigate(n.id)),
         )}

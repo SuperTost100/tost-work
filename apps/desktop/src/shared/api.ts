@@ -160,6 +160,8 @@ export interface TostWorkApi {
     listActive(): Promise<Task[]>;
     /** Every task of one project. */
     listForProject(projectId: string): Promise<Task[]>;
+    /** Tasks whose title or brief holds every word of the query, newest first, at most 20. */
+    search(query: string): Promise<Task[]>;
     get(id: string): Promise<Task | null>;
     /** Creates the task and starts it right away. */
     start(input: NewTaskInput): Promise<Task>;
@@ -317,6 +319,7 @@ export const IPC = {
   tasksList: "tasks:list",
   tasksListActive: "tasks:list-active",
   tasksListForProject: "tasks:list-for-project",
+  tasksSearch: "tasks:search",
   tasksGet: "tasks:get",
   tasksStart: "tasks:start",
   tasksAnswer: "tasks:answer",

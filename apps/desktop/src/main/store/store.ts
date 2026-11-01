@@ -8,6 +8,7 @@ import {
   type Settings,
   type Task,
 } from "../../shared/model";
+import { matchesWords, SEARCH_LIMIT, searchWords } from "../../shared/search";
 
 /**
  * Projects and tasks, in SQLite through Node's built-in driver, so there is no native module to rebuild for Electron.
@@ -122,6 +123,22 @@ export class Store {
       data: string;
     }[];
     return rows.map((r) => JSON.parse(r.data) as Task);
+  }
+
+  /** Tasks whose title or brief holds every word of the query, ignoring case and accents. Newest first. */
+  searchTasks(query: string, limit = SEARCH_LIMIT): Task[] {
+    const words = searchWords(query);
+    if (words.length === 0) return [];
+    // Only the two fields are read for every task; the whole task only for the ones that match.
+    const rows = this.db
+      .prepare(
+        "select id, json_extract(data, '$.title') as title, json_extract(data, '$.brief') as brief from tasks order by updated_at desc",
+      )
+      .all() as { id: string; title: string | null; brief: string | null }[];
+    return rows
+      .filter((r) => matchesWords(`${r.title ?? ""}\n${r.brief ?? ""}`, words))
+      .slice(0, limit)
+      .flatMap((r) => this.getTask(r.id) ?? []);
   }
 
   /** Every task of one project, newest first. The recent list stops at 50, a project's history doesn't. */
