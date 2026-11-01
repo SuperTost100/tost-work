@@ -115,6 +115,15 @@ Changed on 2026-11-01, after testing 0.0.13:
 - Before 0.1.0, the design gets checked against published guidelines ([#142](https://github.com/SuperTost100/tost-work/issues/142)), and every screen gets fixed for small windows ([#143](https://github.com/SuperTost100/tost-work/issues/143)).
 - Every planned feature is on the roadmap with a version, including ones Tost didn't ask for himself, such as choosing the AI for a task from the task box ([#144](https://github.com/SuperTost100/tost-work/issues/144)). The browser and computer use ([#44](https://github.com/SuperTost100/tost-work/issues/44)) moved to 0.3.0.
 
+Changed on 2026-11-01, after testing 0.0.14:
+
+- The rail's timing comes from Tost's settings in the timing lab ([#173](https://github.com/SuperTost100/tost-work/pull/173)). The sidebar opens after the pointer rests 700 ms on the rail. Moves under 20 px don't restart the wait, and a pointer moving faster than 1,500 px a second doesn't open it. It closes once the pointer is 10 px past its edge. The rail's icons show their names at once.
+- Files can be attached to every message, follow-ups and answers included.
+- When a run ends, the page shows the start of its last answer, with the file under it.
+- An option in a question is a whole answer: the user picks one or writes their own. The review lists every request since the first message.
+- The Board's questions are settled: AI tasks only, "To do" for tasks saved for later, two drags in the columns view (start, and mark reviewed), approvals on the row, the last 7 days of done tasks, and "Mark reviewed" ([#154](https://github.com/SuperTost100/tost-work/issues/154)) with it.
+- Tost moved the versions on the roadmap board, which now has a 0.5.0 column. The board decides the versions, and the milestones follow it.
+
 ## From 0.2.0
 
 - The Skills parts above.
