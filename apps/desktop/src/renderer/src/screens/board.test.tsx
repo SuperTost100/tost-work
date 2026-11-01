@@ -141,6 +141,17 @@ describe("the board", () => {
     );
   });
 
+  it("answers an approval from the side panel too", async () => {
+    const { api, ids } = await seeded();
+    const decide = vi.spyOn(api.tasks, "decide");
+    await openBoard(api);
+    await click(row("Supplier contracts summary"));
+    const panel = await screen.findByRole("complementary", { name: "Supplier contracts summary" });
+    expect(within(panel).getByText(/contracts\.xlsx/)).toBeTruthy();
+    await click(within(panel).getByRole("button", { name: "Allow overwrite" }));
+    expect(decide).toHaveBeenCalledWith(ids.approving, true);
+  });
+
   it("opens a summary beside the list, which Escape or a second click closes", async () => {
     const { api } = await seeded();
     await openBoard(api);

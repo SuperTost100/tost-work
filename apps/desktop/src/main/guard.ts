@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { copyFile, mkdir } from "node:fs/promises";
+import { access, copyFile, mkdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type { KeptCopy, Task } from "../shared/model";
 import { taskFile, writablePath } from "./files";
@@ -21,12 +21,28 @@ export function fileGuard(keptDir: string, trashItem: (path: string) => Promise<
     async keep(task, path, reason) {
       const real = await taskFile(task, path);
       const folder = join(keptDir, task.id);
-      await mkdir(folder, { recursive: true });
-      const at = now();
-      // The time orders the copies for people; the random part keeps two copies in one millisecond apart.
-      const copy = join(folder, `${at.getTime()}-${randomUUID().slice(0, 8)}-${basename(real)}`);
-      await copyFile(real, copy, constants.COPYFILE_EXCL);
-      return { path, copy, at: at.toISOString(), reason };
+      try {
+        await mkdir(folder, { recursive: true });
+        const at = now();
+        // The time orders the copies for people; the random part keeps two copies in one millisecond apart.
+        const copy = join(folder, `${at.getTime()}-${randomUUID().slice(0, 8)}-${basename(real)}`);
+        await copyFile(real, copy, constants.COPYFILE_EXCL);
+        return { path, copy, at: at.toISOString(), reason };
+      } catch (err) {
+        // A missing file means there's nothing to keep, which the caller allows. A missing copies folder, with the file
+        // still there, must not pass for that: the file would be replaced with no copy kept.
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+        const there = await access(real).then(
+          () => true,
+          (accessErr: NodeJS.ErrnoException) => {
+            // Only a file that's truly gone counts as gone; a file that can't be read is still there.
+            if (accessErr.code === "ENOENT") return false;
+            throw accessErr;
+          },
+        );
+        if (there) throw new Error(`Couldn't keep a copy of ${basename(real)} before replacing it`);
+        throw err;
+      }
     },
     async trash(task, path) {
       await trashItem(await taskFile(task, path));

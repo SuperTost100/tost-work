@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { lstat } from "node:fs/promises";
 import type { AgentProvider, Approval, KeptCopy, Project, Task } from "../../shared/model";
 import { answersText, BRIEF_MAX, questionItems } from "../../shared/model";
 import { applyEvent, resume } from "../../shared/reduce";
@@ -359,10 +360,23 @@ export class TaskRunner {
         try {
           for (const path of approval.paths) {
             if (approval.done?.includes(path)) continue;
-            if (approval.action === "delete") {
-              await this.guard.trash(task, path);
-              trashed.push(path);
-            } else kept.push(await this.guard.keep(task, path, "overwrite"));
+            try {
+              if (approval.action === "delete") {
+                await this.guard.trash(task, path);
+                trashed.push(path);
+              } else kept.push(await this.guard.keep(task, path, "overwrite"));
+            } catch (err) {
+              // A file that isn't there has nothing to delete or keep a copy of: the decision still holds for it. One
+              // the task made is recorded as deleted, so the task stops listing a file that's gone.
+              if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+              // A link whose target is gone is still an entry on disk, so it isn't skipped as missing.
+              const entry = await lstat(path).catch((statErr: NodeJS.ErrnoException) => {
+                if (statErr.code === "ENOENT") return null;
+                throw statErr;
+              });
+              if (entry) throw err;
+              if (approval.action === "delete" && task.files.some((f) => f.path === path)) trashed.push(path);
+            }
           }
         } catch (err) {
           // What was done before the failure stays recorded: a file already in the Trash, a copy already kept.

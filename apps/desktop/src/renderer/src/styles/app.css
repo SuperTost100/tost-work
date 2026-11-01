@@ -1685,6 +1685,36 @@ h2.gh {
 .bcard.sel {
   border-color: var(--ink);
 }
+/* Only the cards a drag does something with show a grip, under the pointer. */
+.bcard.movable {
+  position: relative;
+}
+.bcard.movable::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  width: 8px;
+  height: 14px;
+  background-image: radial-gradient(circle, var(--t3) 1.2px, transparent 1.4px);
+  background-size: 4px 4.7px;
+  opacity: 0;
+  pointer-events: none;
+}
+.bcard.movable:hover::after {
+  opacity: 1;
+}
+/* A running card is busy: it sits flatter, without the hover that suggests picking it up. */
+.bcard.busy {
+  background: transparent;
+  border-style: dashed;
+}
+.bcard.busy:hover {
+  border-color: var(--line);
+}
+.bcard.busy.sel {
+  border-color: var(--ink);
+}
 .bcard.lifted {
   opacity: 0.45;
 }
@@ -1764,6 +1794,12 @@ h2.gh {
 }
 .bpanel .foot2 .btn {
   justify-content: center;
+}
+/* What the task waits for, above the brief, so the buttons below say what they answer. */
+.bpanel .bwait {
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: 500;
 }
 /* The display menu's heading and its note on the order. */
 .menu-label {

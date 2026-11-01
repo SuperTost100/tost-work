@@ -94,7 +94,11 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
   const [describingProject, setDescribingProject] = useState<string | null>(null);
   // The project whose instructions are being edited in the dialog.
   const [instructionsFor, setInstructionsFor] = useState<string | null>(null);
-  const report = useCallback((err: unknown) => setError(errorText(err)), []);
+  // useT gives a new function on each render; through a ref, report stays the same function and effects that use it
+  // don't run again.
+  const words = useRef(t);
+  words.current = t;
+  const report = useCallback((err: unknown) => setError(errorText(err, words.current)), []);
   const [overviews, setOverviews] = useState<Record<string, ProjectOverview>>({});
   const isMac = api?.platform === "darwin";
   const renameProject = (id: string, name: string | null) => {

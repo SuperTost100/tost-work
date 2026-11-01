@@ -1,4 +1,7 @@
 /** @vitest-environment node */
+import { mkdtemp, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { EngineEvent, Task } from "../../shared/model";
 import { Store } from "../store/store";
@@ -311,7 +314,10 @@ describe("TaskRunner when saving fails", () => {
  * An engine like Codex: the agent asks, ends its turn, and the user's reply starts the next run. Each run plays the
  * next step of the script; `hold` keeps a run open until released, as when the agent is still ending its turn.
  */
-function turnTaking(steps: ((ctx: RunContext) => EngineEvent[])[]) {
+function turnTaking(
+  steps: ((ctx: RunContext) => EngineEvent[])[],
+  trash: (path: string) => Promise<void> = async () => {},
+) {
   const prompts: (string | null)[] = [];
   let release: (() => void) | null = null;
   const engine: Engine = {
@@ -332,7 +338,7 @@ function turnTaking(steps: ((ctx: RunContext) => EngineEvent[])[]) {
   const statuses: string[] = [];
   const runner = new TaskRunner(store, engine, (t) => statuses.push(t.status), undefined, {
     keep: async (_t, path) => ({ path, copy: `/k${path}`, at: "", reason: "overwrite" }),
-    trash: async () => {},
+    trash: async (_t, path) => trash(path),
     restore: async () => {},
   });
   const task = runner.create({ projectId: null, brief: "Prepare the call", workdir: "/w" });
@@ -377,6 +383,44 @@ describe("TaskRunner when the agent ends its turn to wait", () => {
     await waitFor(() => store.getTask(task.id)?.status === "done");
     expect(prompts[1]).toMatch(/allowed replacing \/w\/plan\.xlsx.*kept a copy/);
     expect(store.getTask(task.id)?.kept?.[0]?.path).toBe("/w/plan.xlsx");
+  });
+
+  it("allows deleting a file that's already gone, and trashes the others", async () => {
+    const approval = { id: "a1", action: "delete" as const, paths: ["/w/gone.txt", "/w/old.txt", "/w/made.txt"] };
+    const trashed: string[] = [];
+    const made = {
+      type: "file" as const,
+      change: { path: "/w/made.txt", kind: "add" as const, role: "made" as const },
+    };
+    const { store, runner, task } = turnTaking(
+      [() => [made, { type: "approval", approval }], () => []],
+      async (path) => {
+        if (path.endsWith("gone.txt") || path.endsWith("made.txt"))
+          throw Object.assign(new Error(`ENOENT: no such file or directory, realpath '${path}'`), { code: "ENOENT" });
+        trashed.push(path);
+      },
+    );
+    await runner.start(task.id);
+    await runner.decide(task.id, true);
+    await waitFor(() => store.getTask(task.id)?.status === "done");
+    expect(trashed).toEqual(["/w/old.txt"]);
+    // A file the task made and that's gone now shows as deleted; one it never had isn't added.
+    expect(store.getTask(task.id)?.files.map((f) => [f.path, f.kind])).toEqual([
+      ["/w/old.txt", "delete"],
+      ["/w/made.txt", "delete"],
+    ]);
+  });
+
+  it("doesn't take a link to a missing file for a missing file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tw-runner-link-"));
+    const link = join(dir, "link.txt");
+    await symlink(join(dir, "nowhere.txt"), link);
+    const approval = { id: "a1", action: "delete" as const, paths: [link] };
+    const { runner, task } = turnTaking([() => [{ type: "approval", approval }], () => []], async (path) => {
+      throw Object.assign(new Error(`ENOENT: no such file or directory, realpath '${path}'`), { code: "ENOENT" });
+    });
+    await runner.start(task.id);
+    await expect(runner.decide(task.id, true)).rejects.toThrow(/ENOENT/);
   });
 
   it("holds an answer that comes while the turn is still ending, then sends it", async () => {

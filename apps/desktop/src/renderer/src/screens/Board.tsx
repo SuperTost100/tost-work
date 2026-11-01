@@ -549,7 +549,7 @@ function Columns({
               return (
                 <div
                   key={task.id}
-                  className={`bcard${task.id === selected ? " sel" : ""}${task.id === dragging ? " lifted" : ""}`}
+                  className={`bcard${movable ? " movable" : ""}${task.status === "running" ? " busy" : ""}${task.id === selected ? " sel" : ""}${task.id === dragging ? " lifted" : ""}`}
                 >
                   {/* The card's button is what's dragged, since it covers the card, and the card is the picture. */}
                   <button
@@ -576,7 +576,8 @@ function Columns({
                   />
                   <span className="nm">{task.title}</span>
                   <span className="sn">
-                    <Tags task={task} status={place === "stopped"} />
+                    {/* A running card says it's working, so it doesn't look like one more card to move. */}
+                    <Tags task={task} status={place === "stopped" || task.status === "running"} />
                     <span className="clip">{summary(task)}</span>
                   </span>
                   <InlineActions task={task} actions={actions} />
@@ -638,6 +639,7 @@ function SidePanel({
           <span className="truncate">{project}</span>
           <TaskTag task={task} />
         </p>
+        {task.approval && <p className="bwait">{approvalTitle(t, task.approval)}</p>}
         <h3>{t("task.asked")}</h3>
         <p className="bbrief">{brief}</p>
         <h3>{t("task.made")}</h3>
@@ -651,6 +653,18 @@ function SidePanel({
           <Icon name="arrow-right" />
           {t("board.open")}
         </button>
+        {/* The same choice as on the card, here too: the panel is the larger view of the same task. The footer stacks
+            from the bottom, so the safe choice ends up above Open, as the dark button. */}
+        {task.approval && (
+          <>
+            <button type="button" className="btn dark" onClick={() => actions.decide(task.id, false)}>
+              {task.approval.action === "delete" ? t("approval.keep") : t("approval.saveNew")}
+            </button>
+            <button type="button" className="btn" onClick={() => actions.decide(task.id, true)}>
+              {task.approval.action === "delete" ? t("approval.trash") : t("approval.allowOverwrite")}
+            </button>
+          </>
+        )}
         {task.status === "draft" && (
           <button type="button" className="btn dark" onClick={() => actions.start(task.id)}>
             <Icon name="play" />

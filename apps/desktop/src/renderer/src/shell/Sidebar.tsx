@@ -4,7 +4,7 @@ import { Logo } from "@/lib/Logo";
 import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
 import type { TaskMenuAction } from "../../../shared/api";
-import type { SectionKey, Task } from "../../../shared/model";
+import { type SectionKey, type Task, toReview } from "../../../shared/model";
 import { Clipped } from "../components/Clipped";
 import { SearchBox } from "../components/SearchDialog";
 import { WorkingDots } from "../components/TaskTag";
@@ -139,6 +139,9 @@ export function Sidebar({
                   {t("tag.working")}
                 </span>
               )}
+              {/* Work to look at and work not started yet, so both stay findable at every level, Board or not. */}
+              {toReview(task) && <span className="tag mine">{t("tag.toReview")}</span>}
+              {task.status === "draft" && <span className="tag">{t("tag.draft")}</span>}
             </button>
           )}
           <button
