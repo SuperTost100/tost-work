@@ -99,6 +99,14 @@ Changed on 2026-10-30, after testing 0.0.11:
 - A task's side panel is a card as tall as what it lists. The page scrolls under it, so its scrollbar sits at the window's edge.
 - With cli-funnel 0.6.2, Codex's short notes between steps show in the task as Claude's do.
 
+Changed on 2026-11-01, after testing 0.0.12:
+
+- On a Mac the window buttons sit in the middle of the rail, with the same space on both sides. macOS 26 draws them wider, so their position depends on the macOS version.
+- The sidebar that opens over the page puts its icons where the rail's are, at their size, so they don't move as it opens.
+- The space under the task card's last row matches its sides. The scrollbar runs to the bottom of the window, with the page scrolling under the composer.
+- Search works: ⌘K, the sidebar's Search box or the rail's icon opens it. It finds projects, and tasks by title or brief.
+- Each message will show when it was sent ([#139](https://github.com/SuperTost100/tost-work/issues/139), 0.1.0).
+
 ## From 0.2.0
 
 - The Skills parts above.
