@@ -246,11 +246,55 @@ export class TaskRunner {
     }
   }
 
-  /** Marks a finished task's work as looked at, so it's no longer "to review". Its place in Recent stays where it was. */
+  /**
+   * Changes a task saved for later: its brief, project, folder and files, before anything has run. The title follows
+   * the brief, as it does when a task is made, unless the user gave the task a name of their own.
+   */
+  updateDraft(
+    taskId: string,
+    input: { brief: string; projectId: string | null; workdir: string; attachments: string[] },
+  ): Task {
+    const task = this.mustGet(taskId);
+    if (task.status !== "draft") throw new Error("This task has already started");
+    // A start under way is copying the files it read before this edit, and would run the old brief.
+    if (this.starting.has(taskId)) throw new Error("This task is already starting");
+    const brief = input.brief.trim();
+    if (!brief) throw new Error("A task needs a brief");
+    if (input.projectId && this.removing.has(input.projectId)) throw new Error("That project doesn't exist");
+    // A task keeps no mark of a rename, so a title other than the one its old brief gives counts as the user's.
+    const title = task.title === titleFrom(task.brief) ? titleFrom(brief) : task.title;
+    const at = this.now();
+    const [first, ...rest] = task.messages;
+    const { attachments: _old, ...message } = first ?? { from: "user" as const, text: "", at };
+    return this.save({
+      ...task,
+      title,
+      brief,
+      projectId: input.projectId,
+      workdir: input.workdir,
+      attachments: input.attachments,
+      messages: [
+        { ...message, text: brief, ...(input.attachments.length ? { attachments: input.attachments } : {}) },
+        ...rest,
+      ],
+      updatedAt: at,
+    });
+  }
+
+  /** Marks a finished task's work as looked at, so it's no longer "to check". Its place in Recent stays where it was. */
   markReviewed(taskId: string): Task {
     const task = this.mustGet(taskId);
-    if (task.status !== "done") throw new Error("Only a finished task can be marked as reviewed");
+    if (task.status !== "done") throw new Error("Only a finished task can be marked as checked");
     return task.reviewedAt ? task : this.save({ ...task, reviewedAt: this.now() });
+  }
+
+  /** Puts a finished task back among the ones to check. Its place in Recent stays where it was. */
+  markUnreviewed(taskId: string): Task {
+    const task = this.mustGet(taskId);
+    if (task.status !== "done") throw new Error("Only a finished task can be marked to check");
+    if (!task.reviewedAt) return task;
+    const { reviewedAt: _reviewed, ...rest } = task;
+    return this.save(rest);
   }
 
   /**

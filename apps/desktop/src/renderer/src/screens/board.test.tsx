@@ -71,14 +71,14 @@ describe("the board", () => {
     expect(within(needsYou).getByText("The task wants to replace contracts.xlsx")).toBeTruthy();
     expect(within(await group("To do")).getByText("Brief written, not started")).toBeTruthy();
     const done = await group("Done in the last 7 days");
-    expect(within(done).getByText("to review")).toBeTruthy();
+    expect(within(done).getByText("to check")).toBeTruthy();
     expect(within(done).getByText("Proposta.docx")).toBeTruthy();
     // Each row names its project.
     expect(within(done).getByText("Proposals")).toBeTruthy();
 
     const filters = screen.getByRole("radiogroup", { name: "Show" });
     expect(within(filters).getByRole("radio", { name: "Needs you 2" })).toBeTruthy();
-    await click(within(filters).getByRole("radio", { name: "To review 1" }));
+    await click(within(filters).getByRole("radio", { name: "To check 1" }));
     expect(screen.queryByRole("region", { name: "Needs you" })).toBeNull();
     expect(inBoard().getByRole("button", { name: "Proposal for Ferraris" })).toBeTruthy();
     await click(within(filters).getByRole("radio", { name: "Needs you 2" }));
@@ -177,18 +177,18 @@ describe("the board", () => {
     expect(await screen.findByText("Check it against your brief")).toBeTruthy();
   });
 
-  it("marks finished work reviewed from the side panel, which clears its to-review tag", async () => {
+  it("marks finished work checked from the side panel, which clears its to-check tag", async () => {
     const { api, ids } = await seeded();
     await openBoard(api);
     await click(row("Proposal for Ferraris"));
     const panel = await screen.findByRole("complementary", { name: "Proposal for Ferraris" });
-    await click(within(panel).getByRole("button", { name: "Mark reviewed" }));
+    await click(within(panel).getByRole("button", { name: "Mark as checked" }));
     expect((await api.tasks.get(ids.finished))?.reviewedAt).toBeTruthy();
-    await waitFor(() => expect(inBoard().queryByText("to review")).toBeNull());
+    await waitFor(() => expect(inBoard().queryByText("to check")).toBeNull());
     const filters = screen.getByRole("radiogroup", { name: "Show" });
-    expect(within(filters).getByRole("radio", { name: "To review" })).toBeTruthy();
+    expect(within(filters).getByRole("radio", { name: "To check" })).toBeTruthy();
     // Nothing left to mark.
-    expect(within(panel).queryByRole("button", { name: "Mark reviewed" })).toBeNull();
+    expect(within(panel).queryByRole("button", { name: "Mark as checked" })).toBeNull();
   });
 
   it("groups by project from the display menu, and remembers it", async () => {
@@ -234,11 +234,11 @@ describe("the board", () => {
     await waitFor(() => expect(within(screen.getByRole("region", { name: "To do" })).queryByRole("button")).toBeNull());
   });
 
-  it("in columns, marks a card to review dropped on Done", async () => {
+  it("in columns, marks a card to check dropped on Done", async () => {
     const { api, ids } = await seeded();
     await api.settings.update({ boardView: "columns" });
     await openBoard(api);
-    const card = within(await group("To review")).getByRole("button", { name: "Proposal for Ferraris" });
+    const card = within(await group("To check")).getByRole("button", { name: "Proposal for Ferraris" });
     fireEvent.dragStart(card);
     fireEvent.dragOver(screen.getByRole("region", { name: "Done" }));
     await act(async () => {
@@ -254,17 +254,17 @@ describe("the board", () => {
 });
 
 describe("the finished task screen", () => {
-  it("marks the work reviewed near its check, and opening it alone doesn't", async () => {
+  it("marks the work checked near its check, and opening it alone doesn't", async () => {
     const { api, ids } = await seeded();
     render(<Root api={api} />);
     await openRecent(/Proposal for Ferraris/);
     expect(await screen.findByText("Check it against your brief")).toBeTruthy();
     expect((await api.tasks.get(ids.finished))?.reviewedAt).toBeUndefined();
     const top = document.querySelector(".main .top") as HTMLElement;
-    expect(within(top).getByText("to review")).toBeTruthy();
-    await click(button("Mark reviewed"));
-    await waitFor(() => expect(within(top).queryByText("to review")).toBeNull());
-    expect(screen.queryByRole("button", { name: "Mark reviewed" })).toBeNull();
+    expect(within(top).getByText("to check")).toBeTruthy();
+    await click(button("Mark as checked"));
+    await waitFor(() => expect(within(top).queryByText("to check")).toBeNull());
+    expect(screen.queryByRole("button", { name: "Mark as checked" })).toBeNull();
     expect((await api.tasks.get(ids.finished))?.reviewedAt).toBeTruthy();
   });
 
@@ -277,6 +277,220 @@ describe("the finished task screen", () => {
     await click(button("Start"));
     expect(await screen.findByText("Who pays the insurance?")).toBeTruthy();
     expect((await api.tasks.get(ids.later))?.status).toBe("needs-you");
+  });
+});
+
+describe("the task menu on the board", () => {
+  const confirm = async (name: string) => {
+    const card = await screen.findByRole("alertdialog");
+    await click(within(card).getByRole("button", { name }));
+  };
+
+  it("opens from a row's … and from a right-click, and starts, checks and unchecks", async () => {
+    const { api, ids } = await seeded();
+    const menu = vi.spyOn(api.tasks, "menu");
+    await openBoard(api);
+
+    api.pickInMenu("review");
+    await act(async () => {
+      fireEvent.contextMenu(await row("Proposal for Ferraris"));
+    });
+    expect(menu).toHaveBeenLastCalledWith(ids.finished);
+    await waitFor(async () => expect((await api.tasks.get(ids.finished))?.reviewedAt).toBeTruthy());
+    await waitFor(() => expect(inBoard().queryByText("to check")).toBeNull());
+
+    api.pickInMenu("unreview");
+    await click(inBoard().getByRole("button", { name: "More for Proposal for Ferraris" }));
+    await waitFor(async () => expect((await api.tasks.get(ids.finished))?.reviewedAt).toBeUndefined());
+    expect(await inBoard().findByText("to check")).toBeTruthy();
+
+    // Start goes to the task, as its Start button does.
+    api.pickInMenu("start");
+    await click(inBoard().getByRole("button", { name: "More for Write three case studies" }));
+    expect(menu).toHaveBeenLastCalledWith(ids.later);
+    expect(await screen.findByText("Who pays the insurance?")).toBeTruthy();
+    expect((await api.tasks.get(ids.later))?.status).toBe("needs-you");
+  });
+
+  it("has a … on every card and in the side panel, and deletes after asking", async () => {
+    const { api, ids } = await seeded();
+    await api.settings.update({ boardView: "columns" });
+    await openBoard(api);
+    const card = within(await group("To check")).getByRole("button", { name: "More for Proposal for Ferraris" });
+    expect(card).toBeTruthy();
+
+    await click(inBoard().getByRole("button", { name: "Write three case studies" }));
+    const panel = await screen.findByRole("complementary", { name: "Write three case studies" });
+    api.pickInMenu("delete");
+    await click(within(panel).getByRole("button", { name: "More for Write three case studies" }));
+    await confirm("Cancel");
+    expect(await api.tasks.get(ids.later)).toBeTruthy();
+    await act(async () => {
+      fireEvent.contextMenu(inBoard().getByRole("button", { name: "Write three case studies" }));
+    });
+    await confirm("Delete");
+    expect(await api.tasks.get(ids.later)).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("complementary", { name: "Write three case studies" })).toBeNull());
+    expect(inBoard().queryByRole("button", { name: "Write three case studies" })).toBeNull();
+  });
+
+  it("renames on the row, or in the panel's head when picked there", async () => {
+    const { api, ids } = await seeded();
+    await openBoard(api);
+    api.pickInMenu("rename");
+    await click(inBoard().getByRole("button", { name: "More for Write three case studies" }));
+    const field = within(await group("To do")).getByRole("textbox", { name: "Rename" });
+    fireEvent.change(field, { target: { value: "Case studies" } });
+    await act(async () => {
+      fireEvent.keyDown(field, { key: "Enter" });
+    });
+    expect(await row("Case studies")).toBeTruthy();
+    expect((await api.tasks.get(ids.later))?.title).toBe("Case studies");
+
+    await click(row("Case studies"));
+    const panel = await screen.findByRole("complementary", { name: "Case studies" });
+    await click(within(panel).getByRole("button", { name: "More for Case studies" }));
+    const inPanel = within(panel).getByRole("textbox", { name: "Rename" });
+    fireEvent.change(inPanel, { target: { value: "Three case studies" } });
+    // Escape keeps the old name, and leaves the panel open.
+    fireEvent.keyDown(inPanel, { key: "Escape" });
+    expect(within(panel).queryByRole("textbox")).toBeNull();
+    expect((await api.tasks.get(ids.later))?.title).toBe("Case studies");
+    expect(screen.getByRole("complementary", { name: "Case studies" })).toBeTruthy();
+  });
+
+  it("offers only what the task's state allows", async () => {
+    const { api, ids } = await seeded();
+    // Start isn't in a finished task's menu, so picking it there does nothing.
+    api.pickInMenu("start");
+    expect(await api.tasks.menu(ids.finished)).toBeNull();
+    api.pickInMenu("review");
+    expect(await api.tasks.menu(ids.later)).toBeNull();
+    expect(await api.tasks.menu(ids.finished)).toBe("review");
+  });
+});
+
+describe("a task saved for later, opened", () => {
+  it("shows its brief, files and project in the task box, and saves the changes without starting", async () => {
+    const api = createMemoryApi(intermediate);
+    await api.projects.create({ name: "Proposals", folder: "/home/giulia/Proposals" });
+    await api.projects.create({ name: "Website", folder: "/home/giulia/Website" });
+    const saved = await api.tasks.saveForLater({
+      projectId: "p1",
+      brief: "Write three case studies",
+      attachments: ["/home/giulia/notes.txt"],
+    });
+    const startSaved = vi.spyOn(api.tasks, "startSaved");
+    render(<Root api={api} />);
+    await openRecent(/Write three case studies/);
+
+    const box = (await screen.findByRole("textbox", { name: "What should get done?" })) as HTMLTextAreaElement;
+    expect(box.value).toBe("Write three case studies");
+    expect(screen.getByRole("button", { name: "Remove notes.txt" })).toBeTruthy();
+    const saveChanges = screen.getByRole("button", { name: "Save changes" }) as HTMLButtonElement;
+    // Nothing to save until something changes.
+    expect(saveChanges.disabled).toBe(true);
+
+    fireEvent.change(box, { target: { value: "Write two case studies" } });
+    await click(screen.getByRole("button", { name: "Remove notes.txt" }));
+    await click(document.querySelector(".under .pick") as HTMLElement);
+    await click(await screen.findByRole("menuitem", { name: "Website" }));
+    await click(saveChanges);
+
+    await waitFor(async () =>
+      expect(await api.tasks.get(saved.id)).toMatchObject({
+        status: "draft",
+        title: "Write two case studies",
+        brief: "Write two case studies",
+        projectId: "p2",
+        attachments: [],
+      }),
+    );
+    expect(startSaved).not.toHaveBeenCalled();
+    expect(saveChanges.disabled).toBe(true);
+  });
+
+  it("starts with the brief as edited", async () => {
+    const api = createMemoryApi(intermediate);
+    await api.projects.create({ name: "Proposals", folder: "/home/giulia/Proposals" });
+    const saved = await api.tasks.saveForLater({ projectId: "p1", brief: "Write three case studies" });
+    render(<Root api={api} />);
+    await openRecent(/Write three case studies/);
+    const box = await screen.findByRole("textbox", { name: "What should get done?" });
+    fireEvent.change(box, { target: { value: "Write one case study, for Alpi" } });
+    await click(button("Start"));
+
+    expect(await screen.findByText("Who pays the insurance?")).toBeTruthy();
+    expect(await api.tasks.get(saved.id)).toMatchObject({
+      status: "needs-you",
+      brief: "Write one case study, for Alpi",
+    });
+  });
+});
+
+describe("the home's To do", () => {
+  it("lists the tasks saved for later, with Start, and no Recent of its own", async () => {
+    const { api, ids } = await seeded();
+    render(<Root api={api} />);
+    const todo = await screen.findByRole("region", { name: "To do" });
+    expect(within(todo).getByText("Write three case studies")).toBeTruthy();
+    expect(within(todo).getByText("Website")).toBeTruthy();
+    // Only tasks saved for later: the finished one is in the sidebar's Recent, not here.
+    expect(within(todo).queryByText("Proposal for Ferraris")).toBeNull();
+    const main = within(document.querySelector(".main") as HTMLElement);
+    expect(main.queryByText("Recent")).toBeNull();
+
+    await click(within(todo).getByRole("button", { name: "Start: Write three case studies" }));
+    expect(await screen.findByText("Who pays the insurance?")).toBeTruthy();
+    expect((await api.tasks.get(ids.later))?.status).toBe("needs-you");
+  });
+
+  it("opens a task from its row, and shows nothing without tasks saved for later", async () => {
+    const api = createMemoryApi(intermediate);
+    await api.projects.create({ name: "Proposals", folder: "/home/giulia/Proposals" });
+    await api.tasks.start({ projectId: "p1", brief: "Proposal for Alpi" });
+    const { unmount } = render(<Root api={api} />);
+    await screen.findAllByText("Proposal for Alpi");
+    expect(screen.queryByRole("region", { name: "To do" })).toBeNull();
+    unmount();
+
+    await api.tasks.saveForLater({ projectId: "p1", brief: "Write three case studies" });
+    render(<Root api={api} />);
+    const todo = await screen.findByRole("region", { name: "To do" });
+    await click(within(todo).getByRole("button", { name: /^Write three case studies/ }));
+    expect(await screen.findByText("Saved for later. Nothing has run yet.")).toBeTruthy();
+  });
+});
+
+describe("the message after saving for later", () => {
+  it("says where the task went from the home, and Open opens it", async () => {
+    const api = createMemoryApi(intermediate);
+    await api.projects.create({ name: "Proposals", folder: "/home/giulia/Proposals" });
+    render(<Root api={api} />);
+    const box = await screen.findByRole("textbox", { name: "What should get done?" });
+    fireEvent.change(box, { target: { value: "Draft the newsletter" } });
+    await click(button("Save for later"));
+    const status = document.querySelector(".toasts [role=status]") as HTMLElement;
+    expect(within(status).getByText("Saved to To do")).toBeTruthy();
+    await click(within(status).getByRole("button", { name: "Open" }));
+    expect(await screen.findByText("Saved for later. Nothing has run yet.")).toBeTruthy();
+    expect(within(status).queryByText("Saved to To do")).toBeNull();
+  });
+
+  it("comes after New on the board too, and Escape closes it", async () => {
+    const api = createMemoryApi(intermediate);
+    await api.projects.create({ name: "Proposals", folder: "/home/giulia/Proposals" });
+    await openBoard(api);
+    await click(button("New"));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("What should get done"), { target: { value: "Rewrite About" } });
+    await click(within(dialog).getByRole("button", { name: "Save for later" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(await screen.findByText("Saved to To do")).toBeTruthy();
+    await act(async () => {
+      fireEvent.keyDown(document.body, { key: "Escape" });
+    });
+    expect(screen.queryByText("Saved to To do")).toBeNull();
   });
 });
 
@@ -316,6 +530,8 @@ describe("finished tasks older than a week", () => {
         allowNoProject
         onOpenTask={() => {}}
         onTaskChanged={() => {}}
+        onSavedForLater={() => {}}
+        onTaskMenu={() => {}}
         onError={() => {}}
         now={new Date(Date.UTC(2026, 9, 30, 12))}
       />,
@@ -344,6 +560,8 @@ describe("finished tasks older than a week", () => {
         allowNoProject
         onOpenTask={() => {}}
         onTaskChanged={() => {}}
+        onSavedForLater={() => {}}
+        onTaskMenu={() => {}}
         onError={() => {}}
         now={new Date(Date.UTC(2026, 9, 30, 12))}
       />,

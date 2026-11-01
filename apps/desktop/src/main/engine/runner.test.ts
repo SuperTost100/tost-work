@@ -781,4 +781,79 @@ describe("marking finished work as reviewed", () => {
 
     expect(runner.followUp(task.id, "Round the prices").reviewedAt).toBeUndefined();
   });
+
+  it("puts checked work back among the ones to check, and only for a finished task", async () => {
+    const { store, runner } = setup();
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
+    expect(() => runner.markUnreviewed(task.id)).toThrow(/finished/);
+    const run = runner.start(task.id);
+    await waitFor(() => store.getTask(task.id)?.status === "needs-you");
+    runner.answer(task.id, ["The client pays it"]);
+    const done = await run;
+    runner.markReviewed(task.id);
+
+    const back = runner.markUnreviewed(task.id);
+    expect(back.reviewedAt).toBeUndefined();
+    expect(back.updatedAt).toBe(done.updatedAt);
+    expect(store.getTask(task.id)?.reviewedAt).toBeUndefined();
+    // Again, it changes nothing.
+    expect(runner.markUnreviewed(task.id)).toEqual(back);
+  });
+});
+
+describe("editing a task saved for later", () => {
+  it("changes the brief, project, folder and files, and the title follows the brief", () => {
+    const { store, runner } = setup();
+    const saved = runner.create({
+      projectId: null,
+      brief: "Fix the letter",
+      workdir: "/tmp/q",
+      attachments: ["/a.pdf"],
+    });
+    const edited = runner.updateDraft(saved.id, {
+      brief: "  Fix the letter to the bank\nand sign it  ",
+      projectId: "p2",
+      workdir: "/home/giulia/Website",
+      attachments: ["/b.docx"],
+    });
+    expect(edited).toMatchObject({
+      status: "draft",
+      title: "Fix the letter to the bank",
+      brief: "Fix the letter to the bank\nand sign it",
+      projectId: "p2",
+      workdir: "/home/giulia/Website",
+      attachments: ["/b.docx"],
+    });
+    // The first message is the brief the agent gets when it starts.
+    expect(edited.messages).toHaveLength(1);
+    expect(edited.messages[0]).toMatchObject({ text: edited.brief, attachments: ["/b.docx"] });
+    expect(store.getTask(saved.id)).toEqual(edited);
+
+    // With no files left, the message has none either.
+    const bare = runner.updateDraft(saved.id, { ...edited, attachments: [] });
+    expect(bare.messages[0]?.attachments).toBeUndefined();
+  });
+
+  it("keeps a name the user gave it", () => {
+    const { runner } = setup();
+    const saved = runner.create({ projectId: null, brief: "Fix the letter", workdir: "/tmp/q" });
+    runner.rename(saved.id, "Bank letter");
+    const edited = runner.updateDraft(saved.id, {
+      brief: "Fix it",
+      projectId: null,
+      workdir: "/tmp/q",
+      attachments: [],
+    });
+    expect(edited.title).toBe("Bank letter");
+  });
+
+  it("refuses an empty brief and a task that has started", async () => {
+    const { store, runner } = setup();
+    const saved = runner.create({ projectId: null, brief: "Fix the letter", workdir: "/tmp/q" });
+    const edit = { brief: "   ", projectId: null, workdir: "/tmp/q", attachments: [] };
+    expect(() => runner.updateDraft(saved.id, edit)).toThrow(/needs a brief/);
+    expect(store.getTask(saved.id)?.brief).toBe("Fix the letter");
+    await runner.startSaved(saved.id, async (t) => t.attachments);
+    expect(() => runner.updateDraft(saved.id, { ...edit, brief: "Something else" })).toThrow(/already started/);
+  });
 });

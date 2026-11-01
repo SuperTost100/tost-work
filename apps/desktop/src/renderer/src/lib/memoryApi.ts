@@ -9,6 +9,7 @@ import type {
   ProjectMenuAction,
   SignInEvent,
   SkillMenuAction,
+  TaskMenuAction,
   TostWorkApi,
 } from "../../../shared/api";
 import { guideText, translate } from "../../../shared/i18n";
@@ -34,10 +35,10 @@ import {
   type Task,
 } from "../../../shared/model";
 import { removalText } from "../../../shared/projectText";
-
 import { applyEvent, resume } from "../../../shared/reduce";
 import { nextRun } from "../../../shared/schedule";
 import { matchesWords, SEARCH_LIMIT, searchWords } from "../../../shared/search";
+import { taskMenuItems } from "../../../shared/taskMenu";
 
 /** The built-in guide the memory API lists, as Tost Work lists its Word, Excel, PowerPoint and PDF guides. */
 const WORD_GUIDE: Skill = {
@@ -58,7 +59,8 @@ const WORD_GUIDE: Skill = {
  */
 export type MemoryApi = TostWorkApi & {
   emit(id: string, e: EngineEvent): void;
-  pickInMenu(action: SkillMenuAction | null): void;
+  /** What the next task or skill menu returns, as if the user had picked it. */
+  pickInMenu(action: SkillMenuAction | TaskMenuAction | null): void;
   /** What the next project menu returns, as if the user had picked it. */
   pickInProjectMenu(action: ProjectMenuAction | null): void;
   /** Picks an item in the menu bar, as the user would. */
@@ -158,7 +160,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   };
 
   // What the next task menu returns, as if the user had picked it.
-  let menuPick: SkillMenuAction | null = null;
+  let menuPick: SkillMenuAction | TaskMenuAction | null = null;
   let menuState: MenuState = { task: false, running: false };
   let projectMenuPick: ProjectMenuAction | null = null;
 
@@ -393,10 +395,39 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         if (tasks.get(id)?.status !== "draft") throw new Error("This task has already started");
         return run(id);
       },
+      updateDraft: async (id, input) => {
+        // The same checks as the main process and the runner, so the screen tests meet the real rules.
+        const t = tasks.get(id);
+        if (!t) throw new Error("That task doesn't exist");
+        if (t.status !== "draft") throw new Error("This task has already started");
+        const brief = input.brief.trim();
+        if (!brief) throw new Error("A task needs a brief");
+        if (input.projectId && !projects.some((p) => p.id === input.projectId))
+          throw new Error("That project doesn't exist");
+        const title = (text: string) => text.split("\n")[0] ?? "";
+        const attachments = input.attachments ?? [];
+        return save({
+          ...t,
+          title: t.title === title(t.brief) ? title(brief) : t.title,
+          brief,
+          projectId: input.projectId,
+          // As in the main process: a project's task works in its folder, and one without keeps its own.
+          workdir: projects.find((p) => p.id === input.projectId)?.folder ?? (t.projectId ? "/tmp/quick" : t.workdir),
+          attachments,
+          messages: [{ from: "user", text: brief, at: now(), ...(attachments.length ? { attachments } : {}) }],
+          updatedAt: now(),
+        });
+      },
       markReviewed: async (id) => {
         const t = tasks.get(id);
-        if (t?.status !== "done") throw new Error("Only a finished task can be marked as reviewed");
+        if (t?.status !== "done") throw new Error("Only a finished task can be marked as checked");
         return t.reviewedAt ? t : save({ ...t, reviewedAt: now() });
+      },
+      markUnreviewed: async (id) => {
+        const t = tasks.get(id);
+        if (t?.status !== "done") throw new Error("Only a finished task can be marked to check");
+        const { reviewedAt: _reviewed, ...rest } = t;
+        return t.reviewedAt ? save(rest) : t;
       },
       answer: async (id, answers, files = []) => {
         const t = tasks.get(id);
@@ -464,8 +495,14 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         if (!t?.interrupted) throw new Error("Only a task stopped by closing Tost Work can be resumed");
         return save({ ...t, status: "running", interrupted: undefined });
       },
-      // Export is only in the skill menu.
-      menu: async () => (menuPick === "export" ? null : menuPick),
+      // Only what the real menu offers the task as it is now: a pick it wouldn't show comes back as nothing.
+      menu: async (id) => {
+        const t = tasks.get(id);
+        if (!t) throw new Error("That task doesn't exist");
+        const offered = taskMenuItems(t, t.status !== "running", () => "");
+        const pick = offered.find((item) => item !== "separator" && item.action === menuPick);
+        return pick && pick !== "separator" && pick.enabled !== false ? pick.action : null;
+      },
       rename: async (id, title) => {
         const t = tasks.get(id);
         if (!t) throw new Error("That task doesn't exist");
@@ -576,7 +613,11 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       exportZip: async (id) => {
         mustSkill(id);
       },
-      menu: async () => menuPick,
+      // Only what the skill menu offers.
+      menu: async () =>
+        menuPick === "rename" || menuPick === "reveal" || menuPick === "delete" || menuPick === "export"
+          ? menuPick
+          : null,
       duplicate: async (id) => {
         if (id !== WORD_GUIDE.id) throw new Error("That isn't one of Tost Work's guides");
         const { builtIn: _b, ...guide } = wordGuide();

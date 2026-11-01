@@ -3,6 +3,7 @@ import type { Attachments } from "@/components/Composer";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
 import { ProjectInstructionsDialog } from "@/components/ProjectInstructionsDialog";
+import { SavedToast } from "@/components/SavedToast";
 import { SearchDialog } from "@/components/SearchDialog";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
@@ -20,8 +21,15 @@ import { Soon } from "@/screens/Soon";
 import { Task } from "@/screens/Task";
 import { RECENT, type Section, Sidebar, SidebarRail } from "@/shell/Sidebar";
 import { useData } from "@/state/useData";
-import type { MenuAction, ProjectMenuAction, TostWorkApi } from "../../shared/api";
-import { ATTACH_MAX, DEFAULT_SETTINGS, type ProjectOverview, type Settings, sectionOn } from "../../shared/model";
+import type { MenuAction, ProjectMenuAction, TaskMenuAction, TostWorkApi } from "../../shared/api";
+import {
+  ATTACH_MAX,
+  DEFAULT_SETTINGS,
+  type ProjectOverview,
+  type Settings,
+  sectionOn,
+  type Task as TaskT,
+} from "../../shared/model";
 
 /** The main process accepts up to 20 attachments per task. */
 
@@ -157,13 +165,35 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
     else if (action === "reveal") void api?.projects.reveal(id).catch(report);
     else if (action === "remove") dropProject(id);
   };
-  const openTaskMenu = async (id: string) => {
+  // Starting a saved task opens it, to watch it work, as starting a new one does.
+  const startSaved = (id: string) =>
+    void api?.tasks.startSaved(id).then((task) => {
+      addTask(task);
+      setRoute({ name: "task", id: task.id });
+    }, report);
+  // The task menu, the same in Recent and on the Board. Rename is the one item carried out where the menu opened,
+  // since the title there turns into the field.
+  const taskMenu = async (id: string, rename: () => void) => {
+    if (!api) return;
+    let action: TaskMenuAction | null = null;
     try {
-      return (await api?.tasks.menu(id)) ?? null;
+      action = await api.tasks.menu(id);
     } catch (err) {
       report(err);
-      return null;
     }
+    if (action === "rename") rename();
+    else if (action === "reveal") void api.tasks.reveal(id).catch(report);
+    else if (action === "start") startSaved(id);
+    else if (action === "review") void api.tasks.markReviewed(id).then(addTask, report);
+    else if (action === "unreview") void api.tasks.markUnreviewed(id).then(addTask, report);
+    else if (action === "delete") void deleteTask(id);
+  };
+  // The task just saved for later, which the message at the bottom of the window can open.
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const closeSaved = useCallback(() => setSavedId(null), []);
+  const savedForLater = (task: TaskT) => {
+    addTask(task);
+    setSavedId(task.id);
   };
 
   const openProjectId = route.name === "project" ? route.id : null;
@@ -228,7 +258,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
     starting.current = true;
     setError(null);
     try {
-      addTask(await api.tasks.saveForLater({ projectId: inProject, brief: text.trim(), attachments }));
+      savedForLater(await api.tasks.saveForLater({ projectId: inProject, brief: text.trim(), attachments }));
       clear();
     } catch (err) {
       report(err);
@@ -414,6 +444,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
         }
         attach={attach(files, setFiles)}
         onOpenTask={(id) => setRoute({ name: "task", id })}
+        onStartSaved={startSaved}
         onNewProject={() => setDialogOpen(true)}
       />
     );
@@ -507,6 +538,21 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
           onStop={() => void api.tasks.stop(task.id).catch(report)}
           onResume={() => void api.tasks.resume(task.id).catch(report)}
           onStartSaved={() => void api.tasks.startSaved(task.id).then(addTask, report)}
+          projects={projects}
+          allowNoProject={quickEdit}
+          onNewProject={() => setDialogOpen(true)}
+          onSaveDraft={(edit) =>
+            api.tasks.updateDraft(task.id, edit).then(
+              (next) => {
+                addTask(next);
+                return true;
+              },
+              (err: unknown) => {
+                report(err);
+                return false;
+              },
+            )
+          }
           onMarkReviewed={() => void api.tasks.markReviewed(task.id).then(addTask, report)}
           onOpenProject={() => project && setRoute({ name: "project", id: project.id })}
           onError={report}
@@ -547,6 +593,8 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
         allowNoProject={quickEdit}
         onOpenTask={(id) => setRoute({ name: "task", id })}
         onTaskChanged={addTask}
+        onSavedForLater={savedForLater}
+        onTaskMenu={(id, rename) => void taskMenu(id, rename)}
         onError={report}
       />
     );
@@ -567,9 +615,8 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
       tasks={tasks}
       openTaskId={route.name === "task" ? route.id : null}
       onOpenTask={(id) => setRoute({ name: "task", id })}
-      onTaskMenu={openTaskMenu}
+      onTaskMenu={(id, rename) => void taskMenu(id, rename)}
       onRenameTask={(id, title) => void api?.tasks.rename(id, title).catch(report)}
-      onRevealTask={(id) => void api?.tasks.reveal(id).catch(report)}
       // Over the page, a task is renamed in its header, as with the sidebar hidden: the sidebar may close meanwhile.
       renaming={pinned ? renaming : null}
       // So the task opens first, to be renamed in its header.
@@ -577,7 +624,6 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
         if (id && !pinned) setRoute({ name: "task", id });
         setRenaming(id);
       }}
-      onDeleteTask={(id) => void deleteTask(id)}
       search={
         api && {
           api,
@@ -607,14 +653,29 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
         sidebar(true)
       )}
       {screen ?? <div className="main" />}
-      {error && (
-        <div className="toast" role="alert">
-          <span className="grow">{error}</span>
-          <button type="button" className="iconbtn" aria-label={t("common.dismiss")} onClick={() => setError(null)}>
-            <Icon name="close" />
-          </button>
+      <div className="toasts">
+        {error && (
+          <div className="toast" role="alert">
+            <span className="grow">{error}</span>
+            <button type="button" className="iconbtn" aria-label={t("common.dismiss")} onClick={() => setError(null)}>
+              <Icon name="close" />
+            </button>
+          </div>
+        )}
+        {/* Always there and empty until a task is saved, so screen readers announce the message when it comes. */}
+        <div role="status">
+          {savedId && (
+            <SavedToast
+              key={savedId}
+              onOpen={() => {
+                setSavedId(null);
+                openFound(savedId);
+              }}
+              onClose={closeSaved}
+            />
+          )}
         </div>
-      )}
+      </div>
       {api && instructionsProject && (
         <ProjectInstructionsDialog
           key={instructionsProject.id}

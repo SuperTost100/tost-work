@@ -24,6 +24,8 @@ export function Composer({
   className,
   attach,
   onSaveLater,
+  laterLabel,
+  laterDisabled = false,
 }: {
   value: string;
   onChange: (text: string) => void;
@@ -39,6 +41,10 @@ export function Composer({
   attach?: Attachments;
   /** Saves the brief as a task to start later, next to Send. Without it there's no such button. */
   onSaveLater?: () => void;
+  /** What that button says, for example Save changes on a task saved for later. */
+  laterLabel?: string;
+  /** Turns that button off by itself, for example while there's nothing new to save. */
+  laterDisabled?: boolean;
 }) {
   const t = useT();
   const tooLong = value.length > BRIEF_MAX;
@@ -92,8 +98,8 @@ export function Composer({
           })}
         </span>
         {onSaveLater && (
-          <button type="button" className="tbtn later" disabled={!canSend} onClick={onSaveLater}>
-            {t("composer.later")}
+          <button type="button" className="tbtn later" disabled={!canSend || laterDisabled} onClick={onSaveLater}>
+            {laterLabel ?? t("composer.later")}
           </button>
         )}
         <button

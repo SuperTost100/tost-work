@@ -130,6 +130,14 @@ Changed on 2026-11-01, building the Board:
 - "Salva per dopo" next to Send saves a task without starting it, and "Avvia" starts it later.
 - A finished task stays "da rivedere" until the user marks it reviewed, from the Board or from the task.
 
+Changed on 2026-11-01, after Tost tried the Board:
+
+- "Da rivedere" is now "da controllare", with "Segna come controllata" and its undo, "Segna da controllare".
+- Every task has the same menu, from its … or a right-click, in Recent, on the Board's rows and cards and in its side panel. It adds Avvia for a task saved for later and the two checking items for a finished one.
+- A task saved for later opens in the home's task box, with its files and project, to change before it starts.
+- The side panel is a sidebar on the right, beside the Board rather than over it.
+- The home lists the tasks saved for later under Da fare instead of a Recent of its own, and saving one says "Salvata in Da fare" with a button to open it.
+
 ## From 0.2.0
 
 - The Skills parts above.

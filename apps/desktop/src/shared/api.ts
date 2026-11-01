@@ -171,8 +171,15 @@ export interface TostWorkApi {
     saveForLater(input: NewTaskInput): Promise<Task>;
     /** Starts a task saved for later, as `start` starts a new one. */
     startSaved(id: string): Promise<Task>;
-    /** Marks a finished task as reviewed, so it's no longer "to review". */
+    /**
+     * Changes a task saved for later before it starts: its brief, project and files. The files are copied only when it
+     * starts, as for a new one.
+     */
+    updateDraft(id: string, input: NewTaskInput): Promise<Task>;
+    /** Marks a finished task as checked, so it's no longer "to check". */
     markReviewed(id: string): Promise<Task>;
+    /** Puts a finished task back among the ones to check. */
+    markUnreviewed(id: string): Promise<Task>;
     /** One answer per question in the round, in order, with any files the user attached to them. */
     answer(id: string, answers: string[], attachments?: string[]): Promise<Task>;
     /** Allows or refuses the overwrite or delete the task asked for. */
@@ -259,11 +266,11 @@ export interface TostWorkApi {
   };
 }
 
-/** What the task menu offers. */
-export type TaskMenuAction = "rename" | "reveal" | "delete";
+/** What the task menu offers. Start, and the two for checking, show only when the task's state allows them. */
+export type TaskMenuAction = "rename" | "reveal" | "start" | "review" | "unreview" | "delete";
 
-/** What the skill menu offers: the task menu's, and Export as .zip. */
-export type SkillMenuAction = TaskMenuAction | "export";
+/** What the skill menu offers: Rename, Show in folder and Delete, as a task's, and Export as .zip. */
+export type SkillMenuAction = "rename" | "reveal" | "delete" | "export";
 
 /** What the project menu offers. */
 export type ProjectMenuAction = "rename" | "describe" | "instructions" | "reveal" | "remove";
@@ -333,7 +340,9 @@ export const IPC = {
   tasksStart: "tasks:start",
   tasksSaveForLater: "tasks:save-for-later",
   tasksStartSaved: "tasks:start-saved",
+  tasksUpdateDraft: "tasks:update-draft",
   tasksMarkReviewed: "tasks:mark-reviewed",
+  tasksMarkUnreviewed: "tasks:mark-unreviewed",
   tasksAnswer: "tasks:answer",
   tasksStop: "tasks:stop",
   tasksResume: "tasks:resume",

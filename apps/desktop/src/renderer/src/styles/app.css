@@ -966,6 +966,41 @@ textarea {
 .item .when.now {
   color: var(--ink);
 }
+/* A task in the home's To do: its name and project open it, and Start sits at the end of the row. */
+.item.todo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 2px;
+}
+.item.todo .open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 0;
+  text-align: left;
+}
+.item.todo .ttl {
+  flex: 0 1 auto;
+}
+.item.todo .where {
+  flex: 0 1000 auto;
+  min-width: 0;
+  font-size: 13.5px;
+}
+.item.todo:hover .ttl {
+  text-decoration: none;
+}
+.item.todo .open:hover .ttl {
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+.item.todo .btn {
+  height: 30px;
+}
 .outs {
   display: flex;
   gap: 6px;
@@ -1443,7 +1478,7 @@ textarea {
 .thead,
 .brow {
   display: grid;
-  grid-template-columns: 46px 1fr 170px 90px;
+  grid-template-columns: 46px 1fr 170px 90px 24px;
   gap: 14px;
   align-items: center;
   padding: 0 32px;
@@ -1502,26 +1537,27 @@ textarea {
   gap: 6px;
   margin-top: 8px;
 }
-/* The board's page: the list or columns, and the selected task's card beside them, as on the task screen. The page
-   runs under the card to the window's edge, so its scrollbar sits there. */
+/* The board: its page, and the selected task's panel as a sidebar on the right, beside the page and never over it. */
+.main.board {
+  flex-direction: row;
+}
 .board-page {
   flex: 1;
+  min-width: 0;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
 }
-.board-page.with-panel {
-  --panel-w: clamp(240px, 32%, 320px);
-  grid-template-columns: minmax(0, 1fr) var(--panel-w);
-}
+/* The columns reach the bottom of the window, so an empty one is a drop target along its whole height. */
 .board-page > .scroll {
-  grid-area: 1 / 1 / 2 / -1;
-}
-.board-page.with-panel > .scroll {
-  padding-right: var(--panel-w);
+  display: flex;
+  flex-direction: column;
 }
 .board-wrap.wide {
   max-width: none;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
 }
 .bhead {
   flex-wrap: wrap;
@@ -1585,9 +1621,53 @@ h2.gh {
   cursor: grab;
 }
 .brow .actions,
-.bcard .actions {
+.bcard .actions,
+.brow .rename,
+.bcard .rename,
+.board .more {
   position: relative;
   z-index: 1;
+}
+/* The … of a row, a card or the panel: there under the pointer, on the selected task, and when the keyboard reaches
+   it, as in Recent. */
+.board .more {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--t3);
+  opacity: 0;
+}
+.board .more:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+:is(.brow, .bcard):is(:hover, .sel) .more,
+.board .more:focus-visible,
+.bpanel .more {
+  opacity: 1;
+}
+.board .rename {
+  min-width: 0;
+  width: 100%;
+  height: 26px;
+  padding: 0 6px;
+  margin-left: -7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--canvas);
+  font: inherit;
+  color: var(--ink);
+}
+.brow .rename {
+  font-size: 15px;
+}
+.bcard .rename {
+  font-size: 14px;
+  font-weight: 500;
 }
 .brow .main-c {
   min-width: 0;
@@ -1625,7 +1705,7 @@ h2.gh {
 }
 @container (max-width: 560px) {
   .board-list :is(.thead, .brow) {
-    grid-template-columns: 40px 1fr 56px;
+    grid-template-columns: 40px 1fr 56px 24px;
   }
   .board-list .bproj {
     display: none;
@@ -1635,10 +1715,14 @@ h2.gh {
 /* The columns: a lane per status, scrolling sideways when they don't fit. */
 .bcols {
   display: flex;
-  align-items: flex-start;
   gap: 12px;
   padding: 0 32px 24px;
   overflow-x: auto;
+}
+/* Every lane is as tall as the tallest, and at least as the board, so its whole height takes a drop. */
+.board-wrap.wide .bcols {
+  flex: 1 0 auto;
+  align-items: stretch;
 }
 /* The lanes share the width, down to a size a card still reads at, and then the row scrolls. */
 .bcol {
@@ -1746,26 +1830,69 @@ h2.gh {
 }
 .bcard .meta {
   display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 12px;
-}
-
-/* The side panel's card: a head with the title, what the task is, and its buttons at the foot. */
-.bpanel .head {
-  display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 10px 4px 16px;
+  min-height: 24px;
+  font-size: 12px;
+}
+/* The … takes no room of its own: it sits at the end of the line, past the date. */
+.bcard .meta .more {
+  margin: -4px -6px -4px -4px;
+}
+
+/* The side panel: a sidebar on the right, as the left one is, with a head, a body that scrolls and the buttons at
+   the foot. */
+.bpanel {
+  flex: none;
+  width: clamp(260px, 30%, 340px);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--side);
+  border-left: 1px solid var(--line-2);
+}
+.bpanel .body {
+  flex: 1;
+  min-height: 0;
+  padding: 2px 16px 16px;
+  overflow: auto;
+}
+.bpanel h3 {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--t3);
+  margin: 14px 0 8px;
+}
+/* The head lines up with the page's top bar, and drags the window as it does. */
+.bpanel .head {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 44px;
+  padding: 10px 10px 4px 16px;
+  -webkit-app-region: drag;
+}
+.bpanel .head button,
+.bpanel .head input {
+  -webkit-app-region: no-drag;
 }
 .bpanel .head b {
+  padding-top: 3px;
   font-weight: 600;
   font-size: 15px;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
+.bpanel .head .rename {
+  flex: 1;
+  margin-left: -7px;
+  font-weight: 600;
+  font-size: 15px;
+}
 .bpanel .head .iconbtn {
-  align-self: flex-start;
+  width: 24px;
+  height: 24px;
 }
 .bpanel .bmeta {
   display: flex;
@@ -1824,13 +1951,13 @@ h2.gh {
   opacity: 0.4;
   cursor: default;
 }
-/* A task saved for later, where the composer would be. */
-.composer.saved-later {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 12px 12px 16px;
-  font-size: 14.5px;
+/* A task saved for later, open to change: the home's task box, a little down the page under a line saying so. */
+.draft-col {
+  padding-top: 72px;
+}
+.draft-note {
+  margin: 0 4px 12px;
+  font-size: 14px;
 }
 .reviewed-row {
   justify-content: flex-end;
@@ -3848,13 +3975,21 @@ fieldset.fld > legend {
   background-color: var(--t3);
 }
 
-/* An action that failed, at the bottom of the window until dismissed */
-.toast {
+/* Messages at the bottom of the window: an action that failed, until dismissed, and a task saved for later. */
+.toasts {
   position: fixed;
   left: 50%;
   bottom: 20px;
   transform: translateX(-50%);
   width: min(520px, calc(100% - 48px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 50;
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -3865,7 +4000,15 @@ fieldset.fld > legend {
     0 0 0 1px var(--line),
     0 12px 32px rgba(27, 23, 18, 0.14);
   font-size: 14px;
-  z-index: 50;
+}
+.toast.saved {
+  padding-left: 14px;
+}
+.toast.saved > .ic {
+  color: var(--t2);
+}
+.toast.saved .btn {
+  height: 30px;
 }
 
 /* ===== File previews ===== */

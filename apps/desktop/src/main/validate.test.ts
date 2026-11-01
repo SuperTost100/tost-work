@@ -1,6 +1,7 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { absolutePath, oneLine, paths, settingsPatch, taskInput, text } from "./validate";
+import type { Project } from "../shared/model";
+import { absolutePath, oneLine, paths, placedTask, settingsPatch, taskInput, text } from "./validate";
 
 describe("taskInput", () => {
   it("takes a brief, a project or none, and files, the same for starting now or later", () => {
@@ -17,6 +18,45 @@ describe("taskInput", () => {
     expect(() => taskInput(null)).toThrow(/brief must be text/);
     expect(() => taskInput({ brief: "x", projectId: 3 })).toThrow(/projectId/);
     expect(() => taskInput({ brief: "x", attachments: ["notes.txt"] })).toThrow(/absolute/);
+  });
+});
+
+describe("placedTask", () => {
+  const projects: Record<string, Project> = {
+    p1: {
+      id: "p1",
+      name: "Proposals",
+      description: "",
+      folder: "/home/giulia/Proposals",
+      instructions: "",
+      createdAt: "",
+    },
+    p2: { id: "p2", name: "Website", description: "", folder: "/home/giulia/Website", instructions: "", createdAt: "" },
+  };
+  const place = (input: unknown) =>
+    placedTask(
+      input,
+      (id) => projects[id],
+      () => "/tmp/tost-work/quick/new",
+    );
+
+  it("works in its project's folder, so moving a saved task to another project moves its folder too", () => {
+    expect(place({ brief: "Rewrite About", projectId: "p1" }).workdir).toBe("/home/giulia/Proposals");
+    expect(place({ brief: "Rewrite About", projectId: "p2" })).toEqual({
+      brief: "Rewrite About",
+      projectId: "p2",
+      attachments: [],
+      workdir: "/home/giulia/Website",
+    });
+    // Without a project it gets a temporary folder of its own, as a quick edit does.
+    expect(place({ brief: "Fix the letter", projectId: null, attachments: ["/a.docx"] }).workdir).toBe(
+      "/tmp/tost-work/quick/new",
+    );
+  });
+
+  it("refuses an empty brief and a project that isn't there", () => {
+    expect(() => place({ brief: "  ", projectId: "p1" })).toThrow(/needs a brief/);
+    expect(() => place({ brief: "Rewrite About", projectId: "gone" })).toThrow(/doesn't exist/);
   });
 });
 

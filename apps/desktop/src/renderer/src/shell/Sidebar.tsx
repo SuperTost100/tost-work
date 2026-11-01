@@ -3,7 +3,6 @@ import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
 import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
-import type { TaskMenuAction } from "../../../shared/api";
 import { type SectionKey, type Task, toReview } from "../../../shared/model";
 import { Clipped } from "../components/Clipped";
 import { SearchBox } from "../components/SearchDialog";
@@ -41,8 +40,6 @@ export function Sidebar({
   onOpenTask,
   onTaskMenu,
   onRenameTask,
-  onRevealTask,
-  onDeleteTask,
   renaming: renamingProp,
   onRenamingChange,
   search,
@@ -61,10 +58,9 @@ export function Sidebar({
   openTaskId: string | null;
   onOpenTask: (id: string) => void;
   /** Shows the native task menu and resolves with the pick. */
-  onTaskMenu: (id: string) => Promise<TaskMenuAction | null>;
+  /** Shows the task menu, the same as on the Board, and calls `rename` if the user picks Rename. */
+  onTaskMenu: (id: string, rename: () => void) => void;
   onRenameTask: (id: string, title: string) => void;
-  onRevealTask: (id: string) => void;
-  onDeleteTask: (id: string) => void;
   /** The task whose title is being edited, when the parent holds that state. */
   renaming?: string | null;
   onRenamingChange?: (id: string | null) => void;
@@ -76,16 +72,11 @@ export function Sidebar({
   // The menu bar's Rename starts it from outside, so the parent may hold this state.
   const renaming = renamingProp === undefined ? ownRenaming : renamingProp;
   const setRenaming = onRenamingChange ?? setOwnRenaming;
-  const menu = async (id: string) => {
-    const action = await onTaskMenu(id);
-    if (action === "rename") setRenaming(id);
-    else if (action === "reveal") onRevealTask(id);
-    else if (action === "delete") onDeleteTask(id);
-  };
+  const menu = (id: string) => onTaskMenu(id, () => setRenaming(id));
   // Right-click opens the same menu as the … button, as in Finder.
   const contextMenu = (id: string) => (e: MouseEvent) => {
     e.preventDefault();
-    void menu(id);
+    menu(id);
   };
   // While the search field has words, its results take the place of these.
   const items = (
@@ -149,7 +140,7 @@ export function Sidebar({
             className="more"
             aria-label={t("recent.more", { name: task.title })}
             title={t("recent.more", { name: task.title })}
-            onClick={() => void menu(task.id)}
+            onClick={() => menu(task.id)}
             onContextMenu={contextMenu(task.id)}
           >
             <Icon name="more-1" />

@@ -2,7 +2,7 @@ import { useContext, useState } from "react";
 import { approvalTitle } from "@/components/Approval";
 import { type Attachments, Composer } from "@/components/Composer";
 import { ProjectPicker } from "@/components/ProjectPicker";
-import { TaskTag } from "@/components/TaskTag";
+import { Icon } from "@/lib/Icon";
 import { LanguageContext, useT } from "@/lib/useT";
 import { greeting, homeLine } from "../../../shared/i18n";
 import type { Project, Task } from "../../../shared/model";
@@ -19,6 +19,7 @@ export function Home({
   onSaveLater,
   attach,
   onOpenTask,
+  onStartSaved,
   onNewProject,
   allowNoProject = true,
   now = new Date(),
@@ -36,6 +37,8 @@ export function Home({
   onSaveLater?: () => void;
   attach?: Attachments;
   onOpenTask: (id: string) => void;
+  /** Starts a task saved for later, from its row in To do. */
+  onStartSaved: (id: string) => void;
   onNewProject: () => void;
   /** Whether "No project" (a quick edit) is on offer. */
   allowNoProject?: boolean;
@@ -47,7 +50,9 @@ export function Home({
   const lang = useContext(LanguageContext);
   const [randomLine] = useState(() => Math.random());
   const waiting = tasks.filter((x) => x.status === "needs-you");
-  const recent = tasks.slice(0, 6);
+  // shortcut: only the tasks saved for later among the recent ones the window keeps (50, and all of them once the
+  // Board has opened); ask the main process for every one if people keep more than that waiting.
+  const todo = tasks.filter((x) => x.status === "draft");
   const projectName = (id: string | null) => projects.find((p) => p.id === id)?.name;
   return (
     <div className="main">
@@ -97,20 +102,30 @@ export function Home({
               </div>
             </button>
           ))}
-          {recent.length > 0 && (
-            <>
+          {todo.length > 0 && (
+            <section aria-labelledby="home-todo">
               <div className="sec">
-                <span>{t("nav.recent")}</span>
+                <span id="home-todo">{t("board.group.draft")}</span>
               </div>
-              {recent.map((task) => (
-                <button type="button" key={task.id} className="item" onClick={() => onOpenTask(task.id)}>
-                  <div className="r1">
-                    <span className="ttl">{task.title}</span>
-                    <TaskTag task={task} />
-                  </div>
-                </button>
+              {todo.map((task) => (
+                <div key={task.id} className="item todo">
+                  {/* The row opens the task, to change it first; Start beside it starts it as it is. */}
+                  <button type="button" className="open" onClick={() => onOpenTask(task.id)}>
+                    <span className="ttl truncate">{task.title}</span>
+                    <span className="where t3 truncate">{projectName(task.projectId) ?? t("quick.title")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    aria-label={`${t("board.start")}: ${task.title}`}
+                    onClick={() => onStartSaved(task.id)}
+                  >
+                    <Icon name="play" />
+                    {t("board.start")}
+                  </button>
+                </div>
               ))}
-            </>
+            </section>
           )}
         </div>
       </div>

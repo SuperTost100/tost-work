@@ -25,6 +25,7 @@ describe("Home", () => {
           tasks={tasks}
           onStart={() => {}}
           onOpenTask={() => {}}
+          onStartSaved={() => {}}
           onNewProject={() => {}}
           now={new Date(2026, 9, 27, 21)}
         />

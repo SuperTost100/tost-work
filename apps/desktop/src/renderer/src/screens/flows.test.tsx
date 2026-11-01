@@ -4,6 +4,9 @@ import { App } from "@/App";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { DEFAULT_SETTINGS } from "../../../shared/model";
 
+/** The page's own status line, not the window's message area, which is a status region too. */
+const pageStatus = () => within(document.querySelector(".main") as HTMLElement).getByRole("status");
+
 /** Presses a button in the confirmation card. */
 const answer = async (name: string) => {
   const card = await screen.findByRole("alertdialog");
@@ -358,11 +361,11 @@ describe("quick edit", () => {
     });
     await screen.findByText("Check it against your brief");
 
-    expect(screen.getByRole("status").textContent).toBe("Your original isn't touched");
+    expect(pageStatus().textContent).toBe("Your original isn't touched");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Save a copy" }));
     });
-    expect(screen.getByRole("status").textContent).toBe("Saved in /Users/giulia/Documents");
+    expect(pageStatus().textContent).toBe("Saved in /Users/giulia/Documents");
 
     fireEvent.change(screen.getByRole("textbox", { name: "Ask for another change" }), {
       target: { value: "Make it shorter" },
@@ -437,7 +440,7 @@ describe("what the agent is doing", () => {
     expect(screen.getByRole("button", { name: "What it's doing" }).getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByText("Reading note.txt")).toBeTruthy();
     // The line above the composer only says it's at work: the log above already says what it's doing.
-    expect(screen.getByRole("status").textContent).toBe("Working on it");
+    expect(pageStatus().textContent).toBe("Working on it");
 
     // A guide the agent read shows in the side panel by its title.
     await act(async () => api.emit(task.id, { type: "activity", kind: "skill", target: "@word" }));

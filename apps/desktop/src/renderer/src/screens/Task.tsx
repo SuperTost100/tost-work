@@ -3,6 +3,7 @@ import { ApprovalCard } from "@/components/Approval";
 import { type Attachments, Composer } from "@/components/Composer";
 import { FileLine, fileName } from "@/components/FileLine";
 import { Preview } from "@/components/Preview";
+import { ProjectPicker } from "@/components/ProjectPicker";
 import { TaskTag } from "@/components/TaskTag";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
@@ -10,7 +11,7 @@ import { keyed } from "@/lib/keys";
 import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
 import { RenameField } from "@/shell/Sidebar";
-import type { SaveResult, TostWorkApi } from "../../../shared/api";
+import type { NewTaskInput, SaveResult, TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
 import {
   type Activity,
@@ -636,6 +637,10 @@ export function Task({
   onError,
   renaming = false,
   onRenamed,
+  projects,
+  allowNoProject,
+  onNewProject,
+  onSaveDraft,
 }: {
   api: TostWorkApi;
   task: TaskT;
@@ -660,6 +665,12 @@ export function Task({
   /** The menu bar's Rename, for a task Recent doesn't show: its title in the header becomes the field. */
   renaming?: boolean;
   onRenamed?: (title: string | null) => void;
+  /** For a task saved for later, the projects its box can move it to, as on the home. */
+  projects: Project[];
+  allowNoProject: boolean;
+  onNewProject: () => void;
+  /** Saves the edits to a task saved for later. Resolves true once saved, false when it failed. */
+  onSaveDraft: (edit: NewTaskInput) => Promise<boolean>;
 }) {
   const t = useT();
   const [answer, setAnswer] = useState("");
@@ -858,173 +869,175 @@ export function Task({
           </button>
         )}
       </div>
-      <div className={quick ? "qe" : "task"}>
-        <div className="mid">
-          <div
-            className="scroll"
-            ref={scroller}
-            onScroll={(e) => {
-              const el = e.currentTarget;
-              pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
-            }}
-          >
-            <div className="col">
-              <div className="msg mine">
-                <div className="you">
-                  <LongText text={task.brief} />
-                  <AttachedFiles paths={task.messages[0]?.attachments ?? firstFiles(task)} />
-                </div>
-                <CopyButton text={() => task.brief} />
-              </div>
-              {runStart > 0 && range(1, runStart + 1)}
-              {task.steps.length > 0 && (
-                <div className="steps">
-                  {live && current >= 0 && (
-                    <p className="t3" style={{ fontSize: 13, margin: 0 }}>
-                      {t("task.step", { n: String(current + 1), total: String(task.steps.length) })}
-                    </p>
-                  )}
-                  {keyed(task.steps, (s) => s.text).map(([key, s]) => (
-                    <div key={key} className={s.status === "in_progress" ? "now" : undefined}>
-                      <Icon name={s.status === "done" ? "check" : s.status === "in_progress" ? "pencil" : "time"} />
-                      {s.text}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {range(runStart > 0 ? runStart + 1 : 1, end)}
-              {older.length > 0 && <ActivityLog key="older" activity={older} live={false} />}
-              {(tail.length > 0 || waiting) && <ActivityLog key="tail" activity={tail} live={live} waiting={waiting} />}
-              {draft && <TypedMessage key={`draft-${end}`} text={draft} onShown={followDraft} />}
-              {made.length > 0 && (
-                <Artifact api={api} task={task} files={made} picked={picked} onPick={setPicked} onError={onError} />
-              )}
-              {task.status === "stopped" &&
-                (task.interrupted ? (
-                  <div className="agent row">
-                    {/* Only the note is grey: Resume is a normal button. */}
-                    <span className="grow t3">
-                      {t("task.interrupted")}
-                      {/* A resume that failed, for example offline, says why; Resume stays to try again. */}
-                      {task.error && (
-                        <>
-                          <br />
-                          {t("task.failed", { error: task.error })}
-                        </>
-                      )}
-                    </span>
-                    <button type="button" className="btn" onClick={onResume}>
-                      {t("task.resume")}
-                    </button>
-                  </div>
-                ) : (
-                  <p className="agent t3">{t("task.stopped")}</p>
-                ))}
-              {task.status === "failed" && <p className="agent">{t("task.failed", { error: task.error ?? "" })}</p>}
-              {checked ? (
-                <>
-                  <div className="check-h">
-                    <b>{t("task.review")}</b>
-                    <span className="grow" />
-                    {reviewButton}
-                  </div>
-                  <Checks title={t("task.asked")} items={checked.asked} icon="check" />
-                  <Checks title={t("task.decided")} items={checked.decided} icon="question" />
-                  <Checks title={t("task.checkYourself")} items={checked.checkYourself} icon="eye-2" />
-                </>
-              ) : (
-                // Work with no check to read, such as an answer in the chat, is marked reviewed at its end.
-                reviewButton && <div className="agent row reviewed-row">{reviewButton}</div>
-              )}
-            </div>
-            {/* In the scroller, held at its bottom: the page scrolls under the composer, and so does the scrollbar. */}
-            <div className="foot">
+      {task.status === "draft" ? (
+        <DraftEditor
+          task={task}
+          projects={projects}
+          allowNoProject={allowNoProject}
+          onNewProject={onNewProject}
+          attach={attach}
+          onSave={onSaveDraft}
+          onStart={onStartSaved}
+        />
+      ) : (
+        <div className={quick ? "qe" : "task"}>
+          <div className="mid">
+            <div
+              className="scroll"
+              ref={scroller}
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+              }}
+            >
               <div className="col">
-                {task.status === "running" && <Working />}
-                {/* Always there, so a screen reader hears when a question or approval starts waiting, log open or
-                    not. */}
-                <span className="sr-only" aria-live="polite">
-                  {waiting && t(waiting === "question" ? "activity.asking" : "activity.approval")}
-                </span>
-                {task.question ? (
-                  <QuestionCard
-                    key={task.question.id}
-                    question={task.question}
-                    draft={answer}
-                    onDraft={setAnswer}
-                    onSend={send}
-                    attach={attach(answerFiles, setAnswerFiles)}
-                  />
-                ) : task.approval ? (
-                  <ApprovalCard approval={task.approval} t={t} onDecide={onDecide} />
-                ) : task.status === "draft" ? (
-                  // Nothing has run, so there's nothing to follow up on: the brief starts when the user says so.
-                  <div className="composer saved-later">
-                    <span className="grow t2">{t("task.notStarted")}</span>
-                    <button type="button" className="btn dark" onClick={onStartSaved}>
-                      <Icon name="play" />
-                      {t("board.start")}
-                    </button>
+                <div className="msg mine">
+                  <div className="you">
+                    <LongText text={task.brief} />
+                    <AttachedFiles paths={task.messages[0]?.attachments ?? firstFiles(task)} />
                   </div>
-                ) : (
-                  <Composer
-                    value={live ? "" : message}
-                    onChange={setMessage}
-                    onSubmit={() => {
-                      // One at a time: copying the files takes a moment, and a second Send would run it twice.
-                      if (followSending.current) return;
-                      followSending.current = true;
-                      // Cleared once it's sent, unless the user changed them meanwhile, so a failed send keeps both.
-                      const text = message;
-                      const files = messageFiles;
-                      void onFollowUp(text.trim(), files).then((sent) => {
-                        followSending.current = false;
-                        if (!sent) return;
-                        setMessage((current) => (current === text ? "" : current));
-                        setMessageFiles((current) => (current === files ? [] : current));
-                      });
-                    }}
-                    placeholder={live ? t("composer.busy") : quick ? t("composer.another") : t("composer.followup")}
-                    sendLabel={t("composer.send")}
-                    disabled={live}
-                    minHeight={44}
-                    attach={attach(messageFiles, setMessageFiles)}
-                  />
+                  <CopyButton text={() => task.brief} />
+                </div>
+                {runStart > 0 && range(1, runStart + 1)}
+                {task.steps.length > 0 && (
+                  <div className="steps">
+                    {live && current >= 0 && (
+                      <p className="t3" style={{ fontSize: 13, margin: 0 }}>
+                        {t("task.step", { n: String(current + 1), total: String(task.steps.length) })}
+                      </p>
+                    )}
+                    {keyed(task.steps, (s) => s.text).map(([key, s]) => (
+                      <div key={key} className={s.status === "in_progress" ? "now" : undefined}>
+                        <Icon name={s.status === "done" ? "check" : s.status === "in_progress" ? "pencil" : "time"} />
+                        {s.text}
+                      </div>
+                    ))}
+                  </div>
                 )}
+                {range(runStart > 0 ? runStart + 1 : 1, end)}
+                {older.length > 0 && <ActivityLog key="older" activity={older} live={false} />}
+                {(tail.length > 0 || waiting) && (
+                  <ActivityLog key="tail" activity={tail} live={live} waiting={waiting} />
+                )}
+                {draft && <TypedMessage key={`draft-${end}`} text={draft} onShown={followDraft} />}
+                {made.length > 0 && (
+                  <Artifact api={api} task={task} files={made} picked={picked} onPick={setPicked} onError={onError} />
+                )}
+                {task.status === "stopped" &&
+                  (task.interrupted ? (
+                    <div className="agent row">
+                      {/* Only the note is grey: Resume is a normal button. */}
+                      <span className="grow t3">
+                        {t("task.interrupted")}
+                        {/* A resume that failed, for example offline, says why; Resume stays to try again. */}
+                        {task.error && (
+                          <>
+                            <br />
+                            {t("task.failed", { error: task.error })}
+                          </>
+                        )}
+                      </span>
+                      <button type="button" className="btn" onClick={onResume}>
+                        {t("task.resume")}
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="agent t3">{t("task.stopped")}</p>
+                  ))}
+                {task.status === "failed" && <p className="agent">{t("task.failed", { error: task.error ?? "" })}</p>}
+                {checked ? (
+                  <>
+                    <div className="check-h">
+                      <b>{t("task.review")}</b>
+                      <span className="grow" />
+                      {reviewButton}
+                    </div>
+                    <Checks title={t("task.asked")} items={checked.asked} icon="check" />
+                    <Checks title={t("task.decided")} items={checked.decided} icon="question" />
+                    <Checks title={t("task.checkYourself")} items={checked.checkYourself} icon="eye-2" />
+                  </>
+                ) : (
+                  // Work with no check to read, such as an answer in the chat, is marked reviewed at its end.
+                  reviewButton && <div className="agent row reviewed-row">{reviewButton}</div>
+                )}
+              </div>
+              {/* In the scroller, held at its bottom: the page scrolls under the composer, and so does the scrollbar. */}
+              <div className="foot">
+                <div className="col">
+                  {task.status === "running" && <Working />}
+                  {/* Always there, so a screen reader hears when a question or approval starts waiting, log open or
+                    not. */}
+                  <span className="sr-only" aria-live="polite">
+                    {waiting && t(waiting === "question" ? "activity.asking" : "activity.approval")}
+                  </span>
+                  {task.question ? (
+                    <QuestionCard
+                      key={task.question.id}
+                      question={task.question}
+                      draft={answer}
+                      onDraft={setAnswer}
+                      onSend={send}
+                      attach={attach(answerFiles, setAnswerFiles)}
+                    />
+                  ) : task.approval ? (
+                    <ApprovalCard approval={task.approval} t={t} onDecide={onDecide} />
+                  ) : (
+                    <Composer
+                      value={live ? "" : message}
+                      onChange={setMessage}
+                      onSubmit={() => {
+                        // One at a time: copying the files takes a moment, and a second Send would run it twice.
+                        if (followSending.current) return;
+                        followSending.current = true;
+                        // Cleared once it's sent, unless the user changed them meanwhile, so a failed send keeps both.
+                        const text = message;
+                        const files = messageFiles;
+                        void onFollowUp(text.trim(), files).then((sent) => {
+                          followSending.current = false;
+                          if (!sent) return;
+                          setMessage((current) => (current === text ? "" : current));
+                          setMessageFiles((current) => (current === files ? [] : current));
+                        });
+                      }}
+                      placeholder={live ? t("composer.busy") : quick ? t("composer.another") : t("composer.followup")}
+                      sendLabel={t("composer.send")}
+                      disabled={live}
+                      minHeight={44}
+                      attach={attach(messageFiles, setMessageFiles)}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        {quick ? (
-          <WhatChanged
-            api={api}
-            task={task}
-            made={made}
-            live={live}
-            onSaveCopy={onSaveCopy}
-            onRestore={onRestore}
-            onError={onError}
-            skillTitles={skillTitles}
-          />
-        ) : (
-          <aside className="rp">
-            <div className="body">
-              <h3>{t("task.made")}</h3>
-              {made.length === 0 && <p className="empty">{t("task.noFiles")}</p>}
-              {made.map((f) => (
-                <Fragment key={f.path}>
-                  <FileLine path={f.path} onSelect={f.kind === "delete" ? undefined : () => showFile(f.path)} />
-                  <KeptRow task={task} path={f.path} onRestore={onRestore} />
-                </Fragment>
-              ))}
-              {used.length > 0 && <h3>{t("task.used")}</h3>}
-              {used.map(({ path, attached }) => (
-                <FileLine key={path} path={path} sub={attached ? t("task.attachedFile") : undefined} />
-              ))}
-              <SkillsFollowed names={task.skillsUsed} titles={skillTitles} />
-              <h3>{t("task.settings")}</h3>
-              {/* A task saved for later gets its model when it starts, from the defaults of that moment. */}
-              {task.status !== "draft" && (
+          {quick ? (
+            <WhatChanged
+              api={api}
+              task={task}
+              made={made}
+              live={live}
+              onSaveCopy={onSaveCopy}
+              onRestore={onRestore}
+              onError={onError}
+              skillTitles={skillTitles}
+            />
+          ) : (
+            <aside className="rp">
+              <div className="body">
+                <h3>{t("task.made")}</h3>
+                {made.length === 0 && <p className="empty">{t("task.noFiles")}</p>}
+                {made.map((f) => (
+                  <Fragment key={f.path}>
+                    <FileLine path={f.path} onSelect={f.kind === "delete" ? undefined : () => showFile(f.path)} />
+                    <KeptRow task={task} path={f.path} onRestore={onRestore} />
+                  </Fragment>
+                ))}
+                {used.length > 0 && <h3>{t("task.used")}</h3>}
+                {used.map(({ path, attached }) => (
+                  <FileLine key={path} path={path} sub={attached ? t("task.attachedFile") : undefined} />
+                ))}
+                <SkillsFollowed names={task.skillsUsed} titles={skillTitles} />
+                <h3>{t("task.settings")}</h3>
                 <div className="setrow">
                   <Icon name="chip" />
                   <span className="grow">
@@ -1034,17 +1047,93 @@ export function Task({
                     </span>
                   </span>
                 </div>
-              )}
-              <div className="setrow">
-                <Icon name="folder" />
-                <span className="grow">
-                  <span className="k">{t("task.savesTo")}</span>
-                  <span className="v">{project?.folder ?? t("task.tempFolder")}</span>
-                </span>
+                <div className="setrow">
+                  <Icon name="folder" />
+                  <span className="grow">
+                    <span className="k">{t("task.savesTo")}</span>
+                    <span className="v">{project?.folder ?? t("task.tempFolder")}</span>
+                  </span>
+                </div>
               </div>
-            </div>
-          </aside>
-        )}
+            </aside>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A task saved for later, open to change before it starts: the task box the home has, with the brief, its files and
+ * its project. Save changes keeps them for later; Start keeps them and starts the task.
+ */
+function DraftEditor({
+  task,
+  projects,
+  allowNoProject,
+  onNewProject,
+  attach,
+  onSave,
+  onStart,
+}: {
+  task: TaskT;
+  projects: Project[];
+  allowNoProject: boolean;
+  onNewProject: () => void;
+  attach: (files: string[], set: (update: (prev: string[]) => string[]) => void) => Attachments;
+  /** Resolves true once the edit is saved, false when it failed and the box should keep it. */
+  onSave: (edit: NewTaskInput) => Promise<boolean>;
+  onStart: () => void;
+}) {
+  const t = useT();
+  const [brief, setBrief] = useState(task.brief);
+  const [files, setFiles] = useState(task.attachments);
+  const [projectId, setProjectId] = useState(task.projectId);
+  const changed =
+    brief.trim() !== task.brief ||
+    projectId !== task.projectId ||
+    files.length !== task.attachments.length ||
+    files.some((f, i) => f !== task.attachments[i]);
+  // One save at a time: a second click before the first returns would save, or start, twice.
+  const busy = useRef(false);
+  const save = async (): Promise<boolean> => {
+    if (busy.current) return false;
+    busy.current = true;
+    try {
+      return await onSave({ brief: brief.trim(), projectId, attachments: files });
+    } finally {
+      busy.current = false;
+    }
+  };
+  // The edits go first, so the task starts with the brief as it reads now.
+  const start = async () => {
+    if (busy.current || (changed && !(await save()))) return;
+    onStart();
+  };
+  return (
+    <div className="scroll">
+      <div className="col draft-col">
+        <p className="t2 draft-note">{t("task.notStarted")}</p>
+        <Composer
+          value={brief}
+          onChange={setBrief}
+          onSubmit={() => void start()}
+          placeholder={t("composer.placeholder")}
+          attach={attach(files, setFiles)}
+          sendLabel={t("board.start")}
+          onSaveLater={() => void save()}
+          laterLabel={t("draft.save")}
+          laterDisabled={!changed}
+        />
+        <div className="under">
+          <ProjectPicker
+            projects={projects}
+            value={projectId}
+            onChange={setProjectId}
+            onNewProject={onNewProject}
+            allowNone={allowNoProject}
+          />
+        </div>
       </div>
     </div>
   );

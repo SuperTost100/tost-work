@@ -9,7 +9,6 @@ import {
   type ProjectMenuAction,
   type SaveResult,
   type SkillMenuAction,
-  type TaskMenuAction,
 } from "../shared/api";
 import { guideText, languageFrom, type MessageKey, translate } from "../shared/i18n";
 import {
@@ -22,6 +21,7 @@ import {
   type Settings,
 } from "../shared/model";
 import { removalText } from "../shared/projectText";
+import { type MenuItem, taskMenuItems } from "../shared/taskMenu";
 import type { Accounts } from "./accounts";
 import { type TaskRunner, withFiles } from "./engine/runner";
 import { type Conflict, copyInto, describe, readablePath, removeCopies, savablePaths, saveCopies } from "./files";
@@ -30,7 +30,7 @@ import { type Jobs, jobDraft } from "./jobs";
 import type { KeyStore } from "./keys";
 import type { GuideText, SkillFolder } from "./skills";
 import type { Store } from "./store/store";
-import { absolutePath, oneLine, paths, settingsPatch, taskInput, text } from "./validate";
+import { absolutePath, oneLine, paths, placedTask, settingsPatch, text } from "./validate";
 
 /** Validates everything that comes from the interface, because IPC is a trust boundary. */
 export function registerIpc(
@@ -124,13 +124,12 @@ export function registerIpc(
 
   // A new task's brief, project and folder. A task without a project works in a temporary folder of its own, as a
   // quick edit does.
-  const newTask = (input: unknown) => {
-    const { brief, projectId, attachments } = taskInput(input);
-    const project = projectId ? store.getProject(projectId) : undefined;
-    if (projectId && !project) throw new Error("That project doesn't exist");
-    const workdir = project?.folder ?? join(tmpdir(), "tost-work", "quick", randomUUID());
-    return { brief, projectId, attachments, workdir };
-  };
+  const newTask = (input: unknown) =>
+    placedTask(
+      input,
+      (id) => store.getProject(id),
+      () => join(tmpdir(), "tost-work", "quick", randomUUID()),
+    );
   // The files the agent works on. A quick edit's agent edits copies, so the user's originals stay as they are until
   // they save a copy.
   const workFiles = async (projectId: string | null, workdir: string, given: string[]) => {
@@ -152,7 +151,13 @@ export function registerIpc(
   ipcMain.handle(IPC.tasksStartSaved, (_e, id: unknown) =>
     runner.startSaved(text(id, "id", 100), (task) => workFiles(task.projectId, task.workdir, task.attachments)),
   );
+  // An edit to a task saved for later is placed as a new one is, so a change of project moves it to that folder. A
+  // quick edit's files are still copied only when it starts.
+  ipcMain.handle(IPC.tasksUpdateDraft, (_e, id: unknown, input: unknown) =>
+    runner.updateDraft(text(id, "id", 100), newTask(input)),
+  );
   ipcMain.handle(IPC.tasksMarkReviewed, (_e, id: unknown) => runner.markReviewed(text(id, "id", 100)));
+  ipcMain.handle(IPC.tasksMarkUnreviewed, (_e, id: unknown) => runner.markUnreviewed(text(id, "id", 100)));
 
   // Files attached after the first message: a quick edit works on copies, as it does with the first ones. If the task
   // then refuses the message, for example because it's working, the copies go again.
@@ -227,7 +232,7 @@ export function registerIpc(
     return task;
   };
   // A native menu, as Finder's and Mail's are. It only says what was picked; the window carries it out.
-  const popup = <A>(items: ({ label: string; action: A; enabled?: boolean } | "separator")[]) =>
+  const popup = <A>(items: MenuItem<A>[]) =>
     new Promise<A | null>((resolve) => {
       let picked = false;
       const menu = Menu.buildFromTemplate(
@@ -249,13 +254,6 @@ export function registerIpc(
       const win = window();
       menu.popup(win ? { window: win, callback: closed } : { callback: closed });
     });
-  const itemMenu = (canDelete: boolean) =>
-    popup<TaskMenuAction>([
-      { label: t("menu.rename"), action: "rename" },
-      { label: t("menu.reveal"), action: "reveal" },
-      "separator",
-      { label: t("menu.delete"), action: "delete", enabled: canDelete },
-    ]);
   const skillMenu = () =>
     popup<SkillMenuAction>([
       { label: t("menu.rename"), action: "rename" },
@@ -264,7 +262,10 @@ export function registerIpc(
       "separator",
       { label: t("menu.delete"), action: "delete" },
     ]);
-  ipcMain.handle(IPC.tasksMenu, (_e, id: unknown) => itemMenu(!runner.isRunning(taskOf(id).id)));
+  ipcMain.handle(IPC.tasksMenu, (_e, id: unknown) => {
+    const task = taskOf(id);
+    return popup(taskMenuItems(task, !runner.isRunning(task.id), t));
+  });
   ipcMain.handle(IPC.tasksRename, (_e, id: unknown, title: unknown) =>
     runner.rename(text(id, "id", 100), text(title, "title", 200)),
   );

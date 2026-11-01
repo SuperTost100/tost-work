@@ -17,6 +17,7 @@ import {
   NOTIFY_LEVELS,
   type NotifyKind,
   type NotifyLevel,
+  type Project,
   SECTION_LEVEL,
   type SectionKey,
   type Settings,
@@ -57,6 +58,21 @@ export const taskInput = (v: unknown): Required<NewTaskInput> => {
   if (!brief) throw new Error("A task needs a brief");
   const projectId = input.projectId == null ? null : text(input.projectId, "projectId", 100);
   return { brief, projectId, attachments: paths(input.attachments, "attachments") };
+};
+
+/**
+ * A new or edited task's brief, project and files, with the folder it works in: its project's, or for a task without
+ * a project a temporary folder of its own, as a quick edit has.
+ */
+export const placedTask = (
+  v: unknown,
+  projectOf: (id: string) => Project | undefined,
+  quickFolder: () => string,
+): Required<NewTaskInput> & { workdir: string } => {
+  const { brief, projectId, attachments } = taskInput(v);
+  const project = projectId ? projectOf(projectId) : undefined;
+  if (projectId && !project) throw new Error("That project doesn't exist");
+  return { brief, projectId, attachments, workdir: project?.folder ?? quickFolder() };
 };
 
 /** Only the known settings, each with the right type. Anything else is refused rather than stored. */

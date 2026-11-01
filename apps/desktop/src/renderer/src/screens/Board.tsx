@@ -1,12 +1,13 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
-import { type DragEvent, type ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { type DragEvent, type MouseEvent, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { approvalTitle } from "@/components/Approval";
 import { FileLine, fileName, Thumb } from "@/components/FileLine";
 import { TaskTag } from "@/components/TaskTag";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { LanguageContext, useT } from "@/lib/useT";
+import { RenameField } from "@/shell/Sidebar";
 import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
 import { updatedText } from "../../../shared/jobText";
@@ -72,6 +73,8 @@ export function Board({
   allowNoProject,
   onOpenTask,
   onTaskChanged,
+  onSavedForLater,
+  onTaskMenu,
   onError,
   now = new Date(),
 }: {
@@ -85,6 +88,10 @@ export function Board({
   onOpenTask: (id: string) => void;
   /** A task the board changed, in its new state, so the window shows it before the change event arrives. */
   onTaskChanged: (task: Task) => void;
+  /** A task New saved, which the window announces. */
+  onSavedForLater: (task: Task) => void;
+  /** Shows the task menu, the same as in Recent, and calls `rename` if the user picks Rename. */
+  onTaskMenu: (id: string, rename: () => void) => void;
   onError: (err: unknown) => void;
   now?: Date;
 }) {
@@ -94,6 +101,8 @@ export function Board({
   const [selected, setSelected] = useState<string | null>(null);
   const [showOlder, setShowOlder] = useState(false);
   const [creating, setCreating] = useState(false);
+  // The task whose title is a field, and whether that's in the side panel or on its row or card.
+  const [renaming, setRenaming] = useState<{ id: string; inPanel: boolean } | null>(null);
   const view = settings.boardView;
   const group = settings.boardGroup;
 
@@ -106,12 +115,16 @@ export function Board({
   const count = (f: Filter) => sorted.filter(PASSES[f]).length;
   const open = tasks.find((x) => x.id === selected) ?? null;
 
-  // Escape closes the side panel, unless it's meant for something above it, such as a menu or a dialog.
+  // Escape closes the side panel, unless it's meant for something above it, such as a menu, a dialog or a title being
+  // renamed.
   useEffect(() => {
     if (!open || creating) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (e.target instanceof Element && e.target.closest('[role="menu"], [role="dialog"], [role="alertdialog"]'))
+      if (
+        e.target instanceof Element &&
+        e.target.closest('[role="menu"], [role="dialog"], [role="alertdialog"], input, textarea')
+      )
         return;
       setSelected(null);
     };
@@ -133,6 +146,17 @@ export function Board({
     review: (id) => act(api.tasks.markReviewed(id)),
   };
   const select = (id: string) => setSelected((current) => (current === id ? null : id));
+  const menu = (id: string, inPanel = false) => onTaskMenu(id, () => setRenaming({ id, inPanel }));
+  const renamed = (id: string) => (title: string | null) => {
+    setRenaming(null);
+    const task = tasks.find((x) => x.id === id);
+    if (title && task && title !== task.title) act(api.tasks.rename(id, title));
+  };
+  const titleField = (task: Task, inPanel = false) =>
+    renaming?.id === task.id &&
+    renaming.inPanel === inPanel && (
+      <RenameField title={task.title} label={t("menu.rename")} onDone={renamed(task.id)} />
+    );
   const row = (task: Task) => (
     <Row
       key={task.id}
@@ -142,6 +166,8 @@ export function Board({
       selected={task.id === selected}
       showTag={group === "project" || ["done", "failed", "stopped"].includes(task.status)}
       onSelect={() => select(task.id)}
+      onMenu={() => menu(task.id)}
+      titleField={titleField(task)}
       actions={actions}
     />
   );
@@ -170,6 +196,8 @@ export function Board({
         onSelect={select}
         project={projectName}
         when={(task) => updatedText(lang, new Date(task.updatedAt), now)}
+        onMenu={menu}
+        titleField={titleField}
         actions={actions}
       />
     );
@@ -221,18 +249,19 @@ export function Board({
   }
 
   return (
-    <div className="main">
-      <div className="top">
-        <span className="grow" />
-        <button type="button" className="tbtn" onClick={() => setCreating(true)}>
-          <Icon name="add" />
-          {t("board.new")}
-        </button>
-        <ViewButton view="list" icon="list-check" label={t("board.list")} current={view} onPick={save} />
-        <ViewButton view="columns" icon="layout" label={t("board.columns")} current={view} onPick={save} />
-        <DisplayMenu group={group} disabled={view === "columns"} onPick={(boardGroup) => save({ boardGroup })} />
-      </div>
-      <div className={open ? "board-page with-panel" : "board-page"}>
+    // The side panel is a sidebar on the right, beside the page rather than over it, so it never covers a task.
+    <div className="main board">
+      <div className="board-page">
+        <div className="top">
+          <span className="grow" />
+          <button type="button" className="tbtn" onClick={() => setCreating(true)}>
+            <Icon name="add" />
+            {t("board.new")}
+          </button>
+          <ViewButton view="list" icon="list-check" label={t("board.list")} current={view} onPick={save} />
+          <ViewButton view="columns" icon="layout" label={t("board.columns")} current={view} onPick={save} />
+          <DisplayMenu group={group} disabled={view === "columns"} onPick={(boardGroup) => save({ boardGroup })} />
+        </div>
         <div className="scroll">
           <div className={view === "columns" ? "board-wrap wide" : "board-wrap"}>
             <div className="bhead">
@@ -263,19 +292,21 @@ export function Board({
             {body}
           </div>
         </div>
-        {open && (
-          <SidePanel
-            key={open.id}
-            api={api}
-            task={open}
-            project={projectName(open)}
-            onClose={() => setSelected(null)}
-            onOpenTask={() => onOpenTask(open.id)}
-            actions={actions}
-            onError={onError}
-          />
-        )}
       </div>
+      {open && (
+        <SidePanel
+          key={open.id}
+          api={api}
+          task={open}
+          project={projectName(open)}
+          titleField={titleField(open, true)}
+          onMenu={() => menu(open.id, true)}
+          onClose={() => setSelected(null)}
+          onOpenTask={() => onOpenTask(open.id)}
+          actions={actions}
+          onError={onError}
+        />
+      )}
       {creating && (
         <NewDialog
           api={api}
@@ -283,7 +314,7 @@ export function Board({
           allowNoProject={allowNoProject}
           lastUsed={sorted.find((x) => x.projectId && projects.some((p) => p.id === x.projectId))?.projectId ?? null}
           onClose={() => setCreating(false)}
-          onSaved={onTaskChanged}
+          onSaved={onSavedForLater}
         />
       )}
     </div>
@@ -436,6 +467,30 @@ function Tags({ task, status }: { task: Task; status: boolean }) {
   );
 }
 
+/** The … button of a row, a card or the side panel, which opens the task menu, as right-clicking does. */
+function MoreButton({ task, onMenu }: { task: Task; onMenu: () => void }) {
+  const t = useT();
+  const label = t("recent.more", { name: task.title });
+  return (
+    <button
+      type="button"
+      className="more"
+      aria-label={label}
+      title={label}
+      onClick={onMenu}
+      onContextMenu={contextMenu(onMenu)}
+    >
+      <Icon name="more-1" />
+    </button>
+  );
+}
+
+/** Right-click opens the task menu instead of the system's, as in Recent. */
+const contextMenu = (onMenu: () => void) => (e: MouseEvent) => {
+  e.preventDefault();
+  onMenu();
+};
+
 function Row({
   task,
   project,
@@ -443,6 +498,8 @@ function Row({
   selected,
   showTag,
   onSelect,
+  onMenu,
+  titleField,
   actions,
 }: {
   task: Task;
@@ -451,6 +508,9 @@ function Row({
   selected: boolean;
   showTag: boolean;
   onSelect: () => void;
+  onMenu: () => void;
+  /** The field that takes the title's place while it's renamed. */
+  titleField: ReactNode;
   actions: RowActions;
 }) {
   const summary = useSummary();
@@ -464,10 +524,11 @@ function Row({
         aria-expanded={selected}
         aria-controls={selected ? "board-panel" : undefined}
         onClick={onSelect}
+        onContextMenu={contextMenu(onMenu)}
       />
       <TaskThumb task={task} />
       <span className="main-c">
-        <span className="nm truncate">{task.title}</span>
+        {titleField || <span className="nm truncate">{task.title}</span>}
         <span className="sn">
           <Tags task={task} status={showTag} />
           <span className="truncate">{summary(task)}</span>
@@ -476,6 +537,7 @@ function Row({
       </span>
       <span className="c bproj truncate">{project}</span>
       <span className="c t3">{when}</span>
+      <MoreButton task={task} onMenu={onMenu} />
     </div>
   );
 }
@@ -489,6 +551,8 @@ function Columns({
   onSelect,
   project,
   when,
+  onMenu,
+  titleField,
   actions,
 }: {
   tasks: Task[];
@@ -499,6 +563,8 @@ function Columns({
   onSelect: (id: string) => void;
   project: (task: Task) => string;
   when: (task: Task) => string;
+  onMenu: (id: string) => void;
+  titleField: (task: Task) => ReactNode;
   actions: RowActions;
 }) {
   const t = useT();
@@ -559,6 +625,7 @@ function Columns({
                     aria-expanded={task.id === selected}
                     aria-controls={task.id === selected ? "board-panel" : undefined}
                     onClick={() => onSelect(task.id)}
+                    onContextMenu={contextMenu(() => onMenu(task.id))}
                     draggable={movable}
                     onDragStart={(e) => {
                       if (e.dataTransfer) {
@@ -574,7 +641,7 @@ function Columns({
                       setOver(null);
                     }}
                   />
-                  <span className="nm">{task.title}</span>
+                  {titleField(task) || <span className="nm">{task.title}</span>}
                   <span className="sn">
                     {/* A running card says it's working, so it doesn't look like one more card to move. */}
                     <Tags task={task} status={place === "stopped" || task.status === "running"} />
@@ -582,8 +649,9 @@ function Columns({
                   </span>
                   <InlineActions task={task} actions={actions} />
                   <span className="meta t3">
-                    <span className="truncate">{project(task)}</span>
+                    <span className="truncate grow">{project(task)}</span>
                     <span>{when(task)}</span>
+                    <MoreButton task={task} onMenu={() => onMenu(task.id)} />
                   </span>
                 </div>
               );
@@ -604,6 +672,8 @@ function SidePanel({
   api,
   task,
   project,
+  titleField,
+  onMenu,
   onClose,
   onOpenTask,
   actions,
@@ -612,6 +682,9 @@ function SidePanel({
   api: TostWorkApi;
   task: Task;
   project: string;
+  /** The field that takes the title's place while it's renamed. */
+  titleField: ReactNode;
+  onMenu: () => void;
   onClose: () => void;
   onOpenTask: () => void;
   actions: RowActions;
@@ -621,9 +694,10 @@ function SidePanel({
   const made = task.files.filter((f) => f.role === "made" && f.kind !== "delete");
   const brief = task.brief.length > EXCERPT ? `${task.brief.slice(0, EXCERPT).trimEnd()}…` : task.brief;
   return (
-    <aside className="rp bpanel" id="board-panel" aria-label={task.title}>
+    <aside className="bpanel" id="board-panel" aria-label={task.title}>
       <div className="head">
-        <b className="grow">{task.title}</b>
+        {titleField || <b className="grow">{task.title}</b>}
+        <MoreButton task={task} onMenu={onMenu} />
         <button
           type="button"
           className="iconbtn"
@@ -697,6 +771,7 @@ function NewDialog({
   /** The project of the newest task, which the picker starts on, as the home's does. */
   lastUsed: string | null;
   onClose: () => void;
+  /** The task, once it's saved and the dialog is closing. */
   onSaved: (task: Task) => void;
 }) {
   const t = useT();
