@@ -126,7 +126,7 @@ Changed on 2026-11-01, after testing 0.0.14:
 
 Changed on 2026-11-01, building the Board:
 
-- The Board lists every AI task, grouped by Tocca a te, In corso, Da fare and the last 7 days of finished tasks, with older ones behind "Mostra più vecchie". Columns is the other view, with its own Da rivedere column.
+- The Board lists every AI task, grouped by Tocca a te, In corso, Da fare and the last 7 days of finished tasks, with older ones behind "Mostra più vecchie". Tasks that failed or were stopped go in an Interrotte group at the end. Columns is the other view, with its own Da rivedere column.
 - "Salva per dopo" next to Send saves a task without starting it, and "Avvia" starts it later.
 - A finished task stays "da rivedere" until the user marks it reviewed, from the Board or from the task.
 
