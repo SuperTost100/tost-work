@@ -250,12 +250,61 @@ h3 {
   background: var(--panel);
   border-color: transparent;
 }
-.search kbd {
-  margin-left: auto;
-  font:
-    500 11px / 1 "Schibsted Grotesk",
-    sans-serif;
+.search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+}
+.search input::placeholder {
   color: var(--t3);
+}
+/* The box shows the focus, as other fields do, rather than a ring round the text inside it. */
+.search input:focus-visible {
+  outline: none;
+}
+/* :root outranks the dark theme's own border. */
+:root .search:focus-within {
+  border-color: var(--ink);
+}
+/* In the sidebar, the results take the place of the sections and Recent, at the size of Recent's rows. */
+.side .search-hits {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: none;
+  padding: 0;
+  border-top: 0;
+}
+.side .search-h {
+  padding: 10px 8px 4px;
+}
+.side .search-hit {
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px;
+  font-size: 13.5px;
+}
+.side .search-hit .ic {
+  width: 16px;
+  height: 16px;
+}
+.side .search-none {
+  padding: 8px;
+  border-top: 0;
+  font-size: 13px;
+}
+/* Rows that light up under the pointer keep apart, so two lit at once never touch. */
+.nav + .nav,
+.rec + .rec,
+.slist .sitem + .sitem,
+.menu-item + .menu-item,
+.search-hit + .search-hit,
+.prow + .prow {
+  margin-top: 2px;
 }
 .nav {
   display: flex;
@@ -3204,8 +3253,7 @@ ol.editable li::before {
 textarea:focus-visible {
   outline: none;
 }
-.side .nav,
-.side .search {
+.side .nav {
   width: 100%;
   text-align: left;
   cursor: pointer;
@@ -4168,6 +4216,10 @@ html:has(.panel) body {
 .railbtn .ic {
   width: 20px;
   height: 20px;
+}
+/* Apart as the sidebar's sections are, so each icon stays at its row's height. */
+.railbtn:not([data-nav="search"], :has(.avatar)) + .railbtn {
+  margin-top: 2px;
 }
 .railbtn:hover {
   background: var(--hover);

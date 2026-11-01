@@ -84,10 +84,13 @@ describe("the sidebar", () => {
     expect(sections()).toBeNull();
   });
 
-  it("leaves Ctrl+B to text fields, so the Skills editor still makes text bold", async () => {
+  it("toggles with Ctrl+B from the task box, but leaves it to the Skills editor, where it makes text bold", async () => {
     const api = createMemoryApi();
     render(<Root api={api} />);
-    await press(await screen.findByRole("textbox"), { ctrlKey: true });
+    const box = await screen.findByRole("textbox", { name: /./ });
+    await press(box, { ctrlKey: true });
+    expect(sections()).toBeNull();
+    await press(box, { ctrlKey: true });
     expect(sections()).toBeTruthy();
 
     const editor = document.createElement("div");
@@ -244,6 +247,32 @@ describe("the collapsed sidebar's rail", () => {
     });
     expect(peek()).toBeNull();
     expect(document.activeElement).toBe(skills);
+  });
+
+  it("stays open while the user types in its search field, and the first Escape only empties the field", async () => {
+    render(<Root api={hidden()} />);
+    const box = (await findRail()).parentElement as HTMLElement;
+    vi.useFakeTimers();
+    fireEvent.pointerEnter(box);
+    act(() => vi.advanceTimersByTime(PEEK_OPEN_MS));
+    const field = peek()?.querySelector(".search input") as HTMLInputElement;
+    act(() => {
+      field.focus();
+      fireEvent.change(field, { target: { value: "rossi" } });
+    });
+    fireEvent.pointerLeave(box);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(peek()?.classList.contains("folding")).toBe(false);
+
+    act(() => {
+      fireEvent.keyDown(field, { key: "Escape" });
+    });
+    expect(field.value).toBe("");
+    expect(peek()).toBeTruthy();
+    act(() => {
+      fireEvent.keyDown(field, { key: "Escape" });
+    });
+    expect(peek()).toBeNull();
   });
 
   it("stays open when a click on its blank space takes the focus from a button, while the pointer is over it", async () => {

@@ -1,4 +1,4 @@
-import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type ComponentProps, type MouseEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
 import { withShortcut } from "@/lib/shortcut";
@@ -6,6 +6,7 @@ import { useT } from "@/lib/useT";
 import type { TaskMenuAction } from "../../../shared/api";
 import type { SectionKey, Task } from "../../../shared/model";
 import { Clipped } from "../components/Clipped";
+import { SearchBox } from "../components/SearchDialog";
 import { WorkingDots } from "../components/TaskTag";
 
 /** How many tasks Recent shows. */
@@ -44,7 +45,7 @@ export function Sidebar({
   onDeleteTask,
   renaming: renamingProp,
   onRenamingChange,
-  onSearch,
+  search,
 }: {
   current: Section | null;
   onNavigate: (s: Section) => void;
@@ -67,8 +68,8 @@ export function Sidebar({
   /** The task whose title is being edited, when the parent holds that state. */
   renaming?: string | null;
   onRenamingChange?: (id: string | null) => void;
-  /** Opens the search. */
-  onSearch?: () => void;
+  /** What the search field looks through and opens. */
+  search?: ComponentProps<typeof SearchBox>;
 }) {
   const t = useT();
   const [ownRenaming, setOwnRenaming] = useState<string | null>(null);
@@ -86,33 +87,9 @@ export function Sidebar({
     e.preventDefault();
     void menu(id);
   };
-  return (
-    <aside className="side">
-      <div className="chrome">
-        {isMac && <span className="lights-space" />}
-        <span className="grow" />
-        {/* Over the page, the logo keeps it open, as it does on the rail. */}
-        {pinned && (
-          <button
-            type="button"
-            className="iconbtn"
-            title={withShortcut(t("nav.collapse"), "B", isMac)}
-            aria-label={t("nav.collapse")}
-            onClick={onCollapse}
-          >
-            <Icon name="layout-leftbar-close" />
-          </button>
-        )}
-      </div>
-      <div className="brand">
-        {pinned ? <Logo /> : <LogoButton label={t("nav.keepOpen")} isMac={isMac} onClick={onCollapse} />}
-        <b>Tost Work</b>
-      </div>
-      <button type="button" className="search" data-nav="search" onClick={onSearch}>
-        <Icon name="search" />
-        {t("nav.search")}
-        <kbd>{isMac ? "⌘K" : "Ctrl K"}</kbd>
-      </button>
+  // While the search field has words, its results take the place of these.
+  const items = (
+    <>
       <nav aria-label="Sections">
         {NAV.filter((n) => !n.section || showSection(n.section)).map((n) => (
           <button
@@ -176,6 +153,37 @@ export function Sidebar({
           </button>
         </div>
       ))}
+    </>
+  );
+  return (
+    <aside className="side">
+      <div className="chrome">
+        {isMac && <span className="lights-space" />}
+        <span className="grow" />
+        {/* Over the page, the logo keeps it open, as it does on the rail. */}
+        {pinned && (
+          <button
+            type="button"
+            className="iconbtn"
+            title={withShortcut(t("nav.collapse"), "B", isMac)}
+            aria-label={t("nav.collapse")}
+            onClick={onCollapse}
+          >
+            <Icon name="layout-leftbar-close" />
+          </button>
+        )}
+      </div>
+      <div className="brand">
+        {pinned ? <Logo /> : <LogoButton label={t("nav.keepOpen")} isMac={isMac} onClick={onCollapse} />}
+        <b>Tost Work</b>
+      </div>
+      {search ? (
+        <SearchBox {...search} inSidebar>
+          {items}
+        </SearchBox>
+      ) : (
+        items
+      )}
       <span className="spacer" />
       <div className="me">
         <button
@@ -302,10 +310,13 @@ export function SidebarRail({
       clicked = true;
       clearTimeout(timer.current);
     };
+    // The pointer may go while the user types in its search field: it stays until the field loses the focus.
+    const typing = () => el.querySelector(".peek .search input") === document.activeElement;
     const leave = () => {
       over = false;
       clicked = false;
-      later(PEEK_CLOSE_MS, false);
+      if (typing()) clearTimeout(timer.current);
+      else later(PEEK_CLOSE_MS, false);
     };
     const focusIn = (e: Event) => {
       // A click focuses its button too, but only the keyboard's focus shows a ring; the pointer has its own timing.
@@ -327,6 +338,8 @@ export function SidebarRail({
     // Escape closes it and puts the focus back on the same item in the rail, where the keyboard came in.
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || !el.querySelector(".peek")) return;
+      // The first Escape empties the search field, and only the next one closes the sidebar.
+      if (e.target instanceof HTMLInputElement && e.target.closest(".search") && e.target.value) return;
       clearTimeout(timer.current);
       const id = (e.target as HTMLElement).closest("[data-nav]")?.getAttribute("data-nav");
       // At once: the focus goes back to the rail, which the folding sidebar would still cover.

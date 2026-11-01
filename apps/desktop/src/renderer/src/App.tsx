@@ -26,7 +26,8 @@ import { DEFAULT_SETTINGS, type ProjectOverview, type Settings, sectionOn } from
 const MAX_FILES = 20;
 
 /** Where typing happens: Cmd+B belongs to the text there, not to the sidebar. */
-const EDITABLE = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
+// Only an editor that makes text bold keeps Cmd+B; in a plain field, such as the task box, it toggles the sidebar.
+const BOLDS = '[contenteditable]:not([contenteditable="false"])';
 
 type Route =
   | { name: "home" }
@@ -291,7 +292,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
   menuHandler.current = onMenu;
   useEffect(() => api?.onMenu((action) => menuHandler.current(action)), [api]);
   // Cmd+B is no menu shortcut, because a menu would take the key from the Skills editor, where it makes text bold.
-  // The window handles it, and leaves it alone wherever the user is typing.
+  // The window handles it, and leaves it to the editors where it makes text bold.
   const toggleHandler = useRef(toggleSidebar);
   toggleHandler.current = toggleSidebar;
   useEffect(() => {
@@ -305,7 +306,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
         setSearchOpen((open) => !open);
         return;
       }
-      if (e.target instanceof Element && e.target.closest(EDITABLE)) return;
+      if (e.target instanceof Element && e.target.closest(BOLDS)) return;
       e.preventDefault();
       toggleHandler.current();
     };
@@ -498,7 +499,15 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
         setRenaming(id);
       }}
       onDeleteTask={(id) => void deleteTask(id)}
-      onSearch={() => setSearchOpen(true)}
+      search={
+        api && {
+          api,
+          projects,
+          recent: tasks,
+          onOpenTask: openFound,
+          onOpenProject: (id) => setRoute({ name: "project", id }),
+        }
+      }
     />
   );
   return (
