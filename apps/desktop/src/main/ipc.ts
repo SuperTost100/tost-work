@@ -20,6 +20,7 @@ import {
   type Project,
   type Settings,
 } from "../shared/model";
+import { choiceOf } from "../shared/modelChoice";
 import { removalText } from "../shared/projectText";
 import { type MenuItem, taskMenuItems } from "../shared/taskMenu";
 import type { Accounts } from "./accounts";
@@ -162,7 +163,8 @@ export function registerIpc(
     // Before any copying: if the engine can't start a task, no folder or copies are left behind.
     const { provider, auth, model, effort } = await runner.defaults(pick);
     const attachments = await workFiles(projectId, workdir, given);
-    const task = runner.create({ projectId, brief, workdir, attachments, provider, auth, model, effort });
+    const choice = choiceOf(pick, { provider, auth, model });
+    const task = runner.create({ projectId, brief, workdir, attachments, provider, auth, model, effort, choice });
     runner.launch(task.id);
     return task;
   });

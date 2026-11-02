@@ -182,6 +182,7 @@ const en = {
   "model.balanced": "Balanced",
   "model.balanced.d": "The right amount of thinking for almost everything.",
   "model.thorough": "Thorough",
+  "model.custom": "Custom",
   "model.thorough.d":
     "Slower, but it thinks harder. For long documents and difficult jobs. It uses up your subscription's limits sooner.",
   "model.choose": "Choose the model…",
@@ -392,6 +393,7 @@ const en = {
   "tag.writing": "writing · {n} of {total}",
   "tag.working": "working",
   "tag.toReview": "to check",
+  "tag.done": "done",
   "tag.stopped": "stopped",
   "tag.failed": "failed",
   "common.dismiss": "Dismiss",
@@ -848,6 +850,7 @@ const it: Record<MessageKey, string> = {
   "model.balanced": "Equilibrato",
   "model.balanced.d": "Il giusto per quasi tutto.",
   "model.thorough": "Approfondito",
+  "model.custom": "Personalizzato",
   "model.thorough.d":
     "Più lento, ma ragiona di più. Per documenti lunghi e lavori difficili. Consuma prima i limiti del tuo abbonamento.",
   "model.choose": "Scegli il modello…",
@@ -1059,6 +1062,7 @@ const it: Record<MessageKey, string> = {
   "tag.writing": "in corso · {n} di {total}",
   "tag.working": "al lavoro",
   "tag.toReview": "da vedere",
+  "tag.done": "finita",
   "tag.stopped": "interrotta",
   "tag.failed": "non riuscita",
   "common.dismiss": "Chiudi",

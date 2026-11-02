@@ -21,6 +21,7 @@ import { IPC, type MenuAction, type MenuState } from "../shared/api";
 import { languageFrom, translate } from "../shared/i18n";
 import type { AgentProvider, AiId } from "../shared/model";
 import { PROVIDER_OF } from "../shared/model";
+import { choiceOf } from "../shared/modelChoice";
 import { Accounts } from "./accounts";
 import { giveAgentsOwnHomes } from "./agentHomes";
 import { menuTemplate, nextTextSize, textMenuTemplate } from "./appMenu";
@@ -396,6 +397,8 @@ app.whenReady().then(async () => {
         auth,
         model,
         effort,
+        // A job runs on the engine's default, the middle choice.
+        choice: choiceOf(undefined, { provider, auth, model }),
         jobId: job.id,
         title: `${job.title} · ${day}`,
       });

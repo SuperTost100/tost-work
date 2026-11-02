@@ -14,7 +14,7 @@ export const PRESETS: Preset[] = ["fast", "balanced", "thorough"];
  * can be on another AI.
  */
 export type ModelPick = { preset: Preset } | { ai: AiId; model: string; effort: string };
-export const DEFAULT_PICK: ModelPick = { preset: "balanced" };
+export const DEFAULT_PICK = { preset: "balanced" } as const satisfies ModelPick;
 
 /** A model an AI offers, as the picker needs it. */
 export interface ModelOption {
@@ -223,6 +223,43 @@ export function newestOfEachFamily<T extends Pick<ModelOption, "id" | "name">>(m
       return m.id === keepId || version.length === 0 || (best !== undefined && compareVersions(version, best) === 0);
     })
     .map(({ m }) => m);
+}
+
+/** What a task was started on, as the user chose it: one of the three choices, or a model picked from the full list. */
+export type Choice = Preset | "custom";
+
+/** What a task got to run on: the agent, whether through the course key, and the model. */
+export interface RanOn {
+  provider: AgentProvider;
+  auth?: "account" | "key";
+  model: string;
+}
+
+/**
+ * The choice a task started on, from the pick and what it got. No pick means the middle choice, as the engine reads
+ * it. A model picked from the list that no longer runs as picked starts on the middle choice instead (see `defaults`
+ * in the engine), so that is what the task says. The AI counts as well as the model: the course key and a ChatGPT
+ * subscription share Codex's model ids.
+ */
+export function choiceOf(pick: ModelPick | undefined, ran: RanOn): Choice {
+  if (!pick) return DEFAULT_PICK.preset;
+  if ("preset" in pick) return pick.preset;
+  const ai: AiId = ran.auth === "key" ? "key" : ran.provider === "claude" ? "claude" : "chatgpt";
+  return pick.ai === ai && pick.model === ran.model ? "custom" : DEFAULT_PICK.preset;
+}
+
+/**
+ * A model's name from its id alone, for a task whose model list isn't at hand: "gpt-6.1-terra" is "GPT-6.1 Terra",
+ * "claude-opus-5-5" is "Claude Opus 5.5" and "claude-haiku-4-5-20251001" is "Claude Haiku 4.5". Any other id shows
+ * as it is.
+ */
+export function nameFromId(id: string): string {
+  const cap = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
+  const gpt = /^gpt-(\d+(?:\.\d+)*)-([a-z][a-z-]*)$/.exec(id);
+  if (gpt?.[1] && gpt[2]) return `GPT-${gpt[1]} ${gpt[2].split("-").map(cap).join(" ")}`;
+  const claude = /^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/.exec(id);
+  if (claude?.[1] && claude[2]) return `Claude ${cap(claude[1])} ${claude[2]}${claude[3] ? `.${claude[3]}` : ""}`;
+  return id;
 }
 
 /** Whether a value from outside is a pick this app could have made. */

@@ -461,6 +461,16 @@ h3 {
 .st.seen {
   color: var(--done);
 }
+/* A result to check: a filled amber dot, like an unread message. */
+.st.review {
+  color: var(--need);
+}
+.st .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
 @keyframes spin {
   to {
     transform: rotate(360deg);

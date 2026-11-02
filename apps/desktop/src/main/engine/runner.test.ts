@@ -797,13 +797,16 @@ describe("tasks saved for later", () => {
   });
 
   it("starts on the pick it is given, and on the engine's own choice when it gets none", async () => {
-    const { runner, picks } = counting();
+    const { store, runner, picks } = counting();
     const keep = async (t: Task) => t.attachments;
     const a = runner.create({ projectId: "p", brief: "Write it", workdir: "/p" });
     await runner.startSaved(a.id, keep, { preset: "thorough" });
     const b = runner.create({ projectId: "p", brief: "Write it too", workdir: "/p" });
     await runner.startSaved(b.id, keep);
     expect(picks).toEqual([{ preset: "thorough" }, undefined]);
+    // The task keeps the choice it started on, for its side panel.
+    expect(store.getTask(a.id)?.choice).toBe("thorough");
+    expect(store.getTask(b.id)?.choice).toBe("balanced");
   });
 
   it("starts once, however fast the clicks, and not again after it started", async () => {

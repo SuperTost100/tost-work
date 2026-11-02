@@ -1,6 +1,6 @@
 /** The data Tost Work keeps about projects and tasks. Shared by the main process and the interface. */
 
-import type { ModelPick } from "./modelChoice";
+import type { Choice, ModelPick } from "./modelChoice";
 import type { JobSchedule } from "./schedule";
 
 export interface Project {
@@ -160,6 +160,9 @@ export interface Task {
   auth?: "account" | "key";
   model: string;
   effort: string;
+  /** What the user chose it to run on: one of the three choices, or a model from the full list. Missing on tasks from
+   * before 0.0.21. */
+  choice?: Choice;
   status: TaskStatus;
   steps: Step[];
   files: FileChange[];

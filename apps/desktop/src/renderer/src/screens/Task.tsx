@@ -3,6 +3,7 @@ import { ApprovalCard } from "@/components/Approval";
 import { type Attachments, Composer } from "@/components/Composer";
 import { CallDetail, DebugStrip, useDebugLog } from "@/components/DebugDetails";
 import { FileLine, fileName } from "@/components/FileLine";
+import { ModelUsed } from "@/components/ModelPicker";
 import { Preview } from "@/components/Preview";
 import { ProjectPicker } from "@/components/ProjectPicker";
 import { TaskTag } from "@/components/TaskTag";
@@ -1121,7 +1122,7 @@ export function Task({
                   <span className="grow">
                     <span className="k">{t("task.model")}</span>
                     <span className="v">
-                      {task.model} · {task.effort}
+                      <ModelUsed task={task} />
                     </span>
                   </span>
                 </div>

@@ -4,12 +4,13 @@ import { Icon } from "@/lib/Icon";
 import { LanguageContext, useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
-import { LEVELS, type Level } from "../../../shared/model";
+import type { Task } from "../../../shared/model";
 import {
   EFFORTS,
   type ModelChoices,
   type ModelPick,
   modelName,
+  nameFromId,
   nearestEffort,
   newestOfEachFamily,
   PRESETS,
@@ -20,19 +21,41 @@ import {
 
 const PRESET_ICON: Record<Preset, string> = { fast: "flash", balanced: "balance", thorough: "brain" };
 
+/** The word for a reasoning level. A level the app has no word for (cli-funnel may add one) shows as it is. */
+function useEffortWord() {
+  const t = useT();
+  return (effort: string) =>
+    (EFFORTS as readonly string[]).includes(effort) ? t(`model.effort.${effort}` as MessageKey) : effort;
+}
+
+/**
+ * What a started task runs on, for its side panel: the choice the user made, then the model and reasoning level behind
+ * it, at every level, so people learn which AI does the work. "Personalizzato" for a model picked from the full list;
+ * a task from before choices were kept shows the model and level without a choice.
+ */
+export function ModelUsed({ task }: { task: Pick<Task, "choice" | "model" | "effort"> }) {
+  const t = useT();
+  const lang = useContext(LanguageContext);
+  const effortWord = useEffortWord();
+  const parts = [
+    ...(task.choice ? [t(task.choice === "custom" ? "model.custom" : `model.${task.choice}`)] : []),
+    nameFromId(task.model),
+    effortWord(task.effort).toLocaleLowerCase(lang),
+  ];
+  return <>{parts.join(" · ")}</>;
+}
+
 /**
  * The AI and model a new task runs on, under the task box: three plain choices, each with a model and reasoning level
- * behind it, and "Choose the model…" for the full list. From Advanced up, each choice names the model behind it.
+ * behind it, and "Choose the model…" for the full list. Each choice names the model behind it, at every level.
  */
 export function ModelPicker({
   api,
   pick,
-  level,
   onChange,
 }: {
   api: TostWorkApi;
   pick: ModelPick;
-  level: Level;
   onChange: (pick: ModelPick) => void;
 }) {
   const t = useT();
@@ -46,10 +69,7 @@ export function ModelPicker({
     void load();
   }, [load]);
 
-  // A level the app has no word for (cli-funnel may add one) shows as it is.
-  const effortWord = (effort: string) =>
-    (EFFORTS as readonly string[]).includes(effort) ? t(`model.effort.${effort}` as MessageKey) : effort;
-  const showModels = LEVELS.indexOf(level) >= LEVELS.indexOf("advanced");
+  const effortWord = useEffortWord();
   const current = choices && pickOn(pick, choices);
   const list = (choices?.lists ?? []).find((l) => l.ai === choices?.ai);
   const modelLine = (preset: Preset) => {
@@ -122,7 +142,7 @@ export function ModelPicker({
                       <span className="model-text">
                         <b>{t(`model.${preset}`)}</b>
                         <span className="model-d">{t(`model.${preset}.d`)}</span>
-                        {showModels && modelLine(preset) && <span className="model-line">{modelLine(preset)}</span>}
+                        {modelLine(preset) && <span className="model-line">{modelLine(preset)}</span>}
                       </span>
                       <Menu.RadioItemIndicator className="menu-check">
                         <Icon name="check" />

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  choiceOf,
   isModelPick,
   type ModelChoices,
   type ModelOption,
   modelName,
+  nameFromId,
   nearestEffort,
   newestOfEachFamily,
   pickOn,
@@ -202,5 +204,38 @@ describe("the newest model of each family", () => {
   it("keeps a name with no version, and works from the id when there's no name", () => {
     const list = [named("mini", "Mini"), named("other", "Mini"), model("gpt-6-luna"), model("gpt-5.6-luna")];
     expect(newestOfEachFamily(list).map((m) => m.id)).toEqual(["mini", "other", "gpt-6-luna"]);
+  });
+});
+
+describe("the choice a task started on", () => {
+  const codex = (model: string) => ({ provider: "codex" as const, model });
+  it("is the middle choice when nothing was picked, and the preset when one was", () => {
+    expect(choiceOf(undefined, codex("gpt-6.1-terra"))).toBe("balanced");
+    expect(choiceOf({ preset: "thorough" }, { provider: "claude", model: "claude-sonnet-5-5" })).toBe("thorough");
+  });
+
+  it("is custom for a model picked from the list, unless it fell back to the middle choice", () => {
+    const opus = { ai: "claude", model: "claude-opus-5-5", effort: "high" } as const;
+    expect(choiceOf(opus, { provider: "claude", model: "claude-opus-5-5" })).toBe("custom");
+    expect(choiceOf({ ...opus, model: "claude-opus-4-6" }, codex("gpt-6.1-terra"))).toBe("balanced");
+  });
+
+  it("counts the AI too: a key pick that fell back to the subscription's same model is the middle choice", () => {
+    const keyPick = { ai: "key", model: "gpt-6.1-terra", effort: "medium" } as const;
+    expect(choiceOf(keyPick, { provider: "codex", auth: "key", model: "gpt-6.1-terra" })).toBe("custom");
+    expect(choiceOf(keyPick, codex("gpt-6.1-terra"))).toBe("balanced");
+  });
+});
+
+describe("a model's name from its id", () => {
+  it.each([
+    ["gpt-6.1-terra", "GPT-6.1 Terra"],
+    ["gpt-6-luna", "GPT-6 Luna"],
+    ["claude-opus-5-5", "Claude Opus 5.5"],
+    ["claude-sonnet-5", "Claude Sonnet 5"],
+    ["claude-haiku-4-5-20251001", "Claude Haiku 4.5"],
+    ["o4-mini", "o4-mini"],
+  ])("names %s as %s", (id, name) => {
+    expect(nameFromId(id)).toBe(name);
   });
 });

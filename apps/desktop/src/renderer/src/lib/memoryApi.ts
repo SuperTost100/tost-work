@@ -35,7 +35,7 @@ import {
   type SkillVersion,
   type Task,
 } from "../../../shared/model";
-import { type ModelPick, pickOn, SAMPLE_CHOICES } from "../../../shared/modelChoice";
+import { choiceOf, type ModelPick, pickOn, SAMPLE_CHOICES } from "../../../shared/modelChoice";
 import { removalText } from "../../../shared/projectText";
 import { applyEvent, resume } from "../../../shared/reduce";
 import { nextRun } from "../../../shared/schedule";
@@ -182,7 +182,16 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   const running = (pick: ModelPick = settings.modelPick) => {
     const picked = pickOn(pick, SAMPLE_CHOICES);
     if (!picked) throw new Error("No models");
-    return { provider: picked.provider, model: picked.model.id, effort: picked.effort };
+    return {
+      provider: picked.provider,
+      model: picked.model.id,
+      effort: picked.effort,
+      choice: choiceOf(pick, {
+        provider: picked.provider,
+        auth: picked.ai === "key" ? "key" : "account",
+        model: picked.model.id,
+      }),
+    };
   };
   // A task as the runner makes it, not started yet: saved for later until `run` starts it.
   const created = (input: NewTaskInput): Task => {

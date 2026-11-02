@@ -27,7 +27,7 @@ const start = async (brief: string) => {
 };
 
 describe("the model picker under the task box", () => {
-  it("offers the three choices at Beginner, with the middle one picked and no model named", async () => {
+  it("offers the three choices at Beginner, with the middle one picked", async () => {
     await open();
     const fast = await choice(/Fast/);
     expect(fast.textContent).toContain("Answers quickly. For simple jobs: an email, a summary, a correction.");
@@ -35,24 +35,19 @@ describe("the model picker under the task box", () => {
     expect(fast.getAttribute("aria-checked")).toBe("false");
     const thorough = await choice(/Thorough/);
     expect(thorough.textContent).toContain("It uses up your subscription's limits sooner.");
-    // Beginner sees choices, not model names.
-    expect(screen.queryByText(/GPT-6/)).toBeNull();
     expect(screen.getByRole("menuitem", { name: "Choose the model…" })).toBeTruthy();
   });
 
-  it("names the model and level behind each choice from Advanced up", async () => {
-    await open({ level: "advanced" });
-    expect((await choice(/Fast/)).textContent).toContain("GPT-6 Luna · medium");
-    expect((await choice(/Balanced/)).textContent).toContain("GPT-6.1 Terra · medium");
-    expect((await choice(/Thorough/)).textContent).toContain("GPT-6.1 Sol · high");
-  });
-
-  it("does not name models at Intermediate", async () => {
-    await open({ level: "intermediate" });
-    await choice(/Fast/);
-    expect(screen.queryByText(/GPT-6/)).toBeNull();
-    expect(screen.getByRole("menuitem", { name: "Choose the model…" })).toBeTruthy();
-  });
+  // Everyone sees which AI does the work, so people learn the models.
+  it.each(["beginner", "intermediate", "expert"] as const)(
+    "names the model and level behind each choice at %s",
+    async (level) => {
+      await open({ level });
+      expect((await choice(/Fast/)).textContent).toContain("GPT-6 Luna · medium");
+      expect((await choice(/Balanced/)).textContent).toContain("GPT-6.1 Terra · medium");
+      expect((await choice(/Thorough/)).textContent).toContain("GPT-6.1 Sol · high");
+    },
+  );
 
   it("starts the task on the choice made, and remembers it for the next one", async () => {
     const api = await open();
@@ -61,7 +56,7 @@ describe("the model picker under the task box", () => {
     await waitFor(async () => expect((await api.settings.get()).modelPick).toEqual({ preset: "thorough" }));
     await start("Write a proposal for Alpi Logistica");
     const [task] = await api.tasks.list();
-    expect(task).toMatchObject({ provider: "codex", model: "gpt-6.1-sol", effort: "high" });
+    expect(task).toMatchObject({ provider: "codex", model: "gpt-6.1-sol", effort: "high", choice: "thorough" });
   });
 
   it("starts on the middle choice when nothing was picked", async () => {
@@ -103,7 +98,7 @@ describe("the model picker under the task box", () => {
     expect((await picker(/AI for this task/)).textContent).toBe("Claude Sonnet 5.5 · Maximum");
     await start("Write a proposal for Alpi Logistica");
     const [task] = await api.tasks.list();
-    expect(task).toMatchObject({ provider: "claude", model: "claude-sonnet-5-5", effort: "max" });
+    expect(task).toMatchObject({ provider: "claude", model: "claude-sonnet-5-5", effort: "max", choice: "custom" });
   });
 
   it("lists only the newest model of each family, and keeps the one picked even when it's older", async () => {

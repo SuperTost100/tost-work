@@ -3,7 +3,7 @@ import { lstat } from "node:fs/promises";
 import type { Language } from "../../shared/i18n";
 import type { AgentProvider, Approval, KeptCopy, Project, Task } from "../../shared/model";
 import { answersText, BRIEF_MAX, questionItems } from "../../shared/model";
-import type { ModelChoices, ModelPick } from "../../shared/modelChoice";
+import { type Choice, choiceOf, type ModelChoices, type ModelPick } from "../../shared/modelChoice";
 import { applyEvent, resume } from "../../shared/reduce";
 import type { Guard } from "../guard";
 import type { Store } from "../store/store";
@@ -19,6 +19,7 @@ export interface NewTask {
   auth?: "account" | "key";
   model?: string;
   effort?: string;
+  choice?: Choice;
   /** For a run of a job: the job, and the title its tasks carry. */
   jobId?: string;
   title?: string;
@@ -128,6 +129,7 @@ export class TaskRunner {
       ...(input.jobId ? { jobId: input.jobId } : {}),
       model: input.model ?? "gpt-5.5",
       effort: input.effort ?? "medium",
+      ...(input.choice ? { choice: input.choice } : {}),
       status: "draft",
       steps: [],
       files: [],
@@ -262,6 +264,7 @@ export class TaskRunner {
         ...(auth === "key" ? { auth: "key" as const } : {}),
         model,
         effort,
+        choice: choiceOf(pick, { provider, auth, model }),
         attachments,
         // The brief is sent now, so that's when the message was written to the agent.
         messages: task.messages.map((m, i) => (i === 0 ? { ...m, at } : m)),
