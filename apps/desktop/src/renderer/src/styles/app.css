@@ -407,17 +407,13 @@ h3 {
   background: var(--hover);
   color: var(--ink);
 }
-/* The … comes without moving anything in the row. A row with a tag keeps the …'s place free beside it, so the tag stays
-   where it is; on a row without one, the … covers the end of the title, which fades out under it. */
+/* The … comes on top of the row's end without moving anything: the title, or the tag at the right, fades out under it. */
 .rec .more {
   position: absolute;
   top: 3px;
   right: 2px;
 }
-.rec:has(.open .tag) .open {
-  padding-right: 26px;
-}
-.rec:is(:hover, :has(.more:focus-visible)):not(:has(.open .tag)) .open {
+.rec:is(:hover, :has(.more:focus-visible)) .open {
   mask-image: linear-gradient(to left, transparent 28px, #000 44px);
 }
 /* While a title is renamed, the field has the whole row. */
@@ -1801,12 +1797,14 @@ h2.gh {
   opacity: 1;
 }
 /* A running card is busy: it sits flatter, without the hover that suggests picking it up. */
+/* A running card: a dashed outline clear enough to see on the column, darker under the pointer. */
 .bcard.busy {
   background: transparent;
   border-style: dashed;
+  border-color: color-mix(in srgb, var(--t3) 60%, transparent);
 }
 .bcard.busy:hover {
-  border-color: var(--line);
+  border-color: var(--t3);
 }
 .bcard.busy.sel {
   border-color: var(--ink);

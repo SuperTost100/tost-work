@@ -89,6 +89,16 @@ describe("activity", () => {
     expect(commandActivity("npm --version")).toEqual({ kind: "command" });
   });
 
+  it("names the work a subagent was handed, under the tool's old name too", () => {
+    expect(activityOf("Agent", { description: "Find sources", prompt: "…", subagent_type: "general-purpose" })).toEqual(
+      {
+        kind: "helper",
+        target: "Find sources",
+      },
+    );
+    expect(activityOf("Task", { prompt: "…" })).toEqual({ kind: "helper", target: undefined });
+  });
+
   it("leaves out the plan and Tost Work's own tools, which show on their own", () => {
     expect(activityOf("TodoWrite", {})).toBeNull();
     expect(activityOf("update_plan", {})).toBeNull();

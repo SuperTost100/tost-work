@@ -438,6 +438,25 @@ describe("AgentEngine", () => {
     expect(inputs).toHaveLength(2);
   });
 
+  it("shows a Claude subagent's work in the activity, under the line that hands it off", async () => {
+    const { funnel } = fakeFunnel(async (_input, emit) => {
+      emit({ type: "tool.start", id: "a1", name: "Agent", input: { description: "Trova le fonti", prompt: "…" } });
+      emit({ type: "subagent.text", parentId: "a1", text: "Ho trovato 12   fonti\nutili." });
+      return { text: "Fatto." };
+    });
+    const engine = new AgentEngine(funnel, () => "it");
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const seen: EngineEvent[] = [];
+    const t = task({ provider: "claude", model: "claude-sonnet-5-5" });
+    const signal = new AbortController().signal;
+    for await (const e of engine.run({ task: t, project: null, workdir: "/w", followUp: null, signal })) seen.push(e);
+    expect(seen.filter((e) => e.type === "activity")).toEqual([
+      { type: "activity", kind: "helper", target: "Trova le fonti" },
+      { type: "activity", kind: "note", target: "Ho trovato 12 fonti utili." },
+    ]);
+    expect(seen.at(-1)).toEqual({ type: "done" });
+  });
+
   it("runs a Claude task on Claude Code, with its tools held to the same rules", async () => {
     const workdir = await realpath(await mkdtemp(join(tmpdir(), "tw-claude-")));
     await writeFile(join(workdir, "theirs.docx"), "x");
@@ -471,8 +490,10 @@ describe("AgentEngine", () => {
     expect(inputs[0]?.selection).toMatchObject({ provider: "claude", model: "claude-sonnet-5-5", cwd: workdir });
     // Its shell commands run in Claude Code's sandbox: the policy can't tell where a command writes.
     expect(inputs[0]?.sandbox).toBe(true);
-    // Claude Code has its own search tool, so it gets no Codex options.
-    expect(inputs[0]?.providerOptions).toBeUndefined();
+    // Claude Code has its own search tool, so it gets no Codex options; it passes on what its subagents write.
+    expect(inputs[0]?.providerOptions).toEqual({ claude: { forwardSubagentText: true } });
+    // It waits for each command and subagent instead of leaving one in the background and finishing the task.
+    expect(inputs[0]?.env).toMatchObject({ CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1" });
     expect(decisions).toEqual([
       "allow",
       { decision: "deny", message: "Work only inside the task's folder." },

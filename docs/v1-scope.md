@@ -140,10 +140,15 @@ Changed on 2026-11-01, after Tost tried the Board:
 
 Changed on 2026-11-01, after Tost tried 0.0.17:
 
-- "Da controllare" is now "da vedere", short enough to leave the title room in Recent, with "Segna come vista" and its undo, "Segna come da vedere". The tags beside a title in Recent stay at 10 letters or fewer in every language.
+- "Da controllare" is now "da vedere" on the tag, the filter and the column, short enough to leave the title room in Recent. The menu keeps "Segna come controllata" and "Segna da controllare". The tags beside a title in Recent stay at 10 letters or fewer in every language.
 - The task box sits in the middle of the window on Home, and at the same height on a task saved for later.
 - The message after "Salva per dopo" rises in and sinks out, in the middle of the page beside the sidebar.
-- Hovering a row in Recent or in the skills list moves nothing: a tag keeps the …'s place free beside it, and a title without one fades out under the ….
+- Hovering a row in Recent or in the skills list moves nothing: the … comes on top of the row's end, and the title or the tag fades out under it.
+
+Changed on 2026-11-02, after Tost tried 0.0.18:
+
+- Claude waits for every command and subagent instead of leaving one in the background and finishing the task. The activity shows "Delego: …" for each subagent, with what the subagent writes under it.
+- Right-click in a text field offers Taglia, Copia, Incolla and Seleziona tutto.
 
 ## From 0.2.0
 

@@ -319,6 +319,12 @@ export class AgentEngine implements Engine, ToolHandler {
 
     // A skills folder that can't be read leaves the task without skills rather than failing it.
     const skills = await this.skills().catch(() => []);
+    // Claude Code can leave a command or a subagent running in the background and end its turn, saying it will look
+    // later. Nothing would wake it to look, and the task would show as finished, so here it waits for each one.
+    const env =
+      task.provider === "claude"
+        ? { ...this.documents?.env, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1" }
+        : this.documents?.env;
     const stream = this.funnel.stream({
       selection: {
         provider: task.provider ?? "codex",
@@ -337,13 +343,15 @@ export class AgentEngine implements Engine, ToolHandler {
         skills,
         task.jobId ? (this.job(task.jobId) ?? null) : null,
       ),
-      ...(this.documents ? { env: this.documents.env } : {}),
+      ...(env ? { env } : {}),
       ...(apiKey ? { apiKey } : {}),
       // Web search, without asking before each site. Codex searches OpenAI's web index: its live search needs a looser
-      // access level than supervised. Claude Code has its own search tool, which the policy allows.
-      ...((task.provider ?? "codex") === "codex"
-        ? { providerOptions: { codex: { webSearch: "cached" as const } } }
-        : {}),
+      // access level than supervised. Claude Code has its own search tool, which the policy allows, and passes on
+      // what its subagents write, so the activity shows that work too.
+      providerOptions:
+        (task.provider ?? "codex") === "codex"
+          ? { codex: { webSearch: "cached" as const } }
+          : { claude: { forwardSubagentText: true } },
       // Claude Code's file tools are held to the folder by the approval policy, but a shell command could write
       // anywhere: its sandbox stops that. Codex at supervised was sandboxed already. A sandbox that can't start fails
       // the run rather than letting it go unconfined.
@@ -384,6 +392,9 @@ export class AgentEngine implements Engine, ToolHandler {
             if (note) channel.push({ type: "activity", kind: "note", target: note });
             const line = activityOf(event.name, event.input, this.documents?.skills);
             if (line) channel.push({ type: "activity", ...line });
+          } else if (event.type === "subagent.text") {
+            const note = noteText(event.text);
+            if (note) channel.push({ type: "activity", kind: "note", target: note });
           } else if (event.type === "file.change" && event.status === "done") {
             const path = event.movedTo ?? event.path;
             if (event.kind === "delete") made.delete(path);

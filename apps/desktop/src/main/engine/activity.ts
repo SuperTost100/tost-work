@@ -114,6 +114,10 @@ export function activityOf(name: string, input: unknown, builtIns?: string): Act
       return { kind: "web", target: text(i.query) };
     case "WebFetch":
       return { kind: "page", target: host(i.url) };
+    // A subagent, which Claude Code calls Agent, and Task before that: what it was given to do.
+    case "Agent":
+    case "Task":
+      return { kind: "helper", target: text(i.description) };
     case "Bash":
     case "command":
       return commandActivity(String(i.command ?? ""), builtIns);

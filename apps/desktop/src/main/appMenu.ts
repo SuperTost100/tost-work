@@ -137,3 +137,28 @@ export function nextTextSize(current: Settings["textSize"], step: -1 | 0 | 1): S
   const i = Math.min(2, Math.max(0, sizes.indexOf(current) + step));
   return sizes[i] ?? "normal";
 }
+
+/** What a right-click on the page says about where it landed, from Electron's `context-menu` event. */
+export interface TextSpot {
+  isEditable: boolean;
+  selectionText: string;
+  editFlags: { canCut: boolean; canCopy: boolean; canPaste: boolean; canSelectAll: boolean };
+}
+
+/**
+ * The menu for a right-click on text: Cut, Copy, Paste and Select all in a text field, Copy on selected text, nothing
+ * elsewhere. Rows with a menu of their own, such as a task in Recent, open theirs and never reach this one.
+ */
+export function textMenuTemplate(spot: TextSpot, t: (key: MessageKey) => string): MenuItemConstructorOptions[] {
+  const f = spot.editFlags;
+  if (spot.isEditable)
+    return [
+      { label: t("appMenu.cut"), role: "cut", enabled: f.canCut },
+      { label: t("appMenu.copy"), role: "copy", enabled: f.canCopy },
+      { label: t("appMenu.paste"), role: "paste", enabled: f.canPaste },
+      { type: "separator" },
+      { label: t("appMenu.selectAll"), role: "selectAll", enabled: f.canSelectAll },
+    ];
+  if (spot.selectionText.trim()) return [{ label: t("appMenu.copy"), role: "copy" }];
+  return [];
+}

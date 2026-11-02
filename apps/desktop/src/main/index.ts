@@ -22,7 +22,7 @@ import { languageFrom, translate } from "../shared/i18n";
 import type { AgentProvider } from "../shared/model";
 import { Accounts } from "./accounts";
 import { giveAgentsOwnHomes } from "./agentHomes";
-import { menuTemplate, nextTextSize } from "./appMenu";
+import { menuTemplate, nextTextSize, textMenuTemplate } from "./appMenu";
 import { documentTools } from "./documents";
 import { AgentEngine } from "./engine/agent";
 import type { Engine } from "./engine/engine";
@@ -135,6 +135,15 @@ function createWindow(store: Store): BrowserWindow {
   win.on("closed", () => {
     if (mainWindow === win) mainWindow = null;
     mainClosed();
+  });
+
+  // Right-click in a text field: Cut, Copy, Paste. Electron shows no menu of its own.
+  win.webContents.on("context-menu", (_e, params) => {
+    const lang = store.getSettings().language ?? languageFrom(app.getLocale());
+    const items = textMenuTemplate(params, (key) => translate(lang, key));
+    // Where it was asked for, so one opened from the keyboard comes up at the field rather than at the pointer.
+    if (items.length)
+      Menu.buildFromTemplate(items).popup({ window: win, x: params.x, y: params.y, sourceType: params.menuSourceType });
   });
 
   // Links open in the user's browser, never inside the app.

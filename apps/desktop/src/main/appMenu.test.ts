@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { MenuAction } from "../shared/api";
 import { translate } from "../shared/i18n";
 import { DEFAULT_SETTINGS } from "../shared/model";
-import { menuTemplate, nextTextSize } from "./appMenu";
+import { menuTemplate, nextTextSize, textMenuTemplate } from "./appMenu";
 
 function build(isMac: boolean, settings = DEFAULT_SETTINGS, task = { task: true, running: true }) {
   const sent: MenuAction[] = [];
@@ -110,5 +110,25 @@ describe("nextTextSize", () => {
     expect(nextTextSize("normal", -1)).toBe("small");
     expect(nextTextSize("small", -1)).toBe("small");
     expect(nextTextSize("large", 0)).toBe("normal");
+  });
+});
+
+describe("textMenuTemplate", () => {
+  const t = (key: Parameters<typeof translate>[1]) => translate("it", key);
+  const flags = { canCut: false, canCopy: false, canPaste: true, canSelectAll: true };
+
+  it("offers Cut, Copy, Paste and Select all in a text field, each on only when it can act", () => {
+    const menu = textMenuTemplate({ isEditable: true, selectionText: "", editFlags: flags }, t);
+    expect(menu.map((i) => i.role ?? i.type)).toEqual(["cut", "copy", "paste", "separator", "selectAll"]);
+    expect(menu.find((i) => i.role === "paste")?.label).toBe("Incolla");
+    expect(menu.find((i) => i.role === "cut")?.enabled).toBe(false);
+    expect(menu.find((i) => i.role === "paste")?.enabled).toBe(true);
+  });
+
+  it("offers Copy on selected text outside a field, and nothing on the bare page", () => {
+    expect(
+      textMenuTemplate({ isEditable: false, selectionText: "Preventivo", editFlags: flags }, t).map((i) => i.role),
+    ).toEqual(["copy"]);
+    expect(textMenuTemplate({ isEditable: false, selectionText: "  ", editFlags: flags }, t)).toEqual([]);
   });
 });

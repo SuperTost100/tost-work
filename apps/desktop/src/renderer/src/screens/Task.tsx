@@ -188,10 +188,11 @@ const ACTIVITY_ICON: Record<ActivityKind, string> = {
   work: "file",
   skill: "magic-2",
   pdf: "file",
+  helper: "group",
   note: "chat-3",
 };
 /** Kinds whose line names a file, search or site, and has a plainer line when it doesn't. */
-const HAS_TARGET = new Set<ActivityKind>(["read", "write", "edit", "web", "page", "work", "skill"]);
+const HAS_TARGET = new Set<ActivityKind>(["read", "write", "edit", "web", "page", "work", "skill", "helper"]);
 
 /** One line of activity in the user's language: "Leggo note.txt". */
 function useActivityText() {
