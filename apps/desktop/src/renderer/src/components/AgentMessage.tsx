@@ -1,8 +1,9 @@
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Icon } from "@/lib/Icon";
-import { useT } from "@/lib/useT";
+import { LanguageContext, useT } from "@/lib/useT";
+import { sentText } from "../../../shared/jobText";
 
 /** Simple Markdown to safe HTML: line breaks are kept, and links stay as their text, since a click would open them inside the app. */
 export function messageHtml(text: string): string {
@@ -112,7 +113,7 @@ const COPIED_FOR = 1500;
  * Copies a message. With `html` the copy keeps its formatting where it's pasted, such as bold and lists in Word, and
  * plain text goes along for places that take only text.
  */
-export function CopyButton({ text, html }: { text: () => string; html?: () => string }) {
+export function CopyButton({ text, html, at }: { text: () => string; html?: () => string; at?: string }) {
   const t = useT();
   const [state, setState] = useState<"ready" | "copied" | "failed">("ready");
   useEffect(() => {
@@ -143,12 +144,60 @@ export function CopyButton({ text, html }: { text: () => string; html?: () => st
       >
         <Icon name={state === "copied" ? "check" : state === "failed" ? "alert" : "copy-2"} />
       </button>
+      {at && <SentAt at={at} />}
     </div>
   );
 }
 
+/** The day as the clock reads it, ticking over at midnight for every message on screen with one timer. */
+const today = (() => {
+  const day = () => new Date().toDateString();
+  let current = day();
+  const listeners = new Set<() => void>();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const arm = () => {
+    const next = new Date();
+    next.setHours(24, 0, 1, 0);
+    timer = setTimeout(() => {
+      current = day();
+      for (const l of listeners) l();
+      arm();
+    }, next.getTime() - Date.now());
+  };
+  return {
+    get: () => current,
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      // The first message on screen starts the timer, from today as it is now: the day may have changed while none
+      // was showing.
+      if (listeners.size === 1) {
+        current = day();
+        arm();
+      }
+      return () => {
+        listeners.delete(listener);
+        if (listeners.size === 0) clearTimeout(timer);
+      };
+    },
+  };
+})();
+
+/** When a message was sent, beside its copy button: "14:32", or with the day once it's from another one. */
+export function SentAt({ at }: { at: string }) {
+  const lang = useContext(LanguageContext);
+  // Read so the label moves on at midnight: today's "14:32" becomes "ieri 14:32" in a task left open overnight.
+  useSyncExternalStore(today.subscribe, today.get);
+  const when = new Date(at);
+  if (Number.isNaN(when.getTime())) return null;
+  return (
+    <time className="sent" dateTime={at} title={when.toLocaleString(lang)}>
+      {sentText(lang, when, new Date())}
+    </time>
+  );
+}
+
 /** An agent's message, with its paragraphs, lists and bold. */
-export function AgentMessage({ text }: { text: string }) {
+export function AgentMessage({ text, at }: { text: string; at?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const html = useMemo(() => messageHtml(text), [text]);
   useEffect(() => {
@@ -157,7 +206,7 @@ export function AgentMessage({ text }: { text: string }) {
   return (
     <div className="msg">
       <div className="agent" ref={ref} />
-      <CopyButton text={() => messagePlain(html)} html={() => html} />
+      <CopyButton text={() => messagePlain(html)} html={() => html} at={at} />
     </div>
   );
 }
@@ -176,8 +225,11 @@ export function TypedMessage({
   text,
   from = 0,
   onShown,
+  at,
 }: {
   text: string;
+  /** When it was sent, once it's a message of its own and not an answer still coming in. */
+  at?: string;
   from?: number;
   /** Called with how much shows after each step, to follow it down the page. */
   onShown?: (shown: number) => void;
@@ -216,5 +268,5 @@ export function TypedMessage({
   useEffect(() => onShown?.(end), [end, onShown]);
   // Whole words only, so none shows half typed.
   const cut = end >= text.length ? end : text.slice(0, end).search(/\S*$/);
-  return <AgentMessage text={text.slice(0, cut)} />;
+  return <AgentMessage text={text.slice(0, cut)} at={at} />;
 }

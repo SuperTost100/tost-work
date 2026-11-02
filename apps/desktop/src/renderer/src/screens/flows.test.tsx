@@ -291,7 +291,10 @@ describe("a typed answer", () => {
       fireEvent.keyDown(box, { key: "Enter" });
     });
     // Sent, it's on the task as the answered line, which opens onto the answer.
-    fireEvent.click(await screen.findByRole("button", { name: "You answered 1 question" }));
+    const line = await screen.findByRole("button", { name: "You answered 1 question" });
+    // Like every message, it says when it was sent.
+    expect(line.parentElement?.querySelector("time.sent")?.textContent).toMatch(/\d\d:\d\d$/);
+    fireEvent.click(line);
     expect(screen.getByText("Split it half and half")).toBeTruthy();
   });
 });

@@ -30,7 +30,7 @@ import {
   type Task as TaskT,
   toReview,
 } from "../../../shared/model";
-import { AgentMessage, CopyButton, TypedMessage } from "../components/AgentMessage";
+import { AgentMessage, CopyButton, SentAt, TypedMessage } from "../components/AgentMessage";
 import { WorkingDots } from "../components/TaskTag";
 
 /** Under a file the task replaced: the kept copy and a button to put it back, or to undo that. */
@@ -537,7 +537,7 @@ const firstFiles = (task: TaskT) => {
   return task.attachments.filter((p) => !later.has(p));
 };
 
-function AnswerLine({ answers, files }: { answers: AnsweredQuestion[]; files?: string[] }) {
+function AnswerLine({ answers, files, at }: { answers: AnsweredQuestion[]; files?: string[]; at?: string }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   return (
@@ -547,6 +547,7 @@ function AnswerLine({ answers, files }: { answers: AnsweredQuestion[]; files?: s
         {answers.length === 1 ? t("task.answeredOne") : t("task.answered", { n: String(answers.length) })}
         <Icon name="down" className="chev" />
       </button>
+      {at && <SentAt at={at} />}
       {open && (
         <ol>
           {keyed(answers, (a) => a.question).map(([key, a]) => (
@@ -863,19 +864,19 @@ export function Task({
       <Fragment key={i}>
         {done.length > 0 && <ActivityLog activity={done} live={false} debug={log} thinking={thinkingAfter(done)} />}
         {m.answers ? (
-          <AnswerLine answers={m.answers} files={m.attachments} />
+          <AnswerLine answers={m.answers} files={m.attachments} at={m.at} />
         ) : m.from === "user" ? (
           <div className="msg mine" style={{ marginTop: 18 }}>
             <div className="you">
               <LongText text={m.text} />
               <AttachedFiles paths={m.attachments} />
             </div>
-            <CopyButton text={() => m.text} />
+            <CopyButton text={() => m.text} at={m.at} />
           </div>
         ) : typing?.index === i ? (
-          <TypedMessage text={m.text} from={typing.from} onShown={follow} />
+          <TypedMessage text={m.text} from={typing.from} onShown={follow} at={m.at} />
         ) : (
-          <AgentMessage text={m.text} />
+          <AgentMessage text={m.text} at={m.at} />
         )}
       </Fragment>
     );
@@ -947,7 +948,7 @@ export function Task({
                     <LongText text={task.brief} />
                     <AttachedFiles paths={task.messages[0]?.attachments ?? firstFiles(task)} />
                   </div>
-                  <CopyButton text={() => task.brief} />
+                  <CopyButton text={() => task.brief} at={task.messages[0]?.at ?? task.createdAt} />
                 </div>
                 {runStart > 0 && range(1, runStart + 1)}
                 {task.steps.length > 0 && (

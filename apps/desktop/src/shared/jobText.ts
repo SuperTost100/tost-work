@@ -66,6 +66,14 @@ export function updatedText(lang: Language, when: Date, now: Date): string {
   return new Intl.DateTimeFormat(locale(lang), { day: "numeric", month: "short", ...year }).format(when);
 }
 
+/** When a message was sent: the time if today, "ieri 18:05" if yesterday, else the date too: "2 nov 14:32". */
+export function sentText(lang: Language, when: Date, now: Date): string {
+  const days = daysBetween(when, now);
+  if (days === 0) return hhmm(when);
+  if (days === 1) return `${lang === "it" ? "ieri" : "yesterday"} ${hhmm(when)}`;
+  return `${updatedText(lang, when, now)} ${hhmm(when)}`;
+}
+
 /** The group a job's card goes in, by its next run. */
 export type JobGroup = "today" | "tomorrow" | "week" | "nextWeek" | "later" | "off";
 export const JOB_GROUPS: JobGroup[] = ["today", "tomorrow", "week", "nextWeek", "later", "off"];

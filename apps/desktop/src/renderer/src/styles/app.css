@@ -4509,6 +4509,17 @@ label.opt:has(input:focus-visible) {
 .answered > button:hover {
   color: var(--ink);
 }
+/* When the answers were sent, beside the line, on hover or focus like every other message's time. */
+.answered > .sent {
+  margin-left: 4px;
+  font-size: 12px;
+  color: var(--t3);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.answered:is(:hover, :focus-within) > .sent {
+  opacity: 1;
+}
 .answered > button .ic {
   color: var(--t3);
 }
@@ -4777,6 +4788,17 @@ label.opt:has(input:focus-visible) {
 .msg-tools .iconbtn .ic {
   width: 15px;
   height: 15px;
+}
+/* Under the user's own message, the copy button keeps the bubble's right edge and the time sits before it. */
+.msg.mine .msg-tools {
+  flex-direction: row-reverse;
+}
+.msg-tools .sent {
+  align-self: center;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--t3);
+  white-space: nowrap;
 }
 
 /* ===== Menu-bar panel ===== */
