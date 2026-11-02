@@ -112,6 +112,8 @@ export type ActivityKind =
   | "web"
   | "page"
   | "command"
+  /** Reading back a command's output that Claude Code saved to a file because it was long. */
+  | "output"
   | "work"
   | "skill"
   | "pdf"

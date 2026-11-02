@@ -348,6 +348,7 @@ const en = {
   "activity.page": "Opening {target}",
   "activity.page.any": "Opening a web page",
   "activity.command": "Running a command",
+  "activity.output": "Reading a command's output",
   "activity.work": "Working on {target}",
   "activity.work.any": "Working on a file",
   "activity.skill": "Reading the {target} skill",
@@ -549,7 +550,7 @@ const en = {
   "skills.emptyBody":
     "A skill is how you do a kind of work you do often, such as a proposal from call notes, written once. Every task follows it when the work matches.",
   "soon.body": "It's part of the plan for 0.1.0. For now, start tasks from New task or from a project.",
-  "tag.draft": "to do",
+  "tag.draft": "draft",
   "tag.job": "job",
   "composer.later": "Save for later",
   "review.mark": "Mark as checked",
@@ -1016,6 +1017,7 @@ const it: Record<MessageKey, string> = {
   "activity.page": "Apro {target}",
   "activity.page.any": "Apro una pagina web",
   "activity.command": "Eseguo un comando",
+  "activity.output": "Leggo il risultato di un comando",
   "activity.work": "Lavoro su {target}",
   "activity.work.any": "Lavoro su un file",
   "activity.skill": "Leggo la skill {target}",
@@ -1218,7 +1220,7 @@ const it: Record<MessageKey, string> = {
   "skills.emptyBody":
     "Una skill è il modo in cui fai un lavoro che ripeti spesso, come una proposta dagli appunti di una chiamata, scritto una volta sola. Ogni attività la segue quando il lavoro corrisponde.",
   "soon.body": "Fa parte del piano per la 0.1.0. Per ora avvia le attività da Nuova attività o da un progetto.",
-  "tag.draft": "da fare",
+  "tag.draft": "bozza",
   "tag.job": "pianificata",
   "composer.later": "Salva per dopo",
   "review.mark": "Segna come controllata",

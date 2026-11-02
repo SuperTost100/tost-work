@@ -25,6 +25,39 @@ describe("activity", () => {
     expect(activityOf("Bash", { command: "ls -la /w", description: "List files" })).toEqual({ kind: "folder" });
   });
 
+  it("says a command's output, not its file, when Claude Code reads the output it saved", () => {
+    const home = "/Users/g/Library/Application Support/Tost Work/agents/claude";
+    const saved = `${home}/projects/-Users-g-Documents-Tost-Work/0d8c3332/tool-results/bhdoaxdta.txt`;
+    expect(activityOf("Read", { file_path: saved })).toEqual({ kind: "output" });
+    expect(activityOf("Bash", { command: `sed -n '1,80p' "${saved}"` })).toEqual({ kind: "output" });
+    const windows = "C:\\Users\\g\\AppData\\Roaming\\Tost Work\\agents\\claude\\projects\\x\\s\\tool-results\\b1.txt";
+    expect(activityOf("Read", { file_path: windows })).toEqual({ kind: "output" });
+    expect(activityOf("Bash", { command: `grep -n 'package.json' "${saved}"` })).toEqual({ kind: "output" });
+    expect(activityOf("Bash", { command: `awk 'NR<=80' "${saved}"` })).toEqual({ kind: "output" });
+    expect(activityOf("Bash", { command: `cat /w/a.txt > "${saved}" && cat "${saved}"` })).toEqual({ kind: "output" });
+    expect(activityOf("Bash", { command: `cat "${saved}" | head -40` })).toEqual({ kind: "output" });
+    expect(activityOf("Bash", { command: `grep -E 'error|warning' "${saved}"` })).toEqual({ kind: "output" });
+    expect(activityOf("Bash", { command: `cat /w/a.txt > "${saved}" && rm "${saved}"` })).toEqual({
+      kind: "read",
+      target: "a.txt",
+    });
+    // Doing something else with it, or reading another file into it, isn't reading it.
+    expect(activityOf("Bash", { command: `rm "${saved}"` })).toEqual({ kind: "command" });
+    expect(activityOf("Bash", { command: `cat /w/report.txt > "${saved}"` })).toEqual({
+      kind: "read",
+      target: "report.txt",
+    });
+    // A user's own folders with the same names are still files.
+    expect(activityOf("Read", { file_path: "/w/projects/cliente/s/tool-results/esito.txt" })).toEqual({
+      kind: "read",
+      target: "esito.txt",
+    });
+    expect(activityOf("Read", { file_path: "/w/tool-results/esito.txt" })).toEqual({
+      kind: "read",
+      target: "esito.txt",
+    });
+  });
+
   it("words Codex's tools, from what a real run sent", () => {
     expect(
       activityOf("file_change", { changes: [{ path: "/w/riassunto.txt", kind: { type: "add" }, diff: "x" }] }),

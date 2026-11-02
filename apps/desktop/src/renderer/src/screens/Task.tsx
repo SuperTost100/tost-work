@@ -189,6 +189,7 @@ const ACTIVITY_ICON: Record<ActivityKind, string> = {
   web: "world-2",
   page: "web",
   command: "terminal-box",
+  output: "terminal-box",
   work: "file",
   skill: "magic-2",
   pdf: "file",

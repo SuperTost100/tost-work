@@ -15,13 +15,11 @@ const QUOTED_DOCUMENT = new RegExp(`"([^"\\n]*\\.(?:${EXTENSIONS}))"|'([^'\\n]*\
 /** A bare path, whose spaces or quotes, if any, are escaped with a backslash. It ends at a shell operator. */
 const DOCUMENT = new RegExp(`(?:[^\\s"'\`\\\\;&|<>()]|\\\\.)+\\.(?:${EXTENSIONS})\\b`, "i");
 
-/** The first document a command names, quoted or not, by its file name, or undefined. */
+/** The path of the first document a command names, quoted or not, or undefined. */
 function documentIn(command: string): string | undefined {
   const quoted = QUOTED_DOCUMENT.exec(command);
   const bare = DOCUMENT.exec(command);
-  const path =
-    quoted && (!bare || quoted.index <= bare.index) ? (quoted[1] ?? quoted[2]) : bare?.[0].replace(/\\(.)/g, "$1");
-  return path === undefined ? undefined : fileName(path);
+  return quoted && (!bare || quoted.index <= bare.index) ? (quoted[1] ?? quoted[2]) : bare?.[0].replace(/\\(.)/g, "$1");
 }
 /** A skill or guide being read: its folder names it. */
 const SKILL_FILE = /([^\s"'`/\\]+)[/\\]SKILL\.md\b/;
@@ -38,10 +36,48 @@ function skillRead(text: string, builtIns?: string): string | undefined {
   const guide = dir && text.slice(Math.max(0, at - dir.length - 1), at - 1) === dir;
   return guide ? `@${match[1]}` : match[1];
 }
-const READS = /(^|[\s;&|(])(cat|sed|head|tail|less|more|rg|grep|wc|nl|file|pdftotext|xxd)\s/;
+/**
+ * Where Claude Code saves a command's output when it's too long to read at once, under the home Tost Work gives it
+ * (agentHomes.ts): agents/claude/projects/<folder>/<session>/tool-results/b1x2y3z4w.txt. Reading it back is reading
+ * the command's output, and its name means nothing.
+ */
+const SAVED_OUTPUT = /[/\\]agents[/\\]claude[/\\]projects[/\\][^/\\]+[/\\][^/\\]+[/\\]tool-results[/\\][^/\\]+$/;
+/** The same folder anywhere in a command, which may name other files and patterns before it. */
+const SAVED_OUTPUT_IN = /[/\\]agents[/\\]claude[/\\]projects[/\\][^/\\\s"']+[/\\][^/\\\s"']+[/\\]tool-results[/\\]/g;
+/** The text before a path ends in a redirection to it: `> "/a b/c`, `>> /a/c`. */
+const REDIRECTED = />\s*(?:"[^"]*|'[^']*|[^\s"']*)$/;
+
+const READS = /(^|[\s;&|(])(cat|sed|awk|head|tail|less|more|rg|grep|wc|nl|file|pdftotext|xxd)\s/;
 const LISTS = /^(\s*(ls|find|tree|pwd|stat)\b[^;&|]*([;&|]+|$))+$/;
 const OFFICE_READS = /officecli\s+(view|get|query|validate|check|info)\b/;
 const OFFICE_WRITES = /officecli\s+(create|add|set|remove|move|merge|batch|import)\b/;
+
+/** A command split at ; && || and | outside quotes, so `grep 'a|b' file` stays one part. */
+function commandParts(command: string): string[] {
+  const parts: string[] = [];
+  let part = "";
+  let quote: string | undefined;
+  for (let i = 0; i < command.length; i++) {
+    const c = command[i] as string;
+    const next = command[i + 1];
+    if (c === "\\" && quote !== "'") {
+      part += c + (next ?? "");
+      i++;
+    } else if (quote) {
+      if (c === quote) quote = undefined;
+      part += c;
+    } else if (c === '"' || c === "'") {
+      quote = c;
+      part += c;
+    } else if (c === ";" || c === "|" || (c === "&" && next === "&")) {
+      parts.push(part);
+      part = "";
+      if (next === c) i++;
+    } else part += c;
+  }
+  parts.push(part);
+  return parts;
+}
 
 /** The command a shell runs, out of Codex's `/bin/bash -lc "…"` wrapper. */
 function innerCommand(command: string): string {
@@ -54,9 +90,19 @@ export function commandActivity(command: string, builtIns?: string): ActivityLin
   const inner = innerCommand(command);
   const skill = skillRead(inner, builtIns);
   if (skill) return { kind: "skill", target: skill };
-  const doc = documentIn(inner);
+  const reads = (part: string) => OFFICE_READS.test(part) || READS.test(` ${part}`);
+  const read = reads(inner);
+  // A part of the command that reads and names the saved output, other than as the place it writes to.
+  const readsSaved = commandParts(inner).some(
+    (part) => reads(part) && [...part.matchAll(SAVED_OUTPUT_IN)].some((m) => !REDIRECTED.test(part.slice(0, m.index))),
+  );
+  if (readsSaved) return { kind: "output" };
+  const path = documentIn(inner);
+  // The output's file name means nothing, so a command that does something else with it is just a command.
+  if (path && SAVED_OUTPUT.test(path)) return { kind: "command" };
+  const doc = path && fileName(path);
   if (doc && OFFICE_WRITES.test(inner)) return { kind: "edit", target: doc };
-  if (doc && (OFFICE_READS.test(inner) || READS.test(` ${inner}`))) return { kind: "read", target: doc };
+  if (doc && read) return { kind: "read", target: doc };
   if (LISTS.test(inner)) return { kind: "folder" };
   if (doc) return { kind: "work", target: doc };
   return { kind: "command" };
@@ -95,6 +141,7 @@ export function activityOf(name: string, input: unknown, builtIns?: string): Act
       const path = text(i.file_path);
       const skill = path && skillRead(path, builtIns);
       if (skill) return { kind: "skill", target: skill };
+      if (path && SAVED_OUTPUT.test(path)) return { kind: "output" };
       return path ? { kind: "read", target: fileName(path) } : { kind: "read" };
     }
     case "Write":
