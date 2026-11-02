@@ -29,6 +29,7 @@
   --btn: #1b1712;
   --on-btn: #faf8f4;
   --need: #9a5b0b;
+  --done: #4f7a3a;
   --danger: #b23a2b;
   --page-shadow: 0 1px 2px rgba(27, 23, 18, 0.06), 0 6px 18px rgba(27, 23, 18, 0.07);
   --bubble: #24211d;
@@ -51,6 +52,7 @@
   --btn: #eeeae3;
   --on-btn: #1b1712;
   --need: #e3a452;
+  --done: #9cbf7f;
   --danger: #ec8a7a;
   --page-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.35);
   --bubble: #3b3732;
@@ -74,6 +76,7 @@
     --btn: #eeeae3;
     --on-btn: #1b1712;
     --need: #e3a452;
+    --done: #9cbf7f;
     --danger: #ec8a7a;
     --page-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.35);
     --bubble: #3b3732;
@@ -407,23 +410,69 @@ h3 {
   background: var(--hover);
   color: var(--ink);
 }
-/* The … comes on top of the row's end without moving anything: the title, or the tag at the right, fades out under it. */
+/* The … comes on top of the row's end without moving anything. A row with a status icon swaps the icon for it; a row
+   without one fades its title out under it. */
 .rec .more {
   position: absolute;
   top: 3px;
   right: 2px;
 }
-.rec:is(:hover, :has(.more:focus-visible)) .open {
+.rec:is(:hover, :has(.more:focus-visible)) .open:not(:has(.st)) {
   mask-image: linear-gradient(to left, transparent 28px, #000 44px);
+}
+/* Out of sight but still in the row's accessible name, so a screen reader hears the state while the … has focus. */
+.rec:is(:hover, :has(.more:focus-visible)) .st {
+  opacity: 0;
+  pointer-events: none;
 }
 /* While a title is renamed, the field has the whole row. */
 .rec:has(.rename) .more {
   display: none;
 }
-/* On a hovered or open row the tag's grey sits too close to the row's own, so its text turns ink and it gets an edge. */
-.rec:is(:hover, .on) .tag:not(.mine) {
-  color: var(--ink);
-  box-shadow: inset 0 0 0 1px var(--line);
+/* A task's state in Recent, in the slot the … takes on hover. */
+.st {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+.st .ic {
+  width: 15px;
+  height: 15px;
+}
+.st svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.st.need {
+  color: var(--need);
+}
+.st.run {
+  color: var(--taupe);
+}
+.st.run svg {
+  animation: spin 1.6s linear infinite;
+}
+.st.seen {
+  color: var(--done);
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.st.draft {
+  color: var(--t3);
+}
+@media (prefers-reduced-motion: reduce) {
+  .st.run svg {
+    animation: none;
+  }
 }
 .rec .rename {
   flex: 1;

@@ -887,10 +887,12 @@ describe("a running task", () => {
     const [task] = await api.tasks.list();
     act(() => api.emit(task?.id ?? "", { type: "withdrawn", id: "q1" }));
     expect((await screen.findByText("Working on it")).closest(".working")?.textContent).toBe("Working on it");
-    // Two signs while it works: the line above the composer and the tag in Recent. The header shows none.
-    expect(screen.getAllByText("working")).toHaveLength(1);
+    // Two signs while it works: the line above the composer and the icon in Recent. The header shows none.
+    expect(screen.queryByText("working")).toBeNull();
+    expect(screen.getAllByRole("img", { name: "working" })).toHaveLength(1);
     expect(screen.queryByText("writing · 1 of 2")).toBeNull();
-    expect(screen.getByRole("button", { name: /Write a proposal.*working/ })).toBeTruthy();
+    // On hover the … covers the icon, so the row itself says the state in its tooltip.
+    expect(screen.getByRole("button", { name: /Write a proposal.*working/ }).getAttribute("title")).toBe("working");
 
     act(() => api.emit(task?.id ?? "", { type: "stopped" }));
     expect(screen.queryByText("Working on it")).toBeNull();

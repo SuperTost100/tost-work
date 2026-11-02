@@ -3,10 +3,10 @@ import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
 import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
-import { type SectionKey, type Task, toReview } from "../../../shared/model";
+import type { SectionKey, Task } from "../../../shared/model";
 import { Clipped } from "../components/Clipped";
 import { SearchBox } from "../components/SearchDialog";
-import { WorkingDots } from "../components/TaskTag";
+import { statusWord, TaskStatusIcon } from "../components/TaskTag";
 
 /** How many tasks Recent shows. */
 export const RECENT = 8;
@@ -119,21 +119,14 @@ export function Sidebar({
               type="button"
               className="open"
               aria-current={openTaskId === task.id ? "page" : undefined}
+              // On hover the … covers the status icon, so the row itself says the state in its tooltip.
+              title={statusWord(task, t) ?? undefined}
               onClick={() => onOpenTask(task.id)}
               onContextMenu={contextMenu(task.id)}
             >
               <Clipped className="truncate grow" text={task.title} />
-              {task.status === "needs-you" && <span className="tag mine">{t("tag.needsYou")}</span>}
-              {task.status === "running" && (
-                <span className="tag">
-                  <WorkingDots />
-                  {t("tag.working")}
-                </span>
-              )}
-              {/* Work to look at and work not started yet, so both stay findable at every level, Board or not.
-                  i18n.test.ts keeps these tags at 10 letters or fewer in every language. */}
-              {toReview(task) && <span className="tag mine">{t("tag.toReview")}</span>}
-              {task.status === "draft" && <span className="tag">{t("tag.draft")}</span>}
+              {/* Work to look at and work not started yet, so both stay findable at every level, Board or not. */}
+              <TaskStatusIcon task={task} />
             </button>
           )}
           <button

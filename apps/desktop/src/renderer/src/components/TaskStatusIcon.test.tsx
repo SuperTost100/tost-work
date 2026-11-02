@@ -1,0 +1,33 @@
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import type { Task } from "../../../shared/model";
+import { statusWord, TaskStatusIcon } from "./TaskTag";
+
+const task = (status: Task["status"], reviewedAt?: string) => ({ status, reviewedAt }) as Task;
+
+describe("a task's status icon in Recent", () => {
+  it.each([
+    ["needs-you", "need", "needs you"],
+    ["running", "run", "working"],
+    ["done", "seen", "to check"],
+    ["draft", "draft", "to do"],
+  ] as const)("shows %s as %s, named in words", (status, kind, label) => {
+    render(<TaskStatusIcon task={task(status)} />);
+    const icon = screen.getByRole("img", { name: label });
+    expect(icon.classList.contains(kind)).toBe(true);
+    expect(icon.getAttribute("title")).toBe(label);
+  });
+
+  it("shows nothing once a finished task has been checked, or for a stopped one", () => {
+    const { container, rerender } = render(<TaskStatusIcon task={task("done", "2026-11-02T10:00:00Z")} />);
+    expect(container.innerHTML).toBe("");
+    rerender(<TaskStatusIcon task={task("stopped")} />);
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("names the state for the row's tooltip, the only one visible while the … covers the icon", () => {
+    const t = (key: string) => key;
+    expect(statusWord(task("needs-you"), t)).toBe("tag.needsYou");
+    expect(statusWord(task("done", "2026-11-02T10:00:00Z"), t)).toBeNull();
+  });
+});

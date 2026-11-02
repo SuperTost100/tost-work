@@ -1,4 +1,7 @@
+import type { ReactNode } from "react";
+import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
+import type { MessageKey } from "../../../shared/i18n";
 import { type Task, toReview } from "../../../shared/model";
 
 /** Three dots that pulse while a task runs. They stand still when the system asks for reduced motion. */
@@ -38,4 +41,48 @@ export function TaskTag({ task }: { task: Task }) {
     case "failed":
       return <span className="tag">{t("tag.failed")}</span>;
   }
+}
+
+/** The word for a task's state where Recent shows an icon, or null where it shows none. */
+export function statusWord(task: Task, t: (key: MessageKey) => string): string | null {
+  if (task.status === "needs-you") return t("tag.needsYou");
+  if (task.status === "running") return t("tag.working");
+  if (toReview(task)) return t("tag.toReview");
+  if (task.status === "draft") return t("tag.draft");
+  return null;
+}
+
+/**
+ * The task's state as a small icon, for rows too narrow for a tag: the sidebar's Recent list. The word is its
+ * accessible name; on hover the … takes its place, so the row's own tooltip says the word (see Sidebar). Only the
+ * states worth a glance get one; a finished, checked task has none.
+ */
+export function TaskStatusIcon({ task }: { task: Task }) {
+  const t = useT();
+  const label = statusWord(task, t);
+  if (!label) return null;
+  const [kind, mark]: [string, ReactNode] =
+    task.status === "needs-you"
+      ? ["need", <Icon key="i" name="hand" />]
+      : task.status === "running"
+        ? [
+            "run",
+            <svg key="i" viewBox="0 0 16 16" aria-hidden="true">
+              <circle cx="8" cy="8" r="6" opacity="0.25" />
+              <path d="M8 2a6 6 0 0 1 6 6" />
+            </svg>,
+          ]
+        : task.status === "draft"
+          ? [
+              "draft",
+              <svg key="i" viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="8" cy="8" r="6" strokeDasharray="3.2 2.2" />
+              </svg>,
+            ]
+          : ["seen", <Icon key="i" name="check-circle" />];
+  return (
+    <span className={`st ${kind}`} role="img" aria-label={label} title={label}>
+      {mark}
+    </span>
+  );
 }
