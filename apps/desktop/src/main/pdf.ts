@@ -15,6 +15,7 @@ import carlitoItalic from "../renderer/src/assets/fonts/Carlito-Italic.ttf?asset
 import carlitoRegular from "../renderer/src/assets/fonts/Carlito-Regular.ttf?asset";
 
 import { officeKind, pageSize, printable } from "./pdf-page";
+import { UserError } from "./userError";
 
 const run = promisify(execFile);
 
@@ -56,7 +57,7 @@ function printSession() {
  */
 export async function makePdf(officecli: string, env: NodeJS.ProcessEnv, source: string, target: string) {
   const kind = officeKind(source);
-  if (!kind) throw new Error("Tost Work makes PDFs of Word, Excel and PowerPoint files");
+  if (!kind) throw new UserError("error.pdfKinds");
   const dir = await mkdtemp(join(tmpdir(), "tost-work-pdf-"));
   try {
     const page = join(dir, "page.html");

@@ -7,6 +7,7 @@ import { pipeline } from "node:stream/promises";
 import JSZip from "jszip";
 import type { Skill, SkillDraft, SkillVersion } from "../shared/model";
 import type { SkillVersions } from "./skillVersions";
+import { UserError } from "./userError";
 
 /** The most an imported skill may hold, so a folder or zip picked by mistake can't fill the disk. */
 export const IMPORT_LIMITS = { files: 500, bytes: 50 * 1024 * 1024 };
@@ -207,7 +208,7 @@ export class SkillFolder {
       if (/\.zip$/i.test(source)) await unzipSkill(source, staging);
       else {
         const info = await lstat(join(source, "SKILL.md")).catch(() => null);
-        if (!info?.isFile()) throw new Error("That folder has no SKILL.md");
+        if (!info?.isFile()) throw new UserError("error.noSkillMdFolder");
         await this.copyFolder(source, staging);
       }
       const { name } = parseSkill(await readFile(join(staging, "SKILL.md"), "utf8"));
@@ -221,7 +222,7 @@ export class SkillFolder {
         setAside = true;
         await this.keep(id);
         const skill = await this.read(id);
-        if (!skill) throw new Error("That skill couldn't be read after importing it");
+        if (!skill) throw new UserError("error.skillReadBack");
         return skill;
       } catch (err) {
         // A half-done import goes, with the version it kept; history set aside from an older skill stays.
@@ -247,7 +248,7 @@ export class SkillFolder {
   private async restoreNow(id: string, n: number): Promise<Skill> {
     const current = await this.checked(id);
     const text = await this.versions?.text(current, n);
-    if (text == null) throw new Error("That version isn't kept any more");
+    if (text == null) throw new UserError("error.versionGone");
     const { description, body, extra } = parseSkill(text);
     await this.writeText(current, formatSkill(current, description, body, extra));
     await this.keep(current);
@@ -297,7 +298,7 @@ export class SkillFolder {
   private async saveNow(id: string, draft: SkillDraft, note: string): Promise<Skill> {
     const current = await this.checked(id);
     const before = await this.read(current);
-    if (!before) throw new Error("That skill isn't there any more");
+    if (!before) throw new UserError("error.skillGone");
     let target = current;
     const wanted = skillName(draft.title);
     if (wanted !== skillName(before.title) && wanted !== current) {
@@ -356,10 +357,10 @@ export class SkillFolder {
           const path = join(dir, e.name);
           // Sized before it's read, so a huge file stops the export without filling memory first.
           const tooBig = (more: number) => files + 1 > IMPORT_LIMITS.files || bytes + more > IMPORT_LIMITS.bytes;
-          if (tooBig((await stat(path)).size)) throw new Error("That skill is too big to export");
+          if (tooBig((await stat(path)).size)) throw new UserError("error.skillTooBigExport");
           const data = await readFile(path);
           // It may have grown since.
-          if (tooBig(data.length)) throw new Error("That skill is too big to export");
+          if (tooBig(data.length)) throw new UserError("error.skillTooBigExport");
           files++;
           bytes += data.length;
           zip.file(`${inZip}/${e.name}`, data);
@@ -368,7 +369,7 @@ export class SkillFolder {
     };
     await walk(join(this.root, name), name);
     // Its SKILL.md may have gone since the list was read: a zip without one wouldn't import, so it fails here instead.
-    if (!zip.file(`${name}/SKILL.md`)) throw new Error("That skill has no SKILL.md to export");
+    if (!zip.file(`${name}/SKILL.md`)) throw new UserError("error.noSkillMdExport");
     return { name, data: await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }) };
   }
 
@@ -428,7 +429,7 @@ export class SkillFolder {
           files++;
           bytes += (await stat(join(dir, e.name))).size;
           if (files > IMPORT_LIMITS.files || bytes > IMPORT_LIMITS.bytes)
-            throw new Error("That skill is too big to import");
+            throw new UserError("error.skillTooBigImport");
           await copyFile(join(dir, e.name), join(out, e.name));
         }
       }
@@ -467,14 +468,14 @@ export class SkillFolder {
    */
   private async checked(id: string): Promise<string> {
     const info = await lstat(join(this.root, valid(id))).catch(() => null);
-    if (!info?.isDirectory()) throw new Error("That isn't a skill");
+    if (!info?.isDirectory()) throw new UserError("error.notSkill");
     return id;
   }
 }
 
 /** A folder name and nothing more: no path separators, not hidden, "." or "..", and not a built-in guide's @ id. */
 function valid(id: string): string {
-  if (!id || id.startsWith(".") || id.startsWith("@") || /[\\/]/.test(id)) throw new Error("That isn't a skill");
+  if (!id || id.startsWith(".") || id.startsWith("@") || /[\\/]/.test(id)) throw new UserError("error.notSkill");
   return id;
 }
 
@@ -489,10 +490,10 @@ async function unzipSkill(source: string, to: string): Promise<void> {
   const marker = entries
     .filter((f) => /(^|\/)SKILL\.md$/.test(f.name))
     .sort((a, b) => a.name.split("/").length - b.name.split("/").length)[0];
-  if (!marker) throw new Error("That zip has no SKILL.md");
+  if (!marker) throw new UserError("error.noSkillMdZip");
   const prefix = marker.name.slice(0, -"SKILL.md".length);
   const inside = entries.filter((f) => f.name.startsWith(prefix));
-  if (inside.length > IMPORT_LIMITS.files) throw new Error("That skill is too big to import");
+  if (inside.length > IMPORT_LIMITS.files) throw new UserError("error.skillTooBigImport");
   let bytes = 0;
   for (const f of inside) {
     // Unix permissions say when an entry is a link, which would point outside the folder.
@@ -501,14 +502,14 @@ async function unzipSkill(source: string, to: string): Promise<void> {
     // JSZip cleans a name that climbs out (../), keeping the original: a zip made that way is refused, not repaired.
     const climbed = f.unsafeOriginalName !== undefined && f.unsafeOriginalName !== f.name;
     if (climbed || rel.startsWith("..") || rel.startsWith(sep) || /^[a-zA-Z]:/.test(rel))
-      throw new Error("That zip has a file outside its folder");
+      throw new UserError("error.zipOutside");
     await mkdir(dirname(join(to, rel)), { recursive: true });
     // Streamed and counted as it unpacks, so one huge entry stops at the limit instead of filling memory.
     // A half-written file stays in the staging folder, which import removes.
     const counted = new Transform({
       transform(chunk: Buffer, _encoding, done) {
         bytes += chunk.length;
-        done(bytes > IMPORT_LIMITS.bytes ? new Error("That skill is too big to import") : null, chunk);
+        done(bytes > IMPORT_LIMITS.bytes ? new UserError("error.skillTooBigImport") : null, chunk);
       },
     });
     await pipeline(f.nodeStream("nodebuffer"), counted, createWriteStream(join(to, rel), { flags: "wx" }));

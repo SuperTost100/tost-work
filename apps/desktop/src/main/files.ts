@@ -2,6 +2,7 @@ import { constants } from "node:fs";
 import { copyFile, lstat, realpath, rm, stat } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
 import type { Task } from "../shared/model";
+import { UserError } from "./userError";
 
 /** The biggest file the interface may load for a preview. */
 export const MAX_PREVIEW_BYTES = 25 * 1024 * 1024;
@@ -20,15 +21,14 @@ export const inside = (folder: string, path: string) => {
 export async function readablePath(task: Task, requested: string, limitSize = true): Promise<string> {
   const listed =
     task.files.some((f) => f.path === requested && f.kind !== "delete") || task.attachments.includes(requested);
-  if (!listed) throw new Error("That file isn't part of this task");
+  if (!listed) throw new UserError("error.fileNotInTask");
   const real = await realpath(requested);
   const isAttachment = task.attachments.includes(requested);
-  if (!isAttachment && !inside(await realpath(task.workdir), real))
-    throw new Error("That file is outside the task's folder");
+  if (!isAttachment && !inside(await realpath(task.workdir), real)) throw new UserError("error.fileOutside");
   const info = await stat(real);
-  if (!info.isFile()) throw new Error("That isn't a file");
+  if (!info.isFile()) throw new UserError("error.notFile");
   // The limit protects the preview's memory; opening or showing a big file in its own app is fine.
-  if (limitSize && info.size > MAX_PREVIEW_BYTES) throw new Error("That file is too big to preview");
+  if (limitSize && info.size > MAX_PREVIEW_BYTES) throw new UserError("error.fileTooBig");
   return real;
 }
 
@@ -44,7 +44,7 @@ export async function savablePaths(task: Task): Promise<string[]> {
       throw err;
     });
     if (resolved === null) continue;
-    if (!inside(folder, resolved)) throw new Error("That file is outside the task's folder");
+    if (!inside(folder, resolved)) throw new UserError("error.fileOutside");
     real.push(resolved);
   }
   return real;
@@ -53,7 +53,7 @@ export async function savablePaths(task: Task): Promise<string[]> {
 /** A file inside the task's folder, resolved through symlinks. Throws for anything outside, so a link can't point out. */
 export async function taskFile(task: Task, path: string): Promise<string> {
   const real = await realpath(path);
-  if (!inside(await realpath(task.workdir), real)) throw new Error("That file is outside the task's folder");
+  if (!inside(await realpath(task.workdir), real)) throw new UserError("error.fileOutside");
   return real;
 }
 
@@ -72,10 +72,10 @@ export async function writablePath(task: Task, path: string): Promise<string> {
     if (err.code === "ENOENT") return null;
     throw err;
   });
-  if (link) throw new Error("That file is a broken link");
+  if (link) throw new UserError("error.fileBrokenLink");
   const folder = await realpath(task.workdir);
   const parent = await realpath(dirname(path));
-  if (parent !== folder && !inside(folder, parent)) throw new Error("That file is outside the task's folder");
+  if (parent !== folder && !inside(folder, parent)) throw new UserError("error.fileOutside");
   return join(parent, basename(path));
 }
 
@@ -99,7 +99,7 @@ export async function freeName(folder: string, name: string): Promise<string> {
     const candidate = join(folder, n === 1 ? name : `${stem} (${n})${ext}`);
     if (!(await exists(candidate))) return candidate;
   }
-  throw new Error(`Too many files called ${name} in that folder`);
+  throw new UserError("error.tooManyFiles", { name });
 }
 
 /** Copies the user's files into a quick edit's folder, so the agent edits copies and the originals stay untouched. */
@@ -108,7 +108,7 @@ export async function copyInto(paths: string[], folder: string): Promise<string[
   try {
     for (const path of paths) {
       const info = await stat(path);
-      if (!info.isFile()) throw new Error(`${basename(path)} isn't a file`);
+      if (!info.isFile()) throw new UserError("error.notAFile", { name: basename(path) });
       const target = await freeName(folder, basename(path));
       await copyFile(path, target, constants.COPYFILE_EXCL);
       copies.push(target);

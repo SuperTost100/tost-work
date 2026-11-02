@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { lstat } from "node:fs/promises";
+import type { Language } from "../../shared/i18n";
 import type { AgentProvider, Approval, KeptCopy, Project, Task } from "../../shared/model";
 import { answersText, BRIEF_MAX, questionItems } from "../../shared/model";
 import { applyEvent, resume } from "../../shared/reduce";
 import type { Guard } from "../guard";
 import type { Store } from "../store/store";
+import { UserError, userMessage } from "../userError";
 import type { Engine } from "./engine";
 
 export interface NewTask {
@@ -90,6 +92,8 @@ export class TaskRunner {
     private onText: (taskId: string, text: string, restart?: boolean) => void = () => {},
     /** The app's debug log: each task's start, answers, decisions and end, which it writes only while debug is on. */
     private log: AppLog = () => {},
+    /** The language a task's saved failure is said in. */
+    private language: () => Language = () => "en",
   ) {}
 
   /** What the running task's agent has written of its answer so far, or "" between answers. */
@@ -103,7 +107,7 @@ export class TaskRunner {
 
   create(input: NewTask): Task {
     // A start that was on its way while the project was being removed doesn't get to add a task to it.
-    if (input.projectId && this.removing.has(input.projectId)) throw new Error("That project doesn't exist");
+    if (input.projectId && this.removing.has(input.projectId)) throw new UserError("error.noProject");
     const at = this.now();
     const task: Task = {
       id: randomUUID(),
@@ -146,7 +150,7 @@ export class TaskRunner {
   async start(taskId: string, followUp: string | null = null): Promise<Task> {
     let task = this.mustGet(taskId);
     const workdir = task.workdir;
-    if (this.running.has(taskId)) throw new Error("This task is already running");
+    if (this.running.has(taskId)) throw new UserError("error.alreadyRunning");
     const project: Project | null = task.projectId ? (this.store.getProject(task.projectId) ?? null) : null;
     const controller = new AbortController();
     this.running.set(taskId, controller);
@@ -196,7 +200,7 @@ export class TaskRunner {
           ? this.save(applyEvent({ ...latest, interrupted: undefined }, { type: "done" }, this.now()))
           : latest;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = userMessage(err, this.language());
       const current = this.mustGet(taskId);
       task = current.interrupted
         ? this.save({ ...current, status: "stopped", error: message, updatedAt: this.now() })
@@ -233,8 +237,8 @@ export class TaskRunner {
    */
   async startSaved(taskId: string, prepare: (task: Task) => Promise<string[]>): Promise<Task> {
     const saved = this.mustGet(taskId);
-    if (saved.status !== "draft") throw new Error("This task has already started");
-    if (this.starting.has(taskId)) throw new Error("This task is already starting");
+    if (saved.status !== "draft") throw new UserError("error.alreadyStarted");
+    if (this.starting.has(taskId)) throw new UserError("error.alreadyStarting");
     this.starting.add(taskId);
     try {
       // Before any copying, as for a new task: if the engine can't start, no folder or copies are left behind.
@@ -242,7 +246,7 @@ export class TaskRunner {
       const attachments = await prepare(saved);
       // Read again: the task may have been renamed, or its project removed, while the files were copied.
       const task = this.mustGet(taskId);
-      if (task.projectId && this.removing.has(task.projectId)) throw new Error("That project doesn't exist");
+      if (task.projectId && this.removing.has(task.projectId)) throw new UserError("error.noProject");
       const at = this.now();
       const { auth: _auth, ...rest } = task;
       this.save({
@@ -272,12 +276,12 @@ export class TaskRunner {
     input: { brief: string; projectId: string | null; workdir: string; attachments: string[] },
   ): Task {
     const task = this.mustGet(taskId);
-    if (task.status !== "draft") throw new Error("This task has already started");
+    if (task.status !== "draft") throw new UserError("error.alreadyStarted");
     // A start under way is copying the files it read before this edit, and would run the old brief.
-    if (this.starting.has(taskId)) throw new Error("This task is already starting");
+    if (this.starting.has(taskId)) throw new UserError("error.alreadyStarting");
     const brief = input.brief.trim();
-    if (!brief) throw new Error("A task needs a brief");
-    if (input.projectId && this.removing.has(input.projectId)) throw new Error("That project doesn't exist");
+    if (!brief) throw new UserError("error.briefNeeded");
+    if (input.projectId && this.removing.has(input.projectId)) throw new UserError("error.noProject");
     // A task keeps no mark of a rename, so a title other than the one its old brief gives counts as the user's.
     const title = task.title === titleFrom(task.brief) ? titleFrom(brief) : task.title;
     const at = this.now();
@@ -301,14 +305,14 @@ export class TaskRunner {
   /** Marks a finished task's work as looked at, so it's no longer "to check". Its place in Recent stays where it was. */
   markReviewed(taskId: string): Task {
     const task = this.mustGet(taskId);
-    if (task.status !== "done") throw new Error("Only a finished task can be marked as checked");
+    if (task.status !== "done") throw new UserError("error.onlyDoneChecked");
     return task.reviewedAt ? task : this.save({ ...task, reviewedAt: this.now() });
   }
 
   /** Puts a finished task back among the ones to check. Its place in Recent stays where it was. */
   markUnreviewed(taskId: string): Task {
     const task = this.mustGet(taskId);
-    if (task.status !== "done") throw new Error("Only a finished task can be marked to check");
+    if (task.status !== "done") throw new UserError("error.onlyDoneToCheck");
     if (!task.reviewedAt) return task;
     const { reviewedAt: _reviewed, ...rest } = task;
     return this.save(rest);
@@ -320,11 +324,11 @@ export class TaskRunner {
    */
   answer(taskId: string, answers: string[], files: string[] = []): Task {
     const task = this.mustGet(taskId);
-    if (!task.question) throw new Error("This task isn't waiting for an answer");
+    if (!task.question) throw new UserError("error.noQuestion");
     const items = questionItems(task.question);
     if (answers.length !== items.length) throw new Error("Send one answer per question");
     const answer = answersText(task.question, answers);
-    if (answer.length > BRIEF_MAX) throw new Error("These answers are too long to send together");
+    if (answer.length > BRIEF_MAX) throw new UserError("error.answersTooLong");
     const at = this.now();
     const answered = items.map((item, i) => ({ question: item.text, answer: answers[i] ?? "" }));
     const next = this.save({
@@ -363,10 +367,10 @@ export class TaskRunner {
    */
   resume(taskId: string): Task {
     const task = this.mustGet(taskId);
-    if (this.running.has(taskId)) throw new Error("This task is still working");
-    if (!task.interrupted) throw new Error("Only a task stopped by closing Tost Work can be resumed");
+    if (this.running.has(taskId)) throw new UserError("error.stillWorking");
+    if (!task.interrupted) throw new UserError("error.onlyInterrupted");
     // A run started now could write to a file the restore is about to put back.
-    if (this.restoring.has(taskId)) throw new Error("Wait for the restore to finish");
+    if (this.restoring.has(taskId)) throw new UserError("error.waitRestore");
     this.launch(taskId, task.sessionId ? RESUME_PROMPT : null);
     return task;
   }
@@ -377,11 +381,11 @@ export class TaskRunner {
    */
   followUp(taskId: string, text: string, files: string[] = []): Task {
     const task = this.mustGet(taskId);
-    if (this.running.has(taskId)) throw new Error("This task is still working");
+    if (this.running.has(taskId)) throw new UserError("error.stillWorking");
     // A run started now could write to a file the restore is about to put back.
-    if (this.restoring.has(taskId)) throw new Error("Wait for the restore to finish");
-    if (task.question || task.approval) throw new Error("This task is waiting for an answer");
-    if (task.status === "draft") throw new Error("Start this task first");
+    if (this.restoring.has(taskId)) throw new UserError("error.waitRestore");
+    if (task.question || task.approval) throw new UserError("error.waitingAnswer");
+    if (task.status === "draft") throw new UserError("error.startFirst");
     const at = this.now();
     // The old review checked the old brief, so it goes until the agent writes a new one. The new run's work hasn't
     // been looked at yet either.
@@ -406,9 +410,9 @@ export class TaskRunner {
   async decide(taskId: string, allow: boolean): Promise<Task> {
     const task = this.mustGet(taskId);
     const approval = task.approval;
-    if (!approval) throw new Error("This task isn't waiting for a decision");
-    if (this.deciding.has(taskId)) throw new Error("This decision is already being carried out");
-    if (this.restoring.has(taskId)) throw new Error("Wait for the restore to finish");
+    if (!approval) throw new UserError("error.noDecision");
+    if (this.deciding.has(taskId)) throw new UserError("error.deciding");
+    if (this.restoring.has(taskId)) throw new UserError("error.waitRestore");
     this.deciding.add(taskId);
     try {
       const kept: KeptCopy[] = [];
@@ -473,14 +477,14 @@ export class TaskRunner {
   /** Puts back the newest kept copy of a file. The version it replaces is kept too, so restoring can be undone. */
   async restore(taskId: string, path: string): Promise<Task> {
     const task = this.mustGet(taskId);
-    if (this.running.has(taskId)) throw new Error("Wait for the task to finish before restoring");
-    if (this.restoring.has(taskId)) throw new Error("A restore is already in progress");
+    if (this.running.has(taskId)) throw new UserError("error.waitFinishRestore");
+    if (this.restoring.has(taskId)) throw new UserError("error.restoring");
     // It would save the task again after its project's records are gone.
-    if (task.projectId && this.removing.has(task.projectId)) throw new Error("That project is being removed");
+    if (task.projectId && this.removing.has(task.projectId)) throw new UserError("error.projectRemoving");
     // Stop can end the run while a decision still copies or trashes files; the restore waits for it.
-    if (this.deciding.has(taskId)) throw new Error("Wait for the decision to finish");
+    if (this.deciding.has(taskId)) throw new UserError("error.waitDecision");
     const latest = (task.kept ?? []).filter((k) => k.path === path).at(-1);
-    if (!latest) throw new Error("There's no kept copy of that file");
+    if (!latest) throw new UserError("error.noKeptCopy");
     this.restoring.add(taskId);
     try {
       // The version being replaced is kept so Undo can bring it back. A file removed since has nothing to keep.
@@ -501,7 +505,7 @@ export class TaskRunner {
   /** Gives the task a name of the user's choosing. Its place in Recent stays where it was. */
   rename(taskId: string, title: string): Task {
     const name = title.trim();
-    if (!name) throw new Error("A task needs a name");
+    if (!name) throw new UserError("error.taskName");
     return this.save({ ...this.mustGet(taskId), title: name });
   }
 
@@ -514,7 +518,7 @@ export class TaskRunner {
       this.restoring.has(taskId) ||
       this.starting.has(taskId)
     )
-      throw new Error("Stop the task before deleting it");
+      throw new UserError("error.stopBeforeDelete");
     this.queued.delete(taskId);
     this.store.deleteTask(taskId);
   }
@@ -555,20 +559,19 @@ export class TaskRunner {
   private async stopAll(projectId: string): Promise<void> {
     // A task putting files back or acting on a decision saves itself when done, whatever its status: it goes first.
     if (this.store.listProjectTasks(projectId).some((t) => this.deciding.has(t.id) || this.restoring.has(t.id)))
-      throw new Error("A task is saving its files. Try again in a moment.");
+      throw new UserError("error.savingFiles");
     const active = () =>
       this.store.listProjectTasks(projectId).filter((t) => t.status === "needs-you" || this.running.has(t.id));
     // More than one round: a job can start a run in the gap while the first ones end.
     for (let round = 0; round < 5 && active().length > 0; round++) {
       const tasks = active();
       for (const task of tasks) {
-        if (this.deciding.has(task.id) || this.restoring.has(task.id))
-          throw new Error("A task is saving its files. Try again in a moment.");
+        if (this.deciding.has(task.id) || this.restoring.has(task.id)) throw new UserError("error.savingFiles");
         this.stop(task.id);
       }
       await Promise.all(tasks.map((task) => this.ended.get(task.id)));
     }
-    if (active().length > 0) throw new Error("A task of this project is still working. Try again in a moment.");
+    if (active().length > 0) throw new UserError("error.projectStillWorking");
   }
 
   /** How many tasks are working right now, so quitting can ask first. */

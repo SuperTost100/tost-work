@@ -26,6 +26,7 @@ import {
   THEMES,
   type Theme,
 } from "../shared/model";
+import { UserError } from "./userError";
 
 /** Checks for values that come from the interface, because IPC is a trust boundary. */
 export const text = (v: unknown, field: string, max = 20_000): string => {
@@ -55,7 +56,7 @@ export const paths = (v: unknown, field: string, max = 20): string[] => {
 export const taskInput = (v: unknown): Required<NewTaskInput> => {
   const input = (typeof v === "object" && v !== null ? v : {}) as Record<string, unknown>;
   const brief = text(input.brief, "brief", BRIEF_MAX).trim();
-  if (!brief) throw new Error("A task needs a brief");
+  if (!brief) throw new UserError("error.briefNeeded");
   const projectId = input.projectId == null ? null : text(input.projectId, "projectId", 100);
   return { brief, projectId, attachments: paths(input.attachments, "attachments") };
 };
@@ -71,7 +72,7 @@ export const placedTask = (
 ): Required<NewTaskInput> & { workdir: string } => {
   const { brief, projectId, attachments } = taskInput(v);
   const project = projectId ? projectOf(projectId) : undefined;
-  if (projectId && !project) throw new Error("That project doesn't exist");
+  if (projectId && !project) throw new UserError("error.noProject");
   return { brief, projectId, attachments, workdir: project?.folder ?? quickFolder() };
 };
 

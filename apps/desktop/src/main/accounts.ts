@@ -1,5 +1,6 @@
 import type { AuthStatus, Installation, LoginSession } from "cli-funnel";
 import type { AgentAccount, SignInEvent } from "../shared/api";
+import { UserError } from "./userError";
 
 /** The parts of cli-funnel the sign-in uses, so tests can stand in for the real Codex. */
 export interface AccountSource {
@@ -35,14 +36,14 @@ export class Accounts {
 
   /** Starts the sign-in and returns at once. Resolves when the flow ends, for tests. */
   signIn(): Promise<void> {
-    if (this.session) throw new Error("A sign-in is already open");
+    if (this.session) throw new UserError("error.signInOpen");
     const session = this.source.login();
     this.session = session;
     return this.follow(session);
   }
 
   sendCode(code: string): void {
-    if (!this.session) throw new Error("No sign-in is waiting for a code");
+    if (!this.session) throw new UserError("error.signInNone");
     this.session.sendCode(code);
   }
 

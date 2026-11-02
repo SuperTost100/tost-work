@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { EngineEvent, Task } from "../../shared/model";
 import { Store } from "../store/store";
+import { UserError } from "../userError";
 import type { Engine, RunContext } from "./engine";
 import { FakeEngine, PROPOSAL_SCRIPT } from "./fake";
 import { RESUME_PROMPT, TaskRunner, titleFrom, withFiles } from "./runner";
@@ -169,6 +170,37 @@ describe("TaskRunner with the fake engine", () => {
     const { runner } = setup();
     const task = runner.create({ projectId: null, brief: "Hello", workdir: "/tmp/p" });
     expect(() => runner.answer(task.id, ["yes"])).toThrow(/isn't waiting/);
+  });
+});
+
+describe("TaskRunner when a run fails with a message for the user", () => {
+  it("saves the failure in the app's language", async () => {
+    const store = new Store(":memory:");
+    const engine: Engine = {
+      defaults: async () => ({ provider: "codex", model: "m", effort: "low" }),
+      // It fails before its first event, as the engine does when the key is gone.
+      run: () => ({
+        [Symbol.asyncIterator]: () => ({ next: () => Promise.reject(new UserError("error.taskKeyGone")) }),
+      }),
+      answer: () => false,
+      decide: () => false,
+    };
+    const runner = new TaskRunner(
+      store,
+      engine,
+      () => {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      () => "it",
+    );
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
+    await runner.start(task.id);
+    expect(store.getTask(task.id)).toMatchObject({
+      status: "failed",
+      error: "Questa attività usava la chiave del corso, che non c'è più. Incollala di nuovo in Impostazioni.",
+    });
   });
 });
 

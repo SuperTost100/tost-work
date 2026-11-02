@@ -371,12 +371,14 @@ app.whenReady().then(async () => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.taskText, taskId, text, restart);
     },
     appLog,
+    language,
   );
   // Set once the tray exists below; jobs and tasks changing before that have nothing to update.
   let trayChanged = () => {};
   // Jobs start their runs as tasks, like the ones the user starts, on the account new tasks use.
   const jobs = new Jobs({
     store,
+    language,
     busy: (jobId) => store.jobBusy(jobId),
     start: async (job, at) => {
       const project = store.getProject(job.projectId);

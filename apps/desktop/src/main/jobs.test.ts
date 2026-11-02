@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Job, JobDraft, TaskStatus } from "../shared/model";
 import { upcoming } from "../shared/schedule";
 import { decide, Jobs, jobDraft } from "./jobs";
+import { UserError } from "./userError";
 
 // Local times. 28 Oct 2026 is a Wednesday.
 const at = (d: number, h = 0, m = 0) => new Date(2026, 9, d, h, m);
@@ -80,13 +81,14 @@ describe("jobDraft", () => {
 });
 
 /** Jobs over an in-memory store, with a clock the test moves. */
-function setup() {
+function setup(language: "en" | "it" = "en") {
   const jobs = new Map<string, Job>();
   const status = new Map<string, TaskStatus>();
   const runOf = new Map<string, string>();
   const started: { jobId: string; at: Date }[] = [];
   let clock = at(28, 8);
   let fail = false;
+  let failure: Error = new Error("No AI is signed in");
   let starting = () => {};
   const changes: unknown[] = [];
   const service = new Jobs({
@@ -105,7 +107,7 @@ function setup() {
     busy: (jobId) =>
       [...status].some(([id, st]) => runOf.get(id) === jobId && (st === "running" || st === "needs-you")),
     start: async (j, when) => {
-      if (fail) throw new Error("No AI is signed in");
+      if (fail) throw failure;
       starting();
       started.push({ jobId: j.id, at: when });
       const id = `t${started.length}`;
@@ -115,6 +117,7 @@ function setup() {
     },
     changed: (change) => void changes.push(change),
     now: () => clock,
+    language: () => language,
   });
   return {
     service,
@@ -125,8 +128,9 @@ function setup() {
       clock = when;
       return service.tick();
     },
-    failNext: () => {
+    failNext: (err?: Error) => {
       fail = true;
+      if (err) failure = err;
     },
     whenStarting: (fn: () => void) => {
       starting = fn;
@@ -215,6 +219,17 @@ describe("Jobs", () => {
     failNext();
     await tick(at(30, 9));
     expect(service.list()[0]?.last).toEqual({ at: at(30, 9).toISOString(), error: "No AI is signed in" });
+  });
+
+  it("says why a run couldn't start in the app's language", async () => {
+    const { service, tick, failNext } = setup("it");
+    service.create(DRAFT);
+    failNext(new UserError("error.courseKeyGone"));
+    await tick(at(28, 9));
+    expect(service.list()[0]?.last).toEqual({
+      at: at(28, 9).toISOString(),
+      error: "La chiave del corso non c'è più. Incollala di nuovo in Impostazioni, Account AI.",
+    });
   });
 
   it("waits for an earlier run that needs the user even after Run now started and finished another", async () => {

@@ -31,6 +31,7 @@ import { type Jobs, jobDraft } from "./jobs";
 import type { KeyStore } from "./keys";
 import type { GuideText, SkillFolder } from "./skills";
 import type { Store } from "./store/store";
+import { UserError, userMessage } from "./userError";
 import { absolutePath, oneLine, paths, placedTask, settingsPatch, text } from "./validate";
 
 /** Validates everything that comes from the interface, because IPC is a trust boundary. */
@@ -54,6 +55,8 @@ export function registerIpc(
         return await listener(e, ...args);
       } catch (err) {
         debug.app("error", `${channel} failed`, err);
+        // The window gets the sentence in the app's language; the log above keeps the English one.
+        if (err instanceof UserError) throw new Error(userMessage(err, language()));
         throw err;
       }
     });
@@ -102,7 +105,7 @@ export function registerIpc(
   handle(IPC.projectsCreate, (_e, input: NewProjectInput) => {
     const name = text(input?.name, "name", 200).trim();
     const folder = absolutePath(input?.folder, "folder");
-    if (!name) throw new Error("A project needs a name");
+    if (!name) throw new UserError("error.projectName");
     const project: Project = {
       id: randomUUID(),
       name,
@@ -176,7 +179,7 @@ export function registerIpc(
   const withAttached = async <T>(taskId: string, given: unknown, use: (files: string[]) => T): Promise<T> => {
     const files = paths(given, "attachments");
     const task = store.getTask(taskId);
-    if (!task) throw new Error("That task doesn't exist");
+    if (!task) throw new UserError("error.noTask");
     const copies = task.projectId === null && files.length ? await copyInto(files, task.workdir) : null;
     try {
       return use(copies ?? files);
@@ -200,7 +203,7 @@ export function registerIpc(
   handle(IPC.tasksFollowUp, (_e, id: unknown, message: unknown, files?: unknown) => {
     const taskId = text(id, "id", 100);
     const body = text(message, "message", BRIEF_MAX).trim();
-    if (!body) throw new Error("Write what to change first");
+    if (!body) throw new UserError("error.changeFirst");
     return withAttached(taskId, files, (attached) => {
       const task = runner.followUp(taskId, body, attached);
       runner.launch(taskId, withFiles(body, attached));
@@ -210,10 +213,10 @@ export function registerIpc(
 
   handle(IPC.tasksSaveCopy, async (_e, id: unknown): Promise<SaveResult | null> => {
     const task = store.getTask(text(id, "id", 100));
-    if (!task) throw new Error("That task doesn't exist");
-    if (runner.isRunning(task.id)) throw new Error("Wait for the task to finish before saving");
+    if (!task) throw new UserError("error.noTask");
+    if (runner.isRunning(task.id)) throw new UserError("error.waitToSave");
     const sources = await savablePaths(task);
-    if (sources.length === 0) throw new Error("This task hasn't made any files yet");
+    if (sources.length === 0) throw new UserError("error.noFilesYet");
     const picked = await openDialog({
       title: t("save.pick"),
       buttonLabel: t("save.here"),
@@ -240,7 +243,7 @@ export function registerIpc(
 
   const taskOf = (id: unknown) => {
     const task = store.getTask(text(id, "id", 100));
-    if (!task) throw new Error("That task doesn't exist");
+    if (!task) throw new UserError("error.noTask");
     return task;
   };
   // A native menu, as Finder's and Mail's are. It only says what was picked; the window carries it out.
@@ -296,7 +299,7 @@ export function registerIpc(
 
   const projectOf = (id: unknown) => {
     const project = store.getProject(text(id, "id", 100));
-    if (!project) throw new Error("That project doesn't exist");
+    if (!project) throw new UserError("error.noProject");
     return project;
   };
   handle(IPC.projectsMenu, (_e, id: unknown) => {
@@ -318,7 +321,7 @@ export function registerIpc(
     for (const key of Object.keys(input)) {
       if (key === "name") {
         next.name = text(input.name, "name", 200).trim();
-        if (!next.name) throw new Error("A project needs a name");
+        if (!next.name) throw new UserError("error.projectName");
       } else if (key === "description")
         next.description = oneLine(text(input.description, "description", DESCRIPTION_MAX));
       else if (key === "instructions") next.instructions = text(input.instructions, "instructions");
@@ -360,12 +363,12 @@ export function registerIpc(
   handle(IPC.debugTaskLog, (_e, id: unknown) => debug.readTask(taskOf(id).id));
   handle(IPC.debugRevealTaskLog, (_e, id: unknown) => {
     const taskId = taskOf(id).id;
-    if (!debug.hasTask(taskId)) throw new Error("This task has no log yet");
+    if (!debug.hasTask(taskId)) throw new UserError("error.noLog");
     shell.showItemInFolder(debug.taskFile(taskId));
   });
   handle(IPC.debugCopyTaskLog, async (_e, id: unknown) => {
     const log = await debug.taskText(taskOf(id).id);
-    if (log === null) throw new Error("This task has no log yet");
+    if (log === null) throw new UserError("error.noLog");
     clipboard.writeText(log);
   });
   handle(IPC.debugRevealAppLog, async () => shell.showItemInFolder(await debug.touchApp()));
@@ -375,7 +378,7 @@ export function registerIpc(
   const draft = (value: unknown) => {
     const d = (value ?? {}) as Record<string, unknown>;
     const title = text(d.title, "title", 200).trim();
-    if (!title) throw new Error("A skill needs a name");
+    if (!title) throw new UserError("error.skillName");
     return { title, description: text(d.description, "description", 1024), steps: text(d.steps, "steps", BRIEF_MAX) };
   };
   handle(IPC.jobsList, () => jobs.list());
@@ -392,7 +395,7 @@ export function registerIpc(
   handle(IPC.skillsList, async () => [...(await skills.list()), ...(await skills.builtIns(guideInLanguage))]);
   handle(IPC.skillsCreate, (_e, title: unknown) => {
     const name = text(title, "title", 200).trim();
-    if (!name) throw new Error("A skill needs a name");
+    if (!name) throw new UserError("error.skillName");
     return skills.create(name);
   });
   handle(IPC.skillsSave, (_e, id: unknown, value: unknown, note: unknown) =>
@@ -404,7 +407,7 @@ export function registerIpc(
   handle(IPC.skillsImport, async (_e, dropped: unknown) => {
     if (dropped != null) {
       const path = text(dropped, "path", 4096);
-      if (!isAbsolute(path)) throw new Error("Drop a skill's folder or a .zip of one");
+      if (!isAbsolute(path)) throw new UserError("error.dropSkill");
       // A SKILL.md dropped on its own stands for the folder it's in.
       return skills.import(basename(path) === "SKILL.md" ? dirname(path) : path);
     }
@@ -434,7 +437,7 @@ export function registerIpc(
   });
   handle(IPC.skillsHistory, (_e, id: unknown) => skills.history(skillId(id)));
   handle(IPC.skillsRestore, (_e, id: unknown, n: unknown) => {
-    if (typeof n !== "number" || !Number.isInteger(n) || n < 1) throw new Error("That version isn't kept any more");
+    if (typeof n !== "number" || !Number.isInteger(n) || n < 1) throw new UserError("error.versionGone");
     return skills.restore(skillId(id), n);
   });
   handle(IPC.skillsAddFiles, async (_e, id: unknown) => {
@@ -479,7 +482,7 @@ export function registerIpc(
 
   const fileOf = async (taskId: unknown, path: unknown, limitSize = true) => {
     const task = store.getTask(text(taskId, "taskId", 100));
-    if (!task) throw new Error("That task doesn't exist");
+    if (!task) throw new UserError("error.noTask");
     return readablePath(task, absolutePath(path, "path"), limitSize);
   };
   // A file the task listed may be missing for a moment while the agent rewrites it, or for good if the user moved

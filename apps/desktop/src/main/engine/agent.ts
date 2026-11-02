@@ -8,6 +8,7 @@ import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
 import type { TaskLog } from "../debugLog";
 import { freeName, inside } from "../files";
 import type { ToolHandler } from "../mcp/server";
+import { UserError } from "../userError";
 import { activityOf, noteText } from "./activity";
 import type { Engine, RunContext } from "./engine";
 import { instructionsFor } from "./instructions";
@@ -278,15 +279,14 @@ export class AgentEngine implements Engine, ToolHandler {
     let provider: AgentProvider;
     if (ai === "key") {
       const key = this.courseKey();
-      if (!key) throw new Error("The course key isn't there any more. Paste it again in Settings, AI accounts.");
+      if (!key) throw new UserError("error.courseKeyGone");
       provider = KEY_PROVIDER[key.vendor];
     } else provider = PROVIDER_OF[ai];
     const auth = ai === "key" ? ("key" as const) : ("account" as const);
     const models = await this.funnel.models(provider);
     // Codex lists its recommended model first. Claude's list starts with the largest model, so it's picked by name.
     const model = (provider === "claude" && models.find((m) => m.id === CLAUDE_MODEL)) || models[0];
-    if (!model)
-      throw new Error(`${provider === "claude" ? "Claude Code" : "Codex"} lists no models. Check that it's installed.`);
+    if (!model) throw new UserError("error.noModels", { ai: provider === "claude" ? "Claude Code" : "Codex" });
     const medium = model.efforts.some((e) => e.id === "medium") ? "medium" : undefined;
     const effort = model.defaultEffort ?? medium ?? model.efforts[0]?.id ?? "medium";
     return { provider, auth, model: model.id, effort };
@@ -317,7 +317,7 @@ export class AgentEngine implements Engine, ToolHandler {
       if (!key || KEY_PROVIDER[key.vendor] !== (task.provider ?? "codex")) {
         this.live.delete(task.id);
         this.tools.close(session.token);
-        throw new Error("This task ran on the course key, which isn't there any more. Paste it again in Settings.");
+        throw new UserError("error.taskKeyGone");
       }
       apiKey = key.key;
     }
@@ -506,7 +506,7 @@ export class AgentEngine implements Engine, ToolHandler {
     const live = this.mustLive(taskId);
     if (!this.documents) throw new Error("This build of Tost Work can't make PDFs");
     const source = await realpath(path);
-    if (!inside(await realpath(live.workdir), source)) throw new Error("That file is outside the task's folder");
+    if (!inside(await realpath(live.workdir), source)) throw new UserError("error.fileOutside");
     const target = await freeName(dirname(source), `${basename(source, extname(source))}.pdf`);
     await this.documents.makePdf(source, target);
     live.made.add(target);
@@ -521,7 +521,7 @@ export class AgentEngine implements Engine, ToolHandler {
   /** The task's run, unless it ended or was stopped: after Stop nothing new goes on the task. */
   private mustLive(taskId: string): Live {
     const live = this.live.get(taskId);
-    if (!live || live.signal.aborted) throw new Error("That task isn't running");
+    if (!live || live.signal.aborted) throw new UserError("error.notRunning");
     return live;
   }
 

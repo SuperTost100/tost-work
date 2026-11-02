@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { isAbsolute, normalize, sep } from "node:path";
+import type { Language } from "../shared/i18n";
 import type { Job, JobDraft, JobLast } from "../shared/model";
 import { JOB_REPEATS, type JobSchedule, lastRun, nextRun, validTime } from "../shared/schedule";
+import { UserError, userMessage } from "./userError";
 import { text } from "./validate";
 
 /** A run found this long after its time still counts as on time: timers drift, and waking up takes a moment. */
@@ -32,14 +34,13 @@ export function jobDraft(v: unknown): JobDraft {
   const input = v as Record<string, unknown>;
   const title = text(input.title, "title", 120).trim();
   const brief = text(input.brief, "brief", 20_000).trim();
-  if (!title || !brief) throw new Error("A job needs a name and what to do");
+  if (!title || !brief) throw new UserError("error.jobNeeds");
   if (input.missed !== "run" && input.missed !== "skip") throw new Error("missed must be run or skip");
   // A subfolder of the project, never a path out of it.
   const output = text(input.output ?? "", "output", 300).trim();
   const norm = normalize(output);
   const climbs = norm === ".." || norm.startsWith(`..${sep}`) || norm.startsWith("../");
-  if (output && (isAbsolute(output) || /^[A-Za-z]:/.test(output) || climbs))
-    throw new Error("The folder for results must be inside the project");
+  if (output && (isAbsolute(output) || /^[A-Za-z]:/.test(output) || climbs)) throw new UserError("error.jobFolder");
   return {
     projectId: text(input.projectId, "projectId", 100),
     title,
@@ -59,12 +60,12 @@ function schedule(v: unknown): JobSchedule {
   if (out.repeat === "weekly") {
     const days = s.days;
     if (!Array.isArray(days) || !days.length || days.some((d) => !Number.isInteger(d) || d < 0 || d > 6))
-      throw new Error("A weekly job needs at least one day");
+      throw new UserError("error.jobWeekly");
     out.days = [...new Set(days as number[])].sort();
   }
   if (out.repeat === "monthly") {
     if (!Number.isInteger(s.day) || (s.day as number) < 1 || (s.day as number) > 31)
-      throw new Error("A monthly job needs a day from 1 to 31");
+      throw new UserError("error.jobMonthly");
     out.day = s.day as number;
   }
   return out;
@@ -88,6 +89,8 @@ export interface JobsDeps {
   /** A job changed, so the window shows it. */
   changed(job: Job | { id: string; removed: true }): void;
   now?: () => Date;
+  /** The language a failed run is said in. */
+  language?: () => Language;
 }
 
 /** Jobs: making and changing them, and running each at its times. */
@@ -104,7 +107,7 @@ export class Jobs {
   }
 
   create(draft: JobDraft): Job {
-    if (!this.deps.store.getProject(draft.projectId)) throw new Error("That project doesn't exist");
+    if (!this.deps.store.getProject(draft.projectId)) throw new UserError("error.noProject");
     const at = this.now().toISOString();
     // Its first run is the next time after now: a time earlier today has already gone.
     const job: Job = {
@@ -122,7 +125,7 @@ export class Jobs {
 
   update(id: string, draft: JobDraft): Job {
     const job = this.must(id);
-    if (!this.deps.store.getProject(draft.projectId)) throw new Error("That project doesn't exist");
+    if (!this.deps.store.getProject(draft.projectId)) throw new UserError("error.noProject");
     const at = this.now().toISOString();
     // New times count from now, so moving today's time earlier doesn't start a run straight away. A Skip once stays
     // while the times stay the same, as when Try it saves before it runs.
@@ -212,7 +215,7 @@ export class Jobs {
       try {
         last = { at: due.toISOString(), taskId: await this.deps.start(job, due) };
       } catch (err) {
-        last = { at: due.toISOString(), error: err instanceof Error ? err.message : String(err) };
+        last = { at: due.toISOString(), error: userMessage(err, this.deps.language?.() ?? "en") };
       }
       // Deleted while its run started: the task stays, the job doesn't come back.
       const fresh = this.deps.store.getJob(job.id);
@@ -222,7 +225,7 @@ export class Jobs {
 
   private must(id: string): Job {
     const job = this.deps.store.getJob(id);
-    if (!job) throw new Error("That job isn't there any more");
+    if (!job) throw new UserError("error.jobGone");
     return job;
   }
 

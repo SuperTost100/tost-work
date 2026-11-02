@@ -4,6 +4,7 @@ import { access, copyFile, mkdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type { KeptCopy, Task } from "../shared/model";
 import { taskFile, writablePath } from "./files";
+import { UserError } from "./userError";
 
 /** What Tost Work does to files on the user's behalf, so the rules hold whatever the agent does. */
 export interface Guard {
@@ -40,7 +41,7 @@ export function fileGuard(keptDir: string, trashItem: (path: string) => Promise<
             throw accessErr;
           },
         );
-        if (there) throw new Error(`Couldn't keep a copy of ${basename(real)} before replacing it`);
+        if (there) throw new UserError("error.keepFailed", { name: basename(real) });
         throw err;
       }
     },

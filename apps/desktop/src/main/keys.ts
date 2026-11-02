@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { type CourseKey, type KeyVendor, keyVendor } from "../shared/model";
+import { UserError } from "./userError";
 
 /** Encryption from the system's secure storage: Electron's safeStorage in the app, a stand-in in tests. */
 export interface Cipher {
@@ -47,7 +48,7 @@ export class KeyStore {
 
   save(key: string): CourseKey {
     const vendor = keyVendor(key);
-    if (!vendor) throw new Error("This isn't an OpenAI or Anthropic API key");
+    if (!vendor) throw new UserError("error.notApiKey");
     if (!this.cipher.available()) {
       this.session = { key, vendor };
       rmSync(this.file, { force: true });
