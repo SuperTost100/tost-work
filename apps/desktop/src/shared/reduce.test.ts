@@ -33,6 +33,17 @@ describe("applyEvent activity", () => {
     ]);
   });
 
+  it("keeps the id of every tool call a line stands for, so the debug view can show each one", () => {
+    let next = applyEvent(task, { type: "activity", kind: "edit", target: "a.docx", id: "c1" }, "t1");
+    next = applyEvent(next, { type: "activity", kind: "edit", target: "a.docx", id: "c2" }, "t2");
+    next = applyEvent(next, { type: "activity", kind: "edit", target: "a.docx" }, "t3");
+    next = applyEvent(next, { type: "activity", kind: "read", target: "b.txt", id: "c3" }, "t4");
+    expect(next.activity).toEqual([
+      { kind: "edit", target: "a.docx", at: "t1", msg: 1, ids: ["c1", "c2"] },
+      { kind: "read", target: "b.txt", at: "t4", msg: 1, ids: ["c3"] },
+    ]);
+  });
+
   it("notes how many messages came before each line, and repeats a line once a message came in between", () => {
     let next = applyEvent(task, { type: "activity", kind: "read", target: "a.txt" }, "t1");
     next = applyEvent(next, { type: "message", text: "I read it." }, "t2");

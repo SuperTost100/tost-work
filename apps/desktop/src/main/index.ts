@@ -23,11 +23,12 @@ import type { AgentProvider } from "../shared/model";
 import { Accounts } from "./accounts";
 import { giveAgentsOwnHomes } from "./agentHomes";
 import { menuTemplate, nextTextSize, textMenuTemplate } from "./appMenu";
+import { DebugLogs } from "./debugLog";
 import { documentTools } from "./documents";
 import { AgentEngine } from "./engine/agent";
 import type { Engine } from "./engine/engine";
 import { FakeEngine } from "./engine/fake";
-import { TaskRunner } from "./engine/runner";
+import { type AppLog, TaskRunner } from "./engine/runner";
 import { fileGuard } from "./guard";
 import { findInstalledCodex, Installer } from "./installer";
 import { registerIpc } from "./ipc";
@@ -64,6 +65,21 @@ let mainClosed = () => {};
 
 const PRELOAD = () => join(import.meta.dirname, "../preload/index.cjs");
 
+// The app's debug log, once the settings say whether debug is on. Nothing is written before that.
+let appLog: AppLog = () => {};
+
+/** Errors and warnings from a window's console, and a window that crashed, go to the app's debug log. */
+function logWindow(win: BrowserWindow, name: string): void {
+  win.webContents.on("console-message", (details) => {
+    if (details.level !== "error" && details.level !== "warning") return;
+    appLog(details.level === "error" ? "error" : "warn", `${name} console: ${details.message}`, {
+      source: details.sourceId,
+      line: details.lineNumber,
+    });
+  });
+  win.webContents.on("render-process-gone", (_e, details) => appLog("error", `${name} stopped working`, details));
+}
+
 /** Loads the interface in a window; the menu-bar panel is the same page, told apart by its hash. */
 function loadPage(win: BrowserWindow, hash?: string): void {
   const devUrl = process.env.ELECTRON_RENDERER_URL;
@@ -97,6 +113,7 @@ function createPanel(width: number, height: number): BrowserWindow {
   // `type: "panel"` if that turns out to matter.
   if (isMac) win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  logWindow(win, "Menu-bar panel");
   loadPage(win, "panel");
   return win;
 }
@@ -152,6 +169,7 @@ function createWindow(store: Store): BrowserWindow {
     return { action: "deny" };
   });
 
+  logWindow(win, "Window");
   loadPage(win);
   return win;
 }
@@ -173,6 +191,27 @@ app.whenReady().then(async () => {
     (path) => shell.trashItem(path),
     { builtIns: documents?.skills, versions: new SkillVersions(join(app.getPath("userData"), "skill-versions")) },
   );
+  // Debug logs are written only while the switch in Settings is on. The flag is kept here because every event of a
+  // run asks for it. The course key is masked in every line, as anything shaped like a key is.
+  let debugOn = store.getSettings().debug;
+  const debugLogs = new DebugLogs(
+    join(app.getPath("userData"), "logs"),
+    () => debugOn,
+    () => [keys.get()?.key],
+  );
+  appLog = (level, message, detail) => debugLogs.app(level, message, detail);
+  appLog("info", `Tost Work ${__APP_VERSION__} (build ${__APP_BUILD__}) started`, {
+    platform: process.platform,
+    electron: process.versions.electron,
+    engine: process.env.TOST_WORK_ENGINE === "fake" ? "fake" : "agents",
+  });
+  // The monitor only watches, so an uncaught exception still behaves as Electron makes it. Electron warns about an
+  // unhandled rejection and carries on; a listener replaces that warning, so the console still gets it.
+  process.on("uncaughtExceptionMonitor", (err, origin) => appLog("error", `Uncaught exception (${origin})`, err));
+  process.on("unhandledRejection", (reason) => {
+    console.error("Unhandled promise rejection", reason);
+    appLog("error", "Unhandled promise rejection", reason);
+  });
   store.stopInterrupted(new Date().toISOString());
   // Before the window, so its background colour already follows the chosen theme.
   applyLook(null, store.getSettings());
@@ -185,7 +224,9 @@ app.whenReady().then(async () => {
   let engine: Engine;
   let tools: ToolServer | null = null;
   if (process.env.TOST_WORK_ENGINE === "fake") {
-    engine = new FakeEngine(undefined, undefined, join(app.getAppPath(), "resources", "fake"));
+    engine = new FakeEngine(undefined, undefined, join(app.getAppPath(), "resources", "fake"), (taskId) =>
+      debugLogs.forTask(taskId),
+    );
   } else {
     const agent = new AgentEngine(funnel, language, {
       documents,
@@ -208,6 +249,7 @@ app.whenReady().then(async () => {
       online: () => net.isOnline(),
       skills: () => skills.list(),
       job: (id) => store.getJob(id),
+      taskLog: (taskId, secrets) => debugLogs.forTask(taskId, secrets),
     });
     tools = new ToolServer(agent);
     await tools.start();
@@ -304,7 +346,10 @@ app.whenReady().then(async () => {
     if (!app.isPackaged) return;
     loginQueue = loginQueue
       .then(() => setOpenAtLogin(on, loginDeps))
-      .catch((err: unknown) => console.error("Couldn't change starting at login", err));
+      .catch((err: unknown) => {
+        console.error("Couldn't change starting at login", err);
+        appLog("error", "Couldn't change starting at login", err);
+      });
   };
   // Off as well as on, so a removal that failed last time is tried again.
   applyLogin(atLogin);
@@ -325,6 +370,7 @@ app.whenReady().then(async () => {
     (taskId, text, restart) => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(IPC.taskText, taskId, text, restart);
     },
+    appLog,
   );
   // Set once the tray exists below; jobs and tasks changing before that have nothing to update.
   let trayChanged = () => {};
@@ -359,7 +405,11 @@ app.whenReady().then(async () => {
     },
   });
   // Every half minute, and on waking up, when a missed run is due straight away.
-  const lookAtJobs = () => void jobs.tick().catch((err: unknown) => console.error("Jobs couldn't run", err));
+  const lookAtJobs = () =>
+    void jobs.tick().catch((err: unknown) => {
+      console.error("Jobs couldn't run", err);
+      appLog("error", "Jobs couldn't run", err);
+    });
   setInterval(lookAtJobs, 30_000);
   powerMonitor.on("resume", lookAtJobs);
   powerMonitor.on("unlock-screen", lookAtJobs);
@@ -526,9 +576,15 @@ app.whenReady().then(async () => {
         atLogin = settings.openAtLogin;
         applyLogin(atLogin);
       }
+      if (settings.debug !== debugOn) {
+        debugOn = settings.debug;
+        // Written only once it's on: turning it off writes nothing more.
+        appLog("info", "Debug turned on");
+      }
     },
     skills,
     jobs,
+    debugLogs,
   );
   // Quitting stops the tasks still working, so it asks first. They show as interrupted, with Resume, next time.
   let quitting = false;

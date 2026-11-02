@@ -129,7 +129,15 @@ export interface Activity {
    * the next. Missing on tasks from before, whose lines all show at the end.
    */
   msg?: number;
+  /**
+   * The tool calls behind the line, by cli-funnel's id, so the debug view can find each one in the task's log. One line
+   * can stand for several calls, such as three edits to one file. Missing on lines from before, and on notes.
+   */
+  ids?: string[];
 }
+
+/** The most tool call ids one activity line keeps. */
+export const MAX_LINE_IDS = 50;
 
 /** The most activity lines a task keeps; older ones drop off. */
 export const MAX_ACTIVITY = 300;
@@ -182,7 +190,8 @@ export interface Task {
 export type EngineEvent =
   | { type: "session"; sessionId: string }
   | { type: "plan"; steps: Step[] }
-  | { type: "activity"; kind: ActivityKind; target?: string }
+  /** `id` is the tool call's, for the debug view. */
+  | { type: "activity"; kind: ActivityKind; target?: string; id?: string }
   | { type: "message"; text: string }
   /** Words of the agent's answer as it writes them, shown live and never saved: the whole answer comes as a message. */
   | { type: "text"; text: string }
@@ -244,6 +253,11 @@ export interface Settings {
   /** The board's view and grouping, as the user last chose them. */
   boardView: BoardView;
   boardGroup: BoardGroup;
+  /**
+   * Technical details on each task and a full log of every run, on this computer only. The switch shows at the Expert
+   * level, but once on it stays on at any level.
+   */
+  debug: boolean;
   setupDone: boolean;
 }
 
@@ -332,6 +346,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sidebarHidden: false,
   boardView: "list",
   boardGroup: "status",
+  debug: false,
   setupDone: false,
 };
 

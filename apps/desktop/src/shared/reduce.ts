@@ -1,4 +1,4 @@
-import { type EngineEvent, MAX_ACTIVITY, type Task } from "./model";
+import { type EngineEvent, MAX_ACTIVITY, MAX_LINE_IDS, type Task } from "./model";
 
 /** Applies one engine event to a task. Pure, so the main process and the tests share it. */
 export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
@@ -16,9 +16,20 @@ export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
       const log = task.activity ?? [];
       const last = log.at(-1);
       const msg = task.messages.length;
-      // The same thing again, such as three edits to one file, stays one line, unless a message came in between.
-      if (last?.kind === event.kind && last.target === event.target && last.msg === msg) return task;
-      const line = { kind: event.kind, ...(event.target ? { target: event.target } : {}), at, msg };
+      // The same thing again, such as three edits to one file, stays one line, unless a message came in between. The
+      // line keeps each call's id, so the debug view shows all of them.
+      if (last?.kind === event.kind && last.target === event.target && last.msg === msg) {
+        const ids = last.ids ?? [];
+        if (!event.id || ids.includes(event.id) || ids.length >= MAX_LINE_IDS) return task;
+        return { ...next, activity: [...log.slice(0, -1), { ...last, ids: [...ids, event.id] }] };
+      }
+      const line = {
+        kind: event.kind,
+        ...(event.target ? { target: event.target } : {}),
+        at,
+        msg,
+        ...(event.id ? { ids: [event.id] } : {}),
+      };
       return { ...next, activity: [...log, line].slice(-MAX_ACTIVITY) };
     }
     case "message":

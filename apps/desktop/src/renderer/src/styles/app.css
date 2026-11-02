@@ -4417,6 +4417,135 @@ label.opt:has(input:focus-visible) {
   overflow: hidden;
   line-height: 1.45;
 }
+/* Debug mode: a line with tool calls behind it is a button that opens onto them, under the line. */
+.activity li.dbg-line {
+  display: block;
+}
+.activity li.dbg-line > button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.activity li.dbg-line > button:hover {
+  color: var(--ink);
+}
+.activity li.dbg-line > button[aria-expanded="true"] .chev {
+  transform: rotate(180deg);
+}
+.activity li.dbg-line:has(.note) > button {
+  align-items: flex-start;
+}
+.activity li.dbg-think {
+  align-items: flex-start;
+  color: var(--t3);
+}
+.activity li.dbg-think span {
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dbg {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 4px 24px;
+  font-size: 12.5px;
+  color: var(--t2);
+}
+.dbg + .dbg {
+  padding-top: 8px;
+  border-top: 1px solid var(--line-2);
+}
+.dbg-k {
+  font-size: 12px;
+  color: var(--t3);
+}
+.dbg-k code,
+.dbg-strip code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--t2);
+}
+.dbg pre {
+  max-height: 320px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--panel);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+.dbg pre.dbg-err {
+  color: var(--danger);
+}
+.dbg p {
+  margin: 0;
+}
+.dbg .dbg-think {
+  color: var(--t3);
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+.dbg-sub {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+}
+/* The technical facts above a task's messages, in one wrapping row. */
+.dbg-strip {
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+.dbg-strip dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin: 0;
+}
+.dbg-strip dl > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.dbg-strip dt {
+  color: var(--t3);
+}
+.dbg-strip dd {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  color: var(--t2);
+}
+.dbg-strip dd code {
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+.dbg-strip .msg-tools {
+  margin: 0;
+  opacity: 1;
+}
+.dbg-strip p {
+  margin: 6px 0 0;
+}
 /* Skills list: the built-in guides under their own heading, and Import at the end. */
 .slist .sgroup {
   margin: 14px 10px 4px;

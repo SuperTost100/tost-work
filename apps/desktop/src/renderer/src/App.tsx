@@ -187,6 +187,8 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
     else if (action === "review") void api.tasks.markReviewed(id).then(addTask, report);
     else if (action === "unreview") void api.tasks.markUnreviewed(id).then(addTask, report);
     else if (action === "delete") void deleteTask(id);
+    else if (action === "log-open") void api.debug.revealTaskLog(id).catch(report);
+    else if (action === "log-copy") void api.debug.copyTaskLog(id).catch(report);
   };
   // The task just saved for later, which the message at the bottom of the window can open.
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -514,6 +516,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
           api={api}
           task={task}
           project={project}
+          debug={current.debug}
           onAnswer={(answers, files) =>
             api.tasks.answer(task.id, answers, files).then(
               () => true,

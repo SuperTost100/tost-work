@@ -1,3 +1,4 @@
+import type { LogLine } from "./debug";
 import type { InstallResult } from "./install";
 import type {
   AgentProvider,
@@ -220,6 +221,17 @@ export interface TostWorkApi {
     /** Puts back the copy kept before the file was replaced. Restoring again undoes it. */
     restore(taskId: string, path: string): Promise<Task>;
   };
+  /** The debug logs, kept on this computer only while Settings' debug switch is on. */
+  debug: {
+    /** The task's log, a line per event, with long output cut. Null when the task has no log. */
+    taskLog(id: string): Promise<LogLine[] | null>;
+    /** Shows the task's log file in Finder or Explorer. */
+    revealTaskLog(id: string): Promise<void>;
+    /** Copies the task's whole log to the clipboard. */
+    copyTaskLog(id: string): Promise<void>;
+    /** Shows the app's own log file in Finder or Explorer. */
+    revealAppLog(): Promise<void>;
+  };
   /** Work that runs by itself on a schedule, a new task each time. */
   jobs: {
     list(): Promise<Job[]>;
@@ -267,7 +279,16 @@ export interface TostWorkApi {
 }
 
 /** What the task menu offers. Start, and the two for checking, show only when the task's state allows them. */
-export type TaskMenuAction = "rename" | "reveal" | "start" | "review" | "unreview" | "delete";
+export type TaskMenuAction =
+  | "rename"
+  | "reveal"
+  | "start"
+  | "review"
+  | "unreview"
+  | "delete"
+  /** Shows the task's debug log in its folder, or copies its text, while debug is on. */
+  | "log-open"
+  | "log-copy";
 
 /** What the skill menu offers: Rename, Show in folder and Delete, as a task's, and Export as .zip. */
 export type SkillMenuAction = "rename" | "reveal" | "delete" | "export";
@@ -361,4 +382,8 @@ export const IPC = {
   filesOpen: "files:open",
   filesReveal: "files:reveal",
   filesRestore: "files:restore",
+  debugTaskLog: "debug:task-log",
+  debugRevealTaskLog: "debug:reveal-task-log",
+  debugCopyTaskLog: "debug:copy-task-log",
+  debugRevealAppLog: "debug:reveal-app-log",
 } as const;

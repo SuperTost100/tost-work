@@ -86,3 +86,32 @@ describe("FakeEngine samples", () => {
     expect(events.at(-1)).toEqual({ type: "stopped" });
   });
 });
+
+describe("FakeEngine debug log", () => {
+  it("writes a run line, a call per activity line with the same id, thinking and token use", async () => {
+    const { work } = await folders();
+    const lines: Record<string, unknown>[] = [];
+    const logged: FakeScript = {
+      steps: ["Read"],
+      files: [],
+      activity: [[{ kind: "read", target: "note.txt" }, { kind: "command" }]],
+      summary: "Done.",
+    };
+    const engine = new FakeEngine(logged, 0, undefined, () => ({ write: (line) => lines.push(line) }));
+    const events = await run(engine, work);
+    const ids = events.flatMap((e) => (e.type === "activity" && e.id ? [e.id] : []));
+    expect(ids).toHaveLength(2);
+    expect(lines.map((l) => l.type)).toEqual([
+      "run",
+      "session",
+      "reasoning.delta",
+      "tool.start",
+      "tool.end",
+      "tool.start",
+      "tool.end",
+      "usage",
+      "reasoning.delta",
+    ]);
+    expect(lines.filter((l) => l.type === "tool.start").map((l) => l.id)).toEqual(ids);
+  });
+});

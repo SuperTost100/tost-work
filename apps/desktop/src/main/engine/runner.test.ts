@@ -54,6 +54,30 @@ describe("TaskRunner with the fake engine", () => {
     expect(final.messages.map((m) => m.from)).toEqual(["user", "user", "agent", "agent"]);
   });
 
+  it("writes the task's start, answer and end to the app's debug log", async () => {
+    const store = new Store(":memory:");
+    const lines: string[] = [];
+    const runner = new TaskRunner(
+      store,
+      new FakeEngine(PROPOSAL_SCRIPT, 0),
+      () => {},
+      undefined,
+      undefined,
+      undefined,
+      (level, message) => lines.push(`${level} ${message}`),
+    );
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
+    const done = runner.start(task.id);
+    await waitFor(() => store.getTask(task.id)?.status === "needs-you");
+    runner.answer(task.id, ["The client pays it"]);
+    await done;
+    expect(lines).toEqual([
+      `info Task ${task.id} started its first run`,
+      `info Task ${task.id} answered its question`,
+      `info Task ${task.id} run ended: done`,
+    ]);
+  });
+
   it("stops a task that is waiting for an answer", async () => {
     const { store, runner } = setup();
     const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });

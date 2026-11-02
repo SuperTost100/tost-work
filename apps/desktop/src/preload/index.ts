@@ -131,6 +131,12 @@ const api: TostWorkApi = {
     reveal: (taskId, path) => ipcRenderer.invoke(IPC.filesReveal, taskId, path),
     restore: (taskId, path) => ipcRenderer.invoke(IPC.filesRestore, taskId, path),
   },
+  debug: {
+    taskLog: (id) => ipcRenderer.invoke(IPC.debugTaskLog, id),
+    revealTaskLog: (id) => ipcRenderer.invoke(IPC.debugRevealTaskLog, id),
+    copyTaskLog: (id) => ipcRenderer.invoke(IPC.debugCopyTaskLog, id),
+    revealAppLog: () => ipcRenderer.invoke(IPC.debugRevealAppLog),
+  },
   jobs: {
     list: () => ipcRenderer.invoke(IPC.jobsList),
     create: (draft) => ipcRenderer.invoke(IPC.jobsCreate, draft),

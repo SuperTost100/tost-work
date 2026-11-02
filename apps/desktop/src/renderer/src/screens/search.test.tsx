@@ -1,14 +1,18 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
 
-// The dialog's field, or with `inDialog` false the sidebar's.
+// The dialog's field, or with `inDialog` false the sidebar's. It waits for that field itself: the sidebar's is always
+// there, so waiting for any field could find only it while the dialog is still opening.
 const type = async (text: string, inDialog = true) => {
-  const fields = await screen.findAllByRole("combobox", { name: "Search tasks and projects" });
-  const field = inDialog
-    ? (fields.find((f) => f.closest(".search-dlg")) as HTMLElement)
-    : (fields.find((f) => f.closest("aside.side")) as HTMLElement);
+  const field = await waitFor(() => {
+    const found = screen
+      .getAllByRole("combobox", { name: "Search tasks and projects" })
+      .find((f) => f.closest(inDialog ? ".search-dlg" : "aside.side"));
+    if (!found) throw new Error(`No search field in the ${inDialog ? "dialog" : "sidebar"} yet`);
+    return found;
+  });
   await act(async () => {
     fireEvent.change(field, { target: { value: text } });
   });

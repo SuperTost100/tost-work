@@ -5,6 +5,7 @@ import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
 import { translate } from "../../shared/i18n";
 import type { AgentProvider, AiId, EngineEvent, Job, KeyVendor, Review, Skill } from "../../shared/model";
 import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
+import type { TaskLog } from "../debugLog";
 import { freeName, inside } from "../files";
 import type { ToolHandler } from "../mcp/server";
 import { activityOf, noteText } from "./activity";
@@ -229,6 +230,7 @@ export class AgentEngine implements Engine, ToolHandler {
   private online: () => boolean;
   private skills: () => Promise<Skill[]>;
   private job: (id: string) => Pick<Job, "title" | "output"> | undefined;
+  private taskLog: (taskId: string, secrets: (string | undefined)[]) => TaskLog;
 
   constructor(
     private funnel: AgentFunnel,
@@ -247,6 +249,8 @@ export class AgentEngine implements Engine, ToolHandler {
       skills?: () => Promise<Skill[]>;
       /** The job a task is a run of, so the agent knows nobody is watching and where the files go. */
       job?: (id: string) => Pick<Job, "title" | "output"> | undefined;
+      /** The task's debug log, which writes only while debug is on. `secrets` are masked in every line. */
+      taskLog?: (taskId: string, secrets: (string | undefined)[]) => TaskLog;
     } = {},
   ) {
     this.documents = options.documents ?? null;
@@ -256,6 +260,7 @@ export class AgentEngine implements Engine, ToolHandler {
     this.online = options.online ?? (() => true);
     this.skills = options.skills ?? (async () => []);
     this.job = options.job ?? (() => undefined);
+    this.taskLog = options.taskLog ?? (() => ({ write: () => {} }));
   }
 
   /** Why the task can't reach its AI, in the user's language. */
@@ -316,6 +321,20 @@ export class AgentEngine implements Engine, ToolHandler {
       }
       apiKey = key.key;
     }
+
+    // The log gets every event as cli-funnel sends it, after a line saying what the run was started with. The run's
+    // tool server token and the course key are masked wherever they would appear.
+    const log = this.taskLog(task.id, [session.token, apiKey]);
+    log.write({
+      type: "run",
+      provider: task.provider ?? "codex",
+      model: task.model,
+      effort: task.effort,
+      access: "supervised",
+      cwd: workdir,
+      ...(task.sessionId ? { sessionId: task.sessionId } : {}),
+      followUp: followUp !== null,
+    });
 
     // A skills folder that can't be read leaves the task without skills rather than failing it.
     const skills = await this.skills().catch(() => []);
@@ -381,6 +400,7 @@ export class AgentEngine implements Engine, ToolHandler {
     const pump = (async () => {
       try {
         for await (const event of stream) {
+          log.write(event);
           if (event.type === "session") channel.push({ type: "session", sessionId: event.sessionId });
           else if (event.type === "text.delta") {
             said += event.text;
@@ -391,7 +411,7 @@ export class AgentEngine implements Engine, ToolHandler {
             said = "";
             if (note) channel.push({ type: "activity", kind: "note", target: note });
             const line = activityOf(event.name, event.input, this.documents?.skills);
-            if (line) channel.push({ type: "activity", ...line });
+            if (line) channel.push({ type: "activity", ...line, id: event.id });
           } else if (event.type === "subagent.text") {
             const note = noteText(event.text);
             if (note) channel.push({ type: "activity", kind: "note", target: note });
@@ -403,6 +423,7 @@ export class AgentEngine implements Engine, ToolHandler {
           }
         }
         const result = await stream.result;
+        log.write({ type: "run.end", finishReason: result.finishReason, deniedActions: result.deniedActions });
         if (result.finishReason === "cancelled") channel.push({ type: "stopped" });
         else {
           if (result.text.trim()) channel.push({ type: "message", text: result.text.trim() });
@@ -412,6 +433,7 @@ export class AgentEngine implements Engine, ToolHandler {
         if (signal.aborted) channel.push({ type: "stopped" });
         else {
           const message = err instanceof Error ? err.message : String(err);
+          log.write({ type: "run.failed", message });
           channel.push({
             type: "failed",
             // Only an error that is about the network gets the plain explanation; any other keeps the CLI's words,

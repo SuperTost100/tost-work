@@ -360,6 +360,33 @@ export function Settings({
               </section>
             )}
 
+            {/* Shown at Expert only. Once on, debug stays on at a lower level: only the switch hides. */}
+            {settings.level === "expert" && (
+              <section className="sgroup" aria-labelledby="settings-advanced">
+                <h2 id="settings-advanced">{t("settings.advanced")}</h2>
+                <div className="srow">
+                  <div className="lbl">
+                    <b>{t("settings.debug")}</b>
+                    <span>{t("settings.debug.d")}</span>
+                  </div>
+                  <Switch label={t("settings.debug")} on={settings.debug} onChange={(debug) => save({ debug })} />
+                </div>
+                <div className="srow">
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      setError(null);
+                      api.debug.revealAppLog().catch((err: unknown) => setError(errorText(err)));
+                    }}
+                  >
+                    <Icon name="folder-open" />
+                    {t("settings.appLog")}
+                  </button>
+                </div>
+              </section>
+            )}
+
             <p className="t3 version">{t("about.version", { version: __APP_VERSION__, build: __APP_BUILD__ })}</p>
           </div>
         </div>

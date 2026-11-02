@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ApprovalCard } from "@/components/Approval";
 import { type Attachments, Composer } from "@/components/Composer";
+import { CallDetail, DebugStrip, useDebugLog } from "@/components/DebugDetails";
 import { FileLine, fileName } from "@/components/FileLine";
 import { Preview } from "@/components/Preview";
 import { ProjectPicker } from "@/components/ProjectPicker";
@@ -12,6 +13,7 @@ import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
 import { RenameField } from "@/shell/Sidebar";
 import type { NewTaskInput, SaveResult, TostWorkApi } from "../../../shared/api";
+import type { DebugView } from "../../../shared/debug";
 import type { MessageKey } from "../../../shared/i18n";
 import {
   type Activity,
@@ -261,17 +263,31 @@ function ActivityLog({
   activity,
   live,
   waiting,
+  debug = null,
+  thinking = "",
 }: {
   activity: Activity[];
   live: boolean;
   /** What the agent waits for from the user, as the last line: it's what it's doing now. */
   waiting?: "question" | "approval";
+  /** The task's debug log, while debug is on: each line with calls in it opens onto them. */
+  debug?: DebugView | null;
+  /** What the model thought after its last tool call, shown in grey after the last line. */
+  thinking?: string;
 }) {
   const t = useT();
   const say = useActivityText();
   // Unless the user chose, it's open while the agent works and folded once it's done.
   const [chosen, setChosen] = useState<boolean | null>(null);
   const open = chosen ?? live;
+  // The lines whose technical detail is open, by key.
+  const [details, setDetails] = useState<ReadonlySet<string>>(() => new Set());
+  const toggle = (key: string) =>
+    setDetails((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
   const lines = live ? activity.slice(-LIVE_LINES) : activity;
   const earlier = activity.length - lines.length;
   return (
@@ -284,18 +300,41 @@ function ActivityLog({
       {open && (
         <ol aria-live={live ? "polite" : undefined}>
           {earlier > 0 && <li className="t3">{t("activity.earlier", { n: String(earlier) })}</li>}
-          {keyed(lines, (a) => `${a.kind} ${a.target ?? ""} ${a.at}`).map(([key, a]) => (
-            <li key={key}>
-              <Icon name={ACTIVITY_ICON[a.kind]} />
-              {a.kind === "note" ? (
+          {keyed(lines, (a) => `${a.kind} ${a.target ?? ""} ${a.at}`).map(([key, a]) => {
+            const text =
+              a.kind === "note" ? (
                 <span className="note" title={a.target}>
                   {a.target}
                 </span>
               ) : (
                 <span className="truncate">{say(a)}</span>
-              )}
+              );
+            const calls = debug ? (a.ids ?? []).flatMap((id) => debug.calls.get(id) ?? []) : [];
+            if (!debug || calls.length === 0)
+              return (
+                <li key={key}>
+                  <Icon name={ACTIVITY_ICON[a.kind]} />
+                  {text}
+                </li>
+              );
+            const shown = details.has(key);
+            return (
+              <li key={key} className="dbg-line">
+                <button type="button" aria-expanded={shown} onClick={() => toggle(key)}>
+                  <Icon name={ACTIVITY_ICON[a.kind]} />
+                  {text}
+                  <Icon name="down" className="chev" />
+                </button>
+                {shown && calls.map((call) => <CallDetail key={call.id} call={call} view={debug} />)}
+              </li>
+            );
+          })}
+          {thinking && (
+            <li className="dbg-think">
+              <Icon name="chat-3" />
+              <span>{thinking}</span>
             </li>
-          ))}
+          )}
           {/* Screen readers hear this from the announcement above the composer, so once is enough. */}
           {waiting && (
             <li aria-hidden="true">
@@ -625,6 +664,7 @@ export function Task({
   api,
   task,
   project,
+  debug = false,
   onAnswer,
   onFollowUp,
   onSaveCopy,
@@ -646,6 +686,8 @@ export function Task({
   api: TostWorkApi;
   task: TaskT;
   project: Project | null;
+  /** Settings' debug switch: the technical details strip, and activity lines that open onto their tool calls. */
+  debug?: boolean;
   /** Resolves true once the answer is sent, false when it failed and the draft should stay. */
   onAnswer: (answers: string[], files: string[]) => Promise<boolean>;
   /** Resolves true once the instruction is sent, false when it failed and the box should keep it. */
@@ -793,6 +835,10 @@ export function Task({
     el.scrollTop += top - box.top - 16;
   }, [live, task.messages.length]);
   const { before, tail, older } = activityByMessage(task.activity ?? [], task.messages.length);
+  const log = useDebugLog(api, task.id, debug, task.updatedAt);
+  // The thinking after the last tool call goes under the newest line, wherever that line shows.
+  const newest = task.activity?.at(-1);
+  const thinkingAfter = (lines: Activity[]) => (log && newest && lines.at(-1) === newest ? log.finalReasoning : "");
   const waiting = task.question ? "question" : task.approval ? "approval" : undefined;
   // The check is on finished work: while it runs or waits on the user, it isn't finished. An answer in the chat has
   // nothing to check against the brief: the check is for files it made.
@@ -812,7 +858,7 @@ export function Task({
     const done = before[i] ?? [];
     return (
       <Fragment key={i}>
-        {done.length > 0 && <ActivityLog activity={done} live={false} />}
+        {done.length > 0 && <ActivityLog activity={done} live={false} debug={log} thinking={thinkingAfter(done)} />}
         {m.answers ? (
           <AnswerLine answers={m.answers} files={m.attachments} />
         ) : m.from === "user" ? (
@@ -892,6 +938,7 @@ export function Task({
               }}
             >
               <div className="col">
+                {debug && <DebugStrip task={task} view={log} />}
                 <div className="msg mine">
                   <div className="you">
                     <LongText text={task.brief} />
@@ -916,9 +963,18 @@ export function Task({
                   </div>
                 )}
                 {range(runStart > 0 ? runStart + 1 : 1, end)}
-                {older.length > 0 && <ActivityLog key="older" activity={older} live={false} />}
+                {older.length > 0 && (
+                  <ActivityLog key="older" activity={older} live={false} debug={log} thinking={thinkingAfter(older)} />
+                )}
                 {(tail.length > 0 || waiting) && (
-                  <ActivityLog key="tail" activity={tail} live={live} waiting={waiting} />
+                  <ActivityLog
+                    key="tail"
+                    activity={tail}
+                    live={live}
+                    waiting={waiting}
+                    debug={log}
+                    thinking={thinkingAfter(tail)}
+                  />
                 )}
                 {draft && <TypedMessage key={`draft-${end}`} text={draft} onShown={followDraft} />}
                 {made.length > 0 && (

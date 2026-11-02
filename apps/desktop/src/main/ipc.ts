@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join } from "node:path";
-import { app, type BrowserWindow, dialog, ipcMain, Menu, type OpenDialogOptions, shell } from "electron";
+import { app, type BrowserWindow, clipboard, dialog, ipcMain, Menu, type OpenDialogOptions, shell } from "electron";
 import {
   IPC,
   type NewProjectInput,
@@ -23,6 +23,7 @@ import {
 import { removalText } from "../shared/projectText";
 import { type MenuItem, taskMenuItems } from "../shared/taskMenu";
 import type { Accounts } from "./accounts";
+import type { DebugLogs } from "./debugLog";
 import { type TaskRunner, withFiles } from "./engine/runner";
 import { type Conflict, copyInto, describe, readablePath, removeCopies, savablePaths, saveCopies } from "./files";
 import type { Installer } from "./installer";
@@ -44,7 +45,18 @@ export function registerIpc(
   settingsSaved: (settings: Settings) => void,
   skills: SkillFolder,
   jobs: Jobs,
+  debug: DebugLogs,
 ): void {
+  // A handler that fails goes to the app's debug log too, and on to the window as before.
+  const handle = (channel: string, listener: Parameters<typeof ipcMain.handle>[1]) =>
+    ipcMain.handle(channel, async (e, ...args) => {
+      try {
+        return await listener(e, ...args);
+      } catch (err) {
+        debug.app("error", `${channel} failed`, err);
+        throw err;
+      }
+    });
   const account = (provider: unknown): Accounts => {
     if (provider !== "codex" && provider !== "claude") throw new Error("provider must be codex or claude");
     return accounts[provider];
@@ -59,35 +71,35 @@ export function registerIpc(
     return win ? dialog.showOpenDialog(win, options) : dialog.showOpenDialog(options);
   };
 
-  ipcMain.handle(IPC.settingsGet, () => store.getSettings());
-  ipcMain.handle(IPC.settingsUpdate, (_e, patch: unknown) => {
+  handle(IPC.settingsGet, () => store.getSettings());
+  handle(IPC.settingsUpdate, (_e, patch: unknown) => {
     const settings = mergeSettings(store.getSettings(), settingsPatch(patch));
     store.saveSettings(settings);
     settingsSaved(settings);
     return settings;
   });
 
-  ipcMain.handle(IPC.accountStatus, (_e, provider: unknown) => account(provider).status());
+  handle(IPC.accountStatus, (_e, provider: unknown) => account(provider).status());
   // The sign-in runs on after this returns; its progress and any failure go out as sign-in events.
-  ipcMain.handle(IPC.accountSignIn, (_e, provider: unknown) => {
+  handle(IPC.accountSignIn, (_e, provider: unknown) => {
     void account(provider).signIn();
   });
-  ipcMain.handle(IPC.accountSendCode, (_e, provider: unknown, code: unknown) =>
+  handle(IPC.accountSendCode, (_e, provider: unknown, code: unknown) =>
     account(provider).sendCode(text(code, "code", 200).trim()),
   );
-  ipcMain.handle(IPC.accountCancel, (_e, provider: unknown) => account(provider).cancel());
-  ipcMain.handle(IPC.accountSignOut, (_e, provider: unknown) => account(provider).signOut());
-  ipcMain.handle(IPC.accountInstall, (_e, provider: unknown) => {
+  handle(IPC.accountCancel, (_e, provider: unknown) => account(provider).cancel());
+  handle(IPC.accountSignOut, (_e, provider: unknown) => account(provider).signOut());
+  handle(IPC.accountInstall, (_e, provider: unknown) => {
     account(provider);
     return installer.install(provider as AgentProvider);
   });
-  ipcMain.handle(IPC.keyInfo, () => keys.info());
-  ipcMain.handle(IPC.keySave, (_e, key: unknown) => keys.save(text(key, "key", 400).trim()));
-  ipcMain.handle(IPC.keyRemove, () => keys.remove());
+  handle(IPC.keyInfo, () => keys.info());
+  handle(IPC.keySave, (_e, key: unknown) => keys.save(text(key, "key", 400).trim()));
+  handle(IPC.keyRemove, () => keys.remove());
 
-  ipcMain.handle(IPC.projectsList, () => store.listProjects());
+  handle(IPC.projectsList, () => store.listProjects());
 
-  ipcMain.handle(IPC.projectsCreate, (_e, input: NewProjectInput) => {
+  handle(IPC.projectsCreate, (_e, input: NewProjectInput) => {
     const name = text(input?.name, "name", 200).trim();
     const folder = absolutePath(input?.folder, "folder");
     if (!name) throw new Error("A project needs a name");
@@ -103,7 +115,7 @@ export function registerIpc(
     return project;
   });
 
-  ipcMain.handle(IPC.projectsPickFolder, async (_e, defaultPath?: unknown) => {
+  handle(IPC.projectsPickFolder, async (_e, defaultPath?: unknown) => {
     const result = await openDialog({
       properties: ["openDirectory", "createDirectory"],
       defaultPath: defaultPath == null ? undefined : text(defaultPath, "defaultPath", 1000),
@@ -111,16 +123,16 @@ export function registerIpc(
     return result.canceled ? null : (result.filePaths[0] ?? null);
   });
 
-  ipcMain.handle(IPC.tasksList, () => store.listTasks());
-  ipcMain.handle(IPC.tasksListActive, () => store.listActiveTasks());
-  ipcMain.handle(IPC.tasksListForProject, (_e, projectId: unknown) =>
+  handle(IPC.tasksList, () => store.listTasks());
+  handle(IPC.tasksListActive, () => store.listActiveTasks());
+  handle(IPC.tasksListForProject, (_e, projectId: unknown) =>
     store.listProjectTasks(text(projectId, "projectId", 100)),
   );
-  ipcMain.handle(IPC.tasksListAll, () => store.listAllTasks());
-  ipcMain.handle(IPC.tasksSearch, (_e, query: unknown) => store.searchTasks(text(query, "query", 200)));
-  ipcMain.handle(IPC.projectsOverviews, () => store.projectOverviews());
-  ipcMain.handle(IPC.tasksGet, (_e, id: unknown) => store.getTask(text(id, "id", 100)) ?? null);
-  ipcMain.handle(IPC.tasksDraft, (_e, id: unknown) => runner.draft(text(id, "id", 100)));
+  handle(IPC.tasksListAll, () => store.listAllTasks());
+  handle(IPC.tasksSearch, (_e, query: unknown) => store.searchTasks(text(query, "query", 200)));
+  handle(IPC.projectsOverviews, () => store.projectOverviews());
+  handle(IPC.tasksGet, (_e, id: unknown) => store.getTask(text(id, "id", 100)) ?? null);
+  handle(IPC.tasksDraft, (_e, id: unknown) => runner.draft(text(id, "id", 100)));
 
   // A new task's brief, project and folder. A task without a project works in a temporary folder of its own, as a
   // quick edit does.
@@ -137,7 +149,7 @@ export function registerIpc(
     await mkdir(workdir, { recursive: true });
     return copyInto(given, workdir);
   };
-  ipcMain.handle(IPC.tasksStart, async (_e, input: unknown) => {
+  handle(IPC.tasksStart, async (_e, input: unknown) => {
     const { brief, projectId, attachments: given, workdir } = newTask(input);
     // Before any copying: if the engine can't start a task, no folder or copies are left behind.
     const { provider, auth, model, effort } = await runner.defaults();
@@ -147,17 +159,17 @@ export function registerIpc(
     return task;
   });
   // Saved without starting: no engine, and for a quick edit no folder or copies yet. They're made when it starts.
-  ipcMain.handle(IPC.tasksSaveForLater, (_e, input: unknown) => runner.create(newTask(input)));
-  ipcMain.handle(IPC.tasksStartSaved, (_e, id: unknown) =>
+  handle(IPC.tasksSaveForLater, (_e, input: unknown) => runner.create(newTask(input)));
+  handle(IPC.tasksStartSaved, (_e, id: unknown) =>
     runner.startSaved(text(id, "id", 100), (task) => workFiles(task.projectId, task.workdir, task.attachments)),
   );
   // An edit to a task saved for later is placed as a new one is, so a change of project moves it to that folder. A
   // quick edit's files are still copied only when it starts.
-  ipcMain.handle(IPC.tasksUpdateDraft, (_e, id: unknown, input: unknown) =>
+  handle(IPC.tasksUpdateDraft, (_e, id: unknown, input: unknown) =>
     runner.updateDraft(text(id, "id", 100), newTask(input)),
   );
-  ipcMain.handle(IPC.tasksMarkReviewed, (_e, id: unknown) => runner.markReviewed(text(id, "id", 100)));
-  ipcMain.handle(IPC.tasksMarkUnreviewed, (_e, id: unknown) => runner.markUnreviewed(text(id, "id", 100)));
+  handle(IPC.tasksMarkReviewed, (_e, id: unknown) => runner.markReviewed(text(id, "id", 100)));
+  handle(IPC.tasksMarkUnreviewed, (_e, id: unknown) => runner.markUnreviewed(text(id, "id", 100)));
 
   // Files attached after the first message: a quick edit works on copies, as it does with the first ones. If the task
   // then refuses the message, for example because it's working, the copies go again.
@@ -173,19 +185,19 @@ export function registerIpc(
       throw err;
     }
   };
-  ipcMain.handle(IPC.tasksAnswer, (_e, id: unknown, answers: unknown, files?: unknown) => {
+  handle(IPC.tasksAnswer, (_e, id: unknown, answers: unknown, files?: unknown) => {
     if (!Array.isArray(answers) || answers.length > MAX_QUESTIONS) throw new Error("Send one answer per question");
     const taskId = text(id, "id", 100);
     const given = answers.map((a) => text(a, "answer", BRIEF_MAX));
     return withAttached(taskId, files, (attached) => runner.answer(taskId, given, attached));
   });
-  ipcMain.handle(IPC.tasksStop, (_e, id: unknown) => runner.stop(text(id, "id", 100)));
-  ipcMain.handle(IPC.tasksResume, (_e, id: unknown) => runner.resume(text(id, "id", 100)));
-  ipcMain.handle(IPC.tasksDecide, (_e, id: unknown, allow: unknown) => {
+  handle(IPC.tasksStop, (_e, id: unknown) => runner.stop(text(id, "id", 100)));
+  handle(IPC.tasksResume, (_e, id: unknown) => runner.resume(text(id, "id", 100)));
+  handle(IPC.tasksDecide, (_e, id: unknown, allow: unknown) => {
     if (typeof allow !== "boolean") throw new Error("allow must be true or false");
     return runner.decide(text(id, "id", 100), allow);
   });
-  ipcMain.handle(IPC.tasksFollowUp, (_e, id: unknown, message: unknown, files?: unknown) => {
+  handle(IPC.tasksFollowUp, (_e, id: unknown, message: unknown, files?: unknown) => {
     const taskId = text(id, "id", 100);
     const body = text(message, "message", BRIEF_MAX).trim();
     if (!body) throw new Error("Write what to change first");
@@ -196,7 +208,7 @@ export function registerIpc(
     });
   });
 
-  ipcMain.handle(IPC.tasksSaveCopy, async (_e, id: unknown): Promise<SaveResult | null> => {
+  handle(IPC.tasksSaveCopy, async (_e, id: unknown): Promise<SaveResult | null> => {
     const task = store.getTask(text(id, "id", 100));
     if (!task) throw new Error("That task doesn't exist");
     if (runner.isRunning(task.id)) throw new Error("Wait for the task to finish before saving");
@@ -262,20 +274,24 @@ export function registerIpc(
       "separator",
       { label: t("menu.delete"), action: "delete" },
     ]);
-  ipcMain.handle(IPC.tasksMenu, (_e, id: unknown) => {
+  handle(IPC.tasksMenu, (_e, id: unknown) => {
     const task = taskOf(id);
-    return popup(taskMenuItems(task, !runner.isRunning(task.id), t));
+    const log = store.getSettings().debug && debug.hasTask(task.id);
+    return popup(taskMenuItems(task, !runner.isRunning(task.id), t, log));
   });
-  ipcMain.handle(IPC.tasksRename, (_e, id: unknown, title: unknown) =>
+  handle(IPC.tasksRename, (_e, id: unknown, title: unknown) =>
     runner.rename(text(id, "id", 100), text(title, "title", 200)),
   );
-  ipcMain.handle(IPC.tasksReveal, async (_e, id: unknown) => {
+  handle(IPC.tasksReveal, async (_e, id: unknown) => {
     const error = await shell.openPath(taskOf(id).workdir);
     if (error) throw new Error(error);
   });
   // The window asks the user before it calls remove.
-  ipcMain.handle(IPC.tasksRemove, (_e, id: unknown) => {
-    runner.remove(taskOf(id).id);
+  handle(IPC.tasksRemove, async (_e, id: unknown) => {
+    const taskId = taskOf(id).id;
+    runner.remove(taskId);
+    // Its log goes with it, whether debug is on or not. The task is gone either way, so a log that stays is reported.
+    await debug.removeTask(taskId).catch((err: unknown) => console.error(`Couldn't delete the log of ${taskId}`, err));
   });
 
   const projectOf = (id: unknown) => {
@@ -283,7 +299,7 @@ export function registerIpc(
     if (!project) throw new Error("That project doesn't exist");
     return project;
   };
-  ipcMain.handle(IPC.projectsMenu, (_e, id: unknown) => {
+  handle(IPC.projectsMenu, (_e, id: unknown) => {
     projectOf(id);
     return popup<ProjectMenuAction>([
       { label: t("menu.rename"), action: "rename" },
@@ -294,7 +310,7 @@ export function registerIpc(
       { label: t("menu.removeProject"), action: "remove" },
     ]);
   });
-  ipcMain.handle(IPC.projectsUpdate, (_e, id: unknown, patch: unknown) => {
+  handle(IPC.projectsUpdate, (_e, id: unknown, patch: unknown) => {
     const project = projectOf(id);
     if (typeof patch !== "object" || patch === null || Array.isArray(patch)) throw new Error("patch must be an object");
     const input = patch as Record<string, unknown>;
@@ -311,28 +327,48 @@ export function registerIpc(
     store.saveProject(next);
     return next;
   });
-  ipcMain.handle(IPC.projectsReveal, async (_e, id: unknown) => {
+  handle(IPC.projectsReveal, async (_e, id: unknown) => {
     const error = await shell.openPath(projectOf(id).folder);
     if (error) throw new Error(error);
   });
-  ipcMain.handle(IPC.projectsRemovalText, (_e, id: unknown) => {
+  handle(IPC.projectsRemovalText, (_e, id: unknown) => {
     const project = projectOf(id);
     const lang = store.getSettings().language ?? languageFrom(app.getLocale());
     return removalText(lang, project.name, store.projectUsage(project.id));
   });
   // The window asks the user, with the text above, before it calls remove.
-  ipcMain.handle(IPC.projectsRemove, async (_e, id: unknown) => {
+  handle(IPC.projectsRemove, async (_e, id: unknown) => {
     const project = projectOf(id);
     // Working tasks end first: a run still ending would save its task back after the project is gone. Only the
     // app's records go. The folder is never touched.
     await runner.stopProject(project.id);
+    const taskIds = store.listProjectTasks(project.id).map((task) => task.id);
     try {
       jobs.removeProject(project.id);
     } catch (err) {
       runner.projectStays(project.id);
       throw err;
     }
+    // The tasks' logs go with the tasks.
+    for (const taskId of taskIds)
+      await debug
+        .removeTask(taskId)
+        .catch((err: unknown) => console.error(`Couldn't delete the log of ${taskId}`, err));
   });
+
+  // The debug logs. They are read only from this computer's own window, and copying puts them on its clipboard.
+  handle(IPC.debugTaskLog, (_e, id: unknown) => debug.readTask(taskOf(id).id));
+  handle(IPC.debugRevealTaskLog, (_e, id: unknown) => {
+    const taskId = taskOf(id).id;
+    if (!debug.hasTask(taskId)) throw new Error("This task has no log yet");
+    shell.showItemInFolder(debug.taskFile(taskId));
+  });
+  handle(IPC.debugCopyTaskLog, async (_e, id: unknown) => {
+    const log = await debug.taskText(taskOf(id).id);
+    if (log === null) throw new Error("This task has no log yet");
+    clipboard.writeText(log);
+  });
+  handle(IPC.debugRevealAppLog, async () => shell.showItemInFolder(await debug.touchApp()));
 
   // Skills. Ids are folder names, which SkillFolder checks; the text fields have the format's limits.
   const skillId = (id: unknown) => text(id, "id", 200);
@@ -342,32 +378,30 @@ export function registerIpc(
     if (!title) throw new Error("A skill needs a name");
     return { title, description: text(d.description, "description", 1024), steps: text(d.steps, "steps", BRIEF_MAX) };
   };
-  ipcMain.handle(IPC.jobsList, () => jobs.list());
-  ipcMain.handle(IPC.jobsCreate, (_e, draft: unknown) => jobs.create(jobDraft(draft)));
-  ipcMain.handle(IPC.jobsUpdate, (_e, id: unknown, draft: unknown) =>
-    jobs.update(text(id, "id", 100), jobDraft(draft)),
-  );
-  ipcMain.handle(IPC.jobsSetOn, (_e, id: unknown, on: unknown) => {
+  handle(IPC.jobsList, () => jobs.list());
+  handle(IPC.jobsCreate, (_e, draft: unknown) => jobs.create(jobDraft(draft)));
+  handle(IPC.jobsUpdate, (_e, id: unknown, draft: unknown) => jobs.update(text(id, "id", 100), jobDraft(draft)));
+  handle(IPC.jobsSetOn, (_e, id: unknown, on: unknown) => {
     if (typeof on !== "boolean") throw new Error("on must be true or false");
     return jobs.setOn(text(id, "id", 100), on);
   });
-  ipcMain.handle(IPC.jobsSkipOnce, (_e, id: unknown) => jobs.skipOnce(text(id, "id", 100)));
-  ipcMain.handle(IPC.jobsRemove, (_e, id: unknown) => jobs.remove(text(id, "id", 100)));
-  ipcMain.handle(IPC.jobsRunNow, (_e, id: unknown) => jobs.runNow(text(id, "id", 100)));
+  handle(IPC.jobsSkipOnce, (_e, id: unknown) => jobs.skipOnce(text(id, "id", 100)));
+  handle(IPC.jobsRemove, (_e, id: unknown) => jobs.remove(text(id, "id", 100)));
+  handle(IPC.jobsRunNow, (_e, id: unknown) => jobs.runNow(text(id, "id", 100)));
 
-  ipcMain.handle(IPC.skillsList, async () => [...(await skills.list()), ...(await skills.builtIns(guideInLanguage))]);
-  ipcMain.handle(IPC.skillsCreate, (_e, title: unknown) => {
+  handle(IPC.skillsList, async () => [...(await skills.list()), ...(await skills.builtIns(guideInLanguage))]);
+  handle(IPC.skillsCreate, (_e, title: unknown) => {
     const name = text(title, "title", 200).trim();
     if (!name) throw new Error("A skill needs a name");
     return skills.create(name);
   });
-  ipcMain.handle(IPC.skillsSave, (_e, id: unknown, value: unknown, note: unknown) =>
+  handle(IPC.skillsSave, (_e, id: unknown, value: unknown, note: unknown) =>
     skills.save(skillId(id), draft(value), note == null ? "" : text(note, "note", 200)),
   );
-  ipcMain.handle(IPC.skillsDuplicate, (_e, id: unknown) =>
+  handle(IPC.skillsDuplicate, (_e, id: unknown) =>
     skills.duplicate(skillId(id), (title) => t("skills.copyOf", { title }), guideInLanguage),
   );
-  ipcMain.handle(IPC.skillsImport, async (_e, dropped: unknown) => {
+  handle(IPC.skillsImport, async (_e, dropped: unknown) => {
     if (dropped != null) {
       const path = text(dropped, "path", 4096);
       if (!isAbsolute(path)) throw new Error("Drop a skill's folder or a .zip of one");
@@ -398,22 +432,22 @@ export function registerIpc(
     const picked = result.canceled ? undefined : result.filePaths[0];
     return picked ? skills.import(picked) : null;
   });
-  ipcMain.handle(IPC.skillsHistory, (_e, id: unknown) => skills.history(skillId(id)));
-  ipcMain.handle(IPC.skillsRestore, (_e, id: unknown, n: unknown) => {
+  handle(IPC.skillsHistory, (_e, id: unknown) => skills.history(skillId(id)));
+  handle(IPC.skillsRestore, (_e, id: unknown, n: unknown) => {
     if (typeof n !== "number" || !Number.isInteger(n) || n < 1) throw new Error("That version isn't kept any more");
     return skills.restore(skillId(id), n);
   });
-  ipcMain.handle(IPC.skillsAddFiles, async (_e, id: unknown) => {
+  handle(IPC.skillsAddFiles, async (_e, id: unknown) => {
     const result = await openDialog({ title: t("skills.addFiles"), properties: ["openFile", "multiSelections"] });
     const skill = skillId(id);
     return skills.addFiles(skill, result.canceled ? [] : result.filePaths);
   });
-  ipcMain.handle(IPC.skillsReveal, async (_e, id: unknown) => {
+  handle(IPC.skillsReveal, async (_e, id: unknown) => {
     const error = await shell.openPath(await skills.folderOf(skillId(id)));
     if (error) throw new Error(error);
   });
-  ipcMain.handle(IPC.skillsRemove, (_e, id: unknown) => skills.remove(skillId(id)));
-  ipcMain.handle(IPC.skillsExport, async (_e, id: unknown) => {
+  handle(IPC.skillsRemove, (_e, id: unknown) => skills.remove(skillId(id)));
+  handle(IPC.skillsExport, async (_e, id: unknown) => {
     // Built before the dialog, so a skill that is gone or too big fails before the user picks a place.
     const { name, data } = await skills.zip(skillId(id));
     const options = { title: t("menu.exportZip"), defaultPath: join(app.getPath("downloads"), `${name}.zip`) };
@@ -433,12 +467,12 @@ export function registerIpc(
     }
     shell.showItemInFolder(filePath);
   });
-  ipcMain.handle(IPC.skillsMenu, (_e, id: unknown) => {
+  handle(IPC.skillsMenu, (_e, id: unknown) => {
     skillId(id);
     return skillMenu();
   });
 
-  ipcMain.handle(IPC.filesPick, async () => {
+  handle(IPC.filesPick, async () => {
     const result = await openDialog({ title: t("attach.pick"), properties: ["openFile", "multiSelections"] });
     return result.canceled ? [] : result.filePaths;
   });
@@ -450,7 +484,7 @@ export function registerIpc(
   };
   // A file the task listed may be missing for a moment while the agent rewrites it, or for good if the user moved
   // it. That's null, which the preview explains, rather than an error.
-  ipcMain.handle(IPC.filesRead, async (_e, taskId: unknown, path: unknown) => {
+  handle(IPC.filesRead, async (_e, taskId: unknown, path: unknown) => {
     try {
       const real = await fileOf(taskId, path);
       return { ...describe(real), bytes: new Uint8Array(await readFile(real)) };
@@ -459,14 +493,14 @@ export function registerIpc(
       throw err;
     }
   });
-  ipcMain.handle(IPC.filesOpen, async (_e, taskId: unknown, path: unknown) => {
+  handle(IPC.filesOpen, async (_e, taskId: unknown, path: unknown) => {
     const error = await shell.openPath(await fileOf(taskId, path, false));
     if (error) throw new Error(error);
   });
-  ipcMain.handle(IPC.filesReveal, async (_e, taskId: unknown, path: unknown) =>
+  handle(IPC.filesReveal, async (_e, taskId: unknown, path: unknown) =>
     shell.showItemInFolder(await fileOf(taskId, path, false)),
   );
-  ipcMain.handle(IPC.filesRestore, (_e, taskId: unknown, path: unknown) =>
+  handle(IPC.filesRestore, (_e, taskId: unknown, path: unknown) =>
     runner.restore(text(taskId, "taskId", 100), absolutePath(path, "path")),
   );
 }

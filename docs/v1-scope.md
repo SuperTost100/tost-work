@@ -149,6 +149,7 @@ Changed on 2026-11-02, after Tost tried 0.0.18:
 
 - Claude waits for every command and subagent instead of leaving one in the background and finishing the task. The activity shows "Delego: …" for each subagent, with what the subagent writes under it.
 - Right-click in a text field offers Taglia, Copia, Incolla and Seleziona tutto.
+- Settings has an Avanzate section, shown at Expert only, with "Mostra dettagli tecnici e debug". Once on, it stays on at any level. With it on, each line in "Cosa ha fatto" opens to show the input, output and thinking. A strip shows the AI, model, effort, session and tokens, and the task menu offers "Apri il log" and "Copia il log". Every task writes a JSONL log on the computer, and the app writes `app.log`. Secrets are masked, and nothing is sent anywhere.
 
 ## From 0.2.0
 

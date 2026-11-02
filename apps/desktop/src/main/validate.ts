@@ -111,7 +111,13 @@ export const settingsPatch = (v: unknown): Partial<Settings> => {
       if (value !== null && !AIS.includes(value as AiId))
         throw new Error("defaultAi must be chatgpt, claude, key or null");
       patch.defaultAi = value as AiId | null;
-    } else if (key === "notifications" || key === "openAtLogin" || key === "stayInMenuBar" || key === "sidebarHidden") {
+    } else if (
+      key === "notifications" ||
+      key === "openAtLogin" ||
+      key === "stayInMenuBar" ||
+      key === "sidebarHidden" ||
+      key === "debug"
+    ) {
       if (typeof value !== "boolean") throw new Error(`${key} must be true or false`);
       patch[key] = value;
     } else if (key === "loginOpens") {

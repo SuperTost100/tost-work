@@ -12,6 +12,7 @@ import type {
   TaskMenuAction,
   TostWorkApi,
 } from "../../../shared/api";
+import type { LogLine } from "../../../shared/debug";
 import { guideText, translate } from "../../../shared/i18n";
 import {
   type AgentProvider,
@@ -73,6 +74,10 @@ export type MemoryApi = TostWorkApi & {
   changeSettings(patch: Partial<Settings>): void;
   /** What the panel's buttons asked for, in order, and the height it last asked for. */
   panelCalls: { open: (PanelTarget | undefined)[]; quit: number; height: number };
+  /** Adds a line to the task's debug log, as the engine does while debug is on. */
+  log(taskId: string, line: LogLine): void;
+  /** What the debug log buttons and menu items asked for, in order. */
+  debugCalls: { revealed: string[]; copied: string[]; appLog: number };
 };
 
 export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", setupDone: true }): MemoryApi {
@@ -217,6 +222,15 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
     return tasks.get(id) ?? t;
   };
   const panelCalls: MemoryApi["panelCalls"] = { open: [], quit: 0, height: 0 };
+  // Each task's debug log, as the main process keeps it in its file.
+  const logs = new Map<string, LogLine[]>();
+  const debugCalls: MemoryApi["debugCalls"] = { revealed: [], copied: [], appLog: 0 };
+  const mustLog = (id: string) => {
+    if (!tasks.has(id)) throw new Error("That task doesn't exist");
+    const log = logs.get(id);
+    if (!log) throw new Error("This task has no log yet");
+    return log;
+  };
   const api: MemoryApi = {
     platform: "linux",
     pickInMenu: (action) => {
@@ -249,6 +263,11 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       for (const l of settingsListeners) l(settings);
     },
     panelCalls,
+    debugCalls,
+    log: (taskId, line) => {
+      // As the main process: written only while debug is on.
+      if (settings.debug) logs.set(taskId, [...(logs.get(taskId) ?? []), line]);
+    },
     panel: {
       open: (target) => {
         panelCalls.open.push(target);
@@ -359,7 +378,11 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       remove: async (id) => {
         if (!projects.some((p) => p.id === id)) throw new Error("That project doesn't exist");
         projects = projects.filter((p) => p.id !== id);
-        for (const t of [...tasks.values()]) if (t.projectId === id) tasks.delete(t.id);
+        for (const t of [...tasks.values()])
+          if (t.projectId === id) {
+            tasks.delete(t.id);
+            logs.delete(t.id);
+          }
         for (const j of [...jobs.values()]) {
           if (j.projectId !== id) continue;
           jobs.delete(j.id);
@@ -499,7 +522,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       menu: async (id) => {
         const t = tasks.get(id);
         if (!t) throw new Error("That task doesn't exist");
-        const offered = taskMenuItems(t, t.status !== "running", () => "");
+        const offered = taskMenuItems(t, t.status !== "running", () => "", settings.debug && logs.has(id));
         const pick = offered.find((item) => item !== "separator" && item.action === menuPick);
         return pick && pick !== "separator" && pick.enabled !== false ? pick.action : null;
       },
@@ -511,6 +534,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       reveal: async () => {},
       remove: async (id) => {
         tasks.delete(id);
+        logs.delete(id);
       },
       onChange: (l) => {
         listeners.add(l);
@@ -645,6 +669,23 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         const next = keep({ ...mustSkill(id), ...old.draft, updatedAt: now() });
         skills = skills.map((s) => (s.id === id ? next : s));
         return next;
+      },
+    },
+    debug: {
+      taskLog: async (id) => {
+        if (!tasks.has(id)) throw new Error("That task doesn't exist");
+        return logs.get(id) ?? null;
+      },
+      revealTaskLog: async (id) => {
+        mustLog(id);
+        debugCalls.revealed.push(id);
+      },
+      copyTaskLog: async (id) => {
+        mustLog(id);
+        debugCalls.copied.push(id);
+      },
+      revealAppLog: async () => {
+        debugCalls.appLog++;
       },
     },
     files: {

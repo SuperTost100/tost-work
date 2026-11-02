@@ -61,6 +61,9 @@ export function withFiles(text: string, files: string[]): string {
 export const RESUME_PROMPT =
   "Tost Work closed while you were working on this task, so your last turn was cut short. Check what you had already done in the folder, then carry on where you left off.";
 
+/** A line in the app's debug log. */
+export type AppLog = (level: "info" | "warn" | "error", message: string, detail?: unknown) => void;
+
 export class TaskRunner {
   private running = new Map<string, AbortController>();
   /** Resolves when a task's run has ended and saved its last state. */
@@ -85,6 +88,8 @@ export class TaskRunner {
     private now: () => string = () => new Date().toISOString(),
     private guard: Guard = REFUSE,
     private onText: (taskId: string, text: string, restart?: boolean) => void = () => {},
+    /** The app's debug log: each task's start, answers, decisions and end, which it writes only while debug is on. */
+    private log: AppLog = () => {},
   ) {}
 
   /** What the running task's agent has written of its answer so far, or "" between answers. */
@@ -151,6 +156,12 @@ export class TaskRunner {
       // An interrupted task stays resumable until its run really starts: a resume that fails at once, for example
       // offline, leaves Resume on the task to try again.
       task = this.save({ ...task, status: "running", error: null, updatedAt: this.now() });
+      this.log("info", `Task ${taskId} started ${followUp === null ? "its first run" : "a run that follows up"}`, {
+        provider: task.provider,
+        model: task.model,
+        effort: task.effort,
+        workdir,
+      });
       for await (const event of this.engine.run({ task, project, workdir, followUp, signal: controller.signal })) {
         // A reply already waits for the next run, so this run's end isn't the task's: it stays running.
         if (event.type === "done" && this.queued.has(taskId)) continue;
@@ -196,6 +207,11 @@ export class TaskRunner {
       this.ended.delete(taskId);
       release();
     }
+    this.log(
+      task.status === "failed" ? "error" : "info",
+      `Task ${taskId} run ended: ${task.status}`,
+      task.error ? { error: task.error } : undefined,
+    );
     const next = this.queued.get(taskId);
     this.queued.delete(taskId);
     if (next !== undefined && task.status !== "stopped" && task.status !== "failed") this.launch(taskId, next);
@@ -206,6 +222,7 @@ export class TaskRunner {
   launch(taskId: string, followUp: string | null = null): void {
     this.start(taskId, followUp).catch((err: unknown) => {
       console.error(`Task ${taskId} failed and its state couldn't be saved`, err);
+      this.log("error", `Task ${taskId} failed and its state couldn't be saved`, err);
     });
   }
 
@@ -317,6 +334,9 @@ export class TaskRunner {
         ...task.messages,
         { from: "user", text: answer, at, answers: answered, ...(files.length ? { attachments: files } : {}) },
       ],
+    });
+    this.log("info", `Task ${taskId} answered ${items.length === 1 ? "its question" : `${items.length} questions`}`, {
+      files: files.length,
     });
     if (!this.engine.answer(taskId, task.question.id, withFiles(answer, files)))
       this.continueWith(
@@ -440,6 +460,9 @@ export class TaskRunner {
       if (current.status !== "needs-you" || current.approval?.id !== approval.id)
         return allow ? this.save({ ...current, updatedAt: this.now() }) : current;
       const next = this.save(resume(current, this.now()));
+      this.log("info", `Task ${taskId}: the user ${allow ? "allowed" : "refused"} the ${approval.action}`, {
+        paths: approval.paths,
+      });
       if (!this.engine.decide(taskId, approval.id, allow)) this.continueWith(taskId, decisionNote(approval, allow));
       return next;
     } finally {
@@ -497,6 +520,7 @@ export class TaskRunner {
   }
 
   stop(taskId: string): void {
+    this.log("info", `Task ${taskId}: stop asked for`);
     this.queued.delete(taskId);
     const run = this.running.get(taskId);
     if (run) {

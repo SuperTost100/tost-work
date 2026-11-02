@@ -152,6 +152,7 @@ describe("Store", () => {
       sidebarHidden: false,
       boardView: "list",
       boardGroup: "status",
+      debug: false,
       setupDone: false,
     });
     store.saveSettings({ ...DEFAULT_SETTINGS, name: "Giulia", level: "advanced", language: "it", setupDone: true });

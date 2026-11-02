@@ -13,6 +13,8 @@ export function taskMenuItems(
   task: Pick<Task, "status" | "reviewedAt" | "projectId">,
   canDelete: boolean,
   t: (key: MessageKey) => string,
+  /** The task has a debug log and debug is on, so the menu offers to show it and to copy it. */
+  log = false,
 ): MenuItem<TaskMenuAction>[] {
   const now: MenuItem<TaskMenuAction>[] = [];
   if (task.status === "draft") now.push({ label: t("board.start"), action: "start" });
@@ -22,6 +24,12 @@ export function taskMenuItems(
     { label: t("menu.rename"), action: "rename" },
     // A saved task without a project gets its own folder only when it starts, so until then there's none to show.
     { label: t("menu.reveal"), action: "reveal", enabled: !(task.status === "draft" && task.projectId === null) },
+    ...(log
+      ? [
+          { label: t("menu.logOpen"), action: "log-open" as const },
+          { label: t("menu.logCopy"), action: "log-copy" as const },
+        ]
+      : []),
     "separator",
     ...(now.length ? [...now, "separator" as const] : []),
     { label: t("menu.delete"), action: "delete", enabled: canDelete },

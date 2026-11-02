@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import type { Project } from "../shared/model";
+import { DEFAULT_SETTINGS, mergeSettings, type Project } from "../shared/model";
 import { absolutePath, oneLine, paths, placedTask, settingsPatch, taskInput, text } from "./validate";
 
 describe("taskInput", () => {
@@ -134,6 +134,13 @@ describe("settingsPatch", () => {
     expect(() => settingsPatch({ notify: { done: "loud" } })).toThrow(/off, quiet or normal/);
     expect(() => settingsPatch({ openAtLogin: "yes" })).toThrow(/true or false/);
     expect(() => settingsPatch({ sidebarHidden: 1 })).toThrow(/true or false/);
+  });
+
+  it("takes the debug switch, on or off only, and keeps it on through a change of level", () => {
+    expect(settingsPatch({ debug: true })).toEqual({ debug: true });
+    expect(() => settingsPatch({ debug: "on" })).toThrow(/true or false/);
+    const on = mergeSettings({ ...DEFAULT_SETTINGS, level: "expert" }, { debug: true });
+    expect(mergeSettings(on, { level: "intermediate" }).debug).toBe(true);
   });
 
   it("takes the profile's work and notes, trimmed", () => {

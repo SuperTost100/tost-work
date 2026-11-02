@@ -2,6 +2,7 @@ import { constants } from "node:fs";
 import { copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { ActivityKind, EngineEvent, Review } from "../../shared/model";
+import type { TaskLog } from "../debugLog";
 import { freeName } from "../files";
 import type { Engine, RunContext } from "./engine";
 
@@ -97,16 +98,62 @@ const sleep = (ms: number, signal: AbortSignal) =>
     );
   });
 
-/** Replays a script with a delay between steps, and waits for real answers to its question. */
+/** What the real agent's tool call might have been for a line of the script, so the debug view has something to show. */
+function fakeCall(kind: ActivityKind, target: string | undefined, workdir: string) {
+  const path = join(workdir, target ?? "file.txt");
+  switch (kind) {
+    case "folder":
+      return {
+        name: "command",
+        input: { command: "ls -la" },
+        output: "total 8\n-rw-r--r--  1 giulia  staff  2140 call-notes.txt",
+      };
+    case "read":
+      return {
+        name: "Read",
+        input: { file_path: path },
+        output: "Call with Alpi Logistica, 14 October.\nThey want the training in two days, at their office in Biella.",
+      };
+    case "skill":
+      return {
+        name: "Read",
+        input: { file_path: `/skills/${target}/SKILL.md` },
+        output: "# Word documents\n\nMake it with officecli.",
+      };
+    case "web":
+      return { name: "web_search", input: { query: target }, output: "1. Insurance for training equipment, a guide" };
+    case "write":
+    case "edit":
+      return {
+        name: "file_change",
+        input: { changes: [{ path, kind: kind === "write" ? "add" : "update" }] },
+        output: kind === "write" ? "Created" : "Updated",
+      };
+    case "command":
+      // A command that prints a key, as an agent checking its setup might: the log has to mask it.
+      return {
+        name: "command",
+        input: { command: "printenv | grep -i key" },
+        output: "OPENAI_API_KEY=sk-proj-FakeKeyForTheDebugLog0123456789",
+      };
+    default:
+      return { name: kind, input: target ? { target } : {}, output: "Done" };
+  }
+}
+
 /** Replays a script with a delay between steps, and waits for real answers to its questions and approvals. */
 export class FakeEngine implements Engine {
   private waiting = new Map<string, (reply: string | boolean) => void>();
+  /** Gives each tool call an id of its own, across runs, as the real agents do. */
+  private calls = 0;
 
   constructor(
     private script: FakeScript = PROPOSAL_SCRIPT,
     private stepMs = 900,
     /** Folder with sample files to copy into the task's folder, so previews have something real to show. */
     private samples?: string,
+    /** The task's debug log, written as the real engine writes it, so debug mode can be tried without an account. */
+    private taskLog: (taskId: string) => TaskLog = () => ({ write: () => {} }),
   ) {}
 
   async defaults() {
@@ -126,6 +173,18 @@ export class FakeEngine implements Engine {
     const quickEdit = task.projectId === null && task.attachments.length > 0;
     const s = followUp ? FOLLOW_UP_SCRIPT : quickEdit ? EDIT_SCRIPT : this.script;
     const steps = s.steps.map((text) => ({ text, status: "pending" as const }));
+    const log = this.taskLog(task.id);
+    const { model, effort } = await this.defaults();
+    log.write({
+      type: "run",
+      provider: "codex",
+      model,
+      effort,
+      access: "supervised",
+      cwd: workdir,
+      followUp: !!followUp,
+    });
+    log.write({ type: "session", sessionId: `fake-${task.id}` });
     for (let i = 0; i < steps.length; i++) {
       if (signal.aborted) return yield { type: "stopped" };
       if (s.question && s.question.beforeStep === i) {
@@ -140,7 +199,15 @@ export class FakeEngine implements Engine {
         type: "plan",
         steps: steps.map((st, j) => ({ ...st, status: j < i ? "done" : j === i ? "in_progress" : "pending" })),
       };
-      for (const line of s.activity?.[i] ?? []) yield { type: "activity", ...line };
+      log.write({ type: "reasoning.delta", text: `Next: ${s.steps[i]?.toLowerCase()}. ` });
+      for (const line of s.activity?.[i] ?? []) {
+        const id = `fake-call-${++this.calls}`;
+        const { output, ...call } = fakeCall(line.kind, line.target, workdir);
+        log.write({ type: "tool.start", id, ...call });
+        log.write({ type: "tool.end", id, output });
+        yield { type: "activity", ...line, id };
+      }
+      log.write({ type: "usage", usage: { inputTokens: 4200, outputTokens: 380, totalTokens: 4580 } });
       await sleep(this.stepMs, signal);
       for (const f of s.files.filter((f) => f.afterStep === i)) {
         // Stop can land during the sleep above, and a stopped task writes nothing more.
@@ -183,6 +250,7 @@ export class FakeEngine implements Engine {
     }
     if (signal.aborted) return yield { type: "stopped" };
     if (s.review) yield { type: "review", review: s.review };
+    log.write({ type: "reasoning.delta", text: "Everything is in the folder, so I can tell the user where it is." });
     // The answer comes word by word, as a real agent writes it.
     for (const word of s.summary.match(/\S+\s*/g) ?? []) {
       yield { type: "text", text: word };

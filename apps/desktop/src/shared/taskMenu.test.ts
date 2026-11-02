@@ -62,4 +62,22 @@ describe("the task menu", () => {
         "delete",
       ]);
   });
+
+  it("offers to open and copy the log only when the task has one and debug is on", () => {
+    expect(labels(taskMenuItems({ status: "done", projectId: "p", reviewedAt: "x" }, true, t, true))).toEqual([
+      "Rename",
+      "Show in folder",
+      "Open the log",
+      "Copy the log",
+      "—",
+      "Mark to check",
+      "—",
+      "Delete…",
+    ]);
+    expect(actions(taskMenuItems({ status: "running", projectId: "p" }, false, t))).not.toContain("log-open");
+    const it_ = (key: MessageKey) => translate("it", key);
+    expect(labels(taskMenuItems({ status: "running", projectId: "p" }, false, it_, true))).toEqual(
+      expect.arrayContaining(["Apri il log", "Copia il log"]),
+    );
+  });
 });

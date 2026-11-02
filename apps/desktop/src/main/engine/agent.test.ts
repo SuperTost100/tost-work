@@ -160,8 +160,8 @@ describe("AgentEngine", () => {
       { type: "text", text: "Leggo le note " },
       { type: "text", text: "della chiamata." },
       { type: "activity", kind: "note", target: "Leggo le note della chiamata." },
-      { type: "activity", kind: "read", target: "note.txt" },
-      { type: "activity", kind: "read", target: "prezzi.xlsx" },
+      { type: "activity", kind: "read", target: "note.txt", id: "t1" },
+      { type: "activity", kind: "read", target: "prezzi.xlsx", id: "t2" },
       { type: "text", text: "Il preventivo è pronto." },
       { type: "message", text: "Il preventivo è pronto." },
       { type: "done" },
@@ -451,10 +451,45 @@ describe("AgentEngine", () => {
     const signal = new AbortController().signal;
     for await (const e of engine.run({ task: t, project: null, workdir: "/w", followUp: null, signal })) seen.push(e);
     expect(seen.filter((e) => e.type === "activity")).toEqual([
-      { type: "activity", kind: "helper", target: "Trova le fonti" },
+      { type: "activity", kind: "helper", target: "Trova le fonti", id: "a1" },
       { type: "activity", kind: "note", target: "Ho trovato 12 fonti utili." },
     ]);
     expect(seen.at(-1)).toEqual({ type: "done" });
+  });
+
+  it("writes the run and every event to the task's log, with the run's token and the course key among its secrets", async () => {
+    const key = { key: "sk-ant-api03-thecoursekeyfortoday0123456789", vendor: "anthropic" as const };
+    const { funnel } = fakeFunnel(async (_input, emit) => {
+      emit({ type: "reasoning.delta", text: "Leggo prima le note." });
+      emit({ type: "tool.start", id: "c1", name: "Read", input: { file_path: "/w/note.txt" } });
+      emit({ type: "tool.end", id: "c1", output: "le note" });
+      return { text: "Fatto." };
+    });
+    const written: { taskId: string; secrets: (string | undefined)[]; line: Record<string, unknown> }[] = [];
+    const engine = new AgentEngine(funnel, () => "it", {
+      courseKey: () => key,
+      taskLog: (taskId, secrets) => ({ write: (line) => written.push({ taskId, secrets, line }) }),
+    });
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok-123" }), close: () => {} });
+    const t = task({ provider: "claude", auth: "key", model: "claude-sonnet-5-5", sessionId: "s0" });
+    const signal = new AbortController().signal;
+    for await (const _ of engine.run({ task: t, project: null, workdir: "/w", followUp: "Ancora", signal })) {
+      // Drained for the log it writes.
+    }
+    expect(written.map((w) => w.line.type)).toEqual(["run", "reasoning.delta", "tool.start", "tool.end", "run.end"]);
+    expect(written[0]?.line).toEqual({
+      type: "run",
+      provider: "claude",
+      model: "claude-sonnet-5-5",
+      effort: "medium",
+      access: "supervised",
+      cwd: "/w",
+      sessionId: "s0",
+      followUp: true,
+    });
+    expect(
+      written.every((w) => w.taskId === "t1" && w.secrets.includes("tok-123") && w.secrets.includes(key.key)),
+    ).toBe(true);
   });
 
   it("runs a Claude task on Claude Code, with its tools held to the same rules", async () => {
