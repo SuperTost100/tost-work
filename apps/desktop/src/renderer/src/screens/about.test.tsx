@@ -63,10 +63,12 @@ describe("About", () => {
     await aboutPage();
     await click(`What's new in ${__APP_VERSION__}`);
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("What's new");
-    expect(screen.getByRole("heading", { level: 2, name: "0.0.19" })).toBeTruthy();
+    // This version first, and an earlier one under it. Hiding a newer entry is checked in changelog.test.ts, so this
+    // test doesn't change with every release.
+    const versions = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(versions[0]).toBe(__APP_VERSION__);
+    expect(versions).toContain("0.0.19");
     expect(screen.getByText("Debug mode:")).toBeTruthy();
-    // The entry for the release in preparation stays out of sight until the version reaches it.
-    expect(screen.queryByRole("heading", { level: 2, name: "0.0.20" })).toBeNull();
     // Back to About through the crumb.
     await act(async () => {
       fireEvent.click(within(screen.getByRole("navigation", { name: "About" })).getByRole("button", { name: "About" }));

@@ -15,11 +15,23 @@
 
 ### en
 
-- **Notes to come:** what changed in this version is written when it is released.
+- **Choose how the AI works:** under the task box, pick Fast, Balanced or Thorough, each with a line saying when it fits. "Choose the model…" opens the full list of AIs, models and reasoning levels. From the Advanced level, each choice also names the model behind it. Your last pick stays for the next task.
+- **Recent:** each task's state is a small icon: a hand when it needs you, a turning ring while it works, a check when it's done and waiting for you to look, a dashed circle when it's saved for later. On hover the ⋯ button takes the icon's place, and the row's tooltip says the state in words.
+- **Message times:** every message, yours and the AI's, shows when it was sent, beside its copy button.
+- **About:** a page with the version, what's new, credits and licences, and a way to send feedback. Settings and the app menu open it.
+- **Errors in Italian:** the messages that used to appear in English now follow the app's language.
+- **Small windows:** Settings, a skill's page, a project's page, a task's file and quick edit no longer get squeezed or cut off in a small window or with large text.
+- **ChatGPT's helpers:** while ChatGPT waits for work it handed off, the task says so.
 
 ### it
 
-- **Note in arrivo:** le novità di questa versione vengono scritte quando esce.
+- **Scegli come lavora l'AI:** sotto la casella scegli Veloce, Equilibrato o Approfondito, ognuno con una riga che dice quando conviene. "Scegli il modello…" apre l'elenco completo di AI, modelli e livelli di ragionamento. Dal livello Avanzato, sotto ogni scelta compare anche il modello. L'ultima scelta resta per l'attività successiva.
+- **Recenti:** lo stato di ogni attività è una piccola icona: una mano quando tocca a te, un cerchio che gira mentre lavora, una spunta quando è finita e aspetta che la guardi, un cerchio tratteggiato quando è salvata per dopo. Al passaggio del mouse il pulsante ⋯ prende il posto dell'icona, e il suggerimento della riga dice lo stato a parole.
+- **Orari dei messaggi:** ogni messaggio, tuo e dell'AI, mostra quando è stato inviato, accanto al pulsante per copiarlo.
+- **Informazioni:** una pagina con la versione, le novità, i crediti e le licenze, e un modo per inviare un feedback. Si apre da Impostazioni e dal menu dell'app.
+- **Errori in italiano:** i messaggi che comparivano in inglese ora seguono la lingua dell'app.
+- **Finestre piccole:** Impostazioni, la pagina di una skill, quella di un progetto, il file di un'attività e la modifica veloce non vengono più schiacciati o tagliati in una finestra piccola o con il testo grande.
+- **Aiutanti di ChatGPT:** mentre ChatGPT aspetta il lavoro che ha delegato, l'attività lo dice.
 
 ## 0.0.19
 
