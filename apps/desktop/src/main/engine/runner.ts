@@ -3,6 +3,7 @@ import { lstat } from "node:fs/promises";
 import type { Language } from "../../shared/i18n";
 import type { AgentProvider, Approval, KeptCopy, Project, Task } from "../../shared/model";
 import { answersText, BRIEF_MAX, questionItems } from "../../shared/model";
+import type { ModelChoices, ModelPick } from "../../shared/modelChoice";
 import { applyEvent, resume } from "../../shared/reduce";
 import type { Guard } from "../guard";
 import type { Store } from "../store/store";
@@ -101,8 +102,14 @@ export class TaskRunner {
     return this.drafts.get(taskId) ?? "";
   }
 
-  defaults(): Promise<{ provider: AgentProvider; auth?: "account" | "key"; model: string; effort: string }> {
-    return this.engine.defaults();
+  defaults(
+    pick?: ModelPick,
+  ): Promise<{ provider: AgentProvider; auth?: "account" | "key"; model: string; effort: string }> {
+    return this.engine.defaults(pick);
+  }
+
+  choices(): Promise<ModelChoices> {
+    return this.engine.choices();
   }
 
   create(input: NewTask): Task {
@@ -231,18 +238,18 @@ export class TaskRunner {
   }
 
   /**
-   * Starts a task the user saved for later, the way a new task starts: on the engine's defaults as they are now, not
-   * as they were when it was saved. `prepare` readies the folder and gives the files the agent works on, such as a
+   * Starts a task the user saved for later, the way a new task starts: on what `pick` says (the middle choice when it
+   * doesn't), with the engine's models as they are now, not as they were when it was saved. `prepare` readies the folder and gives the files the agent works on, such as a
    * quick edit's copies, which are made only now so a task never started leaves nothing behind.
    */
-  async startSaved(taskId: string, prepare: (task: Task) => Promise<string[]>): Promise<Task> {
+  async startSaved(taskId: string, prepare: (task: Task) => Promise<string[]>, pick?: ModelPick): Promise<Task> {
     const saved = this.mustGet(taskId);
     if (saved.status !== "draft") throw new UserError("error.alreadyStarted");
     if (this.starting.has(taskId)) throw new UserError("error.alreadyStarting");
     this.starting.add(taskId);
     try {
       // Before any copying, as for a new task: if the engine can't start, no folder or copies are left behind.
-      const { provider, auth, model, effort } = await this.defaults();
+      const { provider, auth, model, effort } = await this.defaults(pick);
       const attachments = await prepare(saved);
       // Read again: the task may have been renamed, or its project removed, while the files were copied.
       const task = this.mustGet(taskId);

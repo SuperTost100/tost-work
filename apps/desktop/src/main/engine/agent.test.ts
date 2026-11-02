@@ -383,7 +383,7 @@ describe("AgentEngine", () => {
     });
   });
 
-  it("starts tasks on Claude Sonnet at medium when Claude is the default", async () => {
+  it("starts tasks on Claude Sonnet at high when Claude is the default", async () => {
     const { funnel } = fakeFunnel(async () => ({ text: "" }));
     const efforts = [{ id: "low" }, { id: "medium" }, { id: "high" }];
     (funnel as { models: unknown }).models = async (provider: string) =>
@@ -398,8 +398,113 @@ describe("AgentEngine", () => {
       provider: "claude",
       auth: "account",
       model: "claude-sonnet-5-5",
+      effort: "high",
+    });
+  });
+
+  /** An engine whose AIs offer the models Tost's table names, so each choice can be checked on both agents. */
+  function engineWithModels(
+    over: {
+      ai?: "chatgpt" | "claude" | "key";
+      claudeModels?: string[];
+      usable?: ("chatgpt" | "claude")[];
+      codexFails?: boolean;
+      claudeFails?: boolean;
+    } = {},
+  ) {
+    const { funnel } = fakeFunnel(async () => ({ text: "" }));
+    const efforts = ["low", "medium", "high", "xhigh", "max"].map((id) => ({ id }));
+    const list = (ids: string[]) => ids.map((id) => ({ id, name: id, efforts }));
+    (funnel as { models: unknown }).models = async (provider: string) => {
+      if (provider === "claude" && over.claudeFails) throw new Error("claude isn't answering");
+      if (provider === "claude")
+        return list(over.claudeModels ?? ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]);
+      if (over.codexFails) throw new Error("codex isn't answering");
+      return list(["gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-luna"]);
+    };
+    return new AgentEngine(funnel, () => "it", {
+      ai: async () => over.ai ?? "chatgpt",
+      usable: async () => over.usable ?? ["chatgpt", "claude"],
+      courseKey: () => null,
+    });
+  }
+
+  it("starts the middle choice when nothing is picked, and each choice on the default AI", async () => {
+    const codex = engineWithModels();
+    expect(await codex.defaults()).toMatchObject({ model: "gpt-6.1-terra", effort: "medium" });
+    expect(await codex.defaults({ preset: "fast" })).toMatchObject({ model: "gpt-6-luna", effort: "medium" });
+    expect(await codex.defaults({ preset: "thorough" })).toMatchObject({ model: "gpt-6.1-sol", effort: "high" });
+    const claude = engineWithModels({ ai: "claude" });
+    expect(await claude.defaults({ preset: "fast" })).toEqual({
+      provider: "claude",
+      auth: "account",
+      model: "claude-haiku-5-5",
       effort: "medium",
     });
+    expect(await claude.defaults({ preset: "thorough" })).toMatchObject({ model: "claude-opus-5-5", effort: "high" });
+  });
+
+  it("starts Claude's thorough choice on Sonnet at xhigh when Opus isn't offered", async () => {
+    const claude = engineWithModels({ ai: "claude", claudeModels: ["claude-sonnet-5-5", "claude-haiku-5-5"] });
+    expect(await claude.defaults({ preset: "thorough" })).toMatchObject({
+      model: "claude-sonnet-5-5",
+      effort: "xhigh",
+    });
+  });
+
+  it("starts a model picked from the full list on the AI it belongs to, even when it isn't the default", async () => {
+    const engine = engineWithModels();
+    expect(await engine.defaults({ ai: "claude", model: "claude-opus-5-5", effort: "max" })).toEqual({
+      provider: "claude",
+      auth: "account",
+      model: "claude-opus-5-5",
+      effort: "max",
+    });
+    // A model that's no longer listed falls back to the middle choice.
+    expect(await engine.defaults({ ai: "claude", model: "claude-opus-4-1", effort: "max" })).toMatchObject({
+      provider: "codex",
+      model: "gpt-6.1-terra",
+    });
+    // So does a pick on a course key that was removed.
+    expect(await engine.defaults({ ai: "key", model: "gpt-6.1-sol", effort: "high" })).toMatchObject({
+      provider: "codex",
+      model: "gpt-6.1-terra",
+    });
+  });
+
+  it("leaves out a remembered pick on an AI that's signed out, and the middle choice stands in", async () => {
+    const engine = engineWithModels({ usable: ["chatgpt"] });
+    expect(await engine.defaults({ ai: "claude", model: "claude-opus-5-5", effort: "max" })).toMatchObject({
+      provider: "codex",
+      model: "gpt-6.1-terra",
+    });
+  });
+
+  it("falls back to the middle choice when the picked AI's list can't be read", async () => {
+    const engine = engineWithModels({ claudeFails: true });
+    expect(await engine.defaults({ ai: "claude", model: "claude-opus-5-5", effort: "high" })).toMatchObject({
+      provider: "codex",
+      model: "gpt-6.1-terra",
+    });
+  });
+
+  it("starts a pick on another AI even when the default AI's list can't be read", async () => {
+    const engine = engineWithModels({ codexFails: true });
+    expect(await engine.defaults({ ai: "claude", model: "claude-opus-5-5", effort: "high" })).toMatchObject({
+      provider: "claude",
+      model: "claude-opus-5-5",
+    });
+    // A choice of the three still needs that list, and says why it can't start.
+    await expect(engine.defaults({ preset: "balanced" })).rejects.toThrow("codex isn't answering");
+  });
+
+  it("lists the default AI first, then the others that can run a task, with their models", async () => {
+    const engine = engineWithModels({ ai: "claude" });
+    const choices = await engine.choices();
+    expect(choices).toMatchObject({ ai: "claude", provider: "claude" });
+    expect(choices.lists.map((l) => l.ai)).toEqual(["claude", "chatgpt"]);
+    expect(choices.lists[1]?.models.map((m) => m.id)).toEqual(["gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-luna"]);
+    expect(choices.lists[0]?.models[0]).toMatchObject({ efforts: ["low", "medium", "high", "xhigh", "max"] });
   });
 
   it("runs on the course key through the agent its vendor needs, and stops when the key is gone", async () => {

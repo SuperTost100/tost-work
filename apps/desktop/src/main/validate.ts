@@ -26,6 +26,7 @@ import {
   THEMES,
   type Theme,
 } from "../shared/model";
+import { isModelPick, type ModelPick } from "../shared/modelChoice";
 import { UserError } from "./userError";
 
 /** Checks for values that come from the interface, because IPC is a trust boundary. */
@@ -53,7 +54,17 @@ export const paths = (v: unknown, field: string, max = 20): string[] => {
 };
 
 /** A new task's brief, project and files, checked the same way whether it starts now or is saved for later. */
-export const taskInput = (v: unknown): Required<NewTaskInput> => {
+export type PlacedInput = Required<Pick<NewTaskInput, "brief" | "projectId" | "attachments">>;
+
+/** The AI a new task asked for, or undefined when it asked for none and the remembered one applies. */
+export const pickInput = (v: unknown): ModelPick | undefined => {
+  const pick = typeof v === "object" && v !== null ? (v as Record<string, unknown>).pick : undefined;
+  if (pick === undefined || pick === null) return undefined;
+  if (!isModelPick(pick)) throw new Error("pick must be one of the three choices or a model");
+  return pick;
+};
+
+export const taskInput = (v: unknown): PlacedInput => {
   const input = (typeof v === "object" && v !== null ? v : {}) as Record<string, unknown>;
   const brief = text(input.brief, "brief", BRIEF_MAX).trim();
   if (!brief) throw new UserError("error.briefNeeded");
@@ -69,7 +80,7 @@ export const placedTask = (
   v: unknown,
   projectOf: (id: string) => Project | undefined,
   quickFolder: () => string,
-): Required<NewTaskInput> & { workdir: string } => {
+): PlacedInput & { workdir: string } => {
   const { brief, projectId, attachments } = taskInput(v);
   const project = projectId ? projectOf(projectId) : undefined;
   if (projectId && !project) throw new UserError("error.noProject");
@@ -112,6 +123,9 @@ export const settingsPatch = (v: unknown): Partial<Settings> => {
       if (value !== null && !AIS.includes(value as AiId))
         throw new Error("defaultAi must be chatgpt, claude, key or null");
       patch.defaultAi = value as AiId | null;
+    } else if (key === "modelPick") {
+      if (!isModelPick(value)) throw new Error("modelPick must be one of the three choices or a model");
+      patch.modelPick = value;
     } else if (
       key === "notifications" ||
       key === "openAtLogin" ||

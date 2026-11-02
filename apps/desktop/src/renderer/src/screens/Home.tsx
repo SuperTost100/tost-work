@@ -21,6 +21,7 @@ export function Home({
   onOpenTask,
   onStartSaved,
   onNewProject,
+  modelPicker,
   allowNoProject = true,
   now = new Date(),
   line,
@@ -40,6 +41,8 @@ export function Home({
   /** Starts a task saved for later, from its row in To do. */
   onStartSaved: (id: string) => void;
   onNewProject: () => void;
+  /** The AI and model for the task about to start, shown to the right of the project picker. */
+  modelPicker?: React.ReactNode;
   /** Whether "No project" (a quick edit) is on offer. */
   allowNoProject?: boolean;
   now?: Date;
@@ -83,6 +86,7 @@ export function Home({
               onNewProject={onNewProject}
               allowNone={allowNoProject}
             />
+            {modelPicker}
           </div>
           {waiting.map((task) => (
             <button type="button" key={task.id} className="notice" onClick={() => onOpenTask(task.id)}>

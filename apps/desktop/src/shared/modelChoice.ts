@@ -1,0 +1,201 @@
+/**
+ * How a task's AI is chosen: three plain choices, each with a model and reasoning level behind it, or a model picked
+ * from the full list. The main process starts tasks from this, and the interface shows the same result in the picker.
+ */
+
+import { type AgentProvider, AIS, type AiId } from "./model";
+
+/** The three plain choices, from quickest to most thorough. */
+export type Preset = "fast" | "balanced" | "thorough";
+export const PRESETS: Preset[] = ["fast", "balanced", "thorough"];
+
+/**
+ * What a new task runs on: one of the three choices on the default AI, or a model picked from the full list, which
+ * can be on another AI.
+ */
+export type ModelPick = { preset: Preset } | { ai: AiId; model: string; effort: string };
+export const DEFAULT_PICK: ModelPick = { preset: "balanced" };
+
+/** A model an AI offers, as the picker needs it. */
+export interface ModelOption {
+  id: string;
+  name: string;
+  /** The reasoning levels it offers, in cli-funnel's words ("low", "medium"…). */
+  efforts: string[];
+  defaultEffort?: string;
+}
+
+/** The models of one AI that can run tasks. */
+export interface AiModels {
+  ai: AiId;
+  provider: AgentProvider;
+  models: ModelOption[];
+}
+
+/** What the picker needs from the main process. */
+export interface ModelChoices {
+  /** The AI the three choices run on: the default from Settings, or the first one signed in. */
+  ai: AiId;
+  provider: AgentProvider;
+  /** Every AI that can run a task, the default one included. */
+  lists: AiModels[];
+}
+
+/** The reasoning levels the picker offers, lowest first. Others, such as "ultra", are left out. */
+export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+
+/** What each choice runs on (Tost's decision, #196). */
+export const PRESET_MODELS: Record<Preset, Record<AgentProvider, { model: string; effort: string }>> = {
+  fast: {
+    codex: { model: "gpt-6-luna", effort: "medium" },
+    claude: { model: "claude-haiku-5-5", effort: "medium" },
+  },
+  balanced: {
+    codex: { model: "gpt-6.1-terra", effort: "medium" },
+    claude: { model: "claude-sonnet-5-5", effort: "high" },
+  },
+  thorough: {
+    codex: { model: "gpt-6.1-sol", effort: "high" },
+    claude: { model: "claude-opus-5-5", effort: "high" },
+  },
+};
+
+/**
+ * Claude's default model, and the stand-in for Opus. Sonnet rather than Opus, because a Pro plan's limits run out
+ * quickly on Opus and most office work doesn't need it.
+ */
+export const CLAUDE_MODEL = "claude-sonnet-5-5";
+
+export interface Resolved {
+  model: ModelOption;
+  effort: string;
+}
+
+/**
+ * The offered level nearest to the one wanted; on a tie, the lower one, which uses the subscription's limits more
+ * slowly. Levels outside EFFORTS are never picked. Undefined when the model offers none of them.
+ */
+export function nearestEffort(wanted: string, offered: string[]): string | undefined {
+  const known = EFFORTS.filter((e) => offered.includes(e));
+  const levels: readonly string[] = EFFORTS;
+  const target = levels.indexOf(wanted);
+  if (target < 0) return known[0];
+  return known.reduce<string | undefined>(
+    (best, e) =>
+      best === undefined || Math.abs(levels.indexOf(e) - target) < Math.abs(levels.indexOf(best) - target) ? e : best,
+    undefined,
+  );
+}
+
+/** A model at the level wanted, or at the nearest one it offers; its own default when it offers none of the usual. */
+function withEffort(model: ModelOption, wanted: string): Resolved {
+  return { model, effort: nearestEffort(wanted, model.efforts) ?? model.defaultEffort ?? model.efforts[0] ?? wanted };
+}
+
+/**
+ * What a new task runs on when nothing is chosen: Codex's first listed model, or Claude's Sonnet, at the model's own
+ * default level, else medium. Null when the AI lists no models.
+ */
+export function providerDefault(provider: AgentProvider, models: ModelOption[]): Resolved | null {
+  // Codex lists its recommended model first. Claude's list starts with the largest model, so it's picked by name.
+  const model = (provider === "claude" && models.find((m) => m.id === CLAUDE_MODEL)) || models[0];
+  if (!model) return null;
+  const medium = model.efforts.includes("medium") ? "medium" : undefined;
+  return { model, effort: model.defaultEffort ?? medium ?? model.efforts[0] ?? "medium" };
+}
+
+/**
+ * The model and level behind a choice on one AI, from the models it offers. A level the model doesn't offer becomes
+ * the nearest one it does. A model that isn't offered, such as Opus on a plan without it, becomes Sonnet at
+ * "xhigh" for Claude's thorough choice, and otherwise the AI's default. Null when the AI lists no models.
+ */
+export function resolvePreset(preset: Preset, provider: AgentProvider, models: ModelOption[]): Resolved | null {
+  const want = PRESET_MODELS[preset][provider];
+  const model = models.find((m) => m.id === want.model);
+  if (model) return withEffort(model, want.effort);
+  const sonnet = preset === "thorough" && provider === "claude" && models.find((m) => m.id === CLAUDE_MODEL);
+  if (sonnet) return withEffort(sonnet, "xhigh");
+  return providerDefault(provider, models);
+}
+
+/** A pick worked out against the models on offer: the AI, agent, model and level a task would run on. */
+export interface Picked extends Resolved {
+  ai: AiId;
+  provider: AgentProvider;
+}
+
+/**
+ * What a pick runs on. A model picked from the full list runs on the AI it was picked on, at the nearest level that
+ * model offers. A choice of the three, or a pick whose AI or model is no longer on offer, runs on the default AI as the
+ * middle choice. Null when the default AI lists no models.
+ */
+export function pickOn(pick: ModelPick, choices: ModelChoices): Picked | null {
+  if ("ai" in pick) {
+    const list = choices.lists.find((l) => l.ai === pick.ai);
+    const model = list?.models.find((m) => m.id === pick.model);
+    if (list && model)
+      return {
+        ai: list.ai,
+        provider: list.provider,
+        model,
+        effort: nearestEffort(pick.effort, model.efforts) ?? model.defaultEffort ?? pick.effort,
+      };
+  }
+  const list = choices.lists.find((l) => l.ai === choices.ai);
+  const resolved = list && resolvePreset("preset" in pick ? pick.preset : "balanced", list.provider, list.models);
+  return list && resolved ? { ai: list.ai, provider: list.provider, ...resolved } : null;
+}
+
+/** Models for trying the picker without an account (the fake engine, and the interface tests). */
+export const SAMPLE_CHOICES: ModelChoices = (() => {
+  const model = (id: string, name: string, efforts = ["low", "medium", "high", "xhigh", "max"]): ModelOption => ({
+    id,
+    name,
+    efforts,
+    defaultEffort: "medium",
+  });
+  return {
+    ai: "chatgpt",
+    provider: "codex",
+    lists: [
+      {
+        ai: "chatgpt",
+        provider: "codex",
+        models: [
+          model("gpt-6.1-terra", "GPT-6.1-Terra"),
+          model("gpt-6-luna", "GPT-6-Luna"),
+          model("gpt-6.1-sol", "GPT-6.1-Sol"),
+        ],
+      },
+      {
+        ai: "claude",
+        provider: "claude",
+        models: [
+          model("claude-sonnet-5-5", "Claude Sonnet 5.5"),
+          model("claude-haiku-5-5", "Claude Haiku 5.5"),
+          model("claude-opus-5-5", "Claude Opus 5.5"),
+        ],
+      },
+    ],
+  };
+})();
+
+/** A model's name for the picker: "GPT-6.1-Terra" reads "GPT-6.1 Terra", and "Claude Sonnet 5.5" stays as it is. */
+export const modelName = (model: Pick<ModelOption, "id" | "name">): string =>
+  (model.name || model.id).replace(/^(GPT-[\d.]+)-/, "$1 ");
+
+/** Whether a value from outside is a pick this app could have made. */
+export function isModelPick(v: unknown): v is ModelPick {
+  if (typeof v !== "object" || v === null) return false;
+  const pick = v as Record<string, unknown>;
+  if ("preset" in pick) return PRESETS.includes(pick.preset as Preset);
+  return (
+    AIS.includes(pick.ai as AiId) &&
+    typeof pick.model === "string" &&
+    pick.model.length > 0 &&
+    pick.model.length <= 200 &&
+    typeof pick.effort === "string" &&
+    pick.effort.length > 0 &&
+    pick.effort.length <= 40
+  );
+}

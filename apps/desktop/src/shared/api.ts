@@ -13,6 +13,7 @@ import type {
   SkillVersion,
   Task,
 } from "./model";
+import type { ModelChoices, ModelPick } from "./modelChoice";
 
 export interface NewProjectInput {
   name: string;
@@ -30,6 +31,8 @@ export interface NewTaskInput {
   projectId: string | null;
   brief: string;
   attachments?: string[];
+  /** What the task runs on. Missing means the last pick, as Settings remembers it. */
+  pick?: ModelPick;
 }
 
 export interface FileContent {
@@ -126,6 +129,10 @@ export interface TostWorkApi {
     install(provider: AgentProvider): Promise<InstallResult>;
     onSignIn(listener: (provider: AgentProvider, event: SignInEvent) => void): () => void;
   };
+  /** The AIs and models a new task can run on, for the picker under the task box. */
+  models: {
+    choices(): Promise<ModelChoices>;
+  };
   /** The course API key. The interface never reads it back, only whose it is and how it ends. */
   key: {
     info(): Promise<CourseKey | null>;
@@ -171,8 +178,8 @@ export interface TostWorkApi {
     start(input: NewTaskInput): Promise<Task>;
     /** Creates the task without starting it: it waits in the board's To do until `startSaved`. */
     saveForLater(input: NewTaskInput): Promise<Task>;
-    /** Starts a task saved for later, as `start` starts a new one. */
-    startSaved(id: string): Promise<Task>;
+    /** Starts a task saved for later, as `start` starts a new one. `pick` is what it runs on, as for `start`. */
+    startSaved(id: string, pick?: ModelPick): Promise<Task>;
     /**
      * Changes a task saved for later before it starts: its brief, project and files. The files are copied only when it
      * starts, as for a new one.
@@ -340,6 +347,7 @@ export const IPC = {
   skillsImport: "skills:import",
   skillsHistory: "skills:history",
   skillsRestore: "skills:restore",
+  modelsChoices: "models:choices",
   keyInfo: "key:info",
   keySave: "key:save",
   keyRemove: "key:remove",

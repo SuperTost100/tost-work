@@ -50,7 +50,7 @@ async function taskWithLog(debug: boolean) {
     api.emit(task.id, { type: "activity", kind: "command", id: "c2" });
   });
   for (const l of [
-    line({ type: "run", provider: "codex", model: "gpt-5.5", effort: "medium", access: "supervised", cwd: "/w" }),
+    line({ type: "run", provider: "codex", model: "gpt-6.1-terra", effort: "medium", access: "supervised", cwd: "/w" }),
     line({ type: "session", sessionId: "sess-42" }),
     line({ type: "reasoning.delta", text: "The notes come first." }),
     line({ type: "tool.start", id: "c1", name: "Read", input: { file_path: "/w/note.txt" } }),
@@ -97,7 +97,7 @@ describe("debug mode on a task", () => {
     // The session comes from the log, read just after the task opens.
     expect(await facts.findByText("sess-42")).toBeTruthy();
     expect(facts.getByText("Codex")).toBeTruthy();
-    expect(facts.getByText("gpt-5.5")).toBeTruthy();
+    expect(facts.getByText("gpt-6.1-terra")).toBeTruthy();
     expect(facts.getByText("medium")).toBeTruthy();
     expect(facts.getByText(/1.200 in, 300 out|1,200 in, 300 out/)).toBeTruthy();
   });

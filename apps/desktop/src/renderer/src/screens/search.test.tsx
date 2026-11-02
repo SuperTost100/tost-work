@@ -6,13 +6,19 @@ import { Root } from "@/Root";
 // The dialog's field, or with `inDialog` false the sidebar's. It waits for that field itself: the sidebar's is always
 // there, so waiting for any field could find only it while the dialog is still opening.
 const type = async (text: string, inDialog = true) => {
-  const field = await waitFor(() => {
-    const found = screen
-      .getAllByRole("combobox", { name: "Search tasks and projects" })
-      .find((f) => f.closest(inDialog ? ".search-dlg" : "aside.side"));
-    if (!found) throw new Error(`No search field in the ${inDialog ? "dialog" : "sidebar"} yet`);
-    return found;
-  });
+  // On GitHub's runner the dialog once took just over the default second to open (2026-11-02, failed at 1,043 ms; it
+  // passed in every local run, under load too). Three seconds is the wait, not a looser check: the field must still
+  // appear.
+  const field = await waitFor(
+    () => {
+      const found = screen
+        .getAllByRole("combobox", { name: "Search tasks and projects" })
+        .find((f) => f.closest(inDialog ? ".search-dlg" : "aside.side"));
+      if (!found) throw new Error(`No search field in the ${inDialog ? "dialog" : "sidebar"} yet`);
+      return found;
+    },
+    { timeout: 3000 },
+  );
   await act(async () => {
     fireEvent.change(field, { target: { value: text } });
   });

@@ -19,7 +19,8 @@ import {
 } from "electron";
 import { IPC, type MenuAction, type MenuState } from "../shared/api";
 import { languageFrom, translate } from "../shared/i18n";
-import type { AgentProvider } from "../shared/model";
+import type { AgentProvider, AiId } from "../shared/model";
+import { PROVIDER_OF } from "../shared/model";
 import { Accounts } from "./accounts";
 import { giveAgentsOwnHomes } from "./agentHomes";
 import { menuTemplate, nextTextSize, textMenuTemplate } from "./appMenu";
@@ -226,23 +227,25 @@ app.whenReady().then(async () => {
       debugLogs.forTask(taskId),
     );
   } else {
+    // A failed check is unknown (null), not signed out.
+    const signedIn = (provider: AgentProvider) =>
+      funnel.authStatus(provider).then(
+        (status) => status.loggedIn,
+        () => null,
+      );
     const agent = new AgentEngine(funnel, language, {
       documents,
       user: () => {
         const { name, work, notes } = store.getSettings();
         return { name, work, notes };
       },
-      ai: () =>
-        pickAi(
-          store.getSettings().defaultAi,
-          // A failed check is unknown (null), not signed out.
-          (provider) =>
-            funnel.authStatus(provider).then(
-              (status) => status.loggedIn,
-              () => null,
-            ),
-          keys.info() !== null,
-        ),
+      ai: () => pickAi(store.getSettings().defaultAi, signedIn, keys.info() !== null),
+      usable: async () => {
+        const ais: AiId[] = [];
+        for (const ai of ["chatgpt", "claude"] as const) if ((await signedIn(PROVIDER_OF[ai])) === true) ais.push(ai);
+        if (keys.info() !== null) ais.push("key");
+        return ais;
+      },
       courseKey: () => keys.get(),
       online: () => net.isOnline(),
       skills: () => skills.list(),

@@ -32,7 +32,7 @@ import type { KeyStore } from "./keys";
 import type { GuideText, SkillFolder } from "./skills";
 import type { Store } from "./store/store";
 import { UserError, userMessage } from "./userError";
-import { absolutePath, oneLine, paths, placedTask, settingsPatch, text } from "./validate";
+import { absolutePath, oneLine, paths, pickInput, placedTask, settingsPatch, text } from "./validate";
 
 /** Validates everything that comes from the interface, because IPC is a trust boundary. */
 export function registerIpc(
@@ -154,8 +154,9 @@ export function registerIpc(
   };
   handle(IPC.tasksStart, async (_e, input: unknown) => {
     const { brief, projectId, attachments: given, workdir } = newTask(input);
+    const pick = pickInput(input) ?? store.getSettings().modelPick;
     // Before any copying: if the engine can't start a task, no folder or copies are left behind.
-    const { provider, auth, model, effort } = await runner.defaults();
+    const { provider, auth, model, effort } = await runner.defaults(pick);
     const attachments = await workFiles(projectId, workdir, given);
     const task = runner.create({ projectId, brief, workdir, attachments, provider, auth, model, effort });
     runner.launch(task.id);
@@ -163,9 +164,14 @@ export function registerIpc(
   });
   // Saved without starting: no engine, and for a quick edit no folder or copies yet. They're made when it starts.
   handle(IPC.tasksSaveForLater, (_e, input: unknown) => runner.create(newTask(input)));
-  handle(IPC.tasksStartSaved, (_e, id: unknown) =>
-    runner.startSaved(text(id, "id", 100), (task) => workFiles(task.projectId, task.workdir, task.attachments)),
+  handle(IPC.tasksStartSaved, (_e, id: unknown, pick: unknown) =>
+    runner.startSaved(
+      text(id, "id", 100),
+      (task) => workFiles(task.projectId, task.workdir, task.attachments),
+      pickInput({ pick }) ?? store.getSettings().modelPick,
+    ),
   );
+  handle(IPC.modelsChoices, () => runner.choices());
   // An edit to a task saved for later is placed as a new one is, so a change of project moves it to that folder. A
   // quick edit's files are still copied only when it starts.
   handle(IPC.tasksUpdateDraft, (_e, id: unknown, input: unknown) =>

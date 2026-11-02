@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Attachments } from "@/components/Composer";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
+import { ModelPicker } from "@/components/ModelPicker";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
 import { ProjectInstructionsDialog } from "@/components/ProjectInstructionsDialog";
 import { SavedToast } from "@/components/SavedToast";
@@ -31,6 +32,7 @@ import {
   sectionOn,
   type Task as TaskT,
 } from "../../shared/model";
+import type { ModelPick } from "../../shared/modelChoice";
 
 /** The main process accepts up to 20 attachments per task. */
 
@@ -98,6 +100,10 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
   const [searchOpen, setSearchOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const starting = useRef(false);
+  // What the next new task runs on. Settings remembers it; it changes here at once and is saved behind it.
+  const [pick, setPick] = useState<ModelPick>(current.modelPick);
+  const remembered = JSON.stringify(current.modelPick);
+  useEffect(() => setPick(JSON.parse(remembered) as ModelPick), [remembered]);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renamingProject, setRenamingProject] = useState<string | null>(null);
   // The project whose description is being edited in place.
@@ -109,6 +115,16 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
   const words = useRef(t);
   words.current = t;
   const report = useCallback((err: unknown) => setError(errorText(err, words.current)), []);
+  // Only the latest save is applied: an earlier one answering late would bring back the pick it saved.
+  const pickSave = useRef(0);
+  const changePick = (next: ModelPick) => {
+    setPick(next);
+    const save = ++pickSave.current;
+    void api?.settings.update({ modelPick: next }).then((saved) => {
+      if (save === pickSave.current) onSettings?.(saved);
+    }, report);
+  };
+  const modelPicker = api && <ModelPicker api={api} pick={pick} level={current.level} onChange={changePick} />;
   const [overviews, setOverviews] = useState<Record<string, ProjectOverview>>({});
   const isMac = api?.platform === "darwin";
   const renameProject = (id: string, name: string | null) => {
@@ -169,7 +185,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
   };
   // Starting a saved task opens it, to watch it work, as starting a new one does.
   const startSaved = (id: string) =>
-    void api?.tasks.startSaved(id).then((task) => {
+    void api?.tasks.startSaved(id, pick).then((task) => {
       addTask(task);
       setRoute({ name: "task", id: task.id });
     }, report);
@@ -248,7 +264,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
     starting.current = true;
     setError(null);
     try {
-      const task = await api.tasks.start({ projectId: inProject, brief: text.trim(), attachments });
+      const task = await api.tasks.start({ projectId: inProject, brief: text.trim(), attachments, pick });
       clear();
       setRoute({ name: "task", id: task.id });
     } catch (err) {
@@ -452,6 +468,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
         onOpenTask={(id) => setRoute({ name: "task", id })}
         onStartSaved={startSaved}
         onNewProject={() => setDialogOpen(true)}
+        modelPicker={modelPicker}
       />
     );
   } else if (route.name === "projects") {
@@ -508,6 +525,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
         describing={describingProject === project.id}
         onDescribed={(description) => describeProject(project.id, description)}
         onEditInstructions={() => setInstructionsFor(project.id)}
+        modelPicker={modelPicker}
       />
     ) : null;
   } else if (route.name === "task") {
@@ -544,7 +562,8 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
           onRestore={(path) => api.files.restore(task.id, path)}
           onStop={() => void api.tasks.stop(task.id).catch(report)}
           onResume={() => void api.tasks.resume(task.id).catch(report)}
-          onStartSaved={() => void api.tasks.startSaved(task.id).then(addTask, report)}
+          onStartSaved={() => void api.tasks.startSaved(task.id, pick).then(addTask, report)}
+          modelPicker={modelPicker}
           projects={projects}
           allowNoProject={quickEdit}
           onNewProject={() => setDialogOpen(true)}

@@ -144,6 +144,7 @@ describe("Store", () => {
       textSize: "normal",
       theme: "system",
       defaultAi: null,
+      modelPick: { preset: "balanced" },
       notifications: true,
       notify: { needsYou: "normal", failed: "normal", done: "off" },
       openAtLogin: false,

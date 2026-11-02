@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, mergeSettings, type Project } from "../shared/model";
-import { absolutePath, oneLine, paths, placedTask, settingsPatch, taskInput, text } from "./validate";
+import { absolutePath, oneLine, paths, pickInput, placedTask, settingsPatch, taskInput, text } from "./validate";
 
 describe("taskInput", () => {
   it("takes a brief, a project or none, and files, the same for starting now or later", () => {
@@ -18,6 +18,21 @@ describe("taskInput", () => {
     expect(() => taskInput(null)).toThrow(/brief must be text/);
     expect(() => taskInput({ brief: "x", projectId: 3 })).toThrow(/projectId/);
     expect(() => taskInput({ brief: "x", attachments: ["notes.txt"] })).toThrow(/absolute/);
+  });
+});
+
+describe("pickInput", () => {
+  it("reads the AI a new task asked for, and leaves the remembered one when it asked for none", () => {
+    expect(pickInput({ brief: "x" })).toBeUndefined();
+    expect(pickInput({ brief: "x", pick: null })).toBeUndefined();
+    expect(pickInput({ pick: { preset: "thorough" } })).toEqual({ preset: "thorough" });
+    expect(pickInput(null)).toBeUndefined();
+  });
+
+  it("refuses a pick the app couldn't have made", () => {
+    expect(() => pickInput({ pick: { preset: "slow" } })).toThrow(/pick/);
+    expect(() => pickInput({ pick: { ai: "claude", model: "x" } })).toThrow(/pick/);
+    expect(() => pickInput({ pick: "balanced" })).toThrow(/pick/);
   });
 });
 
@@ -169,6 +184,12 @@ describe("settingsPatch", () => {
     expect(settingsPatch({ defaultAi: "claude" })).toEqual({ defaultAi: "claude" });
     expect(settingsPatch({ defaultAi: null })).toEqual({ defaultAi: null });
     expect(() => settingsPatch({ defaultAi: "gemini" })).toThrow(/chatgpt, claude, key or null/);
+    expect(settingsPatch({ modelPick: { preset: "fast" } })).toEqual({ modelPick: { preset: "fast" } });
+    const model = { ai: "claude", model: "claude-opus-5-5", effort: "high" };
+    expect(settingsPatch({ modelPick: model })).toEqual({ modelPick: model });
+    expect(() => settingsPatch({ modelPick: { preset: "slow" } })).toThrow(/modelPick/);
+    expect(() => settingsPatch({ modelPick: { ai: "gemini", model: "x", effort: "low" } })).toThrow(/modelPick/);
+    expect(() => settingsPatch({ modelPick: "balanced" })).toThrow(/modelPick/);
   });
 
   it("refuses unknown keys and wrong values", () => {

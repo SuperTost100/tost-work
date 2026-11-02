@@ -2,6 +2,7 @@ import { constants } from "node:fs";
 import { copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { ActivityKind, EngineEvent, Review } from "../../shared/model";
+import { DEFAULT_PICK, type ModelPick, pickOn, SAMPLE_CHOICES } from "../../shared/modelChoice";
 import type { TaskLog } from "../debugLog";
 import { freeName } from "../files";
 import type { Engine, RunContext } from "./engine";
@@ -156,8 +157,14 @@ export class FakeEngine implements Engine {
     private taskLog: (taskId: string) => TaskLog = () => ({ write: () => {} }),
   ) {}
 
-  async defaults() {
-    return { provider: "codex" as const, model: "gpt-5.5", effort: "medium" };
+  async defaults(pick: ModelPick = DEFAULT_PICK) {
+    const picked = pickOn(pick, SAMPLE_CHOICES);
+    if (!picked) throw new Error("The sample models are missing");
+    return { provider: picked.provider, model: picked.model.id, effort: picked.effort };
+  }
+
+  async choices() {
+    return SAMPLE_CHOICES;
   }
 
   /** Resolves with the user's reply, or null when the task is stopped first. */
@@ -174,12 +181,11 @@ export class FakeEngine implements Engine {
     const s = followUp ? FOLLOW_UP_SCRIPT : quickEdit ? EDIT_SCRIPT : this.script;
     const steps = s.steps.map((text) => ({ text, status: "pending" as const }));
     const log = this.taskLog(task.id);
-    const { model, effort } = await this.defaults();
     log.write({
       type: "run",
-      provider: "codex",
-      model,
-      effort,
+      provider: task.provider ?? "codex",
+      model: task.model,
+      effort: task.effort,
       access: "supervised",
       cwd: workdir,
       followUp: !!followUp,

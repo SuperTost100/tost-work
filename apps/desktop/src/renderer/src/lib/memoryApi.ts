@@ -35,6 +35,7 @@ import {
   type SkillVersion,
   type Task,
 } from "../../../shared/model";
+import { type ModelPick, pickOn, SAMPLE_CHOICES } from "../../../shared/modelChoice";
 import { removalText } from "../../../shared/projectText";
 import { applyEvent, resume } from "../../../shared/reduce";
 import { nextRun } from "../../../shared/schedule";
@@ -171,6 +172,12 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
 
   // Ids never come back, even after a task is removed.
   let taskCount = 0;
+  // The agent, model and level a task starts on, as the main process works them out from a pick.
+  const running = (pick: ModelPick = settings.modelPick) => {
+    const picked = pickOn(pick, SAMPLE_CHOICES);
+    if (!picked) throw new Error("No models");
+    return { provider: picked.provider, model: picked.model.id, effort: picked.effort };
+  };
   // A task as the runner makes it, not started yet: saved for later until `run` starts it.
   const created = (input: NewTaskInput): Task => {
     const at = now();
@@ -181,8 +188,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       brief: input.brief,
       attachments: input.attachments ?? [],
       workdir: "/tmp/quick",
-      model: "gpt-5.5",
-      effort: "medium",
+      ...running(input.pick),
       status: "draft",
       steps: [],
       files: [],
@@ -292,6 +298,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         return settings;
       },
     },
+    models: { choices: async () => SAMPLE_CHOICES },
     account: {
       status: async (provider) => accounts[provider],
       signIn: async (provider) => {
@@ -414,8 +421,10 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
           throw new Error("That project doesn't exist");
         return created(input);
       },
-      startSaved: async (id) => {
-        if (tasks.get(id)?.status !== "draft") throw new Error("This task has already started");
+      startSaved: async (id, pick) => {
+        const saved = tasks.get(id);
+        if (saved?.status !== "draft") throw new Error("This task has already started");
+        save({ ...saved, ...running(pick) });
         return run(id);
       },
       updateDraft: async (id, input) => {

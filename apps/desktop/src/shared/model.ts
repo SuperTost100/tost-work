@@ -1,5 +1,6 @@
 /** The data Tost Work keeps about projects and tasks. Shared by the main process and the interface. */
 
+import type { ModelPick } from "./modelChoice";
 import type { JobSchedule } from "./schedule";
 
 export interface Project {
@@ -240,6 +241,8 @@ export interface Settings {
   theme: Theme;
   /** The account new tasks run on. null picks the first one signed in. */
   defaultAi: AiId | null;
+  /** What the last new task was started on, which the next one offers again. */
+  modelPick: ModelPick;
   /** All notifications on or off: the one question setup asks. */
   notifications: boolean;
   /** How each kind of notification shows, while `notifications` is on. */
@@ -339,6 +342,7 @@ export const DEFAULT_SETTINGS: Settings = {
   textSize: "normal",
   theme: "system",
   defaultAi: null,
+  modelPick: { preset: "balanced" },
   notifications: true,
   // Finished work shows in the app; only what needs the user, or went wrong, interrupts them.
   notify: { needsYou: "normal", failed: "normal", done: "off" },

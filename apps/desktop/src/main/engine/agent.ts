@@ -5,6 +5,14 @@ import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
 import { translate } from "../../shared/i18n";
 import type { AgentProvider, AiId, EngineEvent, Job, KeyVendor, Review, Skill } from "../../shared/model";
 import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
+import {
+  type AiModels,
+  DEFAULT_PICK,
+  type ModelChoices,
+  type ModelOption,
+  type ModelPick,
+  pickOn,
+} from "../../shared/modelChoice";
 import type { TaskLog } from "../debugLog";
 import { freeName, inside } from "../files";
 import type { ToolHandler } from "../mcp/server";
@@ -150,11 +158,6 @@ function changesOf(input: unknown): { path: string; kind: string }[] {
   });
 }
 
-/**
- * Claude's default. Sonnet rather than Opus, because a Pro plan's limits run out quickly on Opus and most office work
- * doesn't need it.
- */
-const CLAUDE_MODEL = "claude-sonnet-5-5";
 /** Claude Code's tools that write one file, and the input field with its path. */
 const CLAUDE_WRITES: Record<string, string> = {
   Write: "file_path",
@@ -229,6 +232,7 @@ export class AgentEngine implements Engine, ToolHandler {
   private ai: () => Promise<AiId>;
   private courseKey: () => { key: string; vendor: KeyVendor } | null;
   private online: () => boolean;
+  private usable: () => Promise<AiId[]>;
   private skills: () => Promise<Skill[]>;
   private job: (id: string) => Pick<Job, "title" | "output"> | undefined;
   private taskLog: (taskId: string, secrets: (string | undefined)[]) => TaskLog;
@@ -246,6 +250,8 @@ export class AgentEngine implements Engine, ToolHandler {
       courseKey?: () => { key: string; vendor: KeyVendor } | null;
       /** Whether the computer has a network connection, so a task without one fails at once with a clear reason. */
       online?: () => boolean;
+      /** The AIs a task could run on right now: the ones signed in, and the course key when there is one. */
+      usable?: () => Promise<AiId[]>;
       /** The user's skills, read for each run so a skill saved a moment ago is there. */
       skills?: () => Promise<Skill[]>;
       /** The job a task is a run of, so the agent knows nobody is watching and where the files go. */
@@ -259,6 +265,7 @@ export class AgentEngine implements Engine, ToolHandler {
     this.ai = options.ai ?? (async () => "chatgpt");
     this.courseKey = options.courseKey ?? (() => null);
     this.online = options.online ?? (() => true);
+    this.usable = options.usable ?? (async () => []);
     this.skills = options.skills ?? (async () => []);
     this.job = options.job ?? (() => undefined);
     this.taskLog = options.taskLog ?? (() => ({ write: () => {} }));
@@ -274,22 +281,67 @@ export class AgentEngine implements Engine, ToolHandler {
     this.tools = tools;
   }
 
-  async defaults(): Promise<{ provider: AgentProvider; auth: "account" | "key"; model: string; effort: string }> {
-    const ai = await this.ai();
-    let provider: AgentProvider;
-    if (ai === "key") {
-      const key = this.courseKey();
-      if (!key) throw new UserError("error.courseKeyGone");
-      provider = KEY_PROVIDER[key.vendor];
-    } else provider = PROVIDER_OF[ai];
-    const auth = ai === "key" ? ("key" as const) : ("account" as const);
+  /** The agent an AI runs through, and whether it runs on the subscription or the course key. */
+  private async target(ai: AiId): Promise<{ provider: AgentProvider; auth: "account" | "key" }> {
+    if (ai !== "key") return { provider: PROVIDER_OF[ai], auth: "account" };
+    const key = this.courseKey();
+    if (!key) throw new UserError("error.courseKeyGone");
+    return { provider: KEY_PROVIDER[key.vendor], auth: "key" };
+  }
+
+  private async modelsOf(provider: AgentProvider): Promise<ModelOption[]> {
     const models = await this.funnel.models(provider);
-    // Codex lists its recommended model first. Claude's list starts with the largest model, so it's picked by name.
-    const model = (provider === "claude" && models.find((m) => m.id === CLAUDE_MODEL)) || models[0];
-    if (!model) throw new UserError("error.noModels", { ai: provider === "claude" ? "Claude Code" : "Codex" });
-    const medium = model.efforts.some((e) => e.id === "medium") ? "medium" : undefined;
-    const effort = model.defaultEffort ?? medium ?? model.efforts[0]?.id ?? "medium";
-    return { provider, auth, model: model.id, effort };
+    return models.map((m) => ({
+      id: m.id,
+      name: m.name ?? m.id,
+      efforts: m.efforts.map((e) => e.id),
+      ...(m.defaultEffort ? { defaultEffort: m.defaultEffort } : {}),
+    }));
+  }
+
+  /** What a new task runs on, from `pickOn`: a choice of the three on the default AI, or a model from the full list. */
+  async defaults(
+    pick: ModelPick = DEFAULT_PICK,
+  ): Promise<{ provider: AgentProvider; auth: "account" | "key"; model: string; effort: string }> {
+    const ai = await this.ai();
+    const { provider } = await this.target(ai);
+    const elsewhere = "ai" in pick && pick.ai !== ai;
+    // A model picked on another AI doesn't need the default AI's list, unless it falls back to the middle choice, so
+    // a failed read of that list doesn't stop it. Without the list, pickOn finds no fallback and says so.
+    const defaultModels = elsewhere ? await this.modelsOf(provider).catch(() => null) : await this.modelsOf(provider);
+    const lists: AiModels[] = defaultModels ? [{ ai, provider, models: defaultModels }] : [];
+    if (elsewhere && (await this.usable()).includes(pick.ai)) {
+      // A model on an AI that has gone (signed out, or a removed course key) is left out, and the middle choice stands
+      // in.
+      const target = await this.target(pick.ai).catch(() => null);
+      // So is one whose list can't be read just now, as in choices().
+      const models = target && (await this.modelsOf(target.provider).catch(() => null));
+      if (target && models) lists.push({ ai: pick.ai, provider: target.provider, models });
+    }
+    const picked = pickOn(pick, { ai, provider, lists });
+    if (!picked) throw new UserError("error.noModels", { ai: provider === "claude" ? "Claude Code" : "Codex" });
+    return {
+      provider: picked.provider,
+      auth: picked.ai === "key" ? "key" : "account",
+      model: picked.model.id,
+      effort: picked.effort,
+    };
+  }
+
+  /** The default AI, and the models of every AI a task could run on, for the picker under the task box. */
+  async choices(): Promise<ModelChoices> {
+    const ai = await this.ai();
+    const { provider } = await this.target(ai);
+    const ais = [ai, ...(await this.usable()).filter((x) => x !== ai)];
+    const lists: AiModels[] = [];
+    for (const id of ais) {
+      const target = await this.target(id).catch(() => null);
+      if (!target) continue;
+      // A list that can't be read leaves that AI out of the full list rather than failing the picker.
+      const models = await this.modelsOf(target.provider).catch(() => null);
+      if (models) lists.push({ ai: id, provider: target.provider, models });
+    }
+    return { ai, provider, lists };
   }
 
   async *run({ task, project, workdir, followUp, signal }: RunContext): AsyncIterable<EngineEvent> {

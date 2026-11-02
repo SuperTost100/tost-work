@@ -178,6 +178,7 @@ describe("TaskRunner when a run fails with a message for the user", () => {
     const store = new Store(":memory:");
     const engine: Engine = {
       defaults: async () => ({ provider: "codex", model: "m", effort: "low" }),
+      choices: async () => ({ ai: "chatgpt", provider: "codex", lists: [] }),
       // It fails before its first event, as the engine does when the key is gone.
       run: () => ({
         [Symbol.asyncIterator]: () => ({ next: () => Promise.reject(new UserError("error.taskKeyGone")) }),
@@ -378,6 +379,7 @@ function turnTaking(
   let release: (() => void) | null = null;
   const engine: Engine = {
     defaults: async () => ({ provider: "codex", model: "m", effort: "low" }),
+    choices: async () => ({ ai: "chatgpt", provider: "codex", lists: [] }),
     async *run(ctx) {
       prompts.push(ctx.followUp);
       const step = steps.shift();
@@ -553,6 +555,7 @@ describe("TaskRunner when the agent ends its turn to wait", () => {
     // A resume that fails before the run starts, as offline, stays resumable and says why.
     const offline: Engine = {
       defaults: async () => ({ provider: "codex", model: "m", effort: "low" }),
+      choices: async () => ({ ai: "chatgpt", provider: "codex", lists: [] }),
       // biome-ignore lint/correctness/useYield: it fails before its first event, as the engine does offline.
       async *run() {
         throw new Error("Tost Work can't reach ChatGPT.");
@@ -578,6 +581,7 @@ describe("TaskRunner when the agent ends its turn to wait", () => {
     const gate: { finish: (() => void) | null } = { finish: null };
     const idle: Engine = {
       defaults: async () => ({ provider: "codex", model: "m", effort: "low" }),
+      choices: async () => ({ ai: "chatgpt", provider: "codex", lists: [] }),
       async *run() {},
       answer: () => false,
       decide: () => false,
@@ -665,6 +669,7 @@ describe("stopping a project's tasks", () => {
     const gate: { finish: (() => void) | null } = { finish: null };
     const idle: Engine = {
       defaults: async () => ({ provider: "codex", model: "m", effort: "low" }),
+      choices: async () => ({ ai: "chatgpt", provider: "codex", lists: [] }),
       async *run() {},
       answer: () => false,
       decide: () => false,
@@ -715,6 +720,7 @@ describe("a rename while the run ends", () => {
     let release: () => void = () => {};
     const engine: Engine = {
       defaults: async () => ({ provider: "codex", model: "m", effort: "low" }),
+      choices: async () => ({ ai: "chatgpt", provider: "codex", lists: [] }),
       // Ends without yielding anything, as an engine may.
       async *run() {
         await new Promise<void>((r) => (release = r));
@@ -739,9 +745,14 @@ describe("tasks saved for later", () => {
   type Defaults = Awaited<ReturnType<Engine["defaults"]>>;
   const counting = () => {
     const runs: string[] = [];
+    const picks: unknown[] = [];
     let defaults: Defaults = { provider: "claude", auth: "key", model: "sonnet", effort: "high" };
     const engine: Engine = {
-      defaults: async () => defaults,
+      defaults: async (pick) => {
+        picks.push(pick);
+        return defaults;
+      },
+      choices: async () => ({ ai: "chatgpt", provider: "codex", lists: [] }),
       async *run({ task }: RunContext) {
         runs.push(task.id);
         yield { type: "done" } satisfies EngineEvent;
@@ -757,7 +768,7 @@ describe("tasks saved for later", () => {
       () => {},
       () => new Date(Date.UTC(2026, 9, 26, 9, 0, tick++)).toISOString(),
     );
-    return { store, runner, runs, setDefaults: (d: Defaults) => (defaults = d) };
+    return { store, runner, runs, picks, setDefaults: (d: Defaults) => (defaults = d) };
   };
 
   it("waits as To do without running, then starts on the engine's defaults of that moment", async () => {
@@ -785,6 +796,16 @@ describe("tasks saved for later", () => {
     expect(runs).toEqual([saved.id]);
   });
 
+  it("starts on the pick it is given, and on the engine's own choice when it gets none", async () => {
+    const { runner, picks } = counting();
+    const keep = async (t: Task) => t.attachments;
+    const a = runner.create({ projectId: "p", brief: "Write it", workdir: "/p" });
+    await runner.startSaved(a.id, keep, { preset: "thorough" });
+    const b = runner.create({ projectId: "p", brief: "Write it too", workdir: "/p" });
+    await runner.startSaved(b.id, keep);
+    expect(picks).toEqual([{ preset: "thorough" }, undefined]);
+  });
+
   it("starts once, however fast the clicks, and not again after it started", async () => {
     const { runner, runs } = counting();
     const saved = runner.create({ projectId: "p", brief: "Write it", workdir: "/p" });
@@ -804,6 +825,7 @@ describe("tasks saved for later", () => {
     const store = new Store(":memory:");
     const engine: Engine = {
       defaults: () => Promise.reject(new Error("No AI is signed in")),
+      choices: async () => ({ ai: "chatgpt", provider: "codex", lists: [] }),
       async *run() {},
       answer: () => false,
       decide: () => false,

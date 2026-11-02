@@ -686,6 +686,7 @@ export function Task({
   allowNoProject,
   onNewProject,
   onSaveDraft,
+  modelPicker,
 }: {
   api: TostWorkApi;
   task: TaskT;
@@ -718,6 +719,8 @@ export function Task({
   onNewProject: () => void;
   /** Saves the edits to a task saved for later. Resolves true once saved, false when it failed. */
   onSaveDraft: (edit: NewTaskInput) => Promise<boolean>;
+  /** For a task saved for later, the AI and model it starts on. */
+  modelPicker?: React.ReactNode;
 }) {
   const t = useT();
   const [answer, setAnswer] = useState("");
@@ -929,6 +932,7 @@ export function Task({
           attach={attach}
           onSave={onSaveDraft}
           onStart={onStartSaved}
+          modelPicker={modelPicker}
         />
       ) : (
         <div className={quick ? "qe" : "task"}>
@@ -1136,6 +1140,7 @@ function DraftEditor({
   attach,
   onSave,
   onStart,
+  modelPicker,
 }: {
   task: TaskT;
   projects: Project[];
@@ -1145,6 +1150,8 @@ function DraftEditor({
   /** Resolves true once the edit is saved, false when it failed and the box should keep it. */
   onSave: (edit: NewTaskInput) => Promise<boolean>;
   onStart: () => void;
+  /** The AI and model it starts on, to the right of the project picker. */
+  modelPicker?: React.ReactNode;
 }) {
   const t = useT();
   const [brief, setBrief] = useState(task.brief);
@@ -1194,6 +1201,7 @@ function DraftEditor({
             onNewProject={onNewProject}
             allowNone={allowNoProject}
           />
+          {modelPicker}
         </div>
       </div>
     </div>

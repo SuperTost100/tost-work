@@ -72,6 +72,9 @@ const api: TostWorkApi = {
       return () => ipcRenderer.removeListener(IPC.accountSignInEvent, handler);
     },
   },
+  models: {
+    choices: () => ipcRenderer.invoke(IPC.modelsChoices),
+  },
   key: {
     info: () => ipcRenderer.invoke(IPC.keyInfo),
     save: (key) => ipcRenderer.invoke(IPC.keySave, key),
@@ -97,7 +100,7 @@ const api: TostWorkApi = {
     get: (id) => ipcRenderer.invoke(IPC.tasksGet, id),
     start: (input) => ipcRenderer.invoke(IPC.tasksStart, input),
     saveForLater: (input) => ipcRenderer.invoke(IPC.tasksSaveForLater, input),
-    startSaved: (id) => ipcRenderer.invoke(IPC.tasksStartSaved, id),
+    startSaved: (id, pick) => ipcRenderer.invoke(IPC.tasksStartSaved, id, pick),
     updateDraft: (id, input) => ipcRenderer.invoke(IPC.tasksUpdateDraft, id, input),
     markReviewed: (id) => ipcRenderer.invoke(IPC.tasksMarkReviewed, id),
     markUnreviewed: (id) => ipcRenderer.invoke(IPC.tasksMarkUnreviewed, id),

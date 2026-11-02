@@ -24,6 +24,7 @@ export function Project({
   describing,
   onDescribed,
   onEditInstructions,
+  modelPicker,
 }: {
   project: ProjectT;
   tasks: Task[];
@@ -48,6 +49,8 @@ export function Project({
   /** The new description, possibly empty, or null when the user kept the old one. */
   onDescribed: (description: string | null) => void;
   onEditInstructions: () => void;
+  /** The AI and model for the task about to start, under the task box. */
+  modelPicker?: React.ReactNode;
 }) {
   const t = useT();
   const mine = tasks.filter((x) => x.projectId === project.id);
@@ -113,6 +116,7 @@ export function Project({
               minHeight={56}
               onSaveLater={onSaveLater}
             />
+            {modelPicker && <div className="under">{modelPicker}</div>}
             <div className="sec">
               <span>{t("project.tasks")}</span>
             </div>

@@ -890,6 +890,97 @@ textarea {
   width: 13px;
   height: 13px;
 }
+/* The AI and model for the task about to start: at the right end of the row under the task box. */
+.under .model-pick {
+  margin-left: auto;
+}
+.model-pick {
+  max-width: 100%;
+  white-space: nowrap;
+}
+.menu.model-menu {
+  width: 340px;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
+  max-height: min(var(--available-height, 80vh), 560px);
+  overflow-y: auto;
+}
+.menu-item.model-item {
+  height: auto;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 10px;
+}
+.menu-item.model-item[data-checked] {
+  background: var(--sel);
+}
+.model-item .menu-check {
+  align-self: center;
+  flex: none;
+}
+.model-icon {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  flex: none;
+  color: var(--t2);
+}
+.model-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.model-text b {
+  font-weight: 500;
+}
+.model-d {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--t2);
+}
+.model-line {
+  margin-top: 3px;
+  font:
+    500 11px / 1.2 "IBM Plex Mono",
+    monospace;
+  color: var(--t3);
+}
+.menu-item.model-more,
+.menu-item.model-back {
+  color: var(--t2);
+}
+.menu-item.model-more[data-highlighted],
+.menu-item.model-back[data-highlighted] {
+  color: var(--ink);
+}
+/* The reasoning level: a row of choices that wraps when a language needs the room. */
+.model-levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 2px 4px 4px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--panel);
+}
+.model-level {
+  flex: 1 0 auto;
+  padding: 5px 8px;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--t2);
+  cursor: default;
+  outline: none;
+}
+.model-level[data-highlighted] {
+  background: var(--hover);
+}
+.model-level[data-checked] {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line);
+}
 
 /* Needs you: a quiet panel, like Claude's notices */
 .notice {
