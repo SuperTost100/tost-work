@@ -58,6 +58,7 @@ const en = {
   "settings.debug.d":
     "While it's on, every task keeps a full log on this computer, which is never sent anywhere and holds the text of your files and requests.",
   "settings.appLog": "Open the app log",
+  "settings.exportLogs": "Export logs",
   "settings.accounts": "AI accounts",
   "settings.notConnected": "Not connected",
   "settings.signOut": "Sign out",
@@ -721,6 +722,7 @@ const it: Record<MessageKey, string> = {
   "settings.debug.d":
     "Finché è attivo, ogni attività salva su questo computer un log completo. Non viene mai inviato e contiene il testo dei tuoi file e delle tue richieste.",
   "settings.appLog": "Apri il log dell'app",
+  "settings.exportLogs": "Esporta i log",
   "settings.accounts": "Account AI",
   "settings.notConnected": "Non collegato",
   "settings.signOut": "Esci",

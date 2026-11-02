@@ -8,7 +8,10 @@ vi.mock("electron", () => ({
   app: { getLocale: () => "en-US" },
   clipboard: {},
   dialog: {},
-  ipcMain: { handle: (channel: string, fn: (...args: unknown[]) => unknown) => void handlers.set(channel, fn) },
+  ipcMain: {
+    handle: (channel: string, fn: (...args: unknown[]) => unknown) => void handlers.set(channel, fn),
+    on: () => {},
+  },
   Menu: {},
   shell: {},
 }));

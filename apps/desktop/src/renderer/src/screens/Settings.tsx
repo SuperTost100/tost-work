@@ -390,6 +390,17 @@ export function Settings({
                     <Icon name="folder-open" />
                     {t("settings.appLog")}
                   </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      setError(null);
+                      api.debug.exportLogs().catch((err: unknown) => setError(errorText(err)));
+                    }}
+                  >
+                    <Icon name="download-2" />
+                    {t("settings.exportLogs")}
+                  </button>
                 </div>
               </section>
             )}

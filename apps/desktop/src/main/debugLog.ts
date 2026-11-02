@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
-import { appendFile, mkdir, open, readFile, rename, rm, stat } from "node:fs/promises";
+import { appendFile, mkdir, open, readdir, readFile, rename, rm, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { redact } from "cli-funnel";
 import { cutOutput, type LogLine } from "../shared/debug";
+import type { Settings } from "../shared/model";
 
 const MASK = "[redacted]";
 /** Fields whose value is a credential, whatever it looks like. */
@@ -42,6 +43,32 @@ export function redactValue(value: unknown, secrets: (string | undefined)[] = []
   return out;
 }
 
+/** Settings the user types in. A change to one is logged, but what it says is not: it's about the user, not the app. */
+const FREE_TEXT: (keyof Settings)[] = ["name", "work", "notes"];
+
+/**
+ * The settings that differ between two versions, each with its new value. Free text such as the user's name is marked
+ * as changed without its value.
+ */
+export function settingChanges(before: Settings, after: Settings): Record<string, unknown> {
+  const changes: Record<string, unknown> = {};
+  for (const key of Object.keys(after) as (keyof Settings)[]) {
+    if (JSON.stringify(before[key]) === JSON.stringify(after[key])) continue;
+    changes[key] = FREE_TEXT.includes(key) ? "(text changed)" : after[key];
+  }
+  return changes;
+}
+
+/** One file of the export: its name in the zip and its content. */
+export interface LogFile {
+  name: string;
+  data: Buffer;
+}
+
+/** The app log and the ones it rotated to: app.log, app.1.log. */
+const APP_LOG = /^app(\.\d+)?\.log$/;
+const TASK_LOG = /^([\w-]{1,100})\.jsonl$/;
+
 /** Task ids are UUIDs: anything else could reach outside the logs folder. */
 const SAFE_ID = /^[\w-]{1,100}$/;
 /** A cap line is short, so the end of a capped file holds it whole. */
@@ -60,6 +87,8 @@ export interface LogLimits {
 }
 
 const LIMITS: LogLimits = { task: 20 * 1024 * 1024, app: 5 * 1024 * 1024 };
+/** The most log data one export reads: the app logs and about the ten newest task logs at their largest. */
+const EXPORT_BUDGET = 200 * 1024 * 1024;
 
 /**
  * The debug logs: one JSONL file per task in `<dir>/tasks`, and the app's own log, `<dir>/app.log`. They're written
@@ -125,6 +154,63 @@ export class DebugLogs {
       await appendFile(this.appFile, line, { mode: 0o600 });
       this.sizes.set(this.appFile, (this.sizes.get(this.appFile) ?? 0) + bytes);
     });
+  }
+
+  /**
+   * A line for each setting that changed, and one for a new model pick. Nothing while debug is off. The caller says
+   * where it came from, since settings change from the Settings screen, the model picker and the View menu.
+   */
+  settingsChanged(before: Settings, after: Settings): void {
+    const { modelPick, ...changes } = settingChanges(before, after);
+    if (modelPick !== undefined) this.app("info", "Model pick changed", modelPick);
+    if (Object.keys(changes).length > 0) this.app("info", "Settings changed", changes);
+  }
+
+  /**
+   * The log files for the export, as they are on disk: the app logs, then the task logs newest first, up to `budget`
+   * bytes in all, since each is read into memory and zipped there. `leftOut` counts the older task logs past it.
+   */
+  async snapshot(budget = EXPORT_BUDGET): Promise<{ files: LogFile[]; leftOut: number }> {
+    await this.flush();
+    const list = async (dir: string, pattern: RegExp, prefix: string) => {
+      let names: string[];
+      try {
+        names = await readdir(dir);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+        throw err;
+      }
+      const found: { name: string; path: string; size: number; at: number }[] = [];
+      for (const name of names.filter((n) => pattern.test(n)).sort()) {
+        try {
+          const info = await stat(join(dir, name));
+          found.push({ name: `${prefix}${name}`, path: join(dir, name), size: info.size, at: info.mtimeMs });
+        } catch (err) {
+          // A task deleted since the listing has no log to export.
+          if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+        }
+      }
+      return found;
+    };
+    const apps = await list(this.dir, APP_LOG, "");
+    const tasks = (await list(join(this.dir, "tasks"), TASK_LOG, "tasks/")).sort((a, b) => b.at - a.at);
+    const files: LogFile[] = [];
+    let total = 0;
+    let leftOut = 0;
+    for (const file of [...apps, ...tasks]) {
+      if (total + file.size > budget) {
+        leftOut++;
+        continue;
+      }
+      try {
+        const data = await readFile(file.path);
+        total += data.length;
+        files.push({ name: file.name, data });
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+      }
+    }
+    return { files, leftOut };
   }
 
   /** Makes sure app.log exists, so it can be shown in its folder. */

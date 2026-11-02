@@ -1,10 +1,11 @@
 /** @vitest-environment node */
-import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { type EventLine, OUTPUT_MAX } from "../shared/debug";
-import { DebugLogs, redactText, redactValue } from "./debugLog";
+import { DEFAULT_SETTINGS } from "../shared/model";
+import { DebugLogs, redactText, redactValue, settingChanges } from "./debugLog";
 
 const COURSE_KEY = "sk-ant-api03-Abcdefghijklmnopqrstuvwxyz0123456789";
 const OPENAI_KEY = "sk-proj-Zyxwvutsrqponmlkjihgfedcba9876543210";
@@ -153,5 +154,82 @@ describe("DebugLogs", () => {
       console.error = original;
     }
     expect(errors).toHaveLength(1);
+  });
+});
+
+describe("settings changes", () => {
+  const before = { ...DEFAULT_SETTINGS, name: "Giulia", work: "Accountant", notes: "Be brief" };
+
+  it("lists what changed with its new value, and the free text without it", () => {
+    const after = {
+      ...before,
+      name: "Giulia Rossi",
+      work: "Accountant at Alpi Logistica",
+      notes: "Write to giulia@example.com",
+      theme: "dark" as const,
+      sections: { board: false },
+    };
+    const changes = settingChanges(before, after);
+    expect(changes).toEqual({
+      name: "(text changed)",
+      work: "(text changed)",
+      notes: "(text changed)",
+      theme: "dark",
+      sections: { board: false },
+    });
+    expect(JSON.stringify(changes)).not.toMatch(/Rossi|Alpi|example\.com|brief/i);
+  });
+
+  it("is empty when nothing changed", () => {
+    expect(settingChanges(before, { ...before })).toEqual({});
+  });
+
+  it("writes a line for a model pick and one for the other settings, only while debug is on", async () => {
+    const { dir, debug, state } = await logs(false);
+    const after = { ...before, name: "Marco", textSize: "large" as const, modelPick: { preset: "fast" as const } };
+    debug.settingsChanged(before, after);
+    await debug.flush();
+    expect(await readdir(dir)).toEqual([]);
+
+    state.on = true;
+    debug.settingsChanged(before, after);
+    await debug.flush();
+    const text = await readFile(debug.appFile, "utf8");
+    expect(text).toContain('[info] Model pick changed {"preset":"fast"}');
+    expect(text).toContain('[info] Settings changed {"name":"(text changed)","textSize":"large"}');
+    expect(text).not.toContain("Marco");
+  });
+});
+
+describe("snapshot", () => {
+  it("holds the app logs and every task log, and nothing else", async () => {
+    const { dir, debug } = await logs(true, { task: 1000, app: 120 });
+    debug.app("info", "first line of the app log");
+    debug.app("info", "second line, which moves the first to app.1.log");
+    debug.forTask("task-1").write({ type: "run" });
+    debug.forTask("task-2").write({ type: "run" });
+    await debug.flush();
+    await writeFile(join(dir, "tasks", "notes.txt"), "not a log");
+    const names = (await debug.snapshot()).files.map((f) => f.name);
+    expect(names.slice(0, 2)).toEqual(["app.1.log", "app.log"]);
+    expect(names.slice(2).sort()).toEqual(["tasks/task-1.jsonl", "tasks/task-2.jsonl"]);
+  });
+
+  it("stops at its size budget, keeping the app log and the newest task logs", async () => {
+    const { dir, debug } = await logs(true);
+    debug.app("info", "the app log");
+    debug.forTask("old").write({ type: "run", text: "x".repeat(400) });
+    debug.forTask("new").write({ type: "run", text: "y".repeat(400) });
+    await debug.flush();
+    await utimes(join(dir, "tasks", "old.jsonl"), new Date(2026, 0, 1), new Date(2026, 0, 1));
+    const appSize = (await stat(join(dir, "app.log"))).size;
+    const { files, leftOut } = await debug.snapshot(appSize + 600);
+    expect(files.map((f) => f.name)).toEqual(["app.log", "tasks/new.jsonl"]);
+    expect(leftOut).toBe(1);
+  });
+
+  it("is empty when nothing was ever logged", async () => {
+    const { debug } = await logs(false);
+    expect(await debug.snapshot()).toEqual({ files: [], leftOut: 0 });
   });
 });

@@ -239,6 +239,10 @@ export interface TostWorkApi {
     copyTaskLog(id: string): Promise<void>;
     /** Shows the app's own log file in Finder or Explorer. */
     revealAppLog(): Promise<void>;
+    /** Asks where to save, then writes a zip with the app log, the task logs and info.json. Nothing if the user cancels. */
+    exportLogs(): Promise<void>;
+    /** Tells the app log which screen opened, while debug is on: its name and ids, never a title or a file. */
+    screen(route: Record<string, string>): void;
   };
   /** Work that runs by itself on a schedule, a new task each time. */
   jobs: {
@@ -395,4 +399,6 @@ export const IPC = {
   debugRevealTaskLog: "debug:reveal-task-log",
   debugCopyTaskLog: "debug:copy-task-log",
   debugRevealAppLog: "debug:reveal-app-log",
+  debugExportLogs: "debug:export-logs",
+  debugScreen: "debug:screen",
 } as const;

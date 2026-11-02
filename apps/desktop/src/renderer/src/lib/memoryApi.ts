@@ -78,7 +78,13 @@ export type MemoryApi = TostWorkApi & {
   /** Adds a line to the task's debug log, as the engine does while debug is on. */
   log(taskId: string, line: LogLine): void;
   /** What the debug log buttons and menu items asked for, in order. */
-  debugCalls: { revealed: string[]; copied: string[]; appLog: number };
+  debugCalls: {
+    revealed: string[];
+    copied: string[];
+    appLog: number;
+    exported: number;
+    screens: Record<string, string>[];
+  };
 };
 
 export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", setupDone: true }): MemoryApi {
@@ -230,7 +236,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   const panelCalls: MemoryApi["panelCalls"] = { open: [], quit: 0, height: 0 };
   // Each task's debug log, as the main process keeps it in its file.
   const logs = new Map<string, LogLine[]>();
-  const debugCalls: MemoryApi["debugCalls"] = { revealed: [], copied: [], appLog: 0 };
+  const debugCalls: MemoryApi["debugCalls"] = { revealed: [], copied: [], appLog: 0, exported: 0, screens: [] };
   const mustLog = (id: string) => {
     if (!tasks.has(id)) throw new Error("That task doesn't exist");
     const log = logs.get(id);
@@ -695,6 +701,12 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       },
       revealAppLog: async () => {
         debugCalls.appLog++;
+      },
+      exportLogs: async () => {
+        debugCalls.exported++;
+      },
+      screen: (route) => {
+        debugCalls.screens.push(route);
       },
     },
     files: {

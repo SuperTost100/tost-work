@@ -86,6 +86,13 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
     removeTask,
   } = useData(api);
   const [route, setRoute] = useState<Route>({ name: "home" });
+  // While debug is on, the app log gets a line for each screen: its name and ids, never a title or a file.
+  const debugOn = current.debug;
+  useEffect(() => {
+    if (!debugOn) return;
+    const { name, ...ids } = route;
+    api?.debug.screen({ name, ...ids });
+  }, [route, debugOn, api]);
   // The project whose "Add job" opened Jobs, so the builder starts in it.
   const [jobFor, setJobFor] = useState<string | null>(null);
   const clearJobFor = useCallback(() => setJobFor(null), []);

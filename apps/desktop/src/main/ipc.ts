@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { release, tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { app, type BrowserWindow, clipboard, dialog, ipcMain, Menu, type OpenDialogOptions, shell } from "electron";
 import {
@@ -25,6 +25,7 @@ import { type MenuItem, taskMenuItems } from "../shared/taskMenu";
 import type { Accounts } from "./accounts";
 import type { DebugLogs } from "./debugLog";
 import { type TaskRunner, withFiles } from "./engine/runner";
+import { buildInfo, logsZip, logsZipName, within } from "./exportLogs";
 import { type Conflict, copyInto, describe, readablePath, removeCopies, savablePaths, saveCopies } from "./files";
 import type { Installer } from "./installer";
 import { type Jobs, jobDraft } from "./jobs";
@@ -77,8 +78,11 @@ export function registerIpc(
   handle(IPC.settingsGet, () => store.getSettings());
   handle(IPC.settingsUpdate, (_e, patch: unknown) => {
     const settings = mergeSettings(store.getSettings(), settingsPatch(patch));
+    const before = store.getSettings();
     store.saveSettings(settings);
     settingsSaved(settings);
+    // After settingsSaved, which turns the log on or off, so the change that switches debug on is the first one logged.
+    debug.settingsChanged(before, settings);
     return settings;
   });
 
@@ -378,6 +382,42 @@ export function registerIpc(
     clipboard.writeText(log);
   });
   handle(IPC.debugRevealAppLog, async () => shell.showItemInFolder(await debug.touchApp()));
+  handle(IPC.debugExportLogs, async () => {
+    const settings = store.getSettings();
+    // The same checks Settings runs when it opens, with a limit so a stuck CLI can't hold the export.
+    const [codex, claude] = await Promise.all([
+      within(5000, accounts.codex.status()),
+      within(5000, accounts.claude.status()),
+    ]);
+    const win = window();
+    const [width, height] = win && !win.isDestroyed() ? win.getSize() : [];
+    const info = buildInfo({
+      version: __APP_VERSION__,
+      build: __APP_BUILD__,
+      os: { platform: process.platform, release: release(), arch: process.arch },
+      electron: process.versions.electron ?? "",
+      chrome: process.versions.chrome ?? "",
+      window: width && height ? { width, height } : null,
+      systemLanguage: app.getLocale(),
+      settings,
+      accounts: { codex, claude },
+      key: keys.info(),
+      at: new Date().toISOString(),
+    });
+    // Built before the dialog, so a log that can't be read fails before the user picks a place.
+    const { files, leftOut } = await debug.snapshot();
+    const data = await logsZip(files, { ...info, taskLogsLeftOut: leftOut });
+    await saveZip(t("settings.exportLogs"), logsZipName(__APP_VERSION__, new Date()), data);
+  });
+  // A screen the window opened, for the app log while debug is on. Only a name and ids, never a title or a file.
+  ipcMain.on(IPC.debugScreen, (_e, route: unknown) => {
+    if (typeof route !== "object" || route === null) return;
+    const detail: Record<string, string> = {};
+    for (const [key, value] of Object.entries(route))
+      if (["name", "id", "section", "page"].includes(key) && typeof value === "string" && value.length <= 100)
+        detail[key] = value;
+    debug.app("info", "Screen opened", detail);
+  });
 
   // Skills. Ids are folder names, which SkillFolder checks; the text fields have the format's limits.
   const skillId = (id: unknown) => text(id, "id", 200);
@@ -456,10 +496,9 @@ export function registerIpc(
     if (error) throw new Error(error);
   });
   handle(IPC.skillsRemove, (_e, id: unknown) => skills.remove(skillId(id)));
-  handle(IPC.skillsExport, async (_e, id: unknown) => {
-    // Built before the dialog, so a skill that is gone or too big fails before the user picks a place.
-    const { name, data } = await skills.zip(skillId(id));
-    const options = { title: t("menu.exportZip"), defaultPath: join(app.getPath("downloads"), `${name}.zip`) };
+  // Asks where to save, writes the zip beside it first and moves it over, and shows it in its folder.
+  const saveZip = async (title: string, name: string, data: Buffer) => {
+    const options = { title, defaultPath: join(app.getPath("downloads"), name) };
     const win = window();
     const { canceled, filePath } = win
       ? await dialog.showSaveDialog(win, options)
@@ -468,13 +507,19 @@ export function registerIpc(
     // Written beside it first and then moved over it, so a write that fails leaves a zip that was there untouched.
     const part = `${filePath}.${randomUUID()}.part`;
     try {
-      await writeFile(part, data);
+      // Owner-only, as the logs themselves are: the zip can hold what the user's tasks worked on.
+      await writeFile(part, data, { mode: 0o600 });
       await rename(part, filePath);
     } catch (err) {
       await rm(part, { force: true });
       throw err;
     }
     shell.showItemInFolder(filePath);
+  };
+  handle(IPC.skillsExport, async (_e, id: unknown) => {
+    // Built before the dialog, so a skill that is gone or too big fails before the user picks a place.
+    const { name, data } = await skills.zip(skillId(id));
+    await saveZip(t("menu.exportZip"), `${name}.zip`, data);
   });
   handle(IPC.skillsMenu, (_e, id: unknown) => {
     skillId(id);

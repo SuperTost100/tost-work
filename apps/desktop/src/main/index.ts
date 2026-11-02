@@ -534,6 +534,7 @@ app.whenReady().then(async () => {
         const current = store.getSettings();
         const next = { ...current, textSize: nextTextSize(current.textSize, step) };
         store.saveSettings(next);
+        debugLogs.settingsChanged(current, next);
         applyLook(mainWindow, next);
         toWindows(IPC.settingsChanged, next);
       },

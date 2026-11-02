@@ -33,10 +33,34 @@ describe("debug mode in Settings", () => {
     ).toBeTruthy();
     await click("Open the app log");
     expect(api.debugCalls.appLog).toBe(1);
+    await click("Export logs");
+    expect(api.debugCalls.exported).toBe(1);
 
     await click(/Intermediate/, "radio");
     expect(screen.queryByRole("switch", { name: "Show technical details and debug" })).toBeNull();
     expect((await api.settings.get()).debug).toBe(true);
+  });
+});
+
+describe("screen lines for the app log", () => {
+  it("are sent for each screen while debug is on, with names and ids only", async () => {
+    const api = createMemoryApi({ name: "Giulia", setupDone: true, level: "expert", debug: true });
+    const task = await api.tasks.start({ projectId: null, brief: "Sum up the call notes", attachments: [] });
+    render(<Root api={api} />);
+    await click("Settings");
+    expect(api.debugCalls.screens.at(-1)).toEqual({ name: "settings" });
+    await act(async () => {
+      api.openFromOutside(task.id);
+    });
+    expect(api.debugCalls.screens.at(-1)).toEqual({ name: "task", id: task.id });
+    expect(JSON.stringify(api.debugCalls.screens)).not.toContain("Sum up");
+  });
+
+  it("are not sent while debug is off", async () => {
+    const api = createMemoryApi({ name: "Giulia", setupDone: true, level: "expert", debug: false });
+    render(<Root api={api} />);
+    await click("Settings");
+    expect(api.debugCalls.screens).toEqual([]);
   });
 });
 
