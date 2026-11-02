@@ -161,7 +161,7 @@ function WhatChanged({
         <SkillsFollowed names={task.skillsUsed} titles={skillTitles} />
       </div>
       <div className="foot2">
-        <span className="t3 grow truncate" style={{ fontSize: 13 }} role="status" title={saved?.folder}>
+        <span className="t3 note" role="status" title={saved?.folder}>
           {error ?? (saved ? t("quick.saved", { folder: saved.folder }) : t("quick.original"))}
         </span>
         <button
@@ -634,18 +634,20 @@ function Artifact({
         <button
           type="button"
           className="tbtn"
+          title={t("preview.reveal")}
           onClick={() => void api.files.reveal(task.id, current.path).catch(onError)}
         >
           <Icon name="folder-open" />
-          {t("preview.reveal")}
+          <span className="lbl">{t("preview.reveal")}</span>
         </button>
         <button
           type="button"
           className="tbtn"
+          title={t("preview.open")}
           onClick={() => void api.files.open(task.id, current.path).catch(onError)}
         >
           <Icon name="external-link" />
-          {t("preview.open")}
+          <span className="lbl">{t("preview.open")}</span>
         </button>
       </div>
       <div className="page pv">

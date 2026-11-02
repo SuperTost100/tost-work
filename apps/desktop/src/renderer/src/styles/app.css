@@ -1090,6 +1090,7 @@ textarea {
   font-size: 13px;
 }
 .artifact {
+  container-type: inline-size;
   margin-top: 20px;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -1115,6 +1116,18 @@ textarea {
 }
 .artifact .head .t3 {
   font-size: 13px;
+}
+/* In a narrow column the file's name keeps the room, and the buttons keep only their icons (their names stay in the
+   tooltip and for screen readers). */
+@container (max-width: 460px) {
+  .artifact .head .tbtn .lbl {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 .page {
   margin: 0 14px;
@@ -2141,7 +2154,10 @@ h2.gh {
   justify-items: start;
 }
 
-/* One project: Claude-style page with a side column */
+/* One project: Claude-style page with a side column, which goes under the tasks in a small window. */
+.scroll:has(> .proj) {
+  container-type: inline-size;
+}
 .proj {
   display: grid;
   grid-template-columns: 1fr 300px;
@@ -2149,6 +2165,13 @@ h2.gh {
   max-width: 1080px;
   margin: 0 auto;
   padding: 32px 40px 64px;
+}
+@container (max-width: 700px) {
+  .proj {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+    padding-inline: 28px;
+  }
 }
 .proj h1 {
   font-size: 30px;
@@ -2229,6 +2252,7 @@ h2.gh {
 /* Done task: check against the brief */
 .check-h {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   margin: 28px 0 4px;
@@ -2404,8 +2428,17 @@ h2.gh {
   padding: 12px 16px;
   border-top: 1px solid var(--line-2);
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+/* What happens to the original, or where the copy went: a line of its own above the button when the panel is narrow,
+   never cut to a letter. */
+.wc .foot2 .note {
+  flex: 1 1 12em;
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 .chg {
   padding: 12px 0;
@@ -2506,12 +2539,31 @@ ins {
 }
 
 /* Skills */
+/* In a small window the side column goes under the editor, so the editor keeps the width. */
+.main:has(> .skills) {
+  container-type: inline-size;
+}
 .skills {
   display: grid;
   /* The editor keeps most of the room in a small window: the list and the side column give way first. */
   grid-template-columns: clamp(170px, 20vw, 240px) minmax(0, 1fr) clamp(190px, 21vw, 260px);
   flex: 1;
   min-height: 0;
+}
+@container (max-width: 760px) {
+  .skills {
+    grid-template-columns: clamp(150px, 26%, 200px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .skills > .slist {
+    grid-row: 1 / span 2;
+  }
+  .skills > .smeta {
+    grid-column: 2;
+    max-height: 32vh;
+    border-left: 0;
+    border-top: 1px solid var(--line-2);
+  }
 }
 .slist {
   border-right: 1px solid var(--line-2);
@@ -2550,8 +2602,12 @@ ins {
   text-align: left;
   cursor: pointer;
 }
+/* In a narrow window the button goes under the name rather than squeezing it to a letter or two. */
+.editor > .row:first-child {
+  flex-wrap: wrap;
+}
 .editor .title-input {
-  min-width: 0;
+  min-width: min(100%, 220px);
   font-size: 28px;
   font-weight: 800;
   letter-spacing: -0.03em;
@@ -3411,9 +3467,10 @@ ol.editable li::before {
   left: 16px;
   background: var(--canvas);
 }
+/* Four across where they fit, two by two in a small window, so no card is cut off at the edge. */
 .levels {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   margin-top: 12px;
 }
