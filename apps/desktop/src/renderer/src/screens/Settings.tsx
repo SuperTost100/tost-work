@@ -124,6 +124,11 @@ export function Settings({
               <span className="sr">{t("settings.integrations.when")}</span>
             </span>
           </span>
+          {/* Last in the list, as in the mockup: it opens a page of its own. */}
+          <button type="button" onClick={onAbout}>
+            <Icon name="information" />
+            {t("about.crumb")}
+          </button>
         </nav>
         <div className="scontent">
           <div className="sbody">
@@ -388,14 +393,6 @@ export function Settings({
                 </div>
               </section>
             )}
-
-            <p className="t3 version">
-              <span>{t("about.version", { version: __APP_VERSION__, build: __APP_BUILD__ })}</span>
-              {" · "}
-              <button type="button" className="link" onClick={onAbout}>
-                {t("about.open")}
-              </button>
-            </p>
           </div>
         </div>
       </div>

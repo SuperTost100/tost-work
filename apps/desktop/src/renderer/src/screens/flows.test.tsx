@@ -779,10 +779,11 @@ describe("projects", () => {
     expect((await screen.findByRole("alert")).textContent).toMatch(/Couldn't read the tasks/);
   });
 
-  it("shows the version and build on the Settings placeholder", () => {
+  it("shows the version and build in About, the last item in Settings", () => {
     render(<App userName="Giulia" api={createMemoryApi()} />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.getByText(`Tost Work ${__APP_VERSION__} · build ${__APP_BUILD__}`)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "About" }));
+    expect(screen.getByText(`${__APP_VERSION__} · build ${__APP_BUILD__}`)).toBeTruthy();
   });
 
   it("shows a placeholder for a section that can't work without the main process", () => {

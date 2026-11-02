@@ -13,7 +13,12 @@ const click = async (name: string | RegExp) => {
 const aboutPage = async (api = createMemoryApi()) => {
   render(<Root api={api} />);
   await click("Settings");
-  await click("About Tost Work");
+  // The last item in Settings' own list, as in the mockup.
+  const nav = screen.getByRole("navigation", { name: "Settings" });
+  expect(within(nav).getAllByRole("button").at(-1)?.textContent).toBe("About");
+  await act(async () => {
+    fireEvent.click(within(nav).getByRole("button", { name: "About" }));
+  });
 };
 
 describe("About", () => {
@@ -81,7 +86,7 @@ describe("About", () => {
     await api.settings.update({ language: "it" });
     render(<Root api={api} />);
     await click("Impostazioni");
-    await click("Informazioni su Tost Work");
+    await click("Informazioni");
     expect(screen.getByText(/Un'app gratuita e open source di Tommaso Barbera/)).toBeTruthy();
     const feedback = new URL((screen.getByRole("link", { name: /Invia un feedback/ }) as HTMLAnchorElement).href);
     expect(feedback.searchParams.get("body")).toContain("Language: Italian");

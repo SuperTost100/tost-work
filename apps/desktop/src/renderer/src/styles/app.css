@@ -3699,10 +3699,6 @@ ol.editable li::before {
   color: var(--need);
   margin-top: 4px;
 }
-.sbody .version {
-  margin-top: 40px;
-  font-size: 13px;
-}
 
 .opt.wide {
   grid-template-columns: 1fr;
