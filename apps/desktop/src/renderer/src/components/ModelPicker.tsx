@@ -11,6 +11,7 @@ import {
   type ModelPick,
   modelName,
   nearestEffort,
+  newestOfEachFamily,
   PRESETS,
   type Preset,
   pickOn,
@@ -93,7 +94,13 @@ export function ModelPicker({
         <Icon name="down" />
       </Menu.Trigger>
       <Menu.Portal>
-        <Menu.Positioner sideOffset={6} align="end">
+        {/* Always below the box: when the room is short the popup shrinks (see --available-height) instead of flipping up. */}
+        <Menu.Positioner
+          side="bottom"
+          sideOffset={6}
+          align="end"
+          collisionAvoidance={{ side: "none", align: "shift", fallbackAxisSide: "none" }}
+        >
           <Menu.Popup className={all ? "menu model-menu all" : "menu model-menu"}>
             {all && choices ? (
               <FullList
@@ -168,7 +175,9 @@ function FullList({
         {t("model.back")}
       </Menu.Item>
       <div className="menu-sep" />
+      {/* Only the models scroll: the way back and the reasoning level stay in view. */}
       <Menu.RadioGroup
+        className="model-scroll"
         value={selected ? `${selected.ai}|${selected.model.id}` : ""}
         onValueChange={(value: string) => {
           const [ai, id] = value.split("|");
@@ -181,7 +190,7 @@ function FullList({
         {choices.lists.map((l) => (
           <div key={l.ai} role="presentation">
             <div className="menu-label">{t(sectionName(l.ai))}</div>
-            {l.models.map((m) => (
+            {newestOfEachFamily(l.models, selected?.ai === l.ai ? selected.model.id : undefined).map((m) => (
               <Menu.RadioItem key={m.id} value={`${l.ai}|${m.id}`} className="menu-item" closeOnClick={false}>
                 {modelName(m)}
                 <Menu.RadioItemIndicator className="menu-check">

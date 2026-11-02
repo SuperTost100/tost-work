@@ -74,7 +74,7 @@ export function TaskStatusIcon({ task }: { task: Task }) {
           ]
         : task.status === "draft"
           ? [
-              "draft",
+              "later",
               <svg key="i" viewBox="0 0 16 16" aria-hidden="true">
                 <circle cx="8" cy="8" r="6" strokeDasharray="3.2 2.2" />
               </svg>,

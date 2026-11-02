@@ -184,6 +184,47 @@ export const SAMPLE_CHOICES: ModelChoices = (() => {
 export const modelName = (model: Pick<ModelOption, "id" | "name">): string =>
   (model.name || model.id).replace(/^(GPT-[\d.]+)-/, "$1 ");
 
+/** A model's family and version, from its display name: "GPT-6.1 Sol" is family "GPT Sol", version [6, 1]. */
+function familyOf(model: Pick<ModelOption, "id" | "name">): { family: string; version: number[] } {
+  const name = modelName(model);
+  const found = /[-\s]?(\d+(?:[.-]\d+)*)/.exec(name);
+  if (!found?.[1]) return { family: name, version: [] };
+  const family = `${name.slice(0, found.index)} ${name.slice(found.index + found[0].length)}`
+    .replace(/\s+/g, " ")
+    .trim();
+  return { family, version: found[1].split(/[.-]/).map(Number) };
+}
+
+/** Compares version numbers part by part, a missing part counting as 0: 6.1 is above 6, and 6 is above 5.6. */
+function compareVersions(a: number[], b: number[]): number {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = (a[i] ?? 0) - (b[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/**
+ * The newest model of each family, for the picker's full list: "GPT-6 Sol" and "GPT-5.6 Sol" are one family, and only
+ * the higher version stays. A name with no version number always stays, and so does the model in `keepId`, such as the
+ * one picked earlier, even when it's older. The order is kept. This only filters what the picker shows: the engine
+ * still runs any model it's given.
+ */
+export function newestOfEachFamily<T extends Pick<ModelOption, "id" | "name">>(models: T[], keepId?: string): T[] {
+  const newest = new Map<string, number[]>();
+  const parsed = models.map((m) => ({ m, ...familyOf(m) }));
+  for (const { family, version } of parsed) {
+    const best = newest.get(family);
+    if (version.length > 0 && (!best || compareVersions(version, best) > 0)) newest.set(family, version);
+  }
+  return parsed
+    .filter(({ m, family, version }) => {
+      const best = newest.get(family);
+      return m.id === keepId || version.length === 0 || (best !== undefined && compareVersions(version, best) === 0);
+    })
+    .map(({ m }) => m);
+}
+
 /** Whether a value from outside is a pick this app could have made. */
 export function isModelPick(v: unknown): v is ModelPick {
   if (typeof v !== "object" || v === null) return false;

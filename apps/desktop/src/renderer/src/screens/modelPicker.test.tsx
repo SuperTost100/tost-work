@@ -106,6 +106,40 @@ describe("the model picker under the task box", () => {
     expect(task).toMatchObject({ provider: "claude", model: "claude-sonnet-5-5", effort: "max" });
   });
 
+  it("lists only the newest model of each family, and keeps the one picked even when it's older", async () => {
+    const model = (id: string, name: string) => ({ id, name, efforts: ["low", "medium", "high"] });
+    const choices = {
+      ai: "chatgpt" as const,
+      provider: "codex" as const,
+      lists: [
+        {
+          ai: "chatgpt" as const,
+          provider: "codex" as const,
+          models: [
+            model("gpt-6.1-sol", "GPT-6.1-Sol"),
+            model("gpt-6-sol", "GPT-6-Sol"),
+            model("gpt-5.6-sol", "GPT-5.6-Sol"),
+            model("gpt-6.1-terra", "GPT-6.1-Terra"),
+          ],
+        },
+      ],
+    };
+    const api = createMemoryApi({
+      name: "Giulia",
+      setupDone: true,
+      modelPick: { ai: "chatgpt", model: "gpt-6-sol", effort: "medium" },
+    });
+    api.models.choices = async () => choices;
+    render(<Root api={api} />);
+    await click(picker(/AI for this task|AI per questa attività/));
+    await click(screen.getByRole("menuitem", { name: "Choose the model…" }));
+    await screen.findByText("ChatGPT");
+    const names = screen.getAllByRole("menuitemradio").map((r) => r.textContent);
+    // GPT-6 Sol is older than GPT-6.1 Sol but it's the pick, so it stays; GPT-5.6 Sol goes.
+    expect(names.slice(0, 3)).toEqual(["GPT-6.1 Sol", "GPT-6 Sol", "GPT-6.1 Terra"]);
+    expect(screen.queryByRole("menuitemradio", { name: "GPT-5.6 Sol" })).toBeNull();
+  });
+
   it("goes back from the full list to the three choices", async () => {
     await open();
     await click(screen.getByRole("menuitem", { name: "Choose the model…" }));

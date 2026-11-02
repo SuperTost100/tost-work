@@ -5,6 +5,7 @@ import {
   type ModelOption,
   modelName,
   nearestEffort,
+  newestOfEachFamily,
   pickOn,
   providerDefault,
   resolvePreset,
@@ -154,5 +155,52 @@ describe("modelName", () => {
     expect(modelName({ id: "gpt-6.1-terra", name: "GPT-6.1-Terra" })).toBe("GPT-6.1 Terra");
     expect(modelName({ id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5" })).toBe("Claude Sonnet 5.5");
     expect(modelName({ id: "x", name: "" })).toBe("x");
+  });
+});
+
+describe("the newest model of each family", () => {
+  const named = (id: string, name: string): ModelOption => ({ ...model(id), name });
+  const codexList = [
+    named("gpt-6.1-sol", "GPT-6.1-Sol"),
+    named("gpt-6-sol", "GPT-6-Sol"),
+    named("gpt-5.6-sol", "GPT-5.6-Sol"),
+    named("gpt-6-astra", "GPT-6-Astra"),
+    named("gpt-6.1-terra", "GPT-6.1-Terra"),
+    named("gpt-5.6-terra", "GPT-5.6-Terra"),
+    named("gpt-6-luna", "GPT-6-Luna"),
+    named("gpt-5.6-luna", "GPT-5.6-Luna"),
+  ];
+  const claudeList = [
+    named("claude-fable-5-1", "Claude Fable 5.1"),
+    named("claude-opus-5-5", "Claude Opus 5.5"),
+    named("claude-opus-4-6", "Claude Opus 4.6"),
+    named("claude-sonnet-5-5", "Claude Sonnet 5.5"),
+    named("claude-sonnet-5", "Claude Sonnet 5"),
+    named("claude-haiku-5-5", "Claude Haiku 5.5"),
+    named("claude-haiku-4-5-20251001", "Claude Haiku 4.5"),
+  ];
+  const names = (list: ModelOption[]) => list.map((m) => modelName(m));
+
+  it("keeps GPT-6.1 Sol, GPT-6 Astra, GPT-6.1 Terra and GPT-6 Luna", () => {
+    expect(names(newestOfEachFamily(codexList))).toEqual(["GPT-6.1 Sol", "GPT-6 Astra", "GPT-6.1 Terra", "GPT-6 Luna"]);
+  });
+
+  it("keeps Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5", () => {
+    expect(names(newestOfEachFamily(claudeList))).toEqual([
+      "Claude Fable 5.1",
+      "Claude Opus 5.5",
+      "Claude Sonnet 5.5",
+      "Claude Haiku 5.5",
+    ]);
+  });
+
+  it("keeps the model that is picked, even when it's older", () => {
+    expect(names(newestOfEachFamily(claudeList, "claude-opus-4-6"))).toContain("Claude Opus 4.6");
+    expect(newestOfEachFamily(claudeList, "claude-opus-4-6")).toHaveLength(5);
+  });
+
+  it("keeps a name with no version, and works from the id when there's no name", () => {
+    const list = [named("mini", "Mini"), named("other", "Mini"), model("gpt-6-luna"), model("gpt-5.6-luna")];
+    expect(newestOfEachFamily(list).map((m) => m.id)).toEqual(["mini", "other", "gpt-6-luna"]);
   });
 });

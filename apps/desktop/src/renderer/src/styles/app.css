@@ -466,7 +466,7 @@ h3 {
     transform: rotate(360deg);
   }
 }
-.st.draft {
+.st.later {
   color: var(--t3);
 }
 @media (prefers-reduced-motion: reduce) {
@@ -904,6 +904,20 @@ textarea {
   padding: 6px;
   max-height: min(var(--available-height, 80vh), 560px);
   overflow-y: auto;
+}
+/* The full list: the model list scrolls, and the back item and the reasoning level around it stay in view. */
+.menu.model-menu.all {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.model-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.menu.model-menu.all > :not(.model-scroll) {
+  flex: none;
 }
 .menu-item.model-item {
   height: auto;
@@ -3550,13 +3564,15 @@ ol.editable li::before {
 }
 .srow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  gap: 8px 16px;
   padding: 13px 0;
   border-bottom: 1px solid var(--line-2);
 }
+/* With no room for 220px of label beside the control, the control drops under the label instead of squeezing it. */
 .srow .lbl {
-  flex: 1;
+  flex: 1 1 220px;
   min-width: 0;
 }
 .srow .lbl b {
@@ -4860,7 +4876,8 @@ label.opt:has(input:focus-visible) {
 /* The button takes no room of its own: it sits in the gap above whatever comes next, so spacing stays as it was. */
 .msg-tools {
   display: flex;
-  margin: 2px 0 -20px;
+  /* The 15px icon sits in a 26px button: pulling the row left by the padding puts the glyph under the text's edge. */
+  margin: 2px 0 -20px -5.5px;
   opacity: 0;
   transition: opacity 0.12s;
 }
@@ -4879,6 +4896,8 @@ label.opt:has(input:focus-visible) {
 /* Under the user's own message, the copy button keeps the bubble's right edge and the time sits before it. */
 .msg.mine .msg-tools {
   flex-direction: row-reverse;
+  margin-left: 0;
+  margin-right: -5.5px;
 }
 .msg-tools .sent {
   align-self: center;

@@ -10,12 +10,18 @@ describe("a task's status icon in Recent", () => {
     ["needs-you", "need", "needs you"],
     ["running", "run", "working"],
     ["done", "seen", "to check"],
-    ["draft", "draft", "to do"],
+    ["draft", "later", "to do"],
   ] as const)("shows %s as %s, named in words", (status, kind, label) => {
     render(<TaskStatusIcon task={task(status)} />);
     const icon = screen.getByRole("img", { name: label });
     expect(icon.classList.contains(kind)).toBe(true);
     expect(icon.getAttribute("title")).toBe(label);
+  });
+
+  // The Home page's tilted paper card is styled by .draft, so the icon must not carry that class.
+  it("doesn't use the class of Home's draft card", () => {
+    render(<TaskStatusIcon task={task("draft")} />);
+    expect(screen.getByRole("img", { name: "to do" }).classList.contains("draft")).toBe(false);
   });
 
   it("shows nothing once a finished task has been checked, or for a stopped one", () => {

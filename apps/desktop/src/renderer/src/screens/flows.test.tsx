@@ -160,6 +160,38 @@ describe("attaching files after the first message", () => {
   });
 });
 
+describe("what was typed in a task", () => {
+  it("is still there after opening another task and coming back", async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    for (const brief of ["Write a proposal", "Plan the trip"]) {
+      fireEvent.change(screen.getByRole("textbox"), { target: { value: brief } });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+      });
+      await act(async () => {
+        fireEvent.click(await screen.findByRole("button", { name: /We do/ }));
+      });
+      await screen.findByText("Check it against your brief");
+      if (brief === "Write a proposal") {
+        await act(async () => {
+          fireEvent.click(screen.getByRole("button", { name: "New task" }));
+        });
+      }
+    }
+    // The second task is open: type in its follow-up box, then go to the first and back.
+    fireEvent.change(screen.getAllByRole("textbox").at(-1) as HTMLElement, { target: { value: "Shorter" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Write a proposal/ }));
+    });
+    expect((screen.getAllByRole("textbox").at(-1) as HTMLTextAreaElement).value).toBe("");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Plan the trip/ }));
+    });
+    expect((screen.getAllByRole("textbox").at(-1) as HTMLTextAreaElement).value).toBe("Shorter");
+  });
+});
+
 describe("failures and double clicks", () => {
   it("starts one task when Enter is pressed twice", async () => {
     const api = createMemoryApi();
@@ -591,6 +623,34 @@ describe("a round of questions", () => {
     fireEvent.click(line);
     expect(screen.getByText("How long?")).toBeTruthy();
     expect(screen.getByText("Two hours")).toBeTruthy();
+  });
+
+  it("is still on the same question, with its text, after opening another task and coming back", async () => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    const task = await api.tasks.start({ projectId: project.id, brief: "Plan the visit", attachments: [] });
+    await api.tasks.start({ projectId: project.id, brief: "Book the room", attachments: [] });
+    act(() =>
+      api.emit(task.id, {
+        type: "question",
+        question: { id: "r5", text: "Day?", options: ["Mon", "Fri"], more: [{ text: "Room?", options: ["A", "B"] }] },
+      }),
+    );
+    render(<App userName="Giulia" api={api} />);
+    const openTask = async (title: string) => {
+      const [row] = await screen.findAllByText(title);
+      await act(async () => {
+        fireEvent.click(row as HTMLElement);
+      });
+    };
+    await openTask("Plan the visit");
+    fireEvent.click(screen.getByRole("button", { name: /^1Mon$/ }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "The big one" } });
+    await openTask("Book the room");
+    await openTask("Plan the visit");
+    // The text typed for the second question comes back on the second question, not on the first.
+    expect(screen.getByText("Room?")).toBeTruthy();
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("The big one");
   });
 
   it("clears the box when the last answer is an option, even if sending it fails", async () => {

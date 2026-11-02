@@ -11,6 +11,7 @@ import { Icon } from "@/lib/Icon";
 import { keyed } from "@/lib/keys";
 import { withShortcut } from "@/lib/shortcut";
 import { useT } from "@/lib/useT";
+import { dropAll, dropSent, useUnsent } from "@/lib/useUnsent";
 import { RenameField } from "@/shell/Sidebar";
 import type { NewTaskInput, SaveResult, TostWorkApi } from "../../../shared/api";
 import type { DebugView } from "../../../shared/debug";
@@ -387,12 +388,15 @@ function Checks({ title, items, icon }: { title: string; items: ReviewItem[]; ic
  * sends the whole round as one message. A single question sends at once, as before rounds.
  */
 function QuestionCard({
+  round,
   question,
   draft,
   onDraft,
   onSend,
   attach,
 }: {
+  /** Where the round's progress is kept while the task is closed: the question it's on and the answers so far. */
+  round: string;
   question: Question;
   draft: string;
   onDraft: (text: string) => void;
@@ -402,10 +406,11 @@ function QuestionCard({
 }) {
   const t = useT();
   const items = questionItems(question);
-  const [answers, setAnswers] = useState<string[]>([]);
+  // Kept with the task, so the text in the box stays with the question it was written for when the task opens again.
+  const [answers, setAnswers] = useUnsent<string[]>(`${round}:answers`, []);
   // What's in the box for each question, so stepping back and forth never loses text not sent yet.
-  const [drafts, setDrafts] = useState<string[]>([]);
-  const [at, setAt] = useState(0);
+  const [drafts, setDrafts] = useUnsent<string[]>(`${round}:drafts`, []);
+  const [at, setAt] = useUnsent(`${round}:at`, 0);
   const [tooLong, setTooLong] = useState(false);
   // After Next or Back the old question's buttons are gone, so keyboard focus moves to the new question: its block
   // is keyed by the question, so it mounts again and takes focus. The callback is stable, so typing (which renders
@@ -723,10 +728,11 @@ export function Task({
   modelPicker?: React.ReactNode;
 }) {
   const t = useT();
-  const [answer, setAnswer] = useState("");
+  // What is typed and attached stays with the task when the user opens another one and comes back.
+  const [answer, setAnswer] = useUnsent(`${task.id}:answer`, "");
   // Files for the answers and for the next instruction, each sent with its own message.
-  const [answerFiles, setAnswerFiles] = useState<string[]>([]);
-  const [messageFiles, setMessageFiles] = useState<string[]>([]);
+  const [answerFiles, setAnswerFiles] = useUnsent<string[]>(`${task.id}:answerFiles`, []);
+  const [messageFiles, setMessageFiles] = useUnsent<string[]>(`${task.id}:messageFiles`, []);
   const attach = (files: string[], set: (update: (prev: string[]) => string[]) => void): Attachments => ({
     files,
     onAdd: () =>
@@ -747,11 +753,15 @@ export function Task({
     void onAnswer(answers, files).then((sent) => {
       sending.current = false;
       if (!sent) return;
+      // The screen may be closed by now, so what was sent is also dropped from what the task keeps.
+      dropSent(`${task.id}:answer`, draft);
+      dropSent(`${task.id}:answerFiles`, files);
+      dropAll(`${task.id}:round:`);
       setAnswer((current) => (current === draft ? "" : current));
       setAnswerFiles((current) => (current === files ? [] : current));
     });
   };
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useUnsent(`${task.id}:message`, "");
   const followSending = useRef(false);
   // A task without a project is a quick edit: it works on copies in a temporary folder until the user saves.
   const quick = task.projectId === null;
@@ -1038,6 +1048,7 @@ export function Task({
                   {task.question ? (
                     <QuestionCard
                       key={task.question.id}
+                      round={`${task.id}:round:${task.question.id}`}
                       question={task.question}
                       draft={answer}
                       onDraft={setAnswer}
@@ -1060,6 +1071,8 @@ export function Task({
                         void onFollowUp(text.trim(), files).then((sent) => {
                           followSending.current = false;
                           if (!sent) return;
+                          dropSent(`${task.id}:message`, text);
+                          dropSent(`${task.id}:messageFiles`, files);
                           setMessage((current) => (current === text ? "" : current));
                           setMessageFiles((current) => (current === files ? [] : current));
                         });
