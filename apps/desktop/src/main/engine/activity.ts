@@ -118,6 +118,11 @@ export function activityOf(name: string, input: unknown, builtIns?: string): Act
     case "Agent":
     case "Task":
       return { kind: "helper", target: text(i.description) };
+    // Codex: starting a subagent, and waiting for the ones it started. Neither names the work in a few words.
+    case "agent:spawnAgent":
+      return { kind: "helper" };
+    case "agent:wait":
+      return { kind: "helper-wait" };
     case "Bash":
     case "command":
       return commandActivity(String(i.command ?? ""), builtIns);

@@ -191,6 +191,7 @@ const ACTIVITY_ICON: Record<ActivityKind, string> = {
   skill: "magic-2",
   pdf: "file",
   helper: "group",
+  "helper-wait": "time",
   note: "chat-3",
 };
 /** Kinds whose line names a file, search or site, and has a plainer line when it doesn't. */

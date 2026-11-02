@@ -116,6 +116,8 @@ export type ActivityKind =
   | "pdf"
   /** A part of the work handed to a subagent, by what it was asked to do. */
   | "helper"
+  /** Waiting for the subagents to finish. */
+  | "helper-wait"
   /** A few words the agent wrote to the user between its steps, such as "the table is nearly done". */
   | "note";
 

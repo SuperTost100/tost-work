@@ -97,6 +97,12 @@ describe("activity", () => {
       },
     );
     expect(activityOf("Task", { prompt: "…" })).toEqual({ kind: "helper", target: undefined });
+    // Codex 0.166 names only the subagent's thread, an older Codex its whole prompt: neither fits on the line.
+    expect(activityOf("agent:spawnAgent", { agent: "worker", threadId: "t1" })).toEqual({ kind: "helper" });
+    expect(activityOf("agent:spawnAgent", { prompt: "Run sleep 15", receiverThreadIds: ["t1"] })).toEqual({
+      kind: "helper",
+    });
+    expect(activityOf("agent:wait", { receiverThreadIds: [] })).toEqual({ kind: "helper-wait" });
   });
 
   it("leaves out the plan and Tost Work's own tools, which show on their own", () => {
