@@ -72,10 +72,12 @@ export function Settings({
   api,
   settings,
   onChange,
+  onAbout,
 }: {
   api: TostWorkApi;
   settings: SettingsData;
   onChange: (settings: SettingsData) => void;
+  onAbout: () => void;
 }) {
   const t = useT();
   const [error, setError] = useState<string | null>(null);
@@ -387,7 +389,13 @@ export function Settings({
               </section>
             )}
 
-            <p className="t3 version">{t("about.version", { version: __APP_VERSION__, build: __APP_BUILD__ })}</p>
+            <p className="t3 version">
+              <span>{t("about.version", { version: __APP_VERSION__, build: __APP_BUILD__ })}</span>
+              {" · "}
+              <button type="button" className="link" onClick={onAbout}>
+                {t("about.open")}
+              </button>
+            </p>
           </div>
         </div>
       </div>

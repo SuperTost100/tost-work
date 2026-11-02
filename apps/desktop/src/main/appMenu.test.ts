@@ -9,6 +9,7 @@ import { menuTemplate, nextTextSize, textMenuTemplate } from "./appMenu";
 function build(isMac: boolean, settings = DEFAULT_SETTINGS, task = { task: true, running: true }) {
   const sent: MenuAction[] = [];
   const sizes: number[] = [];
+  let abouts = 0;
   const menu = menuTemplate({
     t: (key) => translate("it", key),
     isMac,
@@ -17,13 +18,15 @@ function build(isMac: boolean, settings = DEFAULT_SETTINGS, task = { task: true,
     dev: false,
     send: (a) => sent.push(a),
     textSize: (step) => sizes.push(step),
-    about: () => {},
+    about: () => {
+      abouts++;
+    },
     openSite: () => {},
   });
   const items = (label: string) => (menu.find((m) => m.label === label)?.submenu ?? []) as MenuItemConstructorOptions[];
   const item = (menuLabel: string, label: string) => items(menuLabel).find((i) => i.label === label);
   const click = (menuLabel: string, label: string) => (item(menuLabel, label)?.click as (() => void) | undefined)?.();
-  return { menu, sent, sizes, items, item, click };
+  return { menu, sent, sizes, abouts: () => abouts, items, item, click };
 }
 
 describe("menuTemplate", () => {
@@ -49,6 +52,15 @@ describe("menuTemplate", () => {
     expect(item("File", "Impostazioni")?.accelerator).toBe("CmdOrCtrl+,");
     expect(item("File", "Esci")?.role).toBe("quit");
     expect(items("Aiuto").map((i) => i.label)).toContain("Informazioni su Tost Work");
+  });
+
+  it("opens the About page from the app menu on a Mac and from Help elsewhere", () => {
+    const mac = build(true);
+    mac.click("Tost Work", "Informazioni su Tost Work");
+    expect(mac.abouts()).toBe(1);
+    const other = build(false);
+    other.click("Aiuto", "Informazioni su Tost Work");
+    expect(other.abouts()).toBe(1);
   });
 
   it("hands its actions to the window, and its zoom to the text size", () => {

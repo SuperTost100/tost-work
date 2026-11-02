@@ -9,6 +9,7 @@ import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { useConfirm } from "@/lib/useConfirm";
 import { useT } from "@/lib/useT";
+import { About, type AboutPage } from "@/screens/About";
 import { Board } from "@/screens/Board";
 import { Home } from "@/screens/Home";
 import { Jobs } from "@/screens/Jobs";
@@ -44,6 +45,7 @@ type Route =
   | { name: "task"; id: string }
   | { name: "profile" }
   | { name: "settings" }
+  | { name: "about"; page: AboutPage }
   | { name: "soon"; section: "skills" | "jobs" | "board" };
 
 interface AppProps {
@@ -225,6 +227,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
       case "profile":
         return "profile";
       case "settings":
+      case "about":
         return "settings";
       default:
         return null;
@@ -330,6 +333,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
       focusComposer();
     } else if (action === "new-project") setDialogOpen(true);
     else if (action === "settings") setRoute({ name: "settings" });
+    else if (action === "about") setRoute({ name: "about", page: "home" });
     else if (action === "quick-edit") {
       if (!api || !quickEdit) return;
       void api.files.pick().then((picked) => {
@@ -570,7 +574,23 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
   } else if (route.name === "profile") {
     screen = <Profile api={api} settings={current} onSaved={(next) => onSettings?.(next)} />;
   } else if (route.name === "settings") {
-    screen = api ? <SettingsScreen api={api} settings={current} onChange={(next) => onSettings?.(next)} /> : null;
+    screen = api ? (
+      <SettingsScreen
+        api={api}
+        settings={current}
+        onChange={(next) => onSettings?.(next)}
+        onAbout={() => setRoute({ name: "about", page: "home" })}
+      />
+    ) : null;
+  } else if (route.name === "about") {
+    screen = api ? (
+      <About
+        api={api}
+        page={route.page}
+        onPage={(page) => setRoute({ name: "about", page })}
+        onSettings={() => setRoute({ name: "settings" })}
+      />
+    ) : null;
   } else if (route.section === "skills" && api) {
     screen = <Skills api={api} tasks={tasks} />;
   } else if (route.section === "jobs" && api && sectionStillOn) {

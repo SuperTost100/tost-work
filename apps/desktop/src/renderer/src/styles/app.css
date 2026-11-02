@@ -3647,7 +3647,7 @@ ol.editable li::before {
   display: grid;
   border-top: 1px solid var(--line-2);
 }
-.links a {
+.links :is(a, button) {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -3655,10 +3655,62 @@ ol.editable li::before {
   border-bottom: 1px solid var(--line-2);
   font-size: 14.5px;
 }
-.links a .ic {
+.links button {
+  width: 100%;
+  text-align: left;
+}
+.links :is(a, button) .ic {
   color: var(--t3);
 }
-.links a .grow + .ic {
+.links :is(a, button):hover {
+  color: var(--ink);
+}
+/* About on a short window: the page scrolls instead of clipping, and still sits in the middle when it fits. */
+.solo.scrolls {
+  overflow: auto;
+  place-items: safe center;
+  padding: 24px 0;
+}
+/* Beside the page there is room for the drawing only on a wide window; below that it would sit over the links. */
+@media (max-width: 1199px) {
+  .about ~ .sprig {
+    display: none;
+  }
+}
+.doc {
+  padding-top: 48px;
+}
+.doc h1 {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 4px;
+}
+.doc .sub {
+  color: var(--t3);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.doc .sgroup .sub {
+  margin-top: 8px;
+}
+.changes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.changes li {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line-2);
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--t2);
+}
+.changes li b {
+  font-weight: 600;
+  color: var(--ink);
+}
+.links :is(a, button) .grow + .ic {
   width: 14px;
   height: 14px;
 }

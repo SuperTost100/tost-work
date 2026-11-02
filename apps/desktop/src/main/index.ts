@@ -47,8 +47,6 @@ import { buttonsPosition } from "./windowButtons";
 
 const isMac = process.platform === "darwin";
 
-// macOS shows these in Tost Work > About, so a build can be told apart from another of the same version.
-app.setAboutPanelOptions({ applicationVersion: __APP_VERSION__, version: __APP_BUILD__ });
 let mainWindow: BrowserWindow | null = null;
 // The menu-bar panel, once the icon has been clicked. Hidden rather than closed between clicks.
 let panel: BrowserWindow | null = null;
@@ -536,17 +534,8 @@ app.whenReady().then(async () => {
         applyLook(mainWindow, next);
         toWindows(IPC.settingsChanged, next);
       },
-      // Only a Mac's About panel shows the build, so Windows and Linux get a small dialog with both.
-      about: () => {
-        if (isMac) return app.showAboutPanel();
-        const options = {
-          type: "info" as const,
-          title: translate(lang, "appMenu.about"),
-          message: "Tost Work",
-          detail: translate(lang, "about.version", { version: __APP_VERSION__, build: __APP_BUILD__ }),
-        };
-        void (mainWindow ? dialog.showMessageBox(mainWindow, options) : dialog.showMessageBox(options));
-      },
+      // The About page in the window, which opens first if it is closed or hidden.
+      about: () => showWindowWith("about"),
       openSite: () => void shell.openExternal("https://tost.one"),
     });
     Menu.setApplicationMenu(Menu.buildFromTemplate(menu));

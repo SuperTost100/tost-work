@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "electron-vite";
 import type { Plugin } from "vite";
 import { buildInfo } from "./build-info";
+import { creditsPlugin } from "./credits";
 
 // The production page may load nothing from the network. The dev server injects an inline React preamble, which this
 // policy would block, so it is added only to the built page.
@@ -25,6 +26,6 @@ export default defineConfig({
   renderer: {
     define: buildInfo,
     resolve: { alias: { "@": resolve("src/renderer/src") } },
-    plugins: [react(), cspInBuild()],
+    plugins: [react(), creditsPlugin(), cspInBuild()],
   },
 });

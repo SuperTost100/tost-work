@@ -73,6 +73,7 @@ export type MenuAction =
   | "new-project"
   | "quick-edit"
   | "settings"
+  | "about"
   | "send"
   | "stop"
   | "rename"
