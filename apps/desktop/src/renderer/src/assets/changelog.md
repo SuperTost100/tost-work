@@ -11,6 +11,32 @@
   wait here until the release bumps the version.
 -->
 
+## 0.0.21
+
+### en
+
+- **What to check stands out:** in Recent, a task waiting for you to look at it has an amber dot. The check mark is for tasks you've already checked. A task saved for later is called a draft.
+- **The model behind each task:** a task's side panel says which choice and model it ran on, such as "Balanced · GPT-6.1 Terra · medium", or "Custom" for a model picked from the list. Under the task box, every level now sees the model behind each choice.
+- **Model list:** it opens below the task box every time, the Reasoning row stays in view, and the full list shows only the newest model of each family.
+- **What you were typing stays:** text and files typed in a task are still there after you open another task and come back.
+- **About:** now the last item in the Settings list.
+- **Export logs:** at the Expert level, Settings saves the app log, the task logs and a summary of the app's state in one zip, ready to send. Keys are masked everywhere, and the summary leaves out your name, notes and emails. The task logs keep what your tasks read and wrote, so look before you send it to someone.
+- **Command output:** when the AI reads back a long command's output, the step says "Reading a command's output" instead of a file name made of random letters.
+- **Helpers in debug mode:** the steps a helper takes show under its "Handing off" line, and the log also keeps everything the AI's command-line tool prints.
+- **Small fixes:** the copy button and the time line up with the message, and Settings rows wrap instead of squeezing with large text.
+
+### it
+
+- **Quello da vedere si nota:** in Recenti, un'attività che aspetta che tu la guardi ha un pallino ambra. La spunta resta per le attività che hai già controllato. Un'attività salvata per dopo si chiama bozza.
+- **Il modello di ogni attività:** il pannello laterale di un'attività dice con quale scelta e quale modello ha lavorato, per esempio "Equilibrato · GPT-6.1 Terra · medio", oppure "Personalizzato" per un modello scelto dall'elenco. Sotto la casella, ogni livello ora vede il modello dietro ogni scelta.
+- **Elenco dei modelli:** si apre sempre sotto la casella, la riga del ragionamento resta in vista e l'elenco completo mostra solo il modello più recente di ogni famiglia.
+- **Quello che scrivi resta:** il testo e i file che hai messo in un'attività ci sono ancora quando apri un'altra attività e torni indietro.
+- **Informazioni:** ora è l'ultima voce dell'elenco di Impostazioni.
+- **Esporta i log:** al livello Esperto, Impostazioni salva in un unico zip il log dell'app, i log delle attività e un riepilogo dello stato dell'app, pronto da inviare. Le chiavi sono nascoste ovunque, e il riepilogo non contiene il tuo nome, le note e le email. I log delle attività contengono quello che le attività hanno letto e scritto, quindi dai un'occhiata prima di mandarlo a qualcuno.
+- **Risultato dei comandi:** quando l'AI rilegge il risultato lungo di un comando, il passaggio dice "Leggo il risultato di un comando" invece di un nome di file fatto di lettere a caso.
+- **Aiutanti in modalità debug:** i passaggi di un aiutante compaiono sotto la sua riga "Delego", e il log tiene anche tutto quello che scrive lo strumento a riga di comando dell'AI.
+- **Piccole correzioni:** il pulsante per copiare e l'orario sono allineati al messaggio, e con il testo grande le righe di Impostazioni vanno a capo invece di schiacciarsi.
+
 ## 0.0.20
 
 ### en
