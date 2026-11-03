@@ -105,6 +105,27 @@ describe("ToolServer", () => {
     await Promise.all([a.close(), b.close()]);
   });
 
+  it("takes open questions, without options or with an empty list", async () => {
+    const client = await connect(server.open("task-o"));
+    const asked = await client.callTool({
+      name: "ask_user",
+      arguments: {
+        questions: [
+          { question: "Describe the event" },
+          { question: "List the guests", options: [] },
+          { question: "Who pays?", options: ["Us", "Them"] },
+        ],
+      },
+    });
+    expect(asked.isError).toBeFalsy();
+    expect(calls.at(-1)?.args).toEqual([
+      { text: "Describe the event", options: [] },
+      { text: "List the guests", options: [] },
+      { text: "Who pays?", options: ["Us", "Them"] },
+    ]);
+    await client.close();
+  });
+
   it("rejects bad input before it reaches the handler", async () => {
     const client = await connect(server.open("task-1"));
     const oneOption = await client.callTool({

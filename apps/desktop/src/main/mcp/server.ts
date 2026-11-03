@@ -41,13 +41,19 @@ function toolsFor(session: Session, handler: ToolHandler): McpServer {
     "ask_user",
     {
       description:
-        'Ask the user what the brief leaves open, all at once: every question you need answered now, up to 16, each with 2 to 4 short answer options. For each question the user either picks one option or writes their own answer instead, never both, so every option must be a complete answer on its own: never an option like "I\'ll tell you the amount". To get a number, a name or a date, ask for it and offer likely values. Then end your turn: the answers arrive together as your next message. If they raise new questions, ask another round.',
+        "Ask the user every question you need answered now, up to 16. Give a question 2 to 4 short options, each a complete answer on its own, or none when the answer needs the user's own words. Then end your turn: the answers arrive together as your next message.",
+
       inputSchema: {
         questions: z
           .array(
             z.object({
               question: z.string().min(1).max(500),
-              options: z.array(z.string().min(1).max(120)).min(2).max(4),
+              // No options makes an open question, answered only in the user's own words.
+              options: z
+                .array(z.string().min(1).max(120))
+                .max(4)
+                .refine((o) => o.length !== 1, { message: "Give 2 to 4 options, or none" })
+                .optional(),
             }),
           )
           .min(1)
@@ -58,7 +64,7 @@ function toolsFor(session: Session, handler: ToolHandler): McpServer {
       text(
         await handler.ask(
           taskId,
-          questions.map((q) => ({ text: q.question, options: q.options })),
+          questions.map((q) => ({ text: q.question, options: q.options ?? [] })),
         ),
       ),
   );
@@ -66,7 +72,7 @@ function toolsFor(session: Session, handler: ToolHandler): McpServer {
     "request_approval",
     {
       description:
-        "Ask before replacing or deleting existing files. Never overwrite or delete without it. Then end your turn: the decision arrives as your next message. If allowed, Tost Work keeps a copy of replaced files and moves deleted files to the Trash itself: don't delete them yourself.",
+        "Ask before replacing or deleting existing files. Then end your turn: the decision arrives as your next message.",
       inputSchema: { action: z.enum(["overwrite", "delete"]), paths: z.array(absolute).min(1).max(50) },
     },
     async ({ action, paths }) => text(await handler.approve(taskId, action, paths)),
@@ -95,7 +101,7 @@ function toolsFor(session: Session, handler: ToolHandler): McpServer {
     "submit_review",
     {
       description:
-        "At the end, check the work against the brief: what the user asked and whether it's done, what you decided on your own, and what the user should check themselves. `asked` covers every request in the task, from the user's first message on, not only the latest: when a later message asks for a file, the file usually delivers an earlier request, so name that request too.",
+        "At the end, check the work against the brief: `asked` is what the user asked and whether it's done, `decided` what you decided on your own, `check_yourself` what the user should check themselves.",
       inputSchema: {
         asked: z.array(item).max(20),
         decided: z.array(item).max(20),

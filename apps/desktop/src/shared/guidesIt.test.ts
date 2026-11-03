@@ -38,7 +38,7 @@ function shape(text: string): string[] {
 describe("the Italian guides", () => {
   it("cover every guide in resources/skills, and nothing else", () => {
     expect(Object.keys(GUIDES_IT).sort()).toEqual(folders);
-    expect(folders).toEqual(["excel", "pdf", "powerpoint", "word"]);
+    expect(folders).toEqual(["email", "excel", "pdf", "powerpoint", "word"]);
   });
 
   for (const name of folders) {

@@ -463,9 +463,10 @@ function QuestionCard({
       value={draft}
       onChange={onDraft}
       onSubmit={() => answer(draft.trim())}
-      placeholder={t("composer.answer")}
+      // An open question has no options: the box is the only way to answer, so it says so and has room for more.
+      placeholder={t(item.options.length ? "composer.answer" : "composer.openAnswer")}
       sendLabel={t(at < items.length - 1 ? "task.nextQuestion" : "composer.start")}
-      minHeight={44}
+      minHeight={item.options.length ? 44 : 88}
       attach={attach}
     >
       <div className="q" key={at} ref={takeFocus} tabIndex={-1}>

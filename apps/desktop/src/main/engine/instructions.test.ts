@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
 import type { Project, Task } from "../../shared/model";
-import { instructionsFor } from "./instructions";
+import { fill, instructionsFor, PARTS, readParts } from "./instructions";
 
 const task = { workdir: "/Users/giulia/Proposte", attachments: [] } as unknown as Task;
 const project = { name: "Proposte", instructions: "Use our template.\n" } as Project;
@@ -10,7 +10,7 @@ describe("instructionsFor", () => {
   it("names the folder, the language, the rules and the project's instructions", () => {
     const text = instructionsFor(task, project, "it");
     expect(text).toContain("/Users/giulia/Proposte");
-    expect(text).toContain("plain Italian");
+    expect(text).toContain("plain informal Italian");
     // A request to think or take stock gets an answer in the chat and an offer of a file; questions go through the card.
     expect(text).toContain("answer in your message");
     expect(text).toContain("Make the file only if they say yes");
@@ -53,7 +53,12 @@ describe("instructionsFor", () => {
     expect(text).toContain("officecli command");
     expect(text).toContain("/app/skills/word/SKILL.md");
     expect(text).toContain("/app/skills/pdf/SKILL.md");
+    expect(text).toContain("For an email the user will send, read /app/skills/email/SKILL.md");
     expect(text).toContain('"Giulia Rossi" as their author');
+    // Without a name, the sentence about the author goes, and nothing is left of it.
+    const nameless = instructionsFor(task, project, "it", { skills: "/app/skills" });
+    expect(nameless).not.toContain("as their author");
+    expect(nameless).not.toContain("{{");
     expect(instructionsFor(task, project, "it")).not.toContain("officecli");
   });
 
@@ -96,7 +101,47 @@ describe("instructionsFor", () => {
     expect(text).toMatch(/carry today's date, \d{4}-\d{2}-\d{2}/);
     // A request that names its files, or keeps one file up to date, wins over the date.
     expect(text).toContain("When the job's request says how to name its files");
+    expect(text).toContain("carrying on could make the user lose work, money or data");
     expect(text).toContain("Put them in /Users/giulia/Proposte/Follow-up.");
     expect(instructionsFor(task, project, "it")).not.toContain("a run of the job");
+  });
+
+  it("speaks to the user informally without emojis, and goes straight to the work without placeholders", () => {
+    const text = instructionsFor(task, project, "it");
+    expect(text).toContain("plain informal Italian");
+    expect(text).toContain("Use no emojis.");
+    expect(text).toContain("no practice runs and no test files");
+    expect(text).toContain("never about tools, commands or tests");
+    expect(text).toContain("Never leave placeholders such as [data] or [nome]");
+    expect(text).toContain('(never "I\'ll write the date")');
+    expect(text).toContain(
+      "A question that needs the user's own words, such as a description or a list, gets no options.",
+    );
+    expect(text).toContain("say so plainly: what you can't do, why, and what you can do instead");
+    // The file's own note and headings stay out.
+    expect(text).not.toContain("<!--");
+    expect(text).not.toMatch(/^# /m);
+  });
+
+  it("leaves a job's folder out when the job has none", () => {
+    const job = { title: "Follow-up check", output: "" };
+    const text = instructionsFor(task, project, "it", null, undefined, [], job);
+    expect(text).toContain("a run of the job");
+    expect(text).not.toContain("Put them in");
+  });
+});
+
+describe("instructions.md", () => {
+  it("has every part, and only those", () => {
+    expect(() => readParts("# Every task\nHi")).toThrow(/missing In a project/);
+    const all = PARTS.map((p) => `# ${p}\ntext`).join("\n");
+    expect(Object.keys(readParts(all))).toEqual([...PARTS]);
+    expect(() => readParts(`${all}\n# Extra\nmore`)).toThrow(/unknown parts Extra/);
+    expect(readParts(`<!--\n# Not a part\n-->\n${all}`)["Every task"]).toBe("text");
+  });
+
+  it("fills values, leaves out a line whose value is empty, and refuses a name it wasn't given", () => {
+    expect(fill("Hi {{name}}.\nBy {{author}}.\nEnd", { name: "Giulia", author: "" })).toBe("Hi Giulia.\nEnd");
+    expect(() => fill("Hi {{nmae}}", { name: "Giulia" })).toThrow("no value for {{nmae}}");
   });
 });

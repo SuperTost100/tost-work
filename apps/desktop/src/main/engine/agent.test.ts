@@ -129,7 +129,7 @@ describe("AgentEngine", () => {
     expect(input?.selection).toMatchObject({ provider: "codex", access: "supervised", cwd: "/w", model: "gpt-6-sol" });
     // Shell commands run in the CLI's sandbox, so they can't write outside the folder.
     expect(input?.sandbox).toBe(true);
-    expect(input?.system).toContain("plain Italian");
+    expect(input?.system).toContain("plain informal Italian");
     expect(input?.mcpServers?.tost_work).toMatchObject({ type: "http", autoApprove: true });
     // Codex searches the web without asking before each site.
     // It also passes on what its subagents write and do.

@@ -6,6 +6,39 @@ export type GuideIt = { title: string; description: string; steps: string };
  * commands and file names are the English guide's, word for word.
  */
 export const GUIDES_IT: Record<string, GuideIt> = {
+  email: {
+    title: "Email",
+    description:
+      "Crea la bozza di un'email che l'utente invierà dal suo programma di posta. Serve per risposte, richieste, solleciti, follow-up, messaggi che accompagnano un file e ogni email a un cliente, a un collega o a un ufficio.",
+    steps: `L'email si legge sul telefono, tra una cosa e l'altra. Scrivi la bozza nel tuo messaggio, pronta da copiare nel programma di posta dell'utente. Tost Work non invia email e un file Word sarebbe solo d'intralcio, quindi crealo solo se l'utente lo chiede.
+
+## La bozza
+
+1. Metti per primo l'oggetto, su una riga a sé: "Oggetto: …" in italiano, "Subject: …" in inglese. Deve dire di cosa parla l'email e cosa serve: "Fattura 112: pagamento scaduto il 15 ottobre".
+2. Poi l'email vera e propria, dal saluto alla firma. Niente prima dell'oggetto, e niente nell'email che non sia per chi la legge.
+3. Arriva al punto nelle prime due righe: perché scrivi e cosa ti serve, con una data quando c'è.
+4. Tienila breve: un'idea per paragrafo, circa 150 parole, a meno che non ci sia altro da dire.
+5. Firma con il nome dell'utente preso dal profilo. Aggiungi ruolo, telefono o indirizzo solo se li danno il profilo o la richiesta.
+
+## Il registro
+
+Il registro dipende da chi riceve l'email, non da come parli con l'utente.
+
+- Un cliente, un fornitore o un ufficio pubblico: formale. In italiano usa il "Lei", "Gentile signor Ferraris" e "Cordiali saluti".
+- Un collega o qualcuno a cui l'utente scrive già in modo informale: "Ciao Marco" e il "tu".
+- La risposta a un'email che l'utente ha incollato: la stessa lingua e lo stesso registro di quell'email.
+
+## Quello che non sai
+
+- Non lasciare mai segnaposto come [data] o [telefono]. Chiedi con \`ask_user\` quello che sa solo l'utente, come una nuova scadenza, oppure scrivi l'email in modo che non serva.
+- Quando l'email accompagna un file dell'attività, nomina il file nel testo e, dopo la bozza, ricorda all'utente di allegarlo.
+
+## Prima di finire
+
+- Scrivi testo semplice: niente grassetto, titoli o simboli Markdown nell'email, perché verrà incollata in un programma di posta.
+- Dopo la bozza, al massimo una riga breve: cosa controllare prima di inviarla, come una data che hai scelto o il file da allegare.
+- Proponi la bozza in un file Word solo se dalla richiesta sembra che serva.`,
+  },
   excel: {
     title: "Fogli Excel",
     description:

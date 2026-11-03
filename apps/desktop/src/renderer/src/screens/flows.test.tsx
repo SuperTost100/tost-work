@@ -277,6 +277,25 @@ describe("the answer draft", () => {
     );
   });
 
+  it("is the only way to answer an open question, which has no options", async () => {
+    const { api } = await startAndWait();
+    act(() => api.emit("t1", { type: "question", question: { id: "q2", text: "Describe the event", options: [] } }));
+    const open = screen.getByRole("textbox", { name: "Write your answer" });
+    expect(screen.queryByRole("button", { name: /We do/ })).toBeNull();
+    let sent: string[] = [];
+    api.tasks.answer = async (_id, answers) => {
+      sent = answers;
+      const [task] = await api.tasks.list();
+      if (!task) throw new Error("no task");
+      return task;
+    };
+    fireEvent.change(open, { target: { value: "A dinner for twenty" } });
+    await act(async () => {
+      fireEvent.keyDown(open, { key: "Enter" });
+    });
+    expect(sent).toEqual(["A dinner for twenty"]);
+  });
+
   it("keeps what was typed while the answer was sending", async () => {
     const { api, box } = await startAndWait();
     // The send succeeds later, and the question stays open, so the box stays on screen.
