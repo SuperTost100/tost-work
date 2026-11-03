@@ -125,7 +125,7 @@ export function Sidebar({
               onContextMenu={contextMenu(task.id)}
             >
               <Clipped className="truncate grow" text={task.title} />
-              {/* Work to look at and work not started yet, so both stay findable at every level, Board or not. */}
+              {/* Every state, so work to look at, not started yet or stopped stays findable at every level, Board or not. */}
               <TaskStatusIcon task={task} />
             </button>
           )}

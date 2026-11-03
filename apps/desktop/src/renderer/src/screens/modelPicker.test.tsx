@@ -160,7 +160,7 @@ describe("the model picker under the task box", () => {
     const api = createMemoryApi({ name: "Giulia", setupDone: true });
     const saved = await api.tasks.saveForLater({ projectId: null, brief: "Sort the invoices" });
     render(<Root api={api} />);
-    // The sidebar lists the task too; the home's To do row opens it.
+    // The sidebar lists the task too; the home's Drafts row opens it.
     await click(await screen.findByRole("button", { name: /Sort the invoices\s*Quick edit/ }));
     await click(picker(/AI for this task/));
     await click(choice(/Thorough/));

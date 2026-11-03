@@ -69,7 +69,7 @@ describe("the board", () => {
     expect(within(needsYou).getByRole("button", { name: "Proposal for Alpi" })).toBeTruthy();
     expect(within(needsYou).getByText("Asks you: Who pays the insurance?")).toBeTruthy();
     expect(within(needsYou).getByText("The task wants to replace contracts.xlsx")).toBeTruthy();
-    expect(within(await group("To do")).getByText("Brief written, not started")).toBeTruthy();
+    expect(within(await group("Drafts")).getByText("Brief written, not started")).toBeTruthy();
     const done = await group("Done in the last 7 days");
     expect(within(done).getByText("to check")).toBeTruthy();
     expect(within(done).getByText("Proposta.docx")).toBeTruthy();
@@ -86,7 +86,7 @@ describe("the board", () => {
     expect(inBoard().getByRole("button", { name: "Supplier contracts summary" })).toBeTruthy();
   });
 
-  it("saves a brief for later from the home's task box, and it waits in To do", async () => {
+  it("saves a brief for later from the home's task box, and it waits in Drafts", async () => {
     const api = createMemoryApi(intermediate);
     await api.projects.create({ name: "Proposals", folder: "/home/giulia/Proposals" });
     const start = vi.spyOn(api.tasks, "start");
@@ -100,7 +100,7 @@ describe("the board", () => {
     const [saved] = await api.tasks.listAll();
     expect(saved).toMatchObject({ status: "draft", brief: "Draft the newsletter", projectId: "p1" });
     await click(button("Board"));
-    expect(within(await group("To do")).getByRole("button", { name: "Draft the newsletter" })).toBeTruthy();
+    expect(within(await group("Drafts")).getByRole("button", { name: "Draft the newsletter" })).toBeTruthy();
   });
 
   it("saves one from New with a brief and a project", async () => {
@@ -115,13 +115,13 @@ describe("the board", () => {
     await click(within(dialog).getByRole("button", { name: "Save for later" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect((await api.tasks.listAll())[0]).toMatchObject({ status: "draft", projectId: "p2", brief: "Rewrite About" });
-    expect(within(await group("To do")).getByText("Website")).toBeTruthy();
+    expect(within(await group("Drafts")).getByText("Website")).toBeTruthy();
   });
 
   it("starts a task saved for later from its row and goes to it", async () => {
     const { api, ids } = await seeded();
     await openBoard(api);
-    const todo = await group("To do");
+    const todo = await group("Drafts");
     await click(within(todo).getByRole("button", { name: "Start" }));
     // The task screen, where it works and asks its question.
     expect(await screen.findByText("Who pays the insurance?")).toBeTruthy();
@@ -199,23 +199,23 @@ describe("the board", () => {
     await waitFor(async () => expect((await api.settings.get()).boardGroup).toBe("project"));
     expect(await group("Proposals")).toBeTruthy();
     expect(within(await group("Website")).getByRole("button", { name: "Write three case studies" })).toBeTruthy();
-    expect(screen.queryByRole("region", { name: "To do" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Drafts" })).toBeNull();
   });
 
-  it("in columns, starts a To do card dropped on Running, and does nothing with other drops", async () => {
+  it("in columns, starts a Drafts card dropped on Running, and does nothing with other drops", async () => {
     const { api, ids } = await seeded();
     const startSaved = vi.spyOn(api.tasks, "startSaved");
     const review = vi.spyOn(api.tasks, "markReviewed");
     await openBoard(api);
     await click(button("Columns"));
     await waitFor(async () => expect((await api.settings.get()).boardView).toBe("columns"));
-    const todo = await group("To do");
+    const todo = await group("Drafts");
     const card = within(todo).getByRole("button", { name: "Write three case studies" });
     expect(card.getAttribute("draggable")).toBe("true");
     // A card that's working can't be picked up.
     expect(inBoard().getByRole("button", { name: "Proposal for Alpi" }).getAttribute("draggable")).toBe("false");
 
-    // Dropped on Done, a To do card stays where it was.
+    // Dropped on Done, a Drafts card stays where it was.
     fireEvent.dragStart(card);
     fireEvent.dragOver(screen.getByRole("region", { name: "Done" }));
     fireEvent.drop(screen.getByRole("region", { name: "Done" }));
@@ -229,9 +229,11 @@ describe("the board", () => {
       fireEvent.drop(screen.getByRole("region", { name: "Running" }));
     });
     expect(startSaved).toHaveBeenCalledWith(ids.later);
-    // The board stays open; the card has left To do.
+    // The board stays open; the card has left Drafts.
     expect(screen.getByRole("heading", { level: 1, name: "Board" })).toBeTruthy();
-    await waitFor(() => expect(within(screen.getByRole("region", { name: "To do" })).queryByRole("button")).toBeNull());
+    await waitFor(() =>
+      expect(within(screen.getByRole("region", { name: "Drafts" })).queryByRole("button")).toBeNull(),
+    );
   });
 
   it("in columns, marks a card to check dropped on Done", async () => {
@@ -339,7 +341,7 @@ describe("the task menu on the board", () => {
     await openBoard(api);
     api.pickInMenu("rename");
     await click(inBoard().getByRole("button", { name: "More for Write three case studies" }));
-    const field = within(await group("To do")).getByRole("textbox", { name: "Rename" });
+    const field = within(await group("Drafts")).getByRole("textbox", { name: "Rename" });
     fireEvent.change(field, { target: { value: "Case studies" } });
     await act(async () => {
       fireEvent.keyDown(field, { key: "Enter" });
@@ -428,11 +430,11 @@ describe("a task saved for later, opened", () => {
   });
 });
 
-describe("the home's To do", () => {
+describe("the home's Drafts", () => {
   it("lists the tasks saved for later, with Start, and no Recent of its own", async () => {
     const { api, ids } = await seeded();
     render(<Root api={api} />);
-    const todo = await screen.findByRole("region", { name: "To do" });
+    const todo = await screen.findByRole("region", { name: "Drafts" });
     expect(within(todo).getByText("Write three case studies")).toBeTruthy();
     expect(within(todo).getByText("Website")).toBeTruthy();
     // Only tasks saved for later: the finished one is in the sidebar's Recent, not here.
@@ -451,12 +453,12 @@ describe("the home's To do", () => {
     await api.tasks.start({ projectId: "p1", brief: "Proposal for Alpi" });
     const { unmount } = render(<Root api={api} />);
     await screen.findAllByText("Proposal for Alpi");
-    expect(screen.queryByRole("region", { name: "To do" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Drafts" })).toBeNull();
     unmount();
 
     await api.tasks.saveForLater({ projectId: "p1", brief: "Write three case studies" });
     render(<Root api={api} />);
-    const todo = await screen.findByRole("region", { name: "To do" });
+    const todo = await screen.findByRole("region", { name: "Drafts" });
     await click(within(todo).getByRole("button", { name: /^Write three case studies/ }));
     expect(await screen.findByText("Saved for later. Nothing has run yet.")).toBeTruthy();
   });
@@ -471,10 +473,10 @@ describe("the message after saving for later", () => {
     fireEvent.change(box, { target: { value: "Draft the newsletter" } });
     await click(button("Save for later"));
     const status = document.querySelector(".toasts [role=status]") as HTMLElement;
-    expect(within(status).getByText("Saved to To do")).toBeTruthy();
+    expect(within(status).getByText("Saved to Drafts")).toBeTruthy();
     await click(within(status).getByRole("button", { name: "Open" }));
     expect(await screen.findByText("Saved for later. Nothing has run yet.")).toBeTruthy();
-    expect(within(status).queryByText("Saved to To do")).toBeNull();
+    expect(within(status).queryByText("Saved to Drafts")).toBeNull();
   });
 
   it("comes after New on the board too, and Escape closes it", async () => {
@@ -486,11 +488,11 @@ describe("the message after saving for later", () => {
     fireEvent.change(within(dialog).getByLabelText("What should get done"), { target: { value: "Rewrite About" } });
     await click(within(dialog).getByRole("button", { name: "Save for later" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(await screen.findByText("Saved to To do")).toBeTruthy();
+    expect(await screen.findByText("Saved to Drafts")).toBeTruthy();
     await act(async () => {
       fireEvent.keyDown(document.body, { key: "Escape" });
     });
-    expect(screen.queryByText("Saved to To do")).toBeNull();
+    expect(screen.queryByText("Saved to Drafts")).toBeNull();
   });
 });
 

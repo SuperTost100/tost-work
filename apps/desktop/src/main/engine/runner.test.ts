@@ -771,7 +771,7 @@ describe("tasks saved for later", () => {
     return { store, runner, runs, picks, setDefaults: (d: Defaults) => (defaults = d) };
   };
 
-  it("waits as To do without running, then starts on the engine's defaults of that moment", async () => {
+  it("waits as a draft without running, then starts on the engine's defaults of that moment", async () => {
     const { store, runner, runs, setDefaults } = counting();
     const saved = runner.create({
       projectId: null,

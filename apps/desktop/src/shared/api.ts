@@ -176,7 +176,7 @@ export interface TostWorkApi {
     get(id: string): Promise<Task | null>;
     /** Creates the task and starts it right away. */
     start(input: NewTaskInput): Promise<Task>;
-    /** Creates the task without starting it: it waits in the board's To do until `startSaved`. */
+    /** Creates the task without starting it: it waits in the board's Drafts until `startSaved`. */
     saveForLater(input: NewTaskInput): Promise<Task>;
     /** Starts a task saved for later, as `start` starts a new one. `pick` is what it runs on, as for `start`. */
     startSaved(id: string, pick?: ModelPick): Promise<Task>;

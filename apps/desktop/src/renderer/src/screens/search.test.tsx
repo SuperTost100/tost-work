@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { describe, expect, it } from "vitest";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
+import type { TostWorkApi } from "../../../shared/api";
 
 // The dialog's field, or with `inDialog` false the sidebar's. It waits for that field itself: the sidebar's is always
 // there, so waiting for any field could find only it while the dialog is still opening.
@@ -31,6 +32,27 @@ const key = async (target: Element, init: KeyboardEventInit) => {
   });
 };
 
+// Opens the app and waits until its task and project lists have arrived: the search lists what they hold, and on a busy
+// runner ⌘K once landed before them (#210). The lists answer late here every time, so the tests can't pass by luck.
+const openApp = async (api: TostWorkApi) => {
+  const loads: Promise<unknown>[] = [];
+  const late =
+    <T,>(list: () => Promise<T>) =>
+    () => {
+      const answer = new Promise((r) => setTimeout(r, 50)).then(list);
+      loads.push(answer);
+      return answer;
+    };
+  api.tasks.list = late(api.tasks.list);
+  api.projects.list = late(api.projects.list);
+  render(<Root api={api} />);
+  await screen.findByRole("button", { name: "Start task" });
+  await act(async () => {
+    await Promise.all(loads);
+  });
+  expect(loads.length).toBeGreaterThan(0);
+};
+
 const options = () => screen.queryAllByRole("option").map((o) => o.textContent);
 
 describe("search", () => {
@@ -39,8 +61,7 @@ describe("search", () => {
     await api.tasks.start({ projectId: null, brief: "Preventivo per Rossi srl", attachments: [] });
     await api.tasks.start({ projectId: null, brief: "Perché la fattura Ferrari è ferma", attachments: [] });
     await api.tasks.start({ projectId: null, brief: "Riunione con Bianchi", attachments: [] });
-    render(<Root api={api} />);
-    await screen.findByRole("button", { name: "Start task" });
+    await openApp(api);
     await key(document.body, { key: "k", ctrlKey: true });
     expect(options()).toHaveLength(3);
     const field = await type("ferrari PERCHE", true);
@@ -58,8 +79,7 @@ describe("search", () => {
     const api = createMemoryApi();
     await api.tasks.start({ projectId: null, brief: "Preventivo per Rossi srl", attachments: [] });
     await api.tasks.start({ projectId: null, brief: "Riunione con Bianchi", attachments: [] });
-    render(<Root api={api} />);
-    await screen.findByRole("button", { name: "Start task" });
+    await openApp(api);
     const side = document.querySelector("aside.side") as HTMLElement;
     const field = await type("rossi", false);
     expect(document.querySelector(".search-dlg")).toBeNull();
@@ -89,8 +109,7 @@ describe("search", () => {
   it("opens and closes with Ctrl+K, finds projects, and says when nothing matches", async () => {
     const api = createMemoryApi();
     await api.projects.create({ name: "Agriturismo La Collina", folder: "/home/giulia/Collina" });
-    render(<Root api={api} />);
-    await screen.findByRole("button", { name: "Start task" });
+    await openApp(api);
     await key(window.document.body, { key: "k", ctrlKey: true });
     await type("collina");
     expect(options()).toEqual([expect.stringContaining("Agriturismo La Collina")]);
@@ -108,8 +127,7 @@ describe("search", () => {
     const search = api.tasks.search;
     let calls = 0;
     api.tasks.search = (query) => (++calls === 1 ? search(query) : new Promise(() => {}));
-    render(<Root api={api} />);
-    await screen.findByRole("button", { name: "Start task" });
+    await openApp(api);
     await key(document.body, { key: "k", ctrlKey: true });
     await type("rossi");
     expect(options()).toEqual([expect.stringContaining("Rossi")]);
@@ -129,8 +147,7 @@ describe("search", () => {
   it("says when the search failed, rather than that nothing matches", async () => {
     const api = createMemoryApi();
     api.tasks.search = () => Promise.reject(new Error("disk"));
-    render(<Root api={api} />);
-    await screen.findByRole("button", { name: "Start task" });
+    await openApp(api);
     await key(document.body, { key: "k", ctrlKey: true });
     await type("rossi");
     expect(screen.getByRole("alert").textContent).toBe("The search didn't work. Try again.");

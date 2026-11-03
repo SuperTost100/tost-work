@@ -60,7 +60,7 @@ const COLUMNS: { place: Place; label: MessageKey }[] = [
   { place: "stopped", label: "board.group.stopped" },
 ];
 
-/** The only two drops that do something: a To do card on Running starts it, a card to review on Done marks it. */
+/** The only two drops that do something: a draft card on Running starts it, a card to review on Done marks it. */
 const accepts = (place: Place, task: Task | undefined): boolean =>
   (place === "running" && task?.status === "draft") || (place === "done" && task !== undefined && toReview(task));
 

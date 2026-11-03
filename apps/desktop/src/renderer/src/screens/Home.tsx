@@ -38,7 +38,7 @@ export function Home({
   onSaveLater?: () => void;
   attach?: Attachments;
   onOpenTask: (id: string) => void;
-  /** Starts a task saved for later, from its row in To do. */
+  /** Starts a task saved for later, from its row in Drafts. */
   onStartSaved: (id: string) => void;
   onNewProject: () => void;
   /** The AI and model for the task about to start, shown to the right of the project picker. */

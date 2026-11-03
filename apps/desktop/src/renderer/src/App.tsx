@@ -280,7 +280,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
       starting.current = false;
     }
   };
-  // Saved without starting, to wait in the board's To do. The user stays where they are, with an empty box.
+  // Saved without starting, to wait in the board's Drafts. The user stays where they are, with an empty box.
   const saveLater = async (text: string, inProject: string | null, attachments: string[], clear: () => void) => {
     if (!api || !text.trim() || starting.current) return;
     starting.current = true;

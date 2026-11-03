@@ -11,6 +11,8 @@ describe("a task's status icon in Recent", () => {
     ["running", "run", "working"],
     ["done", "review", "to check"],
     ["draft", "later", "draft"],
+    ["stopped", "stopped", "stopped"],
+    ["failed", "failed", "failed"],
   ] as const)("shows %s as %s, named in words", (status, kind, label) => {
     render(<TaskStatusIcon task={task(status)} />);
     const icon = screen.getByRole("img", { name: label });
@@ -24,11 +26,9 @@ describe("a task's status icon in Recent", () => {
     expect(screen.getByRole("img", { name: "draft" }).classList.contains("draft")).toBe(false);
   });
 
-  it("shows a check once a finished task has been checked, and nothing for a stopped one", () => {
-    const { container, rerender } = render(<TaskStatusIcon task={task("done", "2026-11-02T10:00:00Z")} />);
+  it("shows a check once a finished task has been checked", () => {
+    render(<TaskStatusIcon task={task("done", "2026-11-02T10:00:00Z")} />);
     expect(screen.getByRole("img", { name: "done" }).classList.contains("seen")).toBe(true);
-    rerender(<TaskStatusIcon task={task("stopped")} />);
-    expect(container.innerHTML).toBe("");
   });
 
   it("names the state for the row's tooltip, the only one visible while the … covers the icon", () => {
@@ -36,6 +36,7 @@ describe("a task's status icon in Recent", () => {
     expect(statusWord(task("needs-you"), t)).toBe("tag.needsYou");
     expect(statusWord(task("done"), t)).toBe("tag.toReview");
     expect(statusWord(task("done", "2026-11-02T10:00:00Z"), t)).toBe("tag.done");
-    expect(statusWord(task("failed"), t)).toBeNull();
+    expect(statusWord(task("stopped"), t)).toBe("tag.stopped");
+    expect(statusWord(task("failed"), t)).toBe("tag.failed");
   });
 });

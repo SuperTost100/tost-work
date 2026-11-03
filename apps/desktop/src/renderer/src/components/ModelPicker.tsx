@@ -29,20 +29,21 @@ function useEffortWord() {
 }
 
 /**
- * What a started task runs on, for its side panel: the choice the user made, then the model and reasoning level behind
- * it, at every level, so people learn which AI does the work. "Personalizzato" for a model picked from the full list;
- * a task from before choices were kept shows the model and level without a choice.
+ * What a started task runs on, for its side panel row: the choice the user made as the row's title, then the model and
+ * reasoning level behind it, at every level, so people learn which AI does the work. "Personalizzato" for a model
+ * picked from the full list; a task from before choices were kept is titled "Modello".
  */
 export function ModelUsed({ task }: { task: Pick<Task, "choice" | "model" | "effort"> }) {
   const t = useT();
   const lang = useContext(LanguageContext);
   const effortWord = useEffortWord();
-  const parts = [
-    ...(task.choice ? [t(task.choice === "custom" ? "model.custom" : `model.${task.choice}`)] : []),
-    nameFromId(task.model),
-    effortWord(task.effort).toLocaleLowerCase(lang),
-  ];
-  return <>{parts.join(" · ")}</>;
+  const title = !task.choice ? t("task.model") : t(task.choice === "custom" ? "model.custom" : `model.${task.choice}`);
+  return (
+    <>
+      <span className="k">{title}</span>
+      <span className="v">{`${nameFromId(task.model)} · ${effortWord(task.effort).toLocaleLowerCase(lang)}`}</span>
+    </>
+  );
 }
 
 /**

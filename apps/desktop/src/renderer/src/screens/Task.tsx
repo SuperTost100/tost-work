@@ -1121,10 +1121,7 @@ export function Task({
                 <div className="setrow">
                   <Icon name="chip" />
                   <span className="grow">
-                    <span className="k">{t("task.model")}</span>
-                    <span className="v">
-                      <ModelUsed task={task} />
-                    </span>
+                    <ModelUsed task={task} />
                   </span>
                 </div>
                 <div className="setrow">
