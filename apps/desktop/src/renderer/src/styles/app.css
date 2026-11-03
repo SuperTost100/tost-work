@@ -3519,9 +3519,13 @@ ol.editable li::before {
 .snav {
   border-right: 1px solid var(--line-2);
   padding: 10px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 2px;
-  align-content: start;
+}
+/* About sits at the bottom of the list, apart from the settings themselves. */
+.snav .about {
+  margin-top: auto;
 }
 .snav a,
 .snav button,

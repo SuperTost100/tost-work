@@ -124,8 +124,8 @@ export function Settings({
               <span className="sr">{t("settings.integrations.when")}</span>
             </span>
           </span>
-          {/* Last in the list, as in the mockup: it opens a page of its own. */}
-          <button type="button" onClick={onAbout}>
+          {/* At the bottom of the list: it opens a page of its own. */}
+          <button type="button" className="about" onClick={onAbout}>
             <Icon name="information" />
             {t("about.crumb")}
           </button>
