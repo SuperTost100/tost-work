@@ -29,6 +29,40 @@ import { instructionsFor } from "./instructions";
 /** What Codex and Claude Code pass on from their subagents: the text for the activity, the calls for the debug view. */
 const SUBAGENTS = { forwardSubagentText: true, forwardSubagentTools: true };
 
+/**
+ * Claude Code's built-in tools that a Tost Work task never uses. Their descriptions went with every request: about
+ * 28,000 of a new task's 41,000 tokens, most of it the claude.ai Artifact tools (#194). Off, a task starts at about
+ * 12,000. The ones a task needs stay on: files, commands, the web, subagents, and TaskCreate and TaskUpdate, which
+ * cli-funnel turns into the task's steps. Tost Work asks the user through its own tools, not AskUserQuestion. A name
+ * an older Claude Code doesn't have is ignored.
+ */
+export const UNUSED_CLAUDE_TOOLS = [
+  "Artifact",
+  "ArtifactComments",
+  "ArtifactData",
+  "AskUserQuestion",
+  "CronCreate",
+  "CronDelete",
+  "CronList",
+  "DesignSync",
+  "EnterPlanMode",
+  "ExitPlanMode",
+  "EnterWorktree",
+  "ExitWorktree",
+  "ListAgents",
+  "Monitor",
+  "NotebookEdit",
+  "PushNotification",
+  "RemoteTrigger",
+  "ReportFindings",
+  "ScheduleWakeup",
+  "SendMessage",
+  "Skill",
+  "TaskStop",
+  "ToolSearch",
+  "Workflow",
+];
+
 const END_TURN =
   "It's in front of the user now. End your turn here: don't do anything else and don't repeat it. Their reply arrives as your next message.";
 
@@ -429,7 +463,7 @@ export class AgentEngine implements Engine, ToolHandler {
       providerOptions:
         (task.provider ?? "codex") === "codex"
           ? { codex: { webSearch: "cached" as const, ...SUBAGENTS } }
-          : { claude: SUBAGENTS },
+          : { claude: { ...SUBAGENTS, disallowedTools: UNUSED_CLAUDE_TOOLS } },
       // While debug is on, every line the CLI prints, for the log. It costs nothing while off.
       verbose: this.verbose(),
       // Claude Code's file tools are held to the folder by the approval policy, but a shell command could write

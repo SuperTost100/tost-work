@@ -7,6 +7,11 @@ import { join } from "node:path";
  * stay off. Tost Work's instructions arrive as developer instructions and list the skills to use, which this leaves
  * alone. The agent could still read skill folders on disk with a command, as it could any file: rule 1 of those
  * instructions keeps it in the task's folder.
+ *
+ * ChatGPT's apps and plugins are off too: a task doesn't use them, they could reach the accounts the user connected
+ * in ChatGPT, and their tools cost tokens on every request (#194). Turning off more, such as image generation, would
+ * save a little more but change the start of every request, which then misses the cache that every other Codex user
+ * keeps warm: measured, the first call cached 0 tokens instead of 12,160.
  */
 export const CODEX_CONFIG = `# Written by Tost Work each time it starts. Changes here are replaced.
 project_doc_max_bytes = 0
@@ -16,6 +21,13 @@ include_instructions = false
 
 [skills.bundled]
 enabled = false
+
+[features]
+apps = false
+plugins = false
+remote_plugin = false
+tool_suggest = false
+skill_search = false
 `;
 
 /**

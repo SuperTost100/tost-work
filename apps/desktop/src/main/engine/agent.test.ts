@@ -650,7 +650,27 @@ describe("AgentEngine", () => {
     // Its shell commands run in Claude Code's sandbox: the policy can't tell where a command writes.
     expect(inputs[0]?.sandbox).toBe(true);
     // Claude Code has its own search tool, so it gets no Codex options; it passes on what its subagents write and do.
-    expect(inputs[0]?.providerOptions).toEqual({ claude: { forwardSubagentText: true, forwardSubagentTools: true } });
+    expect(inputs[0]?.providerOptions).toMatchObject({
+      claude: { forwardSubagentText: true, forwardSubagentTools: true },
+    });
+    // Its built-in tools a task never uses stay off: their descriptions were most of every request (#194). The ones
+    // the task needs stay on, the plan's TaskCreate and TaskUpdate included.
+    const off = (inputs[0]?.providerOptions as { claude?: { disallowedTools?: string[] } })?.claude?.disallowedTools;
+    expect(off).toEqual(expect.arrayContaining(["Artifact", "CronCreate", "EnterWorktree", "NotebookEdit", "Skill"]));
+    for (const needed of [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash",
+      "WebSearch",
+      "WebFetch",
+      "Task",
+      "Agent",
+      "TaskCreate",
+      "TaskUpdate",
+    ])
+      expect(off).not.toContain(needed);
+    expect(off?.some((t) => t.startsWith("mcp__"))).toBe(false);
     // It waits for each command and subagent instead of leaving one in the background and finishing the task.
     expect(inputs[0]?.env).toMatchObject({ CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1" });
     expect(decisions).toEqual([
