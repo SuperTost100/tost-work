@@ -11,6 +11,28 @@
   wait here until the release bumps the version.
 -->
 
+## 0.0.22
+
+### en
+
+- **Open questions:** when the AI needs your own words, such as a description or a list, its question comes with no options, just a box to write your answer in. It still counts as waiting for you and notifies you.
+- **A friendlier tone:** the AI talks to you informally and asks every question it has in one round, in the question card instead of in a message.
+- **Drafts:** "To do" on Home and the Board is now called "Drafts", like the tooltip in Recent.
+- **Stopped tasks in Recent:** a stopped task, including one interrupted when Tost Work closed, shows a grey square, and a failed one shows a red warning.
+- **The model in the side panel:** the row's title is the choice, such as "Balanced", with the model and reasoning level under it.
+- **Lighter Claude tasks:** Claude no longer gets the tools Tost Work never uses, so a task sends about 40% fewer tokens and uses less of your plan. ChatGPT's apps and plugins are off in tasks too.
+- **About:** it sits at the bottom of the Settings list, apart from the settings.
+
+### it
+
+- **Domande aperte:** quando l'AI ha bisogno di parole tue, come una descrizione o un elenco, la domanda arriva senza opzioni, solo con una casella dove scrivere la risposta. L'attività risulta comunque in attesa di te e ti avvisa.
+- **Un tono più amichevole:** l'AI ti dà del tu e fa tutte le domande che ha in un solo giro, nella scheda delle domande invece che in un messaggio.
+- **Bozze:** "Da fare" nella Home e nella Bacheca ora si chiama "Bozze", come nel suggerimento di Recenti.
+- **Attività interrotte in Recenti:** un'attività interrotta, anche quando si è fermata perché hai chiuso Tost Work, mostra un quadrato grigio, e una non riuscita mostra un avviso rosso.
+- **Il modello nel pannello laterale:** il titolo della riga è la scelta, per esempio "Equilibrato", con sotto il modello e il livello di ragionamento.
+- **Attività con Claude più leggere:** Claude non riceve più gli strumenti che Tost Work non usa mai, quindi un'attività manda circa il 40% di token in meno e consuma meno del tuo abbonamento. Anche le app e i plugin di ChatGPT sono spenti nelle attività.
+- **Informazioni:** sta in fondo all'elenco di Impostazioni, separata dalle impostazioni.
+
 ## 0.0.21
 
 ### en
