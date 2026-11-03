@@ -4,6 +4,24 @@ import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
 import type { TostWorkApi } from "../../../shared/api";
 
+// What the page held when a wait ran out, so the next failure of #210 says why: it was seen only once in about 140
+// runs under load, and never with this report in place.
+const pageState = () => {
+  const inPage = document.querySelectorAll('[role="option"]');
+  const hider = inPage[0]?.closest('[aria-hidden="true"], [hidden], [inert]');
+  return [
+    `search dialog in the page: ${document.querySelector(".search-dlg") ? "yes" : "no"}`,
+    `results in the page: ${inPage.length}, visible to the test: ${screen.queryAllByRole("option").length}`,
+    hider ? `hidden by ${hider.tagName.toLowerCase()}.${hider.className}` : "",
+  ]
+    .filter(Boolean)
+    .join("; ");
+};
+const withState = (err: Error) => {
+  err.message += ` (${pageState()})`;
+  return err;
+};
+
 // The dialog's field, or with `inDialog` false the sidebar's. It waits for that field itself: the sidebar's is always
 // there, so waiting for any field could find only it while the dialog is still opening.
 const type = async (text: string, inDialog = true) => {
@@ -18,7 +36,7 @@ const type = async (text: string, inDialog = true) => {
       if (!found) throw new Error(`No search field in the ${inDialog ? "dialog" : "sidebar"} yet`);
       return found;
     },
-    { timeout: 3000 },
+    { timeout: 3000, onTimeout: withState },
   );
   await act(async () => {
     fireEvent.change(field, { target: { value: text } });
@@ -54,6 +72,10 @@ const openApp = async (api: TostWorkApi) => {
 };
 
 const options = () => screen.queryAllByRole("option").map((o) => o.textContent);
+// The results right after ⌘K, waited for like the field (#210): read at once, they were missing in two of about 140
+// runs under load. The check is the same once they show.
+const expectOptions = (check: (shown: (string | null)[]) => void) =>
+  waitFor(() => check(options()), { timeout: 3000, onTimeout: withState });
 
 describe("search", () => {
   it("opens with ⌘K on the recent tasks, finds one by its words, and opens it from the keyboard", async () => {
@@ -63,7 +85,7 @@ describe("search", () => {
     await api.tasks.start({ projectId: null, brief: "Riunione con Bianchi", attachments: [] });
     await openApp(api);
     await key(document.body, { key: "k", ctrlKey: true });
-    expect(options()).toHaveLength(3);
+    await expectOptions((shown) => expect(shown).toHaveLength(3));
     const field = await type("ferrari PERCHE", true);
     expect(options()).toEqual([expect.stringContaining("Perché la fattura Ferrari")]);
     await type("r");
@@ -137,7 +159,7 @@ describe("search", () => {
     await key(document.body, { key: "k", ctrlKey: true });
     await key(document.body, { key: "k", ctrlKey: true });
     expect((document.querySelector(".search-dlg input") as HTMLInputElement).value).toBe("");
-    expect(options()).toHaveLength(2);
+    await expectOptions((shown) => expect(shown).toHaveLength(2));
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     });
