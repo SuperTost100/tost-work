@@ -6,9 +6,12 @@ import { cutOutput, type LogLine } from "../shared/debug";
 import type { Settings } from "../shared/model";
 
 const MASK = "[redacted]";
-/** Fields whose value is a credential, whatever it looks like. */
-const SECRET_FIELD =
-  /^(api[-_]?key|x-api-key|authorization|proxy-authorization|cookie|set-cookie|password|passwd|secret|client[-_]?secret|token|(access|refresh|id|auth|session|bearer)[-_]?token|course[-_]?key)$/i;
+/** The names of fields whose value is a credential, whatever it looks like. */
+const SECRET_NAMES =
+  "api[-_]?key|x-api-key|authorization|proxy-authorization|cookie|set-cookie|password|passwd|secret|client[-_]?secret|token|(?:access|refresh|id|auth|session|bearer)[-_]?token|course[-_]?key";
+const SECRET_FIELD = new RegExp(`^(?:${SECRET_NAMES})$`, "i");
+/** The same field written as JSON inside a line of text, such as a CLI's stderr: `"password":"…"`. */
+const SECRET_JSON_FIELD = new RegExp(`("(?:${SECRET_NAMES})"\\s*:\\s*)"(?:\\\\.|[^"\\\\])*"`, "gi");
 /** Fields holding a set of named values, such as a process's environment, where any value may be a credential. */
 const NAMED_VALUES = /^(env|headers)$/i;
 /** An environment variable named like a credential, as `env` or a script prints it: OPENAI_API_KEY=… */
@@ -23,7 +26,14 @@ const AUTH_HEADER =
  * Bearer values, credentials and query strings in URLs), plus credential-named variables and headers.
  */
 export function redactText(text: string, secrets: (string | undefined)[] = []): string {
-  return redact(text, secrets).replace(ENV_SECRET, `$1=${MASK}`).replace(AUTH_HEADER, `$1$2${MASK}`);
+  return (
+    redact(text, secrets)
+      // JSON fields first: the patterns for environment values and headers stop at a space or an escaped quote, and
+      // run first they would mask a field's start and leave its end.
+      .replace(SECRET_JSON_FIELD, `$1"${MASK}"`)
+      .replace(ENV_SECRET, `$1=${MASK}`)
+      .replace(AUTH_HEADER, `$1$2${MASK}`)
+  );
 }
 
 /** A value with every credential masked, in its strings and in fields named like one. */
@@ -67,7 +77,8 @@ export interface LogFile {
 
 /** The app log and the ones it rotated to: app.log, app.1.log. */
 const APP_LOG = /^app(\.\d+)?\.log$/;
-const TASK_LOG = /^([\w-]{1,100})\.jsonl$/;
+/** A task's events, and next to them what its CLI printed: t1.jsonl, t1.raw.jsonl. */
+const TASK_LOG = /^[\w-]{1,100}(\.raw)?\.jsonl$/;
 
 /** Task ids are UUIDs: anything else could reach outside the logs folder. */
 const SAFE_ID = /^[\w-]{1,100}$/;
@@ -118,6 +129,15 @@ export class DebugLogs {
     return join(this.dir, "tasks", `${taskId}.jsonl`);
   }
 
+  /**
+   * What the task's CLI printed, line by line, which cli-funnel sends as `raw` events in verbose mode. It has a file and
+   * a cap of its own, so a chatty CLI can't stop the events, which the task screen reads, at their cap.
+   */
+  rawFile(taskId: string): string {
+    if (!SAFE_ID.test(taskId)) throw new Error("That isn't a task id");
+    return join(this.dir, "tasks", `${taskId}.raw.jsonl`);
+  }
+
   /** A writer for one run of a task. `secrets` are the run's own, such as its tool server token. */
   forTask(taskId: string, secrets: (string | undefined)[] = []): TaskLog {
     // Read once per run rather than per line: reading the course key decrypts it.
@@ -127,7 +147,7 @@ export class DebugLogs {
         if (!this.on()) return;
         const at = this.now();
         this.enqueue(async () => {
-          const file = this.taskFile(taskId);
+          const file = line.type === "raw" ? this.rawFile(taskId) : this.taskFile(taskId);
           all ??= [...secrets, ...this.secrets()];
           const masked = redactValue({ ...line, at }, all);
           await this.appendCapped(file, `${JSON.stringify(masked)}\n`, at);
@@ -268,13 +288,14 @@ export class DebugLogs {
     });
   }
 
-  /** Deletes the task's log, with the task. */
+  /** Deletes the task's logs, with the task. */
   async removeTask(taskId: string): Promise<void> {
     await this.flush();
-    const file = this.taskFile(taskId);
-    this.sizes.delete(file);
-    this.capped.delete(file);
-    await rm(file, { force: true });
+    for (const file of [this.taskFile(taskId), this.rawFile(taskId)]) {
+      this.sizes.delete(file);
+      this.capped.delete(file);
+      await rm(file, { force: true });
+    }
   }
 
   /** Resolves once every line asked for so far is written. */

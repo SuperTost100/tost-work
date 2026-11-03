@@ -59,6 +59,22 @@ describe("redaction", () => {
     expect(masked).toContain('"PATH":"[redacted]"');
   });
 
+  it("masks a credential field written as JSON inside a line of text", () => {
+    const line = '{"type":"x","password":"hunter2","access_token":"ab\\"c","api_key" : "k1","sessionId":"s-123"}';
+    const masked = redactText(`stderr: ${line}`);
+    for (const secret of ["hunter2", 'ab\\"c', "k1"]) expect(masked).not.toContain(secret);
+    expect(masked).toContain('"password":"[redacted]"');
+    // What isn't a credential stays readable.
+    expect(masked).toContain('"sessionId":"s-123"');
+    // A header written as JSON is masked whole, past an escaped quote.
+    const headers = redactText('{"authorization":"Bearer abc\\"sensitive-tail","x-api-key":"k\\"other-tail"}');
+    expect(headers).not.toContain("sensitive-tail");
+    expect(headers).not.toContain("other-tail");
+    // And before environment values, whose mask would otherwise eat the field's start and leave its end.
+    const env = redactText('{"cmd":"API_KEY=abc","password":"correct horse battery"}');
+    expect(env).not.toContain("horse battery");
+  });
+
   it("masks a secret given by value even when it doesn't look like a key", () => {
     expect(redactText("token=abc and opaque-value-42", ["opaque-value-42"])).not.toContain("opaque-value-42");
   });
@@ -131,6 +147,30 @@ describe("DebugLogs", () => {
     await debug.removeTask("t1");
     expect(await debug.readTask("t1")).toBeNull();
     expect(debug.hasTask("t1")).toBe(false);
+  });
+
+  it("keeps what the CLI printed in a file of its own, masked, and deletes it with the task", async () => {
+    const { dir, debug } = await logs(true, { task: 400, app: 1000 });
+    const log = debug.forTask("t1", [SERVER_TOKEN]);
+    log.write({ type: "run" });
+    log.write({
+      type: "raw",
+      provider: "claude",
+      source: "stdout",
+      data: { token: SERVER_TOKEN, text: "x".repeat(600) },
+    });
+    log.write({ type: "raw", provider: "claude", source: "stderr", data: `key ${COURSE_KEY}` });
+    log.write({ type: "tool.start", id: "c1", name: "Read" });
+    await debug.flush();
+    // The raw lines filled their own file to its cap, and the events kept going in theirs.
+    const events = (await readFile(join(dir, "tasks", "t1.jsonl"), "utf8")).trim().split("\n");
+    expect(events.map((l) => JSON.parse(l).type)).toEqual(["run", "tool.start"]);
+    const raw = await readFile(join(dir, "tasks", "t1.raw.jsonl"), "utf8");
+    expect(raw).not.toContain(SERVER_TOKEN);
+    expect(raw).not.toContain(COURSE_KEY);
+    expect(raw).toContain("log.capped");
+    await debug.removeTask("t1");
+    expect(await readdir(join(dir, "tasks"))).toEqual([]);
   });
 
   it("refuses a task id that could reach outside the logs folder", async () => {
@@ -208,11 +248,12 @@ describe("snapshot", () => {
     debug.app("info", "second line, which moves the first to app.1.log");
     debug.forTask("task-1").write({ type: "run" });
     debug.forTask("task-2").write({ type: "run" });
+    debug.forTask("task-2").write({ type: "raw", source: "stdout", data: "x" });
     await debug.flush();
     await writeFile(join(dir, "tasks", "notes.txt"), "not a log");
     const names = (await debug.snapshot()).files.map((f) => f.name);
     expect(names.slice(0, 2)).toEqual(["app.1.log", "app.log"]);
-    expect(names.slice(2).sort()).toEqual(["tasks/task-1.jsonl", "tasks/task-2.jsonl"]);
+    expect(names.slice(2).sort()).toEqual(["tasks/task-1.jsonl", "tasks/task-2.jsonl", "tasks/task-2.raw.jsonl"]);
   });
 
   it("stops at its size budget, keeping the app log and the newest task logs", async () => {

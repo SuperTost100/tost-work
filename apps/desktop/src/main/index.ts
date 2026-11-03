@@ -251,6 +251,7 @@ app.whenReady().then(async () => {
       online: () => net.isOnline(),
       skills: () => skills.list(),
       job: (id) => store.getJob(id),
+      verbose: () => debugOn,
       taskLog: (taskId, secrets) => debugLogs.forTask(taskId, secrets),
     });
     tools = new ToolServer(agent);

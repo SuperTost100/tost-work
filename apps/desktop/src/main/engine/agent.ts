@@ -26,6 +26,9 @@ import { instructionsFor } from "./instructions";
  * about 30 seconds back to the model, which then guesses or gives up. So the agent ends its turn, and the user's
  * answer or decision starts the next one.
  */
+/** What Codex and Claude Code pass on from their subagents: the text for the activity, the calls for the debug view. */
+const SUBAGENTS = { forwardSubagentText: true, forwardSubagentTools: true };
+
 const END_TURN =
   "It's in front of the user now. End your turn here: don't do anything else and don't repeat it. Their reply arrives as your next message.";
 
@@ -236,6 +239,7 @@ export class AgentEngine implements Engine, ToolHandler {
   private skills: () => Promise<Skill[]>;
   private job: (id: string) => Pick<Job, "title" | "output"> | undefined;
   private taskLog: (taskId: string, secrets: (string | undefined)[]) => TaskLog;
+  private verbose: () => boolean;
 
   constructor(
     private funnel: AgentFunnel,
@@ -256,6 +260,8 @@ export class AgentEngine implements Engine, ToolHandler {
       skills?: () => Promise<Skill[]>;
       /** The job a task is a run of, so the agent knows nobody is watching and where the files go. */
       job?: (id: string) => Pick<Job, "title" | "output"> | undefined;
+      /** Whether debug is on, so a run also sends what its CLI prints, for the log. */
+      verbose?: () => boolean;
       /** The task's debug log, which writes only while debug is on. `secrets` are masked in every line. */
       taskLog?: (taskId: string, secrets: (string | undefined)[]) => TaskLog;
     } = {},
@@ -268,6 +274,7 @@ export class AgentEngine implements Engine, ToolHandler {
     this.usable = options.usable ?? (async () => []);
     this.skills = options.skills ?? (async () => []);
     this.job = options.job ?? (() => undefined);
+    this.verbose = options.verbose ?? (() => false);
     this.taskLog = options.taskLog ?? (() => ({ write: () => {} }));
   }
 
@@ -417,12 +424,14 @@ export class AgentEngine implements Engine, ToolHandler {
       ...(env ? { env } : {}),
       ...(apiKey ? { apiKey } : {}),
       // Web search, without asking before each site. Codex searches OpenAI's web index: its live search needs a looser
-      // access level than supervised. Claude Code has its own search tool, which the policy allows, and passes on
-      // what its subagents write, so the activity shows that work too.
+      // access level than supervised. Claude Code has its own search tool, which the policy allows. Both pass on what
+      // their subagents write, for the activity, and the tool calls they make, for the debug view.
       providerOptions:
         (task.provider ?? "codex") === "codex"
-          ? { codex: { webSearch: "cached" as const } }
-          : { claude: { forwardSubagentText: true } },
+          ? { codex: { webSearch: "cached" as const, ...SUBAGENTS } }
+          : { claude: SUBAGENTS },
+      // While debug is on, every line the CLI prints, for the log. It costs nothing while off.
+      verbose: this.verbose(),
       // Claude Code's file tools are held to the folder by the approval policy, but a shell command could write
       // anywhere: its sandbox stops that. Codex at supervised was sandboxed already. A sandbox that can't start fails
       // the run rather than letting it go unconfined.
@@ -458,7 +467,8 @@ export class AgentEngine implements Engine, ToolHandler {
             said += event.text;
             channel.push({ type: "text", text: event.text });
           } else if (event.type === "plan") channel.push({ type: "plan", steps: event.steps });
-          else if (event.type === "tool.start") {
+          // A subagent's own calls show in the debug view under the line that handed it off, from the log.
+          else if (event.type === "tool.start" && !event.parentId) {
             const note = noteText(said);
             said = "";
             if (note) channel.push({ type: "activity", kind: "note", target: note });

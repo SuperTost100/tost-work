@@ -115,6 +115,33 @@ describe("debug mode on a task", () => {
     expect(screen.getByText("Now I can write the summary.").closest("li")?.className).toBe("dbg-think");
   });
 
+  it("opens a hand-off onto what the subagent wrote and the calls it made, indented under it", async () => {
+    const api = createMemoryApi({ name: "Giulia", setupDone: true, level: "expert", debug: true });
+    const task = await api.tasks.start({ projectId: null, brief: "Find the sources", attachments: [] });
+    act(() => {
+      api.emit(task.id, { type: "withdrawn", id: "q1" });
+      api.emit(task.id, { type: "activity", kind: "helper", target: "Search the web", id: "a1" });
+    });
+    for (const l of [
+      line({ type: "tool.start", id: "a1", name: "Agent", input: { description: "Search the web", prompt: "…" } }),
+      line({ type: "tool.start", id: "s1", parentId: "a1", name: "WebSearch", input: { query: "Biella sources" } }),
+      line({ type: "tool.end", id: "s1", parentId: "a1", output: "12 results" }),
+      line({ type: "subagent.text", parentId: "a1", text: "Found 12 sources." }),
+      line({ type: "tool.end", id: "a1", output: "Done" }),
+    ])
+      api.log(task.id, l);
+    render(<Root api={api} />);
+    const [open] = await screen.findAllByText("Find the sources");
+    await act(async () => {
+      fireEvent.click(open as HTMLElement);
+    });
+    await click(/Handing off: Search the web/);
+    const sub = screen.getByText("Biella sources").closest(".dbg-sub");
+    expect(sub).not.toBeNull();
+    expect(within(sub as HTMLElement).getByText("Found 12 sources.")).toBeTruthy();
+    expect(within(sub as HTMLElement).getByText("12 results")).toBeTruthy();
+  });
+
   it("shows the AI, model, effort, session and tokens above the task", async () => {
     await taskWithLog(true);
     const facts = within(await screen.findByRole("region", { name: "Technical details" }));

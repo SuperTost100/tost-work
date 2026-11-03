@@ -132,7 +132,12 @@ describe("AgentEngine", () => {
     expect(input?.system).toContain("plain Italian");
     expect(input?.mcpServers?.tost_work).toMatchObject({ type: "http", autoApprove: true });
     // Codex searches the web without asking before each site.
-    expect(input?.providerOptions).toEqual({ codex: { webSearch: "cached" } });
+    // It also passes on what its subagents write and do.
+    expect(input?.providerOptions).toEqual({
+      codex: { webSearch: "cached", forwardSubagentText: true, forwardSubagentTools: true },
+    });
+    // What the CLI prints goes to the log only while debug is on.
+    expect(input?.verbose).toBe(false);
     // Codex's own question tool would hold the turn open, which Codex gives up on after about 30 seconds.
     expect(input?.onQuestion).toBeUndefined();
     expect(seen).toEqual([
@@ -546,6 +551,9 @@ describe("AgentEngine", () => {
   it("shows a Claude subagent's work in the activity, under the line that hands it off", async () => {
     const { funnel } = fakeFunnel(async (_input, emit) => {
       emit({ type: "tool.start", id: "a1", name: "Agent", input: { description: "Trova le fonti", prompt: "…" } });
+      // The subagent's own calls are for the debug view, under the line that hands it off, not lines of their own.
+      emit({ type: "tool.start", id: "s1", parentId: "a1", agent: "general-purpose", name: "WebSearch", input: {} });
+      emit({ type: "tool.end", id: "s1", parentId: "a1", output: "…" });
       emit({ type: "subagent.text", parentId: "a1", text: "Ho trovato 12   fonti\nutili." });
       return { text: "Fatto." };
     });
@@ -564,15 +572,17 @@ describe("AgentEngine", () => {
 
   it("writes the run and every event to the task's log, with the run's token and the course key among its secrets", async () => {
     const key = { key: "sk-ant-api03-thecoursekeyfortoday0123456789", vendor: "anthropic" as const };
-    const { funnel } = fakeFunnel(async (_input, emit) => {
+    const { funnel, inputs } = fakeFunnel(async (_input, emit) => {
       emit({ type: "reasoning.delta", text: "Leggo prima le note." });
       emit({ type: "tool.start", id: "c1", name: "Read", input: { file_path: "/w/note.txt" } });
       emit({ type: "tool.end", id: "c1", output: "le note" });
+      emit({ type: "raw", provider: "claude", source: "stderr", data: "warning" });
       return { text: "Fatto." };
     });
     const written: { taskId: string; secrets: (string | undefined)[]; line: Record<string, unknown> }[] = [];
     const engine = new AgentEngine(funnel, () => "it", {
       courseKey: () => key,
+      verbose: () => true,
       taskLog: (taskId, secrets) => ({ write: (line) => written.push({ taskId, secrets, line }) }),
     });
     engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok-123" }), close: () => {} });
@@ -581,7 +591,16 @@ describe("AgentEngine", () => {
     for await (const _ of engine.run({ task: t, project: null, workdir: "/w", followUp: "Ancora", signal })) {
       // Drained for the log it writes.
     }
-    expect(written.map((w) => w.line.type)).toEqual(["run", "reasoning.delta", "tool.start", "tool.end", "run.end"]);
+    expect(written.map((w) => w.line.type)).toEqual([
+      "run",
+      "reasoning.delta",
+      "tool.start",
+      "tool.end",
+      "raw",
+      "run.end",
+    ]);
+    // Debug is on, so the CLI's own output comes too.
+    expect(inputs[0]?.verbose).toBe(true);
     expect(written[0]?.line).toEqual({
       type: "run",
       provider: "claude",
@@ -630,8 +649,8 @@ describe("AgentEngine", () => {
     expect(inputs[0]?.selection).toMatchObject({ provider: "claude", model: "claude-sonnet-5-5", cwd: workdir });
     // Its shell commands run in Claude Code's sandbox: the policy can't tell where a command writes.
     expect(inputs[0]?.sandbox).toBe(true);
-    // Claude Code has its own search tool, so it gets no Codex options; it passes on what its subagents write.
-    expect(inputs[0]?.providerOptions).toEqual({ claude: { forwardSubagentText: true } });
+    // Claude Code has its own search tool, so it gets no Codex options; it passes on what its subagents write and do.
+    expect(inputs[0]?.providerOptions).toEqual({ claude: { forwardSubagentText: true, forwardSubagentTools: true } });
     // It waits for each command and subagent instead of leaving one in the background and finishing the task.
     expect(inputs[0]?.env).toMatchObject({ CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1" });
     expect(decisions).toEqual([
