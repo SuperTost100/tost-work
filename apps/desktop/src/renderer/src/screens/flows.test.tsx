@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { App } from "@/App";
+import { versionLabel } from "@/lib/changelog";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { DEFAULT_SETTINGS } from "../../../shared/model";
 
@@ -105,6 +106,51 @@ describe("attaching files after the first message", () => {
     expect(container.querySelector(".msg.mine:not(:first-child) .out")?.textContent).toBe("letter-bank.docx");
     // The box is empty again, files and all.
     expect(container.querySelector(".foot .attached")).toBeNull();
+  });
+
+  it("hides the earlier turn's preview while a follow-up runs, and shows it again when it ends", async () => {
+    const api = createMemoryApi();
+    await api.projects.create({ name: "Proposals", folder: "/Users/giulia/Proposals" });
+    // Hold back the follow-up's end, so the window sees it running.
+    const listen = api.tasks.onChange;
+    let holding = false;
+    const held: Array<() => void> = [];
+    api.tasks.onChange = (l) =>
+      listen((task) => {
+        if (holding && task.status !== "running") held.push(() => l(task));
+        else l(task);
+      });
+    const { container } = render(<App userName="Giulia" api={api} />);
+    // Home starts on the project once the list has come in.
+    await screen.findByText("Proposals");
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal for Alpi Logistica" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: /We do/ }));
+    });
+    await screen.findByText("Check it against your brief");
+    expect(container.querySelector(".artifact")).not.toBeNull();
+
+    holding = true;
+    fireEvent.change(screen.getAllByRole("textbox").at(-1) as HTMLElement, { target: { value: "Shorter" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    });
+    await screen.findByText("Done, I made the change.");
+    expect(container.querySelector(".artifact")).toBeNull();
+    // Picking the file in the side panel shows it anyway, for example to look at it before allowing a change.
+    const pick = container.querySelector<HTMLElement>(".rp .pick-file");
+    expect(pick).not.toBeNull();
+    act(() => pick?.click());
+    expect(container.querySelector(".artifact")).not.toBeNull();
+
+    holding = false;
+    act(() => {
+      for (const deliver of held) deliver();
+    });
+    expect(container.querySelector(".artifact")).not.toBeNull();
   });
 
   it("sends a follow-up once when Send is pressed twice while it's on its way", async () => {
@@ -461,17 +507,17 @@ describe("approvals", () => {
       fireEvent.click(screen.getByRole("button", { name: "Allow overwrite" }));
     });
     expect(screen.queryByRole("button", { name: "Allow overwrite" })).toBeNull();
-    expect(screen.getByText("The version before the edit is kept")).toBeTruthy();
+    expect(screen.getByText("Earlier version")).toBeTruthy();
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Restore" }));
     });
-    expect(screen.getByText("You restored the earlier version")).toBeTruthy();
+    expect(screen.getByText("Restored")).toBeTruthy();
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     });
     // Undo puts the edited version back, so the row is back to offering Restore.
-    expect(screen.getByText("The version before the edit is kept")).toBeTruthy();
+    expect(screen.getByText("Earlier version")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Restore" })).toBeTruthy();
   });
 });
@@ -862,7 +908,7 @@ describe("projects", () => {
     render(<App userName="Giulia" api={createMemoryApi()} />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     fireEvent.click(screen.getByRole("button", { name: "About" }));
-    expect(screen.getByText(`${__APP_VERSION__} · build ${__APP_BUILD__}`)).toBeTruthy();
+    expect(screen.getByText(`${versionLabel(__APP_VERSION__)} · build ${__APP_BUILD__}`)).toBeTruthy();
   });
 
   it("shows a placeholder for a section that can't work without the main process", () => {

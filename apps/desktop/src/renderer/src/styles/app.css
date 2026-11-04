@@ -1395,18 +1395,19 @@ textarea {
   gap: 8px;
   padding: 0 16px 14px;
 }
-.kept {
+/* Under a replaced file's name: the kept copy, on the file's own second line, so the row stays two lines tall. */
+.fileline .kept {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 0 6px 42px;
-  font-size: 13px;
-  color: var(--t3);
+  min-width: 0;
+  white-space: nowrap;
 }
-.kept .ic {
-  width: 14px;
-  height: 14px;
-  flex: none;
+.fileline .grow:has(.kept) {
+  padding-right: 4px;
+}
+/* Restore sits beside the note: a narrow button leaves the note its whole width in a narrow panel. */
+.fileline .grow:has(.kept) ~ .tbtn {
+  padding: 0 6px;
+  margin-right: -6px;
 }
 .asking .o.own {
   color: var(--t3);
@@ -2467,12 +2468,49 @@ h2.gh {
   margin: 18px 0 2px;
 }
 /* File names stay on one line: long ones are cut, and a row too wide for the card scrolls sideways. */
+/* Tabs that don't fit fade out at the edge where more of them are hidden, instead of being cut off mid-word. The fades
+   follow the scroll position; a strip that fits has no scroll timeline, so the animation and its fades stay off. */
+@property --fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes ftabs-fade {
+  from {
+    --fade-start: 0px;
+    --fade-end: 40px;
+  }
+  15% {
+    --fade-start: 40px;
+  }
+  85% {
+    --fade-end: 40px;
+  }
+  to {
+    --fade-start: 40px;
+    --fade-end: 0px;
+  }
+}
 .ftabs {
   display: flex;
   gap: 2px;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--fade-start),
+    #000 calc(100% - var(--fade-end)),
+    transparent
+  );
+  animation: ftabs-fade linear both;
+  animation-timeline: scroll(self inline);
 }
 .ftabs a {
   height: 28px;

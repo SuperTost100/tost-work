@@ -12,6 +12,17 @@ What 0.0.1 and 0.1.0 contain, agreed with Tost on 2026-10-25. The screens are in
 | 0.2.0 (V2) | Everyone | Everything works, with Advanced unlocked at the Expert level. |
 | 0.3.0 (V3) | Everyone | Advanced is finished. |
 
+### Version names
+
+Tost decided on 2026-11-04 that a version carries its stage after the number, and the milestones and the roadmap board follow it:
+
+- dev builds for Tost: `0.0.23-dev` and up (the builds up to 0.0.22 had no stage);
+- the alphas: `0.1.0-alpha` to `0.5.0-alpha`;
+- the betas: `0.6.0-beta` and up;
+- stable releases: `1.0.0` and up, with no stage.
+
+The number comes first because npm, electron-builder and the updater accept only versions in that form, and the updater reads "alpha" and "beta" as channels. About shows a version as "0.1.0 alpha". What's new lists only the entries of the build's own stage, so the first alpha's entry sums up everything before it. The rest of this file was written before the stages, so its "0.1.0" means `0.1.0-alpha`.
+
 The public beta starts at 0.1.0, when this repository goes public after Tost has seen a preview, and a real release comes only after the beta. There's no deadline for any version, 0.1.0 included, because no course is waiting on it.
 
 ## Order of work

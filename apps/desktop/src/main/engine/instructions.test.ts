@@ -118,6 +118,7 @@ describe("instructionsFor", () => {
       "A question that needs the user's own words, such as a description or a list, gets no options.",
     );
     expect(text).toContain("say so plainly: what you can't do, why, and what you can do instead");
+    expect(text).toContain("Do everything the user asked before you end your turn");
     // The file's own note and headings stay out.
     expect(text).not.toContain("<!--");
     expect(text).not.toMatch(/^# /m);

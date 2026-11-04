@@ -1,17 +1,49 @@
 <!--
   What changed in each version, in plain language, newest first. A release adds one block at the top:
 
-    ## 0.0.21
+    ## 0.1.0-alpha
     ### en
     - **Short title:** one or two sentences on what the user sees.
     ### it
     - **Titolo breve:** la stessa cosa in italiano.
 
+  A version is the numbers, then its stage before 1.0.0: 0.0.x-dev for dev builds, 0.1.0-alpha to 0.5.0-alpha, then
+  -beta, then 1.0.0 with no stage. The app lists only the entries of its own stage, so the first alpha's entry sums
+  up everything before it.
+
   Every version needs both languages. A version newer than the app isn't shown, so the entry for the next release can
   wait here until the release bumps the version.
 -->
 
-## 0.0.22
+## 0.0.23-dev
+
+### en
+
+- **Version names:** builds now say their stage after the number. This one is "0.0.23 dev", the alphas will be "0.1.0 alpha" to "0.5.0 alpha", then come the betas and 1.0.0. What's new lists only the versions of the same stage.
+- **Recent tasks:** the sidebar heading is now "Recent tasks".
+- **About:** the line under the name reads "AI that works with you."
+- **The model of older tasks:** a task from before the choices were kept shows the choice its model matches, or "Custom", instead of "Model".
+- **No more stray lines:** clicking a task and then pressing a key such as Shift no longer draws a black line around it, and neither does answering a question. The outline shows only when you move with Tab or the arrow keys.
+- **Scheduled jobs:** the columns use the whole width, so the last run's file name isn't cut short.
+- **The AI finishes what you ask:** it does the whole request before it stops, instead of stopping halfway to list what's left. It still stops to ask you something or to ask before replacing a file.
+- **Follow-ups:** while the AI works on a follow-up, the preview of the earlier result is hidden, and it comes back when the work ends.
+- **Replaced files:** a file the AI replaced takes two lines in the side panel, with "Earlier version" under its name and Restore beside it.
+- **File tabs:** when the files don't all fit above the preview, the tabs fade out at the edge instead of being cut off.
+
+### it
+
+- **Nomi delle versioni:** le build ora dicono la loro fase dopo il numero. Questa è "0.0.23 dev", le alpha saranno da "0.1.0 alpha" a "0.5.0 alpha", poi arriveranno le beta e la 1.0.0. Le novità elencano solo le versioni della stessa fase.
+- **Attività recenti:** il titolo nella barra laterale ora è "Attività recenti".
+- **Informazioni:** la riga sotto il nome dice "L'AI che lavora con te."
+- **Il modello delle attività più vecchie:** un'attività di prima che le scelte venissero salvate mostra la scelta a cui corrisponde il suo modello, oppure "Personalizzato", invece di "Modello".
+- **Niente più righe strane:** cliccare un'attività e poi premere un tasto come Maiusc non disegna più una riga nera intorno, e nemmeno rispondere a una domanda. Il contorno compare solo quando ti sposti con Tab o con le frecce.
+- **Lavori pianificati:** le colonne usano tutta la larghezza, così il nome del file dell'ultima esecuzione non viene tagliato.
+- **L'AI finisce quello che chiedi:** fa tutta la richiesta prima di fermarsi, invece di fermarsi a metà per elencare quello che manca. Si ferma ancora per farti una domanda o per chiederti prima di sostituire un file.
+- **Richieste successive:** mentre l'AI lavora a una nuova richiesta, l'anteprima del risultato precedente è nascosta e torna quando il lavoro finisce.
+- **File sostituiti:** un file che l'AI ha sostituito occupa due righe nel pannello laterale, con "Versione precedente" sotto il nome e Ripristina accanto.
+- **Schede dei file:** quando i file non stanno tutti sopra l'anteprima, le schede sfumano sul bordo invece di essere tagliate.
+
+## 0.0.22-dev
 
 ### en
 
@@ -33,7 +65,7 @@
 - **Attività con Claude più leggere:** Claude non riceve più gli strumenti che Tost Work non usa mai, quindi un'attività manda circa il 40% di token in meno e consuma meno del tuo abbonamento. Anche le app e i plugin di ChatGPT sono spenti nelle attività.
 - **Informazioni:** sta in fondo all'elenco di Impostazioni, separata dalle impostazioni.
 
-## 0.0.21
+## 0.0.21-dev
 
 ### en
 
@@ -59,7 +91,7 @@
 - **Aiutanti in modalità debug:** i passaggi di un aiutante compaiono sotto la sua riga "Delego", e il log tiene anche tutto quello che scrive lo strumento a riga di comando dell'AI.
 - **Piccole correzioni:** il pulsante per copiare e l'orario sono allineati al messaggio, e con il testo grande le righe di Impostazioni vanno a capo invece di schiacciarsi.
 
-## 0.0.20
+## 0.0.20-dev
 
 ### en
 
@@ -81,7 +113,7 @@
 - **Finestre piccole:** Impostazioni, la pagina di una skill, quella di un progetto, il file di un'attività e la modifica veloce non vengono più schiacciati o tagliati in una finestra piccola o con il testo grande.
 - **Aiutanti di ChatGPT:** mentre ChatGPT aspetta il lavoro che ha delegato, l'attività lo dice.
 
-## 0.0.19
+## 0.0.19-dev
 
 ### en
 

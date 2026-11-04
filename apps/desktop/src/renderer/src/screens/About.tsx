@@ -1,6 +1,6 @@
 import credits from "virtual:credits";
 import { Fragment, type ReactNode, useContext } from "react";
-import { CHANGELOG, shownEntries } from "@/lib/changelog";
+import { CHANGELOG, shownEntries, versionLabel } from "@/lib/changelog";
 import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
 import { LanguageContext, useT } from "@/lib/useT";
@@ -44,7 +44,7 @@ function News() {
         <p className="sub">{t("news.sub")}</p>
         {shownEntries(CHANGELOG, __APP_VERSION__).map((entry) => (
           <section className="sgroup" key={entry.version} aria-labelledby={`news-${entry.version}`}>
-            <h2 id={`news-${entry.version}`}>{entry.version}</h2>
+            <h2 id={`news-${entry.version}`}>{versionLabel(entry.version)}</h2>
             <ul className="changes">
               {entry.items[lang].map((text) => (
                 <li key={text}>
@@ -159,7 +159,9 @@ export function About({
               <span>{t("about.tagline")}</span>
             </h1>
             <div className="ver">
-              <span className="tag">{t("about.tag", { version: __APP_VERSION__, build: __APP_BUILD__ })}</span>
+              <span className="tag">
+                {t("about.tag", { version: versionLabel(__APP_VERSION__), build: __APP_BUILD__ })}
+              </span>
             </div>
             <p>{t("about.description")}</p>
             <div className="links">
@@ -171,7 +173,7 @@ export function About({
               </ExternalLink>
               <button type="button" onClick={() => onPage("news")}>
                 <Icon name="sparkles" />
-                <span className="grow">{t("about.news", { version: __APP_VERSION__ })}</span>
+                <span className="grow">{t("about.news", { version: versionLabel(__APP_VERSION__) })}</span>
                 <Icon name="right" />
               </button>
               <button type="button" onClick={() => onPage("credits")}>

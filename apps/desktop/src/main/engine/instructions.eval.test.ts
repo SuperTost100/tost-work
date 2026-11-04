@@ -15,7 +15,7 @@ import { AgentEngine, type DocumentTools } from "./agent";
 import { TaskRunner } from "./runner";
 
 /*
- * Ten everyday office briefs, run on the real Codex and Claude Code with the instructions as they stand, to compare
+ * Eleven everyday office briefs, run on the real Codex and Claude Code with the instructions as they stand, to compare
  * the instructions before and after a change (#153). Each run spends real usage, so it runs only when asked:
  *
  *   TOST_WORK_EVAL=<label> TOST_WORK_EVAL_OUT=<folder> [TOST_WORK_EVAL_AI=chatgpt|claude] [TOST_WORK_EVAL_ONLY=a,b]
@@ -157,6 +157,23 @@ const BRIEFS: Brief[] = [
     },
     brief: "Fai un preventivo in Excel per Bianchi: 10 ore di consulenza a 80 € l'ora.",
     expect: "An .xlsx saved in Clienti/Bianchi, named like the Rossi one.",
+  },
+  {
+    id: "11-long",
+    language: "it",
+    setup: async (folder) => {
+      await writeFile(
+        join(folder, "appunti corso intermedio.txt"),
+        "Corso AI Intermedio, per enti di formazione. 4 incontri da 3 ore, il martedì dalle 14 alle 17, dal 12 gennaio 2027.\n" +
+          "Unità: U1 prompt strutturati (1,5 h), U2 skill composte (2 h), U3 automazioni pianificate (2 h), U4 collegare documenti e posta (1,5 h), " +
+          "U5 calendario e riunioni (1 h), U6 verificare il lavoro dell'AI (1,5 h), U7 dati e fogli di calcolo (1,5 h), U8 progetto finale (1 h).\n" +
+          "Ogni incontro finisce con un esercizio. Prezzo per ente: 1.800 € + IVA per gruppo fino a 15 persone.\n" +
+          "Materiali: dispense PDF e una cartella di esempi. Docente: Giulia Rossi.\n",
+      );
+    },
+    brief:
+      "Con gli appunti del corso intermedio prepara tre cose: la scheda del corso per gli enti in Word, un Excel con la distribuzione delle 8 unità nei quattro incontri (data, unità, ore) e la presentazione del primo incontro in PowerPoint, una decina di slide.",
+    expect: "All three files in one run, without stopping halfway to say what's left; a review that says it's done.",
   },
 ];
 

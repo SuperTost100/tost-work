@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
 
@@ -35,12 +36,15 @@ export function Thumb({ path, brief = false }: { path?: string; brief?: boolean 
 export function FileLine({
   path,
   sub,
+  action,
   onOpen,
   onSelect,
 }: {
   path: string;
   /** A short line under the name, such as where the file came from. */
-  sub?: string;
+  sub?: ReactNode;
+  /** A button of the row's own, before Open. */
+  action?: ReactNode;
   onOpen?: () => void;
   onSelect?: () => void;
 }) {
@@ -65,6 +69,7 @@ export function FileLine({
       ) : (
         name
       )}
+      {action}
       {onOpen && (
         <button type="button" className="tbtn" onClick={onOpen}>
           <Icon name="external-link" />

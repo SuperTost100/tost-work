@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { CHANGELOG, stageOf, versionLabel } from "@/lib/changelog";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
 
@@ -28,7 +29,7 @@ describe("About", () => {
     const crumb = screen.getByRole("navigation", { name: "About" });
     expect(crumb.textContent).toBe("Settings/About");
     expect(within(crumb).getByText("About").getAttribute("aria-current")).toBe("page");
-    expect(screen.getByText(`${__APP_VERSION__} · build ${__APP_BUILD__}`)).toBeTruthy();
+    expect(screen.getByText(`${versionLabel(__APP_VERSION__)} · build ${__APP_BUILD__}`)).toBeTruthy();
     // Back to Settings through the crumb.
     await act(async () => {
       fireEvent.click(within(crumb).getByRole("button", { name: "Settings" }));
@@ -66,14 +67,16 @@ describe("About", () => {
 
   it("shows what's new for each version up to this one, in the interface's language", async () => {
     await aboutPage();
-    await click(`What's new in ${__APP_VERSION__}`);
+    await click(`What's new in ${versionLabel(__APP_VERSION__)}`);
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("What's new");
-    // This version first, and an earlier one under it. Hiding a newer entry is checked in changelog.test.ts, so this
-    // test doesn't change with every release.
+    // This version first, then only versions of its stage, with its own changes. Hiding a newer entry or another
+    // stage is checked in changelog.test.ts, so this test doesn't change with every release.
     const versions = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(versions[0]).toBe(__APP_VERSION__);
-    expect(versions).toContain("0.0.19");
-    expect(screen.getByText("Debug mode:")).toBeTruthy();
+    expect(versions[0]).toBe(versionLabel(__APP_VERSION__));
+    const stage = stageOf(__APP_VERSION__);
+    for (const v of versions) expect(stageOf((v ?? "").replace(" ", "-"))).toBe(stage);
+    const first = CHANGELOG.find((e) => e.version === __APP_VERSION__)?.items.en[0] ?? "";
+    expect(screen.getByText(/^\*\*(.+?)\*\*/.exec(first)?.[1] ?? first)).toBeTruthy();
     // Back to About through the crumb.
     await act(async () => {
       fireEvent.click(within(screen.getByRole("navigation", { name: "About" })).getByRole("button", { name: "About" }));

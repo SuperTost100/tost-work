@@ -35,47 +35,60 @@ import {
 import { AgentMessage, CopyButton, SentAt, TypedMessage } from "../components/AgentMessage";
 import { WorkingDots } from "../components/TaskTag";
 
-/** Under a file the task replaced: the kept copy and a button to put it back, or to undo that. */
-function KeptRow({
+/**
+ * A file the task made or changed. For a file it replaced, the line under the name says a copy is kept, and the row's
+ * button puts it back, or undoes that.
+ */
+function MadeFile({
   task,
   path,
   onRestore,
+  onOpen,
+  onSelect,
 }: {
   task: TaskT;
   path: string;
   onRestore: (path: string) => Promise<unknown>;
+  onOpen?: () => void;
+  onSelect?: () => void;
 }) {
   const t = useT();
   const [error, setError] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
   const copies = (task.kept ?? []).filter((k) => k.path === path);
-  if (copies.length === 0) return null;
+  if (copies.length === 0) return <FileLine path={path} onOpen={onOpen} onSelect={onSelect} />;
   // Each restore swaps the file with its last kept copy, so an odd number of restores since the agent's last
   // overwrite means the older version is in place.
   const sinceOverwrite = copies.length - 1 - copies.map((k) => k.reason).lastIndexOf("overwrite");
   const restored = sinceOverwrite % 2 === 1;
   const busy = restoring || task.status === "running" || task.status === "needs-you";
   return (
-    <div className="kept">
-      <Icon name="history" />
-      <span className="grow" role={error ? "alert" : undefined}>
-        {error ?? (restored ? t("kept.restored") : t("kept.note"))}
-      </span>
-      <button
-        type="button"
-        className="tbtn"
-        disabled={busy}
-        onClick={() => {
-          setError(null);
-          setRestoring(true);
-          onRestore(path)
-            .catch((err: unknown) => setError(errorText(err)))
-            .finally(() => setRestoring(false));
-        }}
-      >
-        {restored ? t("kept.undo") : t("kept.restore")}
-      </button>
-    </div>
+    <FileLine
+      path={path}
+      onOpen={onOpen}
+      onSelect={onSelect}
+      sub={
+        <span className="kept" role={error ? "alert" : undefined}>
+          <span className="truncate">{error ?? (restored ? t("kept.restored") : t("kept.note"))}</span>
+        </span>
+      }
+      action={
+        <button
+          type="button"
+          className="tbtn"
+          disabled={busy}
+          onClick={() => {
+            setError(null);
+            setRestoring(true);
+            onRestore(path)
+              .catch((err: unknown) => setError(errorText(err)))
+              .finally(() => setRestoring(false));
+          }}
+        >
+          {restored ? t("kept.undo") : t("kept.restore")}
+        </button>
+      }
+    />
   );
 }
 
@@ -140,10 +153,13 @@ function WhatChanged({
       <>
         <h3>{title}</h3>
         {files.map((f) => (
-          <Fragment key={f.path}>
-            <FileLine path={f.path} onOpen={() => void api.files.open(task.id, f.path).catch(onError)} />
-            <KeptRow task={task} path={f.path} onRestore={onRestore} />
-          </Fragment>
+          <MadeFile
+            key={f.path}
+            task={task}
+            path={f.path}
+            onRestore={onRestore}
+            onOpen={() => void api.files.open(task.id, f.path).catch(onError)}
+          />
         ))}
       </>
     );
@@ -827,9 +843,19 @@ export function Task({
       alive = false;
     };
   }, [api, usedCount]);
+  // The steps belong to the latest run, so after a follow-up they show under that instruction.
+  const runStart = task.messages.findLastIndex((m) => m.followUp);
+  // A follow-up hides the earlier turn's preview while it runs, but picking a file in the side panel shows it again,
+  // for example to look at a file before allowing the follow-up to replace it.
+  const [pickedInRun, setPickedInRun] = useState(-1);
   const showFile = (path: string) => {
     setPicked(path);
-    document.querySelector(".artifact")?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    setPickedInRun(runStart);
+    const scroll = () =>
+      document.querySelector(".artifact")?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    // A hidden preview comes in with the next render, so it can only be scrolled to after that.
+    if (document.querySelector(".artifact")) scroll();
+    else requestAnimationFrame(scroll);
   };
   const current = task.steps.findIndex((s) => s.status === "in_progress");
   const live = task.status === "running" || task.status === "needs-you";
@@ -870,8 +896,6 @@ export function Task({
       {t("review.mark")}
     </button>
   );
-  // The steps belong to the latest run, so after a follow-up they show under that instruction.
-  const runStart = task.messages.findLastIndex((m) => m.followUp);
   const note = (i: number) => {
     const m = task.messages[i];
     if (!m) return null;
@@ -998,7 +1022,9 @@ export function Task({
                   />
                 )}
                 {draft && <TypedMessage key={`draft-${end}`} text={draft} onShown={followDraft} />}
-                {made.length > 0 && (
+                {/* A follow-up hides the earlier turn's preview until it ends, so the preview isn't left under the new
+                    instruction as if this turn had made it. */}
+                {made.length > 0 && !(live && runStart > 0 && pickedInRun !== runStart) && (
                   <Artifact api={api} task={task} files={made} picked={picked} onPick={setPicked} onError={onError} />
                 )}
                 {task.status === "stopped" &&
@@ -1108,10 +1134,13 @@ export function Task({
                 <h3>{t("task.made")}</h3>
                 {made.length === 0 && <p className="empty">{t("task.noFiles")}</p>}
                 {made.map((f) => (
-                  <Fragment key={f.path}>
-                    <FileLine path={f.path} onSelect={f.kind === "delete" ? undefined : () => showFile(f.path)} />
-                    <KeptRow task={task} path={f.path} onRestore={onRestore} />
-                  </Fragment>
+                  <MadeFile
+                    key={f.path}
+                    task={task}
+                    path={f.path}
+                    onRestore={onRestore}
+                    onSelect={f.kind === "delete" ? undefined : () => showFile(f.path)}
+                  />
                 ))}
                 {used.length > 0 && <h3>{t("task.used")}</h3>}
                 {used.map(({ path, attached }) => (

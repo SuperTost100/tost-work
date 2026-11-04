@@ -22,13 +22,13 @@ export function parseChangelog(text: string): ChangelogEntry[] {
     const line = raw.trim();
     const fail = (why: string) => new Error(`Changelog line ${i + 1}: ${why}`);
     if (!line) return;
-    const version = /^## (\d+\.\d+\.\d+)$/.exec(line)?.[1];
+    const version = line.startsWith("## ") ? VERSION.exec(line.slice(3))?.[0] : undefined;
     if (version) {
       entry = { version, items: { en: [], it: [] } };
       entries.push(entry);
       language = null;
     } else if (line.startsWith("## ")) {
-      throw fail(`"${line}" is not a version like 1.2.3`);
+      throw fail(`"${line}" is not a version like 1.2.3 or 1.2.3-alpha`);
     } else if (line.startsWith("### ")) {
       const name = line.slice(4);
       const found = LANGUAGES.find((l) => l === name);
@@ -44,21 +44,41 @@ export function parseChangelog(text: string): ChangelogEntry[] {
   return entries;
 }
 
-/** Negative when `a` is the older version, positive when it is the newer. */
+/** A version as the app writes it: the numbers, then the stage for any build before 1.0.0, such as "0.1.0-alpha". */
+const VERSION = /^\d+\.\d+\.\d+(?:-(?:dev|alpha|beta))?$/;
+
+export type Stage = "dev" | "alpha" | "beta" | "stable";
+
+/** The stage a version belongs to: "0.0.23-dev" is a dev build, and a version without a stage is a stable release. */
+export function stageOf(version: string): Stage {
+  const stage = version.split("-")[1];
+  return stage === "dev" || stage === "alpha" || stage === "beta" ? stage : "stable";
+}
+
+/** A version as people read it: "0.1.0 alpha". */
+export const versionLabel = (version: string): string => version.replace("-", " ");
+
+/** Negative when `a` is the older version, positive when it is the newer. A stage comes before the release itself. */
 export function compareVersions(a: string, b: string): number {
-  const x = a.split(".").map(Number);
-  const y = b.split(".").map(Number);
+  const [an = "", as] = a.split("-");
+  const [bn = "", bs] = b.split("-");
+  const x = an.split(".").map(Number);
+  const y = bn.split(".").map(Number);
   for (let i = 0; i < Math.max(x.length, y.length); i++) {
     const d = (x[i] ?? 0) - (y[i] ?? 0);
     if (d) return d;
   }
-  return 0;
+  return Number(!as) - Number(!bs);
 }
 
-/** The versions up to the app's own, newest first: the entry for a release in preparation stays out of sight. */
+/**
+ * The entries of the app's own stage up to its version, newest first, so an alpha lists only alphas and not every
+ * dev build before them. The entry for a release in preparation stays out of sight.
+ */
 export function shownEntries(entries: ChangelogEntry[], appVersion: string): ChangelogEntry[] {
+  const stage = stageOf(appVersion);
   return entries
-    .filter((e) => compareVersions(e.version, appVersion) <= 0)
+    .filter((e) => stageOf(e.version) === stage && compareVersions(e.version, appVersion) <= 0)
     .sort((a, b) => compareVersions(b.version, a.version));
 }
 
