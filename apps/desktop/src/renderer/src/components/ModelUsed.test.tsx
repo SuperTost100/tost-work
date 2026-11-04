@@ -31,7 +31,10 @@ describe("what a started task runs on, in its side panel", () => {
     ]);
   });
 
-  it("titles it Modello on a task from before choices were kept", () => {
-    expect(shown({ model: "gpt-6-luna", effort: "low" })).toEqual(["Modello", "GPT-6 Luna · basso"]);
+  it("works out the choice on a task from before choices were kept", () => {
+    expect(shown({ model: "gpt-6.1-terra", effort: "medium" })).toEqual(["Equilibrato", "GPT-6.1 Terra · medio"]);
+    expect(shown({ model: "claude-opus-5-5", effort: "high" })).toEqual(["Approfondito", "Claude Opus 5.5 · alto"]);
+    // A model or level no choice runs on was picked from the list.
+    expect(shown({ model: "gpt-6.1-sol", effort: "low" })).toEqual(["Personalizzato", "GPT-6.1 Sol · basso"]);
   });
 });

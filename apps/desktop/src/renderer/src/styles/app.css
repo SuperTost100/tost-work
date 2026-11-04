@@ -1777,7 +1777,7 @@ textarea {
   color: var(--t3);
   font-weight: 400;
 }
-.seg label:has(input:focus-visible) > span {
+:root[data-keys] .seg label:has(input:focus-visible) > span {
   outline: 2px solid var(--ink);
   outline-offset: 1px;
 }
@@ -3128,9 +3128,10 @@ ol.editable li::before {
 }
 
 /* Jobs: one list grouped by next run */
+/* The columns share the width, so a wide window gives room to the last run's file name too, not only to the gap. */
 .jrow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(150px, 18vw, 190px) clamp(170px, 20vw, 210px) auto;
+  grid-template-columns: minmax(0, 3fr) minmax(150px, 2fr) minmax(170px, 2.5fr) auto;
   gap: 18px;
   align-items: center;
   padding: 14px 12px;
@@ -3715,9 +3716,7 @@ ol.editable li::before {
   opacity: 0;
   pointer-events: none;
 }
-.lv:has(input:focus-visible),
-.switch:focus-visible,
-.choice input:focus-visible + span {
+:root[data-keys] :is(.lv:has(input:focus-visible), .switch:focus-visible, .choice input:focus-visible + span) {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
@@ -3995,10 +3994,21 @@ ol.editable li::before {
 .lights-space {
   width: 64px;
 }
+/* A ring shows only while the user moves with the keyboard (lib/keyboardNav.ts): Chromium also matches :focus-visible
+   when any key, Shift included, is pressed after a click. Text fields keep theirs, since they're focused to type in. */
 :focus-visible {
+  outline: none;
+}
+:root[data-keys] :focus-visible,
+input:not([type="radio"], [type="checkbox"]):focus-visible,
+select:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
   border-radius: 6px;
+}
+/* What the app focuses itself, such as the next question after an answer, is there for screen readers to read out. */
+:root [tabindex="-1"]:focus-visible {
+  outline: none;
 }
 textarea:focus-visible {
   outline: none;
@@ -4539,7 +4549,7 @@ label.opt input {
   opacity: 0;
   pointer-events: none;
 }
-label.opt:has(input:focus-visible) {
+:root[data-keys] label.opt:has(input:focus-visible) {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }

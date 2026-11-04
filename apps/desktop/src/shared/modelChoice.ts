@@ -249,6 +249,17 @@ export function choiceOf(pick: ModelPick | undefined, ran: RanOn): Choice {
 }
 
 /**
+ * The choice a task from before choices were kept most likely ran on: the one whose model and level it ran on, or
+ * "custom" for any other model or level.
+ */
+export function choiceFromModel(model: string, effort: string): Choice {
+  const preset = PRESETS.find((p) =>
+    Object.values(PRESET_MODELS[p]).some((m) => m.model === model && m.effort === effort),
+  );
+  return preset ?? "custom";
+}
+
+/**
  * A model's name from its id alone, for a task whose model list isn't at hand: "gpt-6.1-terra" is "GPT-6.1 Terra",
  * "claude-opus-5-5" is "Claude Opus 5.5" and "claude-haiku-4-5-20251001" is "Claude Haiku 4.5". Any other id shows
  * as it is.

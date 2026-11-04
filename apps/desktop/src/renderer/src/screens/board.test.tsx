@@ -437,10 +437,10 @@ describe("the home's Drafts", () => {
     const todo = await screen.findByRole("region", { name: "Drafts" });
     expect(within(todo).getByText("Write three case studies")).toBeTruthy();
     expect(within(todo).getByText("Website")).toBeTruthy();
-    // Only tasks saved for later: the finished one is in the sidebar's Recent, not here.
+    // Only tasks saved for later: the finished one is in the sidebar's Recent tasks, not here.
     expect(within(todo).queryByText("Proposal for Ferraris")).toBeNull();
     const main = within(document.querySelector(".main") as HTMLElement);
-    expect(main.queryByText("Recent")).toBeNull();
+    expect(main.queryByText("Recent tasks")).toBeNull();
 
     await click(within(todo).getByRole("button", { name: "Start: Write three case studies" }));
     expect(await screen.findByText("Who pays the insurance?")).toBeTruthy();

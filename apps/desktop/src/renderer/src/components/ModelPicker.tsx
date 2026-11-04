@@ -6,6 +6,7 @@ import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
 import type { Task } from "../../../shared/model";
 import {
+  choiceFromModel,
   EFFORTS,
   type ModelChoices,
   type ModelPick,
@@ -37,7 +38,8 @@ export function ModelUsed({ task }: { task: Pick<Task, "choice" | "model" | "eff
   const t = useT();
   const lang = useContext(LanguageContext);
   const effortWord = useEffortWord();
-  const title = !task.choice ? t("task.model") : t(task.choice === "custom" ? "model.custom" : `model.${task.choice}`);
+  const choice = task.choice ?? choiceFromModel(task.model, task.effort);
+  const title = t(choice === "custom" ? "model.custom" : `model.${choice}`);
   return (
     <>
       <span className="k">{title}</span>

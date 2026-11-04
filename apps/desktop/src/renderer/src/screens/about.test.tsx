@@ -24,7 +24,7 @@ const aboutPage = async (api = createMemoryApi()) => {
 describe("About", () => {
   it("is reached from Settings, under the crumb Settings / About", async () => {
     await aboutPage();
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Tost Work.AI that works on your files.");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Tost Work.AI that works with you.");
     const crumb = screen.getByRole("navigation", { name: "About" });
     expect(crumb.textContent).toBe("Settings/About");
     expect(within(crumb).getByText("About").getAttribute("aria-current")).toBe("page");
