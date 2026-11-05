@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   ASSET_NOTICE_FILES,
+  hasLicenseText,
   isAllowedLicense,
   licensedPackages,
   renderLicenses,
@@ -102,6 +103,14 @@ describe("licensedPackages", () => {
     ]);
   });
 
+  it("counts only licence files as the licence text, not a NOTICE on its own", () => {
+    expect(hasLicenseText([{ file: "NOTICE.txt", text: "notice" }])).toBe(false);
+    expect(hasLicenseText([{ file: "PATENTS", text: "patents" }])).toBe(false);
+    expect(hasLicenseText([{ file: "LICENSE.md", text: "licence" }])).toBe(true);
+    expect(hasLicenseText([{ file: "COPYING", text: "licence" }])).toBe(true);
+    expect(hasLicenseText([{ file: "LICENSE (github.com/juliangruber/isarray)", text: "licence" }])).toBe(true);
+  });
+
   it("says so when a needed package is not installed", () => {
     const root = app({
       dependencies: { a: "1" },
@@ -155,7 +164,7 @@ describe("the licences the real app ships", () => {
   });
 
   it("each come with their text, and cover what the window and the archive hold", () => {
-    expect(packages.filter((p) => p.texts.length === 0).map((p) => `${p.name}@${p.version}`)).toEqual([]);
+    expect(packages.filter((p) => !hasLicenseText(p.texts)).map((p) => `${p.name}@${p.version}`)).toEqual([]);
     const names = packages.map((p) => p.name);
     // Direct dependencies, bundled devDependencies and things only those need.
     expect(names).toEqual(

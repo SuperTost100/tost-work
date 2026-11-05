@@ -105,6 +105,11 @@ const MISSING_TEXT: Record<string, LicenseText> = {
 const LEAVES = new Set(["electron"]);
 
 const NOTICE_FILE = /^(licen[cs]es?|copying|notice|patents)([._-].*)?$/i;
+/** The files that hold the licence terms themselves. NOTICE and PATENTS files only add to them. */
+const LICENSE_FILE = /^(licen[cs]es?|copying)\b/i;
+
+/** Whether the texts include the licence terms, and not only notices that go with them. */
+export const hasLicenseText = (texts: LicenseText[]) => texts.some((t) => LICENSE_FILE.test(t.file));
 const NOT_TEXT = /\.(?:[cm]?[jt]sx?|json|map|html?|css|node)$/i;
 
 /** The folder of a dependency as Node finds it from a package: its own `node_modules`, then each parent's. */
@@ -144,7 +149,7 @@ export function licensedPackages(root: string): LicensedPackage[] {
     if (found.has(key)) return;
     const texts = noticeTexts(dir);
     const missing = MISSING_TEXT[key];
-    if (missing && !texts.length) texts.push(missing);
+    if (missing && !hasLicenseText(texts)) texts.push(missing);
     found.set(key, {
       name: pkg.name,
       version: pkg.version,
