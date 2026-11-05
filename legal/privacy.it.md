@@ -13,7 +13,7 @@ L'Applicazione conserva nella propria cartella dati le seguenti informazioni:
 - le impostazioni, i progetti, le attività con la relativa cronologia e i lavori pianificati;
 - quanto l'Utente scrive nella sezione "Su di te";
 - le copie dei file modificati da un'attività, che consentono di ripristinare l'originale;
-- solo mentre è attiva l'opzione "Mostra dettagli tecnici e debug", il log dell'Applicazione e un log dettagliato di ogni attività, che contiene il testo dei file e delle richieste dell'Utente;
+- i log scritti mentre è attiva l'opzione "Mostra dettagli tecnici e debug": il log dell'Applicazione e un log dettagliato di ogni attività, che contiene il testo dei file e delle richieste dell'Utente. Disattivando l'opzione non se ne scrivono di nuovi, ma quelli già scritti restano nella cartella dati; il log di un'attività viene eliminato insieme all'attività;
 - la chiave API dell'Utente, cifrata con l'archivio sicuro del sistema operativo. Se il sistema non dispone di tale archivio, la chiave è conservata solo fino alla chiusura dell'Applicazione.
 
 Le skill create dall'Utente si trovano in `Documenti/Tost Work/Skills`, mentre i file dei progetti restano nelle cartelle in cui l'Utente li conserva.
@@ -30,7 +30,7 @@ Le attività sono svolte da Codex CLI, prodotto da OpenAI, o da Claude Code, pro
 - quanto l'Utente ha scritto nella sezione "Su di te", che accompagna ogni attività;
 - le ricerche sul web effettuate dall'intelligenza artificiale.
 
-Codex CLI e Claude Code conservano le credenziali di accesso sul computer dell'Utente, nella cartella dati dell'Applicazione. Essi possono inoltre trasmettere a OpenAI e ad Anthropic dati sul proprio utilizzo, come avviene anche al di fuori dell'Applicazione.
+Codex CLI conserva le credenziali di accesso nella cartella dati dell'Applicazione. Claude Code le conserva nella stessa cartella oppure, su alcuni sistemi come macOS, nell'archivio sicuro del sistema operativo. L'uscita dall'account nelle Impostazioni le rimuove in entrambi i casi, e si raccomanda di effettuarla prima di eliminare l'Applicazione. Essi possono inoltre trasmettere a OpenAI e ad Anthropic dati sul proprio utilizzo, come avviene anche al di fuori dell'Applicazione.
 
 OpenAI e Anthropic trattano tali dati secondo le proprie informative sulla privacy e le impostazioni dell'account dell'Utente, anche per quanto riguarda l'uso delle conversazioni per l'addestramento dei modelli:
 

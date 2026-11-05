@@ -31,7 +31,7 @@ The App is not made or endorsed by OpenAI or Anthropic and is not affiliated wit
 
 The User's files, requests and the results produced for the User by the artificial intelligence remain the User's. While a task runs, Codex CLI or Claude Code sends the User's request and the files the artificial intelligence reads to OpenAI or Anthropic, which process them under their own terms and privacy policies. Before using the App with confidential, regulated or personal data, the User should review those terms and the data settings of their account, including whether conversations may be used to train models.
 
-The Author does not receive the User's files or requests and therefore never uses them to train models.
+The Author does not receive the User's files or requests through the App and never uses the User's content to train models.
 
 The User warrants that they hold the necessary rights to the files and information they submit to the artificial intelligence.
 

@@ -31,7 +31,7 @@ L'Applicazione non è prodotta né approvata da OpenAI o da Anthropic e non è a
 
 I file, le richieste e i risultati prodotti dall'intelligenza artificiale per l'Utente restano di sua titolarità. Durante lo svolgimento di un'attività, Codex CLI o Claude Code trasmettono a OpenAI o ad Anthropic la richiesta dell'Utente e i file letti dall'intelligenza artificiale, che tali società trattano secondo i propri termini e le proprie informative sulla privacy. Prima di utilizzare l'Applicazione con dati riservati, soggetti a una disciplina specifica o personali, l'Utente è tenuto a verificare tali condizioni e le impostazioni del proprio account, comprese quelle relative all'uso delle conversazioni per l'addestramento dei modelli.
 
-L'Autore non riceve i file né le richieste dell'Utente e, pertanto, non li utilizza in alcun caso per addestrare modelli.
+L'Autore non riceve, tramite l'Applicazione, i file né le richieste dell'Utente e non utilizza in alcun caso i contenuti dell'Utente per addestrare modelli.
 
 L'Utente garantisce di disporre dei diritti necessari sui file e sulle informazioni che sottopone all'intelligenza artificiale.
 

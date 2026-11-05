@@ -13,7 +13,7 @@ The App keeps the following information in its data folder:
 - settings, projects, tasks with their history, and scheduled jobs;
 - what the User writes in the "About you" section;
 - copies of the files a task changed, which allow the original to be restored;
-- only while the "Show technical details and debug" option is on, the App's log and a detailed log of each task, which contains the text of the User's files and requests;
+- the logs written while the "Show technical details and debug" option is on: the App's log and a detailed log of each task, which contains the text of the User's files and requests. Turning the option off stops new logs, but those already written stay in the data folder; a task's log is deleted together with the task;
 - the User's API key, encrypted with the operating system's secure storage. If the system offers no such storage, the key is kept only until the App is closed.
 
 The skills the User creates are kept in `Documents/Tost Work/Skills`, and project files remain in the folders where the User keeps them.
@@ -30,7 +30,7 @@ Tasks are carried out by Codex CLI, made by OpenAI, or by Claude Code, made by A
 - what the User wrote in the "About you" section, which accompanies every task;
 - the web searches made by the artificial intelligence.
 
-Codex CLI and Claude Code keep the User's sign-in on the User's computer, in the App's data folder. They may also send OpenAI and Anthropic data about their own use, as they do outside the App.
+Codex CLI keeps the User's sign-in in the App's data folder. Claude Code keeps it in the same folder or, on some systems such as macOS, in the operating system's secure storage. Signing out in Settings removes it in either case, and the User is advised to sign out before deleting the App. They may also send OpenAI and Anthropic data about their own use, as they do outside the App.
 
 OpenAI and Anthropic process this data under their own privacy policies and the settings of the User's account, including whether conversations may be used to train their models:
 
