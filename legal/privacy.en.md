@@ -26,6 +26,7 @@ Tasks are carried out by Codex CLI, made by OpenAI, or by Claude Code, made by A
 
 - the User's request, the User's answers to the artificial intelligence's questions and any attached files;
 - the files the artificial intelligence reads in the project folder;
+- the skills the artificial intelligence follows to carry out the task;
 - what the User wrote in the "About you" section, which accompanies every task;
 - the web searches made by the artificial intelligence.
 

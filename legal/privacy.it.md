@@ -26,6 +26,7 @@ Le attività sono svolte da Codex CLI, prodotto da OpenAI, o da Claude Code, pro
 
 - la richiesta dell'Utente, le sue risposte alle domande dell'intelligenza artificiale e i file allegati;
 - i file letti dall'intelligenza artificiale nella cartella del progetto;
+- le skill che l'intelligenza artificiale segue per svolgere l'attività;
 - quanto l'Utente ha scritto nella sezione "Su di te", che accompagna ogni attività;
 - le ricerche sul web effettuate dall'intelligenza artificiale.
 
