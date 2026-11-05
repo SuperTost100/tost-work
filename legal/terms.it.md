@@ -2,69 +2,73 @@
 
 Ultimo aggiornamento: 5 novembre 2026
 
-Questi termini riguardano l'app Tost Work pubblicata da Tommaso Barbera, persona fisica, su [github.com/SuperTost100/tost-work](https://github.com/SuperTost100/tost-work). Usando l'app li accetti. Fa fede questa versione italiana; quella inglese è una traduzione.
+## Art. 1. Oggetto e accettazione
 
-## L'app e la sua licenza
+I presenti termini d'uso (i "Termini") disciplinano l'uso dell'applicazione desktop Tost Work (l'"Applicazione"), pubblicata da Tommaso Barbera, persona fisica (l'"Autore"), all'indirizzo [github.com/SuperTost100/tost-work](https://github.com/SuperTost100/tost-work).
 
-Tost Work è un'app desktop gratuita per lavorare con l'AI sul tuo computer. Il suo codice sorgente è distribuito con licenza MIT, e niente in questi termini limita quello che la licenza ti permette di fare con il codice. Questi termini riguardano l'uso dell'app.
+Chi installa o utilizza l'Applicazione (l'"Utente") accetta i presenti Termini. I Termini sono redatti in lingua italiana e in lingua inglese. In caso di difformità prevale la versione italiana.
 
-Tost Work non ha account né un server suo. I tuoi progetti, le attività, le impostazioni e i file restano sul tuo computer.
+## Art. 2. Licenza del codice sorgente
 
-## I tuoi account AI
+Il codice sorgente dell'Applicazione è distribuito con licenza MIT. I presenti Termini disciplinano l'uso dell'Applicazione e non limitano in alcun modo i diritti che la licenza MIT riconosce sul codice sorgente.
 
-Tost Work lavora attraverso due programmi fatti da altri: Codex CLI di OpenAI e Claude Code di Anthropic. Quando lo chiedi, Tost Work li installa con gli installer ufficiali dei loro produttori, e non li modifica.
+L'Applicazione non prevede la creazione di account e non si appoggia a server gestiti dall'Autore. Progetti, attività, impostazioni e file dell'Utente sono conservati sul suo computer.
 
-Colleghi un account tuo: un abbonamento a ChatGPT o a Claude, accedendo dalla pagina di OpenAI o di Anthropic, oppure una tua chiave API. Per questo:
+## Art. 3. Servizi di intelligenza artificiale di terzi
 
-- l'uso di ChatGPT e Codex resta regolato dai termini di OpenAI, e quello di Claude e Claude Code dai termini e dalle regole d'uso di Anthropic;
-- ognuno usa il proprio account o la propria chiave, senza condividerli con altri attraverso Tost Work;
-- le attività consumano i limiti del tuo abbonamento oppure vengono addebitate da OpenAI o Anthropic sulla tua chiave API;
-- OpenAI e Anthropic possono cambiare o chiudere questo tipo di accesso in qualsiasi momento, quindi Tost Work non può garantire che continui a funzionare.
+L'Applicazione svolge le attività richieste per mezzo di programmi di terzi: Codex CLI, prodotto da OpenAI, e Claude Code, prodotto da Anthropic. Su richiesta dell'Utente, l'Applicazione li installa tramite gli installer ufficiali dei rispettivi produttori, senza modificarli.
 
-Tost Work non è prodotta né approvata da OpenAI o da Anthropic, e non ha legami con loro. ChatGPT, Codex, Claude e Claude Code sono loro marchi.
+L'Utente collega un proprio account, ossia un abbonamento a ChatGPT o a Claude con accesso dalla pagina di OpenAI o di Anthropic, oppure una propria chiave API. Di conseguenza:
 
-## I tuoi contenuti
+- l'uso di ChatGPT e di Codex resta soggetto ai termini di OpenAI, e l'uso di Claude e di Claude Code ai termini e alle regole d'uso di Anthropic;
+- ciascun Utente utilizza esclusivamente il proprio account o la propria chiave e non li condivide con terzi per mezzo dell'Applicazione;
+- le attività consumano i limiti di utilizzo dell'abbonamento dell'Utente oppure sono addebitate da OpenAI o da Anthropic sulla sua chiave API;
+- OpenAI e Anthropic possono modificare o interrompere in qualsiasi momento questa modalità di accesso, e l'Autore non può garantirne la continuità.
 
-I tuoi file, le tue richieste e quello che l'AI prepara per te restano tuoi. Quando un'attività è in corso, Codex CLI o Claude Code inviano a OpenAI o ad Anthropic la tua richiesta e i file che l'AI legge, e loro li trattano secondo i propri termini e le proprie informative privacy. Prima di usare Tost Work con dati riservati, regolamentati o personali, controlla quelle regole e le impostazioni sui dati del tuo account, anche per sapere se le tue conversazioni possono servire ad addestrare i loro modelli.
+L'Applicazione non è prodotta né approvata da OpenAI o da Anthropic e non è affiliata ad esse. ChatGPT, Codex, Claude e Claude Code sono marchi dei rispettivi titolari.
 
-L'autore di Tost Work non riceve mai i tuoi file né le tue richieste, quindi da parte sua non vengono mai usati per addestrare nulla.
+## Art. 4. Contenuti dell'Utente
 
-Devi avere il diritto di usare i file e le informazioni che dai all'AI.
+I file, le richieste e i risultati prodotti dall'intelligenza artificiale per l'Utente restano di sua titolarità. Durante lo svolgimento di un'attività, Codex CLI o Claude Code trasmettono a OpenAI o ad Anthropic la richiesta dell'Utente e i file letti dall'intelligenza artificiale, che tali società trattano secondo i propri termini e le proprie informative sulla privacy. Prima di utilizzare l'Applicazione con dati riservati, soggetti a una disciplina specifica o personali, l'Utente è tenuto a verificare tali condizioni e le impostazioni del proprio account, comprese quelle relative all'uso delle conversazioni per l'addestramento dei modelli.
 
-## Cosa fa l'AI
+L'Autore non riceve i file né le richieste dell'Utente e, pertanto, non li utilizza in alcun caso per addestrare modelli.
 
-L'AI può sbagliare. Controlla quello che prepara prima di usarlo, inviarlo o firmarlo.
+L'Utente garantisce di disporre dei diritti necessari sui file e sulle informazioni che sottopone all'intelligenza artificiale.
 
-L'AI lavora nella cartella del progetto che scegli tu. Quando l'AI sostituisce un file che c'era già o ne elimina uno, Tost Work te lo chiede prima, tiene una copia del file sostituito e sposta nel Cestino quelli eliminati. I programmi che l'AI usa, come quello che modifica i file Word ed Excel, possono comunque cambiare o eliminare un file senza chiedere, e un file eliminato da uno di loro non finisce nel Cestino. Tieni una copia di riserva dei file a cui tieni.
+## Art. 5. Risultati dell'intelligenza artificiale e tutela dei file
 
-## Uso consentito
+I risultati prodotti dall'intelligenza artificiale possono contenere errori. L'Utente è tenuto a verificarli prima di utilizzarli, trasmetterli a terzi o sottoscriverli.
 
-Usa Tost Work nel rispetto della legge e delle regole d'uso di OpenAI e di Anthropic. Non usarlo per danneggiare altre persone o per violare la sicurezza di sistemi a cui non hai diritto di accedere.
+L'intelligenza artificiale opera nella cartella di progetto scelta dall'Utente. Quando l'intelligenza artificiale sostituisce un file già esistente o ne elimina uno, l'Applicazione chiede prima il consenso dell'Utente, conserva una copia del file sostituito e sposta nel Cestino i file eliminati. I programmi utilizzati dall'intelligenza artificiale, come quello che modifica i file Word ed Excel, possono tuttavia modificare o eliminare un file senza richiedere il consenso, e un file eliminato da uno di essi non viene spostato nel Cestino. Si raccomanda all'Utente di conservare copie di sicurezza dei file a cui tiene.
 
-## Costi
+## Art. 6. Uso consentito
 
-Tost Work è gratuita. Quello che paghi a OpenAI o ad Anthropic per l'abbonamento o per l'uso delle API riguarda solo te e loro.
+L'Utente si impegna a utilizzare l'Applicazione nel rispetto della legge e delle regole d'uso di OpenAI e di Anthropic, e a non servirsene per arrecare danno a terzi o per violare la sicurezza di sistemi ai quali non è autorizzato ad accedere.
 
-## Nessuna garanzia
+## Art. 7. Gratuità
 
-Tost Work è in alpha. Viene fornita "così com'è", senza garanzie di alcun tipo, come dice la licenza MIT, nei limiti consentiti dalla legge.
+L'Applicazione è gratuita. Gli importi dovuti a OpenAI o ad Anthropic per l'abbonamento o per l'uso delle API sono regolati esclusivamente tra l'Utente e tali società.
 
-## Responsabilità
+## Art. 8. Esclusione di garanzie
 
-Nei limiti consentiti dalla legge, Tommaso Barbera non risponde dei danni che derivano dall'uso di Tost Work, compresi la perdita di dati o di guadagni e i risultati del lavoro fatto dall'AI. Restano salve la responsabilità per dolo o colpa grave e i diritti che la legge del tuo paese riconosce al consumatore e che non si possono escludere.
+L'Applicazione è in fase di sviluppo (alpha) ed è fornita "così com'è", senza garanzie di alcun tipo, come previsto dalla licenza MIT e nei limiti consentiti dalla legge.
 
-## Software di terzi
+## Art. 9. Limitazione di responsabilità
 
-Tost Work contiene software open source di altri autori, ognuno con la propria licenza. L'elenco è in Impostazioni > Informazioni > Crediti e licenze.
+Nei limiti consentiti dalla legge, l'Autore non risponde dei danni derivanti dall'uso dell'Applicazione, ivi compresi la perdita di dati, il mancato guadagno e le conseguenze dei risultati prodotti dall'intelligenza artificiale. Resta ferma la responsabilità per dolo o colpa grave, nonché ogni diritto inderogabile che la legge del paese di residenza riconosce all'Utente consumatore.
 
-## Modifiche
+## Art. 10. Software di terzi
 
-Questi termini possono cambiare con una nuova versione di Tost Work. La nuova versione arriva con l'app e riporta la data in alto. Se continui a usare l'app dopo una modifica, accetti i nuovi termini.
+L'Applicazione include software open source di terzi, ciascuno distribuito con la propria licenza. L'elenco è consultabile in Impostazioni > Informazioni > Crediti e licenze.
 
-## Legge applicabile
+## Art. 11. Modifiche dei Termini
 
-Questi termini sono regolati dalla legge italiana. Se sei un consumatore, mantieni le tutele che ti dà la legge del paese in cui risiedi, compreso il diritto di rivolgerti al giudice del luogo in cui vivi.
+L'Autore può modificare i presenti Termini con una nuova versione dell'Applicazione. La versione aggiornata è distribuita con l'Applicazione e ne riporta la data in apertura. L'uso dell'Applicazione dopo la modifica comporta l'accettazione dei nuovi Termini.
 
-## Contatti
+## Art. 12. Legge applicabile e foro competente
+
+I presenti Termini sono regolati dalla legge italiana. L'Utente consumatore conserva le tutele previste dalla legge del paese in cui risiede, compreso il diritto di agire davanti al giudice del proprio luogo di residenza.
+
+## Art. 13. Contatti
 
 Tommaso Barbera, tommaso.barbera@tost.one

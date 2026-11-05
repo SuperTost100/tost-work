@@ -2,54 +2,56 @@
 
 Ultimo aggiornamento: 5 novembre 2026
 
-Tost Work non raccoglie nessun dato su di te. Non ha account, statistiche d'uso o telemetria, e il suo autore non ha un server che riceva i tuoi dati. Questa informativa spiega cosa resta sul tuo computer e cosa va ai servizi di AI che scegli. Fa fede questa versione italiana; quella inglese è una traduzione.
+## Art. 1. Premessa
 
-## Cosa resta sul tuo computer
+La presente informativa descrive come l'applicazione desktop Tost Work (l'"Applicazione"), pubblicata da Tommaso Barbera, persona fisica (l'"Autore"), gestisce i dati dell'utente (l'"Utente"). L'Applicazione non raccoglie dati sull'Utente: non prevede account, statistiche d'uso o telemetria, e l'Autore non dispone di server che ricevano i dati dell'Utente. L'informativa è redatta in lingua italiana e in lingua inglese. In caso di difformità prevale la versione italiana.
 
-Tost Work conserva nella sua cartella dati queste informazioni:
+## Art. 2. Dati conservati sul computer dell'Utente
 
-- le impostazioni, i progetti, le attività con la loro cronologia e i lavori;
-- quello che scrivi in "Su di te";
-- le copie dei file modificati da un'attività, che ti permettono di tornare all'originale;
-- solo mentre tieni attivo "Mostra dettagli tecnici e debug", il log dell'app e un log dettagliato di ogni attività, che contiene il testo dei tuoi file e delle tue richieste;
-- la tua chiave API, cifrata con l'archivio sicuro del sistema. Se il sistema non lo offre, la chiave resta solo fino a quando chiudi l'app.
+L'Applicazione conserva nella propria cartella dati le seguenti informazioni:
 
-Le skill che crei sono in `Documenti/Tost Work/Skills`, e i file dei tuoi progetti restano nelle cartelle in cui li tieni.
+- le impostazioni, i progetti, le attività con la relativa cronologia e i lavori pianificati;
+- quanto l'Utente scrive nella sezione "Su di te";
+- le copie dei file modificati da un'attività, che consentono di ripristinare l'originale;
+- solo mentre è attiva l'opzione "Mostra dettagli tecnici e debug", il log dell'Applicazione e un log dettagliato di ogni attività, che contiene il testo dei file e delle richieste dell'Utente;
+- la chiave API dell'Utente, cifrata con l'archivio sicuro del sistema operativo. Se il sistema non dispone di tale archivio, la chiave è conservata solo fino alla chiusura dell'Applicazione.
 
-La cartella dati è `~/Library/Application Support/Tost Work` su macOS, `%APPDATA%\Tost Work` su Windows e `~/.config/Tost Work` su Linux (`$XDG_CONFIG_HOME/Tost Work` se hai impostato quella variabile). Eliminando l'app, questa cartella e `Documenti/Tost Work` elimini tutto quello che Tost Work ha salvato. Se Tost Work si apre quando accedi al computer, disattivalo prima nelle Impostazioni, così il sistema non cercherà più di aprirla.
+Le skill create dall'Utente si trovano in `Documenti/Tost Work/Skills`, mentre i file dei progetti restano nelle cartelle in cui l'Utente li conserva.
 
-## Cosa va a OpenAI o ad Anthropic
+La cartella dati è `~/Library/Application Support/Tost Work` su macOS, `%APPDATA%\Tost Work` su Windows e `~/.config/Tost Work` su Linux (`$XDG_CONFIG_HOME/Tost Work` se tale variabile è impostata). L'eliminazione dell'Applicazione, di questa cartella e di `Documenti/Tost Work` rimuove tutti i dati salvati dall'Applicazione. Se l'Applicazione è impostata per aprirsi all'accesso al computer, si raccomanda di disattivare prima tale opzione nelle Impostazioni, affinché il sistema non tenti più di avviarla.
 
-Le attività vengono svolte da Codex CLI di OpenAI o da Claude Code di Anthropic, con l'accesso al tuo account. Mentre un'attività è in corso, questi programmi inviano a OpenAI o ad Anthropic:
+## Art. 3. Dati trasmessi a OpenAI e ad Anthropic
 
-- la tua richiesta, le tue risposte alle domande dell'AI e i file che alleghi;
-- i file che l'AI legge nella cartella del progetto;
-- quello che hai scritto in "Su di te", che accompagna ogni attività;
-- le ricerche sul web fatte dall'AI.
+Le attività sono svolte da Codex CLI, prodotto da OpenAI, o da Claude Code, prodotto da Anthropic, con l'accesso all'account dell'Utente. Durante lo svolgimento di un'attività, tali programmi trasmettono a OpenAI o ad Anthropic:
 
-Codex CLI e Claude Code tengono il tuo accesso sul tuo computer, nella cartella dati di Tost Work. Possono anche inviare a OpenAI e ad Anthropic dati su come vengono usati, come fanno fuori da Tost Work.
+- la richiesta dell'Utente, le sue risposte alle domande dell'intelligenza artificiale e i file allegati;
+- i file letti dall'intelligenza artificiale nella cartella del progetto;
+- quanto l'Utente ha scritto nella sezione "Su di te", che accompagna ogni attività;
+- le ricerche sul web effettuate dall'intelligenza artificiale.
 
-OpenAI e Anthropic trattano tutto questo secondo le proprie informative privacy e le impostazioni del tuo account, anche per quanto riguarda l'uso delle conversazioni per addestrare i loro modelli:
+Codex CLI e Claude Code conservano le credenziali di accesso sul computer dell'Utente, nella cartella dati dell'Applicazione. Essi possono inoltre trasmettere a OpenAI e ad Anthropic dati sul proprio utilizzo, come avviene anche al di fuori dell'Applicazione.
+
+OpenAI e Anthropic trattano tali dati secondo le proprie informative sulla privacy e le impostazioni dell'account dell'Utente, anche per quanto riguarda l'uso delle conversazioni per l'addestramento dei modelli:
 
 - [informativa privacy di OpenAI](https://openai.com/it-IT/policies/privacy-policy/)
 - [informativa privacy di Anthropic](https://www.anthropic.com/legal/privacy)
 
-Per vedere, esportare o cancellare i dati che conservano, o per cambiare le impostazioni sull'addestramento, usa il tuo account OpenAI o Anthropic.
+Per consultare, esportare o cancellare i dati da esse conservati, o per modificare le impostazioni relative all'addestramento, l'Utente può rivolgersi a OpenAI o ad Anthropic tramite il proprio account.
 
-## Quando sei tu a condividere qualcosa
+## Art. 4. Dati condivisi dall'Utente
 
-- **Feedback:** "Invia un feedback" apre nel browser una nuova segnalazione su GitHub, con la versione dell'app, il tuo sistema e la tua lingua già scritti. Decidi tu cosa aggiungere prima di pubblicarla. Le segnalazioni su GitHub sono pubbliche, e vale l'informativa privacy di GitHub.
-- **Log esportati:** "Esporta i log" crea sul tuo computer uno zip con i log dell'app e un riepilogo delle impostazioni, con le chiavi nascoste e senza il tuo nome né i tuoi account. Se il debug era attivo, i log contengono il testo dei tuoi file e delle tue richieste. Lo zip arriva a qualcuno solo se sei tu a inviarlo.
-- **Email:** se scrivi a Tommaso Barbera, usa il tuo indirizzo e il tuo messaggio solo per risponderti, e li cancella quando non servono più.
+- **Feedback:** la funzione "Invia un feedback" apre nel browser una nuova segnalazione su GitHub, con la versione dell'Applicazione, il sistema operativo e la lingua già indicati. L'Utente decide cosa aggiungere prima di pubblicarla. Le segnalazioni su GitHub sono pubbliche e soggette all'informativa sulla privacy di GitHub.
+- **Log esportati:** la funzione "Esporta i log" crea sul computer dell'Utente un archivio zip con i log dell'Applicazione e un riepilogo delle impostazioni, con le chiavi oscurate e senza il nome né gli account dell'Utente. Se l'opzione di debug era attiva, i log contengono il testo dei file e delle richieste dell'Utente. L'archivio è trasmesso a terzi solo se l'Utente lo invia.
+- **Email:** se l'Utente scrive all'Autore, l'indirizzo e il messaggio sono utilizzati al solo fine di rispondere e sono cancellati quando non sono più necessari.
 
-## Chi è responsabile
+## Art. 5. Titolare del trattamento e diritti dell'Utente
 
-L'autore di Tost Work non riceve dati personali dall'app, e quello che l'app conserva sul tuo computer è solo tuo. Dei dati inviati a OpenAI e ad Anthropic rispondono loro, secondo le loro informative. Per le email che gli scrivi, il titolare del trattamento è Tommaso Barbera, e puoi chiedergli di vederle o cancellarle all'indirizzo qui sotto. Puoi anche presentare reclamo all'autorità per la protezione dei dati del tuo paese, che in Italia è il Garante per la protezione dei dati personali.
+L'Autore non riceve dati personali dall'Applicazione, e i dati conservati sul computer dell'Utente restano nella sua esclusiva disponibilità. Dei dati trasmessi a OpenAI e ad Anthropic rispondono tali società, secondo le rispettive informative. Per le email inviate all'Autore, titolare del trattamento è Tommaso Barbera, al quale l'Utente può chiedere l'accesso ai propri dati o la loro cancellazione all'indirizzo indicato all'art. 7. L'Utente ha inoltre il diritto di proporre reclamo all'autorità di controllo per la protezione dei dati del proprio paese, che in Italia è il Garante per la protezione dei dati personali.
 
-## Modifiche
+## Art. 6. Modifiche dell'informativa
 
-Questa informativa può cambiare con una nuova versione di Tost Work. La nuova versione arriva con l'app e riporta la data in alto.
+L'Autore può modificare la presente informativa con una nuova versione dell'Applicazione. La versione aggiornata è distribuita con l'Applicazione e ne riporta la data in apertura.
 
-## Contatti
+## Art. 7. Contatti
 
 Tommaso Barbera, tommaso.barbera@tost.one

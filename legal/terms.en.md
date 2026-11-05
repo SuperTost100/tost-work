@@ -2,69 +2,73 @@
 
 Last updated: 5 November 2026
 
-These terms cover the Tost Work app as published by Tommaso Barbera, a private person, at [github.com/SuperTost100/tost-work](https://github.com/SuperTost100/tost-work). By using the app you accept them. The Italian version of these terms is the one that counts; this English version is a translation.
+## 1. Purpose and acceptance
 
-## The app and its licence
+These terms of use (the "Terms") govern the use of the Tost Work desktop application (the "App"), published by Tommaso Barbera, a private individual (the "Author"), at [github.com/SuperTost100/tost-work](https://github.com/SuperTost100/tost-work).
 
-Tost Work is a free desktop app for working with AI on your computer. Its source code is released under the MIT licence, and nothing in these terms limits what that licence lets you do with the code. These terms cover your use of the app.
+Anyone who installs or uses the App (the "User") accepts these Terms. The Terms are drawn up in Italian and in English. In case of any discrepancy, the Italian version prevails.
 
-Tost Work has no accounts and no server of its own. Your projects, tasks, settings and files stay on your computer.
+## 2. Source code licence
 
-## Your AI accounts
+The App's source code is released under the MIT licence. These Terms govern the use of the App and do not restrict any right that the MIT licence grants over the source code.
 
-Tost Work does its work through two programs made by others: the Codex CLI by OpenAI and Claude Code by Anthropic. When you ask for it, Tost Work installs them with their makers' own installers. It doesn't change them.
+The App requires no account and relies on no server operated by the Author. The User's projects, tasks, settings and files are kept on the User's computer.
 
-You connect your own account: a ChatGPT or Claude subscription, through the sign-in page of OpenAI or Anthropic, or an API key of yours. So:
+## 3. Third-party artificial intelligence services
 
-- your use of ChatGPT and Codex stays under OpenAI's terms, and your use of Claude and Claude Code stays under Anthropic's terms and usage policy;
-- each person uses their own account or key, and doesn't share it with others through Tost Work;
-- tasks count against your plan's limits or are billed to your API key by OpenAI or Anthropic;
-- OpenAI and Anthropic can change or end this kind of access at any time, so Tost Work can't promise it will keep working.
+The App carries out the requested tasks through third-party programs: Codex CLI, made by OpenAI, and Claude Code, made by Anthropic. At the User's request, the App installs them with their makers' official installers, without modifying them.
 
-Tost Work is not made by, endorsed by or affiliated with OpenAI or Anthropic. ChatGPT, Codex, Claude and Claude Code are their trademarks.
+The User connects their own account, either a ChatGPT or Claude subscription signed in through OpenAI's or Anthropic's page, or their own API key. Accordingly:
 
-## Your content
+- the use of ChatGPT and Codex remains subject to OpenAI's terms, and the use of Claude and Claude Code to Anthropic's terms and usage policy;
+- each User uses only their own account or key and does not share it with others through the App;
+- tasks count against the usage limits of the User's subscription or are billed by OpenAI or Anthropic to the User's API key;
+- OpenAI and Anthropic may change or discontinue this form of access at any time, and the Author cannot guarantee that it will remain available.
 
-Your files, your requests and what the AI makes for you stay yours. When a task runs, the Codex CLI or Claude Code sends your request and the files the AI reads to OpenAI or Anthropic, which handle them under their own terms and privacy policies. Before you use Tost Work with confidential, regulated or personal data, check those policies and your account's data settings, including whether your conversations may be used to train their models.
+The App is not made or endorsed by OpenAI or Anthropic and is not affiliated with them. ChatGPT, Codex, Claude and Claude Code are trademarks of their respective owners.
 
-Tost Work's author never receives your files or requests, so they're never used to train anything on his side.
+## 4. User content
 
-You need the right to use the files and information you give the AI.
+The User's files, requests and the results produced for the User by the artificial intelligence remain the User's. While a task runs, Codex CLI or Claude Code sends the User's request and the files the artificial intelligence reads to OpenAI or Anthropic, which process them under their own terms and privacy policies. Before using the App with confidential, regulated or personal data, the User should review those terms and the data settings of their account, including whether conversations may be used to train models.
 
-## What the AI does
+The Author does not receive the User's files or requests and therefore never uses them to train models.
 
-AI can be wrong. Check what it makes before you rely on it, send it or sign it.
+The User warrants that they hold the necessary rights to the files and information they submit to the artificial intelligence.
 
-The AI works in the project folder you choose. When the AI replaces a file that was already there or deletes one, Tost Work asks you first, keeps a copy of the replaced file and moves deleted files to the system Trash. The programs the AI runs, such as the one that edits Word and Excel files, can still change or delete a file without asking, and a file one of them deletes doesn't go to the Trash. Keep your own backups of the files that matter to you.
+## 5. Results of the artificial intelligence and protection of files
 
-## Acceptable use
+Results produced by the artificial intelligence may contain errors. The User should check them before using them, sending them to others or signing them.
 
-Use Tost Work lawfully and within OpenAI's and Anthropic's usage policies. Don't use it to harm other people or to break the security of systems you have no right to access.
+The artificial intelligence works in the project folder chosen by the User. When the artificial intelligence replaces an existing file or deletes one, the App first asks for the User's consent, keeps a copy of the replaced file and moves deleted files to the system Trash. The programs the artificial intelligence uses, such as the one that edits Word and Excel files, may nevertheless change or delete a file without asking for consent, and a file deleted by one of them is not moved to the Trash. The User is advised to keep backup copies of the files that matter to them.
 
-## Fees
+## 6. Acceptable use
 
-Tost Work is free. What you pay OpenAI or Anthropic for your plan or your API usage is between you and them.
+The User undertakes to use the App in compliance with the law and with OpenAI's and Anthropic's usage policies, and not to use it to harm others or to breach the security of systems they are not authorised to access.
 
-## No warranty
+## 7. No charge
 
-Tost Work is in alpha. It's provided "as is", without warranties of any kind, as the MIT licence says, to the extent the law allows.
+The App is free of charge. Any amounts owed to OpenAI or Anthropic for a subscription or for API usage are a matter solely between the User and those companies.
 
-## Liability
+## 8. Disclaimer of warranties
 
-To the extent the law allows, Tommaso Barbera isn't liable for damage that comes from using Tost Work, including lost data, lost earnings, or the results of work done by the AI. This doesn't limit liability for wilful misconduct or gross negligence, or any right a consumer has under the law of their country that can't be waived.
+The App is in development (alpha) and is provided "as is", without warranties of any kind, as stated in the MIT licence and to the extent permitted by law.
 
-## Other software
+## 9. Limitation of liability
 
-Tost Work includes open-source software from others, each under its own licence. The list is in Settings > About > Credits and licences.
+To the extent permitted by law, the Author is not liable for damage arising from the use of the App, including loss of data, loss of earnings and the consequences of results produced by the artificial intelligence. This does not affect liability for wilful misconduct or gross negligence, or any mandatory right that the law of the User's country of residence grants to consumers.
 
-## Changes
+## 10. Third-party software
 
-These terms may change with a new version of Tost Work. The new version comes with the app and shows its date at the top. If you keep using the app after a change, you accept the new terms.
+The App includes open-source software by third parties, each under its own licence. The list is available in Settings > About > Credits and licences.
 
-## Law
+## 11. Changes to these Terms
 
-These terms are governed by Italian law. If you are a consumer, you keep the protections that the law of your country of residence gives you, including the right to go to your local courts.
+The Author may change these Terms with a new version of the App. The updated version is distributed with the App and states its date at the top. Using the App after a change constitutes acceptance of the new Terms.
 
-## Contact
+## 12. Governing law and jurisdiction
+
+These Terms are governed by Italian law. A User who is a consumer keeps the protections provided by the law of their country of residence, including the right to bring proceedings before the courts of their place of residence.
+
+## 13. Contact
 
 Tommaso Barbera, tommaso.barbera@tost.one

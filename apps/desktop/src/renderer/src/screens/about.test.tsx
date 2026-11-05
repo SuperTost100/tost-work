@@ -147,6 +147,6 @@ describe("About", () => {
     await click("Informazioni");
     await click("Termini d'uso");
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Termini d'uso");
-    expect(screen.getByText(/Fa fede questa versione italiana/)).toBeTruthy();
+    expect(screen.getByText(/In caso di difformità prevale la versione italiana/)).toBeTruthy();
   });
 });
