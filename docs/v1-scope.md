@@ -105,7 +105,7 @@ Changed on 2026-10-30, after testing 0.0.10:
 
 Changed on 2026-10-30, after testing 0.0.11:
 
-- The roadmap also has a board, [Tost Work roadmap](https://github.com/users/SuperTost100/projects/2), with a Version field for each issue. Ideas sent with the issue form are added to it.
+- The roadmap also has a private board, Tost Work roadmap, with a Version field for each issue. Ideas sent with the roadmap issue form are added to it.
 - On a Mac the collapsed rail is 80px wide, and the window buttons sit on it instead of in a strip above it. Its icons are 20px.
 - A task's side panel is a card as tall as what it lists. The page scrolls under it, so its scrollbar sits at the window's edge.
 - With cli-funnel 0.6.2, Codex's short notes between steps show in the task as Claude's do.
@@ -254,4 +254,4 @@ The interface ships in Italian and English. Setup takes the language from the sy
 
 ## Releases
 
-Alpha builds are GitHub pre-releases on this private repository, downloaded by hand. The app starts updating itself at 0.1.0, when the repository goes public, because an app can't fetch updates from a private repository without carrying a GitHub token inside it.
+Alpha builds are GitHub pre-releases, downloaded by hand. The app starts updating itself at 0.1.0.
