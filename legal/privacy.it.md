@@ -11,7 +11,7 @@ Tost Work conserva nella sua cartella dati queste informazioni:
 - le impostazioni, i progetti, le attività con la loro cronologia e i lavori;
 - quello che scrivi in "Su di te";
 - le copie dei file modificati da un'attività, che ti permettono di tornare all'originale;
-- il log dell'app e, solo mentre tieni attivo "Mostra dettagli tecnici e debug", un log completo di ogni attività, che contiene il testo dei tuoi file e delle tue richieste;
+- solo mentre tieni attivo "Mostra dettagli tecnici e debug", il log dell'app e un log completo di ogni attività, che contiene il testo dei tuoi file e delle tue richieste;
 - la tua chiave API, cifrata con l'archivio sicuro del sistema. Se il sistema non lo offre, la chiave resta solo fino a quando chiudi l'app.
 
 Le skill che crei sono in `Documenti/Tost Work/Skills`, e i file dei tuoi progetti restano nelle cartelle in cui li tieni.

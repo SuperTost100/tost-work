@@ -11,7 +11,7 @@ Tost Work keeps these in its data folder:
 - your settings, projects, tasks and their history, and jobs;
 - what you write in "About you";
 - the copies of files a task changed, which let you restore the original;
-- the app's log, and, only while you turn on "Show technical details and debug", a full log of each task that includes the text of your files and requests;
+- only while "Show technical details and debug" is on, the app's log and a full log of each task, which includes the text of your files and requests;
 - your API key, encrypted with your system's secure storage. If your system offers none, the key is kept only until you close the app.
 
 The skills you make are in `Documents/Tost Work/Skills`, and the files of your projects stay in the folders where you keep them.
