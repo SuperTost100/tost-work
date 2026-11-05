@@ -10,6 +10,7 @@ import {
   type SaveResult,
   type SkillMenuAction,
 } from "../shared/api";
+import { LICENSES_DIR, LICENSES_FILE } from "../shared/credits";
 import { guideText, languageFrom, type MessageKey, translate } from "../shared/i18n";
 import {
   type AgentProvider,
@@ -382,6 +383,14 @@ export function registerIpc(
     const log = await debug.taskText(taskOf(id).id);
     if (log === null) throw new UserError("error.noLog");
     clipboard.writeText(log);
+  });
+  // The notices file the build writes, next to the app's other resources (documents.ts finds bin the same way).
+  handle(IPC.licensesOpen, async () => {
+    const file = app.isPackaged
+      ? join(process.resourcesPath, LICENSES_FILE)
+      : join(app.getAppPath(), LICENSES_DIR, LICENSES_FILE);
+    const error = await shell.openPath(file);
+    if (error) throw new Error(error);
   });
   handle(IPC.debugRevealAppLog, async () => shell.showItemInFolder(await debug.touchApp()));
   handle(IPC.debugExportLogs, async () => {

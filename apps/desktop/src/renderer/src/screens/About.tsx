@@ -1,6 +1,7 @@
 import credits from "virtual:credits";
-import { Fragment, type ReactNode, useContext } from "react";
+import { Fragment, type ReactNode, useContext, useState } from "react";
 import { CHANGELOG, shownEntries, versionLabel } from "@/lib/changelog";
+import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
 import { LanguageContext, useT } from "@/lib/useT";
@@ -79,8 +80,9 @@ function CreditRows({ list }: { list: readonly Credit[] }) {
   ));
 }
 
-function Credits() {
+function Credits({ api }: { api: TostWorkApi }) {
   const t = useT();
+  const [error, setError] = useState<string | null>(null);
   return (
     <div className="scroll">
       <div className="col doc">
@@ -94,6 +96,30 @@ function Credits() {
           <h2 id="credits-packages">{t("credits.packages")}</h2>
           <p className="sub">{t("credits.packages.d")}</p>
           <CreditRows list={credits} />
+        </section>
+        <section className="sgroup" aria-labelledby="credits-texts">
+          <h2 id="credits-texts">{t("credits.texts")}</h2>
+          <div className="srow">
+            <div className="lbl">
+              <span>{t("credits.texts.d")}</span>
+            </div>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setError(null);
+                api.openLicenses().catch((err: unknown) => setError(errorText(err)));
+              }}
+            >
+              <Icon name="book-2" />
+              {t("credits.texts.open")}
+            </button>
+          </div>
+          {error && (
+            <p className="fld-error" role="alert">
+              {error}
+            </p>
+          )}
         </section>
       </div>
     </div>
@@ -148,7 +174,7 @@ export function About({
         </nav>
       </div>
       {page === "news" && <News />}
-      {page === "credits" && <Credits />}
+      {page === "credits" && <Credits api={api} />}
       {page === "home" && (
         <div className="solo scrolls">
           <div className="about">

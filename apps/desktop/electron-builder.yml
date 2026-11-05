@@ -18,6 +18,10 @@ extraResources:
     to: bin
   - from: resources/skills
     to: skills
+  # The licences of everything the app ships, written by the build (licenses.ts). Electron's own LICENSE and Chromium's
+  # LICENSES.chromium.html are kept by electron-builder itself, next to the app on Windows and Linux and in Resources on Mac.
+  - from: resources/generated/THIRD-PARTY-LICENSES.txt
+    to: THIRD-PARTY-LICENSES.txt
 mac:
   category: public.app-category.productivity
   target:

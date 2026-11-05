@@ -116,6 +116,8 @@ export interface TostWorkApi {
   };
   /** Tells the menu bar whether a task is open and working, so its Task items turn on and off with it. */
   menuState(state: MenuState): void;
+  /** Opens the file with the licences of everything the app ships, in the app that opens text files. */
+  openLicenses(): Promise<void>;
   /** The subscriptions, one per agent CLI. */
   account: {
     status(provider: AgentProvider): Promise<AgentAccount>;
@@ -401,4 +403,5 @@ export const IPC = {
   debugRevealAppLog: "debug:reveal-app-log",
   debugExportLogs: "debug:export-logs",
   debugScreen: "debug:screen",
+  licensesOpen: "licenses:open",
 } as const;

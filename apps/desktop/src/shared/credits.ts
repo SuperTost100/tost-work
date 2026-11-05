@@ -10,6 +10,13 @@ export interface Credit {
 }
 
 /**
+ * The file with every licence the app ships, which the build writes into `LICENSES_DIR` and electron-builder copies
+ * to the app's resources (electron-builder.yml says the same).
+ */
+export const LICENSES_FILE = "THIRD-PARTY-LICENSES.txt";
+export const LICENSES_DIR = "resources/generated";
+
+/**
  * What the app ships besides npm packages: the fonts in `assets/fonts` and the icons in `assets/icons`. Unlike the
  * packages, nothing generates these, so a font or icon set added to the app is added here too.
  */

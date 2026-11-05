@@ -109,4 +109,18 @@ describe("About", () => {
     expect(within(row("zod")).getByText("MIT")).toBeTruthy();
     expect(within(row("jszip")).getByText(/MIT/)).toBeTruthy();
   });
+
+  it("opens the file with the licence texts, and says so when it can't", async () => {
+    const api = createMemoryApi();
+    await aboutPage(api);
+    await click("Credits and licences");
+    await click("Open");
+    expect(api.licensesOpened).toBe(1);
+
+    api.openLicenses = async () => {
+      throw new Error("ENOENT: no such file");
+    };
+    await click("Open");
+    expect((await screen.findByRole("alert")).textContent).toContain("ENOENT");
+  });
 });
