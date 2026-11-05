@@ -1,0 +1,47 @@
+name: Bug report
+description: Something in Tost Work doesn't work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      description: The steps, if you know them.
+      placeholder: |
+        1. Open a project
+        2. Start a task with…
+        3. …
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown in Impostazioni > Informazioni, for example "0.0.23 dev · build 5ecd853".
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: System
+      options: [macOS, Windows, Linux]
+    validations:
+      required: true
+  - type: dropdown
+    id: ai
+    attributes:
+      label: AI account
+      description: Which account the task ran on, if the problem is in a task.
+      options: [ChatGPT, Claude, OpenAI API key, Anthropic API key, Not about a task]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >-
+        Optional. Impostazioni > Avanzate > Esporta i log makes a zip with keys hidden. Check it before you attach it:
+        it can contain the text of your files and requests, and everything you add here is public.

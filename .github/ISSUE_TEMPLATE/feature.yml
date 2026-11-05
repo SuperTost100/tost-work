@@ -1,0 +1,16 @@
+name: Feature request
+description: An idea for something Tost Work should do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you're trying to do
+      description: The work you want to get done, and where Tost Work gets in the way or falls short today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: How you imagine it working. A sketch or a screenshot of another app is welcome.
