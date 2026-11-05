@@ -35,7 +35,7 @@ Devi avere il diritto di usare i file e le informazioni che dai all'AI.
 
 L'AI può sbagliare. Controlla quello che prepara prima di usarlo, inviarlo o firmarlo.
 
-L'AI lavora nella cartella del progetto che scegli tu. Tost Work chiede prima di sovrascrivere o eliminare un file, tiene una copia dei file che modifica e sposta nel Cestino quelli eliminati. Tieni comunque una copia di riserva dei file a cui tieni.
+L'AI lavora nella cartella del progetto che scegli tu. Quando l'AI sostituisce un file che c'era già o ne elimina uno, Tost Work te lo chiede prima, tiene una copia del file sostituito e sposta nel Cestino quelli eliminati. I programmi che l'AI usa, come quello che modifica i file Word ed Excel, possono comunque cambiare un file esistente senza chiedere. Tieni una copia di riserva dei file a cui tieni.
 
 ## Uso consentito
 

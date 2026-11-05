@@ -35,7 +35,7 @@ You need the right to use the files and information you give the AI.
 
 AI can be wrong. Check what it makes before you rely on it, send it or sign it.
 
-The AI works in the project folder you choose. Tost Work asks before a file is overwritten or deleted, keeps a copy of the files it changes, and moves deleted files to the system Trash. Even so, keep your own backups of the files that matter to you.
+The AI works in the project folder you choose. When the AI replaces a file that was already there or deletes one, Tost Work asks you first, keeps a copy of the replaced file and moves deleted files to the system Trash. The programs the AI runs, such as the one that edits Word and Excel files, can still change an existing file without asking. Keep your own backups of the files that matter to you.
 
 ## Acceptable use
 

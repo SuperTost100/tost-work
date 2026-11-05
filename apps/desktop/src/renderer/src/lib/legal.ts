@@ -20,5 +20,10 @@ export const LEGAL_SOURCES: Record<LegalDoc, Record<Language, string>> = {
  */
 export function legalHtml(doc: LegalDoc, lang: Language): string {
   const html = marked.parse(LEGAL_SOURCES[doc][lang], { async: false, gfm: true }) as string;
-  return html.replace(/<a href="/g, '<a target="_blank" rel="noreferrer" href="');
+  return (
+    html
+      // GFM turns the contact address into a mailto link, which the window can't open: it stays as text.
+      .replace(/<a href="mailto:[^"]*">([^<]*)<\/a>/g, "$1")
+      .replace(/<a href="/g, '<a target="_blank" rel="noreferrer" href="')
+  );
 }

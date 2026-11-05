@@ -6,7 +6,7 @@ Tost Work non raccoglie nessun dato su di te. Non ha account, statistiche d'uso 
 
 ## Cosa resta sul tuo computer
 
-Tost Work conserva nella sua cartella dati queste informazioni, che non lasciano mai il tuo computer attraverso Tost Work:
+Tost Work conserva nella sua cartella dati queste informazioni:
 
 - le impostazioni, i progetti, le attività con la loro cronologia e i lavori;
 - quello che scrivi in "Su di te";
@@ -16,7 +16,7 @@ Tost Work conserva nella sua cartella dati queste informazioni, che non lasciano
 
 Le skill che crei sono in `Documenti/Tost Work/Skills`, e i file dei tuoi progetti restano nelle cartelle in cui li tieni.
 
-La cartella dati è `~/Library/Application Support/Tost Work` su macOS, `%APPDATA%\Tost Work` su Windows e `~/.config/Tost Work` su Linux. Eliminando l'app e questa cartella elimini tutto quello che Tost Work ha salvato.
+La cartella dati è `~/Library/Application Support/Tost Work` su macOS, `%APPDATA%\Tost Work` su Windows e `~/.config/Tost Work` su Linux. Eliminando l'app, questa cartella e `Documenti/Tost Work` elimini tutto quello che Tost Work ha salvato.
 
 ## Cosa va a OpenAI o ad Anthropic
 

@@ -6,7 +6,7 @@ Tost Work collects nothing about you. It has no accounts, no analytics and no te
 
 ## What stays on your computer
 
-Tost Work keeps these in its data folder, and they never leave your computer through Tost Work:
+Tost Work keeps these in its data folder:
 
 - your settings, projects, tasks and their history, and jobs;
 - what you write in "About you";
@@ -16,7 +16,7 @@ Tost Work keeps these in its data folder, and they never leave your computer thr
 
 The skills you make are in `Documents/Tost Work/Skills`, and the files of your projects stay in the folders where you keep them.
 
-The data folder is `~/Library/Application Support/Tost Work` on macOS, `%APPDATA%\Tost Work` on Windows and `~/.config/Tost Work` on Linux. Deleting the app and this folder removes everything Tost Work stored.
+The data folder is `~/Library/Application Support/Tost Work` on macOS, `%APPDATA%\Tost Work` on Windows and `~/.config/Tost Work` on Linux. Deleting the app, this folder and `Documents/Tost Work` removes everything Tost Work stored.
 
 ## What goes to OpenAI or Anthropic
 
