@@ -3958,6 +3958,46 @@ ol.editable li::before {
 .doc .sgroup .sub {
   margin-top: 8px;
 }
+/* The terms and the privacy notice: running text from Markdown, set for reading. */
+.legal {
+  padding-bottom: 48px;
+  color: var(--t2);
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+.legal h1 + p {
+  color: var(--t3);
+  font-size: 14px;
+}
+.legal h2 {
+  margin: 28px 0 8px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+.legal p,
+.legal ul {
+  margin: 0 0 10px;
+}
+.legal ul {
+  padding-left: 20px;
+}
+.legal li + li {
+  margin-top: 4px;
+}
+.legal :is(strong, b) {
+  color: var(--ink);
+  font-weight: 600;
+}
+.legal code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.92em;
+}
+.legal a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .changes {
   list-style: none;
   margin: 0;

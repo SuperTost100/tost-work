@@ -1,15 +1,23 @@
 import credits from "virtual:credits";
-import { Fragment, type ReactNode, useContext, useState } from "react";
+import { Fragment, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { CHANGELOG, shownEntries, versionLabel } from "@/lib/changelog";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { Logo } from "@/lib/Logo";
+import { type LegalDoc, legalHtml } from "@/lib/legal";
 import { LanguageContext, useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import { BUNDLED_ASSETS, type Credit } from "../../../shared/credits";
 import { feedbackUrl, REPO_URL, SITE_URL } from "../../../shared/feedback";
 
-export type AboutPage = "home" | "news" | "credits";
+export type AboutPage = "home" | "news" | "credits" | LegalDoc;
+
+const PAGE_TITLES = {
+  news: "news.title",
+  credits: "credits.title",
+  terms: "legal.terms",
+  privacy: "legal.privacy",
+} as const;
 
 /** A link out of the app: the main process opens it in the user's browser, and only if it is https. */
 function ExternalLink({ href, icon, children }: { href: string; icon: string; children: ReactNode }) {
@@ -126,6 +134,20 @@ function Credits({ api }: { api: TostWorkApi }) {
   );
 }
 
+/** The terms of use or the privacy notice, in the app's language, from the Markdown files in `legal/`. */
+function Legal({ doc }: { doc: LegalDoc }) {
+  const lang = useContext(LanguageContext);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.innerHTML = legalHtml(doc, lang);
+  }, [doc, lang]);
+  return (
+    <div className="scroll">
+      <div className="col doc legal" ref={ref} />
+    </div>
+  );
+}
+
 /**
  * About: what Tost Work is, where its code and author are, what changed in each version, which open-source pieces it
  * is made of, and how to send feedback. What's new and Credits are pages of their own under it.
@@ -152,7 +174,7 @@ export function About({
   const trail: { label: string; go?: () => void }[] = [
     { label: t("nav.settings"), go: onSettings },
     { label: t("about.crumb"), go: page === "home" ? undefined : () => onPage("home") },
-    ...(page === "news" ? [{ label: t("news.title") }] : page === "credits" ? [{ label: t("credits.title") }] : []),
+    ...(page === "home" ? [] : [{ label: t(PAGE_TITLES[page]) }]),
   ];
 
   return (
@@ -175,6 +197,7 @@ export function About({
       </div>
       {page === "news" && <News />}
       {page === "credits" && <Credits api={api} />}
+      {(page === "terms" || page === "privacy") && <Legal doc={page} />}
       {page === "home" && (
         <div className="solo scrolls">
           <div className="about">
@@ -205,6 +228,16 @@ export function About({
               <button type="button" onClick={() => onPage("credits")}>
                 <Icon name="book-2" />
                 <span className="grow">{t("credits.title")}</span>
+                <Icon name="right" />
+              </button>
+              <button type="button" onClick={() => onPage("terms")}>
+                <Icon name="file" />
+                <span className="grow">{t("legal.terms")}</span>
+                <Icon name="right" />
+              </button>
+              <button type="button" onClick={() => onPage("privacy")}>
+                <Icon name="lock" />
+                <span className="grow">{t("legal.privacy")}</span>
                 <Icon name="right" />
               </button>
               <ExternalLink href={feedback} icon="mail">
