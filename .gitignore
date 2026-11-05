@@ -6,3 +6,4 @@ release/
 *.log
 .DS_Store
 /apps/desktop/resources/bin/
+/apps/desktop/resources/generated/

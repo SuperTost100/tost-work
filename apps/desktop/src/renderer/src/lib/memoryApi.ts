@@ -77,6 +77,8 @@ export type MemoryApi = TostWorkApi & {
   panelCalls: { open: (PanelTarget | undefined)[]; quit: number; height: number };
   /** Adds a line to the task's debug log, as the engine does while debug is on. */
   log(taskId: string, line: LogLine): void;
+  /** How many times the window asked to open the file with the licences. */
+  licensesOpened: number;
   /** What the debug log buttons and menu items asked for, in order. */
   debugCalls: {
     revealed: string[];
@@ -269,6 +271,10 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       menuState = state;
     },
     menuStateNow: () => menuState,
+    licensesOpened: 0,
+    openLicenses: async () => {
+      api.licensesOpened++;
+    },
     onOpenTask: (l) => {
       openListeners.add(l);
       return () => openListeners.delete(l);

@@ -44,6 +44,10 @@ const en = {
   "credits.assets": "Fonts and icons",
   "credits.packages": "Libraries",
   "credits.packages.d": "The libraries Tost Work is built from. Each one uses others, which have their own licences.",
+  "credits.texts": "Licence texts",
+  "credits.texts.d":
+    "The licence of every library, font and icon set in the app, and where to find those of Electron, Chromium and OfficeCLI. It opens as a text file.",
+  "credits.texts.open": "Open",
   "settings.level": "Level and sections",
   "settings.level.sub":
     "Your level decides which sections you see. You can change it any time, and turn single sections on or off.",
@@ -711,6 +715,10 @@ const it: Record<MessageKey, string> = {
   "credits.packages": "Librerie",
   "credits.packages.d":
     "Le librerie con cui è costruito Tost Work. Ognuna ne usa altre, che hanno ciascuna la propria licenza.",
+  "credits.texts": "Testi delle licenze",
+  "credits.texts.d":
+    "La licenza di ogni libreria, carattere e set di icone dell'app, e dove trovare quelle di Electron, Chromium e OfficeCLI. Si apre come file di testo.",
+  "credits.texts.open": "Apri",
   "settings.level": "Livello e sezioni",
   "settings.level.sub":
     "Il tuo livello decide quali sezioni vedi. Puoi cambiarlo quando vuoi, e accendere o spegnere le singole sezioni.",
