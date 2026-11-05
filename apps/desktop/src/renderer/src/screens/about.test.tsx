@@ -123,4 +123,30 @@ describe("About", () => {
     await click("Open");
     expect((await screen.findByRole("alert")).textContent).toContain("ENOENT");
   });
+
+  it("shows the terms of use and the privacy notice in the app's language, with links that leave the app", async () => {
+    await aboutPage();
+    await click("Terms of use");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Terms of use");
+    expect(screen.getByRole("navigation", { name: "About" }).textContent).toBe("Settings/About/Terms of use");
+    const repo = screen.getByRole("link", { name: "github.com/SuperTost100/tost-work" });
+    expect(repo.getAttribute("target")).toBe("_blank");
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("navigation", { name: "About" })).getByRole("button", { name: "About" }));
+    });
+    await click("Privacy notice");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Privacy notice");
+    expect(screen.getByRole("link", { name: "Anthropic privacy policy" }).getAttribute("target")).toBe("_blank");
+  });
+
+  it("shows the Italian terms when the app speaks Italian", async () => {
+    const api = createMemoryApi();
+    await api.settings.update({ language: "it" });
+    render(<Root api={api} />);
+    await click("Impostazioni");
+    await click("Informazioni");
+    await click("Termini d'uso");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Termini d'uso");
+    expect(screen.getByText(/In caso di difformità prevale la versione italiana/)).toBeTruthy();
+  });
 });

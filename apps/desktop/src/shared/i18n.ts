@@ -39,6 +39,8 @@ const en = {
   "news.title": "What's new",
   "news.sub": "What changed in each version of Tost Work.",
   "credits.title": "Credits and licences",
+  "legal.terms": "Terms of use",
+  "legal.privacy": "Privacy notice",
   "credits.sub":
     "Tost Work is built on open-source software. These are the pieces it ships with, and the licence each one comes with.",
   "credits.assets": "Fonts and icons",
@@ -709,6 +711,8 @@ const it: Record<MessageKey, string> = {
   "news.title": "Novità",
   "news.sub": "Cosa è cambiato in ogni versione di Tost Work.",
   "credits.title": "Crediti e licenze",
+  "legal.terms": "Termini d'uso",
+  "legal.privacy": "Informativa privacy",
   "credits.sub":
     "Tost Work si basa su software open source. Qui trovi i componenti che include e la licenza di ciascuno.",
   "credits.assets": "Caratteri e icone",
