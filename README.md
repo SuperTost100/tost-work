@@ -115,7 +115,7 @@ You need Node 24 and pnpm (the version is pinned in `package.json`). The Mac app
 git clone https://github.com/SuperTost100/tost-work.git
 cd tost-work
 pnpm install
-pnpm dev                          # opens the app with live reload
+pnpm dev                          # opens the app with live reload; the first run downloads Electron
 ```
 
 `TOST_WORK_ENGINE=fake pnpm dev` replays scripted tasks instead of running an AI, to try the interface without an account.
