@@ -23,7 +23,7 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/home-dark.png">
-  <img alt="Tost Work's Home screen: "Good afternoon, Giulia. Which file is next?" over an empty task box for the Studio Bianchi project, with six recent tasks in the sidebar, such as a proposal for Alpi Logistica and a quote for Ferraris." src="docs/screenshots/home-light.png">
+  <img alt="Tost Work's Home screen: &quot;Good afternoon, Giulia. Which file is next?&quot; over an empty task box for the Studio Bianchi project, with six recent tasks in the sidebar, such as a proposal for Alpi Logistica and a quote for Ferraris." src="docs/screenshots/home-light.png">
 </picture>
 
 ## Why Tost Work
@@ -36,7 +36,7 @@ The app is in Italian and English, with light and dark themes. It's in alpha: Ma
 
 ## What you can do
 
-**Work in a project.** A project is a folder you already use, such as client proposals. Write what you need, attach files if you want, and the AI works in that folder only. It saves Word, Excel, PowerPoint and PDF files where they fit, and answers in the chat when you asked a question.
+**Work in a project.** A project is a folder you already use, such as client proposals. Write what you need and attach files. The AI makes and changes files in that folder only, and it also reads your attachments, your skills and the built-in guides to do the work. It saves Word, Excel, PowerPoint and PDF files where they fit, and answers in the chat when you asked a question.
 
 **Answer its questions.** When the AI needs a decision, it asks up to 16 questions at once, each with ready answers and room for your own, and keeps going when you reply.
 
@@ -101,7 +101,7 @@ Everything Tost Work stores stays on your computer, in `~/Library/Application Su
 
 These actions send something off your computer:
 
-- **Running a task** sends your request, your attachments, the files the AI reads in the project folder and your "About you" notes to OpenAI or Anthropic, through the Codex CLI or Claude Code. Their privacy policies and your account settings apply.
+- **Running a task** sends your request, your attachments, the files the AI reads in the project folder, the skills it follows and your "About you" notes to OpenAI or Anthropic, through the Codex CLI or Claude Code. Their privacy policies and your account settings apply.
 - **Installing Codex or Claude Code** downloads them from OpenAI or Anthropic.
 - **Send feedback** opens a new GitHub issue in your browser, which is public once you post it.
 
