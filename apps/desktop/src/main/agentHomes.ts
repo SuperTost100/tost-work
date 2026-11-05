@@ -12,6 +12,9 @@ import { join } from "node:path";
  * in ChatGPT, and their tools cost tokens on every request (#194). Turning off more, such as image generation, would
  * save a little more but change the start of every request, which then misses the cache that every other Codex user
  * keeps warm: measured, the first call cached 0 tokens instead of 12,160.
+ *
+ * Analytics stay off as Tost Work promises: app-server already keeps them off by default, and the setting says so
+ * outright in case that default changes.
  */
 export const CODEX_CONFIG = `# Written by Tost Work each time it starts. Changes here are replaced.
 project_doc_max_bytes = 0
@@ -28,6 +31,9 @@ plugins = false
 remote_plugin = false
 tool_suggest = false
 skill_search = false
+
+[analytics]
+enabled = false
 `;
 
 /**
@@ -45,12 +51,18 @@ export const CLAUDE_SETTINGS = {
   pluginConfigs: { "cc-plugin-agents-md@builtin": { options: { instructionFiles: "managed-only" } } },
 };
 
-/** The same for Claude Code through its environment, which also holds when a run loads no settings files. */
+/**
+ * The same for Claude Code through its environment, which also holds when a run loads no settings files. Its usage
+ * telemetry and error reports stay off too. CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC would cover both, but it also
+ * stops Claude Code from updating itself.
+ */
 export const CLAUDE_ENV = {
   CLAUDE_CODE_DISABLE_CLAUDE_MDS: "1",
   CLAUDE_CODE_DISABLE_BUNDLED_SKILLS: "1",
   CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
   ENABLE_CLAUDEAI_MCP_SERVERS: "false",
+  DISABLE_TELEMETRY: "1",
+  DISABLE_ERROR_REPORTING: "1",
 };
 
 /**
