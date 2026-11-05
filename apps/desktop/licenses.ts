@@ -106,7 +106,7 @@ const LEAVES = new Set(["electron"]);
 
 const NOTICE_FILE = /^(licen[cs]es?|copying|notice|patents)([._-].*)?$/i;
 /** The files that hold the licence terms themselves. NOTICE and PATENTS files only add to them. */
-const LICENSE_FILE = /^(licen[cs]es?|copying)\b/i;
+const LICENSE_FILE = /^(licen[cs]es?|copying)(?![a-z0-9])/i;
 
 /** Whether the texts include the licence terms, and not only notices that go with them. */
 export const hasLicenseText = (texts: LicenseText[]) => texts.some((t) => LICENSE_FILE.test(t.file));

@@ -108,6 +108,8 @@ describe("licensedPackages", () => {
     expect(hasLicenseText([{ file: "PATENTS", text: "patents" }])).toBe(false);
     expect(hasLicenseText([{ file: "LICENSE.md", text: "licence" }])).toBe(true);
     expect(hasLicenseText([{ file: "COPYING", text: "licence" }])).toBe(true);
+    expect(hasLicenseText([{ file: "LICENSE_MIT", text: "licence" }])).toBe(true);
+    expect(hasLicenseText([{ file: "LICENSEE", text: "not one" }])).toBe(false);
     expect(hasLicenseText([{ file: "LICENSE (github.com/juliangruber/isarray)", text: "licence" }])).toBe(true);
   });
 
