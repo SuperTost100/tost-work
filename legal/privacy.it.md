@@ -16,7 +16,7 @@ Tost Work conserva nella sua cartella dati queste informazioni:
 
 Le skill che crei sono in `Documenti/Tost Work/Skills`, e i file dei tuoi progetti restano nelle cartelle in cui li tieni.
 
-La cartella dati è `~/Library/Application Support/Tost Work` su macOS, `%APPDATA%\Tost Work` su Windows e `~/.config/Tost Work` su Linux. Eliminando l'app, questa cartella e `Documenti/Tost Work` elimini tutto quello che Tost Work ha salvato.
+La cartella dati è `~/Library/Application Support/Tost Work` su macOS, `%APPDATA%\Tost Work` su Windows e `~/.config/Tost Work` su Linux (`$XDG_CONFIG_HOME/Tost Work` se hai impostato quella variabile). Eliminando l'app, questa cartella e `Documenti/Tost Work` elimini tutto quello che Tost Work ha salvato.
 
 ## Cosa va a OpenAI o ad Anthropic
 
