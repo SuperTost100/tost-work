@@ -11,12 +11,12 @@ Tost Work conserva nella sua cartella dati queste informazioni:
 - le impostazioni, i progetti, le attività con la loro cronologia e i lavori;
 - quello che scrivi in "Su di te";
 - le copie dei file modificati da un'attività, che ti permettono di tornare all'originale;
-- solo mentre tieni attivo "Mostra dettagli tecnici e debug", il log dell'app e un log completo di ogni attività, che contiene il testo dei tuoi file e delle tue richieste;
+- solo mentre tieni attivo "Mostra dettagli tecnici e debug", il log dell'app e un log dettagliato di ogni attività, che contiene il testo dei tuoi file e delle tue richieste;
 - la tua chiave API, cifrata con l'archivio sicuro del sistema. Se il sistema non lo offre, la chiave resta solo fino a quando chiudi l'app.
 
 Le skill che crei sono in `Documenti/Tost Work/Skills`, e i file dei tuoi progetti restano nelle cartelle in cui li tieni.
 
-La cartella dati è `~/Library/Application Support/Tost Work` su macOS, `%APPDATA%\Tost Work` su Windows e `~/.config/Tost Work` su Linux (`$XDG_CONFIG_HOME/Tost Work` se hai impostato quella variabile). Eliminando l'app, questa cartella e `Documenti/Tost Work` elimini tutto quello che Tost Work ha salvato.
+La cartella dati è `~/Library/Application Support/Tost Work` su macOS, `%APPDATA%\Tost Work` su Windows e `~/.config/Tost Work` su Linux (`$XDG_CONFIG_HOME/Tost Work` se hai impostato quella variabile). Eliminando l'app, questa cartella e `Documenti/Tost Work` elimini tutto quello che Tost Work ha salvato. Se Tost Work si apre quando accedi al computer, disattivalo prima nelle Impostazioni, così il sistema non cercherà più di aprirla.
 
 ## Cosa va a OpenAI o ad Anthropic
 

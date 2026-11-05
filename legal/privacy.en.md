@@ -11,12 +11,12 @@ Tost Work keeps these in its data folder:
 - your settings, projects, tasks and their history, and jobs;
 - what you write in "About you";
 - the copies of files a task changed, which let you restore the original;
-- only while "Show technical details and debug" is on, the app's log and a full log of each task, which includes the text of your files and requests;
+- only while "Show technical details and debug" is on, the app's log and a detailed log of each task, which includes the text of your files and requests;
 - your API key, encrypted with your system's secure storage. If your system offers none, the key is kept only until you close the app.
 
 The skills you make are in `Documents/Tost Work/Skills`, and the files of your projects stay in the folders where you keep them.
 
-The data folder is `~/Library/Application Support/Tost Work` on macOS, `%APPDATA%\Tost Work` on Windows and `~/.config/Tost Work` on Linux (`$XDG_CONFIG_HOME/Tost Work` if you set that variable). Deleting the app, this folder and `Documents/Tost Work` removes everything Tost Work stored.
+The data folder is `~/Library/Application Support/Tost Work` on macOS, `%APPDATA%\Tost Work` on Windows and `~/.config/Tost Work` on Linux (`$XDG_CONFIG_HOME/Tost Work` if you set that variable). Deleting the app, this folder and `Documents/Tost Work` removes everything Tost Work stored. If Tost Work opens when you log in, turn that off in Settings first, so the system doesn't try to open it afterwards.
 
 ## What goes to OpenAI or Anthropic
 
