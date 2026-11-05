@@ -30,7 +30,7 @@ Le attività sono svolte da Codex CLI, prodotto da OpenAI, o da Claude Code, pro
 - quanto l'Utente ha scritto nella sezione "Su di te", che accompagna ogni attività;
 - le ricerche sul web effettuate dall'intelligenza artificiale.
 
-Codex CLI conserva le credenziali di accesso nella cartella dati dell'Applicazione. Claude Code le conserva nella stessa cartella oppure, su alcuni sistemi come macOS, nell'archivio sicuro del sistema operativo. L'uscita dall'account nelle Impostazioni le rimuove in entrambi i casi, e si raccomanda di effettuarla prima di eliminare l'Applicazione. Essi possono inoltre trasmettere a OpenAI e ad Anthropic dati sul proprio utilizzo, come avviene anche al di fuori dell'Applicazione.
+Codex CLI conserva le credenziali di accesso nella cartella dati dell'Applicazione. Claude Code le conserva nella stessa cartella oppure, su alcuni sistemi come macOS, nell'archivio sicuro del sistema operativo. L'uscita dall'account nelle Impostazioni le rimuove in entrambi i casi, e si raccomanda di effettuarla prima di eliminare l'Applicazione. Codex CLI e Claude Code possono inoltre trasmettere a OpenAI e ad Anthropic dati sull'uso che l'Utente ne fa, come avviene anche al di fuori dell'Applicazione.
 
 OpenAI e Anthropic trattano tali dati secondo le proprie informative sulla privacy e le impostazioni dell'account dell'Utente, anche per quanto riguarda l'uso delle conversazioni per l'addestramento dei modelli:
 

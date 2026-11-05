@@ -30,7 +30,7 @@ Tasks are carried out by Codex CLI, made by OpenAI, or by Claude Code, made by A
 - what the User wrote in the "About you" section, which accompanies every task;
 - the web searches made by the artificial intelligence.
 
-Codex CLI keeps the User's sign-in in the App's data folder. Claude Code keeps it in the same folder or, on some systems such as macOS, in the operating system's secure storage. Signing out in Settings removes it in either case, and the User is advised to sign out before deleting the App. They may also send OpenAI and Anthropic data about their own use, as they do outside the App.
+Codex CLI keeps the User's sign-in in the App's data folder. Claude Code keeps it in the same folder or, on some systems such as macOS, in the operating system's secure storage. Signing out in Settings removes it in either case, and the User is advised to sign out before deleting the App. Codex CLI and Claude Code may also send OpenAI and Anthropic data on how the User uses them, as they do outside the App.
 
 OpenAI and Anthropic process this data under their own privacy policies and the settings of the User's account, including whether conversations may be used to train their models:
 
