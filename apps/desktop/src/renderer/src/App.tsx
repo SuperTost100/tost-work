@@ -557,7 +557,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
             )
           }
           onSaveCopy={() => api.tasks.saveCopy(task.id)}
-          onDecide={(allow) => api.tasks.decide(task.id, allow)}
+          onDecide={(decision) => api.tasks.decide(task.id, decision)}
           onRestore={(path) => api.files.restore(task.id, path)}
           onStop={() => void api.tasks.stop(task.id).catch(report)}
           onResume={() => void api.tasks.resume(task.id).catch(report)}

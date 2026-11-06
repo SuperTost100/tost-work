@@ -8,7 +8,7 @@ import { Store } from "../store/store";
 import { UserError } from "../userError";
 import type { Engine, RunContext } from "./engine";
 import { FakeEngine, PROPOSAL_SCRIPT } from "./fake";
-import { FILES_ONLY, RESUME_PROMPT, TaskRunner, taskTitle, titleFrom, withFiles } from "./runner";
+import { decisionNote, FILES_ONLY, RESUME_PROMPT, TaskRunner, taskTitle, titleFrom, withFiles } from "./runner";
 
 function setup() {
   const store = new Store(":memory:");
@@ -212,6 +212,18 @@ describe("TaskRunner when a run fails with a message for the user", () => {
       status: "failed",
       error: "Questa attività usava la chiave del corso, che non c'è più. Incollala di nuovo in Impostazioni.",
     });
+  });
+});
+
+describe("decisionNote", () => {
+  const overwrite = { id: "a", action: "overwrite" as const, paths: ["/w/a.docx"] };
+  it("tells the agent where its version goes for each choice on an overwrite", () => {
+    expect(decisionNote(overwrite, "allow")).toMatch(/go ahead and replace/);
+    expect(decisionNote(overwrite, "refuse")).toMatch(/new name/);
+    expect(decisionNote(overwrite, "discard")).toMatch(/Don't save it/);
+  });
+  it("keeps the files when a deletion is refused", () => {
+    expect(decisionNote({ ...overwrite, action: "delete" }, "refuse")).toMatch(/keep \/w\/a.docx/);
   });
 });
 
@@ -447,7 +459,7 @@ describe("TaskRunner when the agent ends its turn to wait", () => {
     const approval = { id: "a1", action: "overwrite" as const, paths: ["/w/plan.xlsx"] };
     const { store, runner, task, prompts } = turnTaking([() => [{ type: "approval", approval }], () => []]);
     expect((await runner.start(task.id)).status).toBe("needs-you");
-    await runner.decide(task.id, true);
+    await runner.decide(task.id, "allow");
     await waitFor(() => store.getTask(task.id)?.status === "done");
     expect(prompts[1]).toMatch(/allowed replacing \/w\/plan\.xlsx.*kept a copy/);
     expect(store.getTask(task.id)?.kept?.[0]?.path).toBe("/w/plan.xlsx");
@@ -469,7 +481,7 @@ describe("TaskRunner when the agent ends its turn to wait", () => {
       },
     );
     await runner.start(task.id);
-    await runner.decide(task.id, true);
+    await runner.decide(task.id, "allow");
     await waitFor(() => store.getTask(task.id)?.status === "done");
     expect(trashed).toEqual(["/w/old.txt"]);
     // A file the task made and that's gone now shows as deleted; one it never had isn't added.
@@ -488,7 +500,7 @@ describe("TaskRunner when the agent ends its turn to wait", () => {
       throw Object.assign(new Error(`ENOENT: no such file or directory, realpath '${path}'`), { code: "ENOENT" });
     });
     await runner.start(task.id);
-    await expect(runner.decide(task.id, true)).rejects.toThrow(/ENOENT/);
+    await expect(runner.decide(task.id, "allow")).rejects.toThrow(/ENOENT/);
   });
 
   it("holds an answer that comes while the turn is still ending, then sends it", async () => {

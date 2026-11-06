@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { errorText } from "@/lib/errorText";
 import type { useT } from "@/lib/useT";
-import type { Approval } from "../../../shared/model";
+import type { Approval, Decision } from "../../../shared/model";
 
 const names = (paths: string[]) => paths.map((p) => p.split(/[\\/]/).pop() ?? p).join(", ");
 
@@ -11,7 +11,10 @@ export function approvalTitle(t: ReturnType<typeof useT>, approval: Approval): s
   return t(key, { names: names(approval.paths) });
 }
 
-/** The "Needs you" card for an overwrite or delete. The safe choice is the dark button, as in the mockup. */
+/**
+ * The "Needs you" card for an overwrite or delete. The safe choice is the dark button, as in the mockup. An overwrite
+ * can also be turned down altogether, with the quieter button on the left.
+ */
 export function ApprovalCard({
   approval,
   t,
@@ -19,16 +22,16 @@ export function ApprovalCard({
 }: {
   approval: Approval;
   t: ReturnType<typeof useT>;
-  onDecide: (allow: boolean) => Promise<unknown>;
+  onDecide: (decision: Decision) => Promise<unknown>;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const remove = approval.action === "delete";
-  const decide = async (allow: boolean) => {
+  const decide = async (decision: Decision) => {
     setBusy(true);
     setError(null);
     try {
-      await onDecide(allow);
+      await onDecide(decision);
     } catch (err) {
       setError(errorText(err));
     } finally {
@@ -47,10 +50,15 @@ export function ApprovalCard({
         )}
       </div>
       <div className="acts">
-        <button type="button" className="btn" disabled={busy} onClick={() => void decide(true)}>
+        {!remove && (
+          <button type="button" className="tbtn discard" disabled={busy} onClick={() => void decide("discard")}>
+            {t("approval.discard")}
+          </button>
+        )}
+        <button type="button" className="btn" disabled={busy} onClick={() => void decide("allow")}>
           {remove ? t("approval.trash") : t("approval.allowOverwrite")}
         </button>
-        <button type="button" className="btn dark" disabled={busy} onClick={() => void decide(false)}>
+        <button type="button" className="btn dark" disabled={busy} onClick={() => void decide("refuse")}>
           {remove ? t("approval.keep") : t("approval.saveNew")}
         </button>
       </div>

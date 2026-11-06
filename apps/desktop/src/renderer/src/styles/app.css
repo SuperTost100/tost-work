@@ -1405,6 +1405,11 @@ textarea {
   gap: 8px;
   padding: 0 16px 14px;
 }
+/* Turning the change down altogether: a quiet button on the left, apart from the two ways of saving it. */
+.approve .acts .discard {
+  height: 32px;
+  margin-right: auto;
+}
 /* Under a replaced file's name: the kept copy, on the file's own second line, so the row stays two lines tall. */
 .fileline .kept {
   display: flex;
@@ -1466,6 +1471,13 @@ textarea {
 /* The card's padding is the space under the last row, as on its sides, rather than added to the row's own. */
 .rp .body > .setrow:last-child {
   padding-bottom: 0;
+}
+/* "Show all" under a long list of files, lined up with the file names' icons. */
+.rp .more-files {
+  margin: 2px 0 0 -10px;
+}
+.rp .more-files[aria-expanded="true"] .ic {
+  transform: rotate(180deg);
 }
 .rp h3 {
   font-size: 12.5px;

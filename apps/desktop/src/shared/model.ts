@@ -68,6 +68,13 @@ export interface Approval {
   done?: string[];
 }
 
+/**
+ * The user's answer to an approval. "refuse" keeps the file: for an overwrite the agent saves its version under a new
+ * name. "discard", only for an overwrite, keeps the file and drops the agent's version altogether.
+ */
+export type Decision = "allow" | "refuse" | "discard";
+export const DECISIONS: readonly Decision[] = ["allow", "refuse", "discard"];
+
 /** A copy Tost Work kept before a file was replaced, so the user can put it back. */
 export interface KeptCopy {
   /** The file in the task's folder. */

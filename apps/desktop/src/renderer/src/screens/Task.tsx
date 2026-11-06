@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ApprovalCard } from "@/components/Approval";
 import { type Attachments, attachments, Composer } from "@/components/Composer";
 import { CallDetail, DebugStrip, useDebugLog } from "@/components/DebugDetails";
@@ -23,6 +23,7 @@ import {
   type AnsweredQuestion,
   answersText,
   BRIEF_MAX,
+  type Decision,
   type FileChange,
   type Project,
   type Question,
@@ -556,6 +557,30 @@ export const wheelSideways = (el: HTMLElement | null) => {
   );
 };
 
+/** How many files the side panel lists before the rest fold under "Show all". */
+export const SHORT_LIST = 5;
+
+/**
+ * A list that shows its first few items and a button for the rest, so a task that made many files doesn't push
+ * everything else in the panel out of sight. One item more than the limit is shown rather than folded alone.
+ */
+function ShortList<T>({ items, render }: { items: T[]; render: (item: T) => ReactNode }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const folds = items.length > SHORT_LIST + 1;
+  return (
+    <>
+      {(folds && !open ? items.slice(0, SHORT_LIST) : items).map(render)}
+      {folds && (
+        <button type="button" className="tbtn more-files" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <Icon name="down" />
+          {open ? t("task.showLess") : t("task.allFiles", { count: String(items.length) })}
+        </button>
+      )}
+    </>
+  );
+}
+
 /** The side panel's heading: whether the task made its files, changed files that were there, or both. */
 export function madeHeading(made: { kind: FileChange["kind"] }[]): MessageKey {
   const added = made.some((f) => f.kind === "add");
@@ -826,7 +851,7 @@ export function Task({
   /** Resolves true once the instruction is sent, false when it failed and the box should keep it. */
   onFollowUp: (text: string, files: string[]) => Promise<boolean>;
   onSaveCopy: () => Promise<SaveResult | null>;
-  onDecide: (allow: boolean) => Promise<unknown>;
+  onDecide: (decision: Decision) => Promise<unknown>;
   onRestore: (path: string) => Promise<unknown>;
   onStop: () => void;
   /** Carries on with a task that stopped when Tost Work closed. */
@@ -1296,15 +1321,18 @@ export function Task({
               <div className="body">
                 <h3>{t(madeHeading(made))}</h3>
                 {made.length === 0 && <p className="empty">{t("task.noFiles")}</p>}
-                {made.map((f) => (
-                  <MadeFile
-                    key={f.path}
-                    task={task}
-                    path={f.path}
-                    onRestore={onRestore}
-                    onSelect={f.kind === "delete" ? undefined : () => showFile(f.path)}
-                  />
-                ))}
+                <ShortList
+                  items={made}
+                  render={(f) => (
+                    <MadeFile
+                      key={f.path}
+                      task={task}
+                      path={f.path}
+                      onRestore={onRestore}
+                      onSelect={f.kind === "delete" ? undefined : () => showFile(f.path)}
+                    />
+                  )}
+                />
                 {used.length > 0 && <h3>{t("task.used")}</h3>}
                 {used.map(({ path, attached }) => (
                   <FileLine key={path} path={path} sub={attached ? t("task.attachedFile") : undefined} />

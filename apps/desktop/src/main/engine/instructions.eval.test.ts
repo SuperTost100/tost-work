@@ -235,7 +235,7 @@ for (const ai of ais) {
             handled.add(open);
             if (t.approval) {
               asked.push({ approval: t.approval });
-              await runner.decide(task.id, true);
+              await runner.decide(task.id, "allow");
             } else if (t.question) {
               const items = questionItems(t.question);
               asked.push({ questions: items });

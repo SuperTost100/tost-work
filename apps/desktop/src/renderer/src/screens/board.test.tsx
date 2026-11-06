@@ -135,7 +135,7 @@ describe("the board", () => {
     const needsYou = await group("Needs you");
     expect(within(needsYou).getByRole("button", { name: "Allow overwrite" })).toBeTruthy();
     await click(within(needsYou).getByRole("button", { name: "Save as new file" }));
-    expect(decide).toHaveBeenCalledWith(ids.approving, false);
+    expect(decide).toHaveBeenCalledWith(ids.approving, "refuse");
     await waitFor(() =>
       expect(within(screen.getByRole("region", { name: "Needs you" })).queryByText(/Supplier/)).toBeNull(),
     );
@@ -149,7 +149,7 @@ describe("the board", () => {
     const panel = await screen.findByRole("complementary", { name: "Supplier contracts summary" });
     expect(within(panel).getByText(/contracts\.xlsx/)).toBeTruthy();
     await click(within(panel).getByRole("button", { name: "Allow overwrite" }));
-    expect(decide).toHaveBeenCalledWith(ids.approving, true);
+    expect(decide).toHaveBeenCalledWith(ids.approving, "allow");
   });
 
   it("opens a summary beside the list, which Escape or a second click closes", async () => {

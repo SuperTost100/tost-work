@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FunnelEvent, RunRequest } from "cli-funnel";
 import { describe, expect, it } from "vitest";
-import type { EngineEvent, Task } from "../../shared/model";
+import type { Decision, EngineEvent, Task } from "../../shared/model";
 import { AgentEngine, type AgentFunnel, deletesFiles, isNetworkError } from "./agent";
 
 type Emit = (event: FunnelEvent) => void;
@@ -88,10 +88,10 @@ function setup(script: Script) {
         seen.push(e);
         // Answer what the engine asks, as the user would.
         if (e.type === "question") engine.answer(t.id, e.question.id, e.question.options[0] ?? "my own words");
-        if (e.type === "approval") engine.decide(t.id, e.approval.id, decisions.shift() ?? false);
+        if (e.type === "approval") engine.decide(t.id, e.approval.id, decisions.shift() ?? "refuse");
       }
     })();
-  const decisions: boolean[] = [];
+  const decisions: Decision[] = [];
   return { engine, inputs, seen, run, closed, controller, decisions };
 }
 
@@ -129,7 +129,7 @@ describe("AgentEngine", () => {
     expect(input?.selection).toMatchObject({ provider: "codex", access: "supervised", cwd: "/w", model: "gpt-6-sol" });
     // Shell commands run in the CLI's sandbox, so they can't write outside the folder.
     expect(input?.sandbox).toBe(true);
-    expect(input?.system).toContain("plain informal Italian");
+    expect(input?.system).toContain("use Italian.");
     expect(input?.mcpServers?.tost_work).toMatchObject({ type: "http", autoApprove: true });
     // Codex searches the web without asking before each site.
     // It also passes on what its subagents write and do.
@@ -205,7 +205,7 @@ describe("AgentEngine", () => {
     const approval = seen.find((e) => e.type === "approval");
     expect(approval).toMatchObject({ approval: { action: "overwrite", paths: ["/w/theirs.xlsx"] } });
     // The run is over, so the decision goes to the next one, which may make the change without asking again.
-    expect(engine.decide("t1", approval?.type === "approval" ? approval.approval.id : "", true)).toBe(false);
+    expect(engine.decide("t1", approval?.type === "approval" ? approval.approval.id : "", "allow")).toBe(false);
     const next = await drain("go ahead");
     expect(decisions).toEqual(["allow"]);
     expect(next.some((e) => e.type === "approval")).toBe(false);
@@ -225,7 +225,7 @@ describe("AgentEngine", () => {
     // The turn ended: Codex hears no, and the task keeps the card until the user decides.
     expect(seen.at(-1)).toEqual({ type: "done" });
     expect(decisions).toEqual([expect.objectContaining({ decision: "deny" })]);
-    expect(engine.decide("t1", ids[0] ?? "", false)).toBe(false);
+    expect(engine.decide("t1", ids[0] ?? "", "refuse")).toBe(false);
     const again = await drain("try again");
     expect(again.filter((e) => e.type === "approval")).toHaveLength(1);
   });
@@ -246,16 +246,19 @@ describe("AgentEngine", () => {
       decisions.push(await input.onApproval?.(change("/w/theirs.xlsx", "update")));
       decisions.push(await input.onApproval?.(change("/w/theirs.xlsx", "update")));
       decisions.push(await input.onApproval?.(change("/w/new.docx", "add")));
+      decisions.push(await input.onApproval?.(change("/w/theirs.xlsx", "update")));
       return { text: "" };
     });
-    replies.push(true, false);
+    replies.push("allow", "refuse", "discard");
     await run(task({ files: [{ path: "/w/made.docx", kind: "add", role: "made" }] }));
     expect(decisions[0]).toBe("allow");
     expect(decisions[1]).toBe("allow");
     expect(decisions[2]).toMatchObject({ decision: "deny", message: expect.stringMatching(/new name/) });
     expect(decisions[3]).toBe("allow");
+    // Turned down altogether, the agent hears not to save its version at all.
+    expect(decisions[4]).toMatchObject({ decision: "deny", message: expect.stringMatching(/Don't save it/) });
     const asked = seen.filter((e) => e.type === "approval");
-    expect(asked).toHaveLength(2);
+    expect(asked).toHaveLength(3);
     expect(asked[0]).toMatchObject({ approval: { action: "overwrite", paths: ["/w/theirs.xlsx"] } });
   });
 
@@ -275,7 +278,7 @@ describe("AgentEngine", () => {
       );
       return { text: "" };
     });
-    replies.push(true);
+    replies.push("allow");
     await run(
       task({
         files: [{ path: "/w/theirs.xlsx", kind: "update", role: "made" }],
@@ -329,7 +332,7 @@ describe("AgentEngine", () => {
       );
       return { text: "" };
     });
-    replies.push(true, false);
+    replies.push("allow", "refuse");
     await run();
     expect(seen.filter((e) => e.type === "approval")[0]).toMatchObject({
       approval: { action: "delete", paths: ["/w/old.txt"] },
@@ -644,7 +647,7 @@ describe("AgentEngine", () => {
     })) {
       seen.push(e);
       // The user refuses the overwrite.
-      if (e.type === "approval") engine.decide(t.id, e.approval.id, false);
+      if (e.type === "approval") engine.decide(t.id, e.approval.id, "refuse");
     }
     expect(inputs[0]?.selection).toMatchObject({ provider: "claude", model: "claude-sonnet-5-5", cwd: workdir });
     // Its shell commands run in Claude Code's sandbox: the policy can't tell where a command writes.
@@ -677,7 +680,7 @@ describe("AgentEngine", () => {
       "allow",
       { decision: "deny", message: "Work only inside the task's folder." },
       { decision: "deny", message: "Work only inside the task's folder." },
-      expect.objectContaining({ decision: "deny", message: expect.stringMatching(/keep the file/) }),
+      expect.objectContaining({ decision: "deny", message: expect.stringMatching(/keep .*theirs\.docx as it is\. Save your version under a new name/) }),
       expect.objectContaining({ decision: "deny", message: expect.stringMatching(/Don't delete files/) }),
       "allow",
       expect.objectContaining({ decision: "deny", message: expect.stringMatching(/ask_user/) }),

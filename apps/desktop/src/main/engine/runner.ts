@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { lstat } from "node:fs/promises";
 import { basename } from "node:path";
 import type { Language } from "../../shared/i18n";
-import type { AgentProvider, Approval, KeptCopy, Project, Task } from "../../shared/model";
+import type { AgentProvider, Approval, Decision, KeptCopy, Project, Task } from "../../shared/model";
 import { answersText, BRIEF_MAX, questionItems } from "../../shared/model";
 import { type Choice, choiceOf, type ModelChoices, type ModelPick } from "../../shared/modelChoice";
 import { applyEvent, resume } from "../../shared/reduce";
@@ -42,16 +42,23 @@ const REFUSE: Guard = {
 };
 
 /** What the agent hears when the user decides on an approval after its turn ended. */
-export function decisionNote(approval: Approval, allow: boolean): string {
+export function decisionNote(approval: Approval, decision: Decision): string {
   const files = approval.paths.join(", ");
   if (approval.action === "delete")
-    return allow
+    return decision === "allow"
       ? `The user allowed deleting ${files}, and Tost Work moved them to the Trash. Don't delete them again. Carry on.`
       : `The user wants to keep ${files}. Leave them as they are and carry on.`;
-  return allow
-    ? `The user allowed replacing ${files}. Tost Work kept a copy of the current version, so go ahead and replace it.`
-    : `The user wants to keep ${files} as it is. Save your version under a new name.`;
+  return OVERWRITE_NOTE[decision](files);
 }
+
+/** What the agent hears about an overwrite, whether its run is still waiting or the note comes as the next message. */
+export const OVERWRITE_NOTE: Record<Decision, (files: string) => string> = {
+  allow: (files) =>
+    `The user allowed replacing ${files}. Tost Work kept a copy of the current version, so go ahead and replace it.`,
+  refuse: (files) => `The user wants to keep ${files} as it is. Save your version under a new name.`,
+  discard: (files) =>
+    `The user wants to keep ${files} as it is and doesn't want your version saved, under this name or another. Don't save it. Carry on with the rest of the work.`,
+};
 
 /** Starts tasks on an engine, keeps each task's state in the store and reports every change. */
 /** What the agent hears when a task resumes after Tost Work closed during its turn. */
@@ -429,12 +436,15 @@ export class TaskRunner {
    * Carries out the user's decision on an overwrite or delete, then tells the engine. Allowed overwrites keep a copy
    * first and allowed deletions go to the Trash, both done here so they don't depend on the agent.
    */
-  async decide(taskId: string, allow: boolean): Promise<Task> {
+  async decide(taskId: string, decision: Decision): Promise<Task> {
     const task = this.mustGet(taskId);
     const approval = task.approval;
     if (!approval) throw new UserError("error.noDecision");
     if (this.deciding.has(taskId)) throw new UserError("error.deciding");
     if (this.restoring.has(taskId)) throw new UserError("error.waitRestore");
+    // A delete has no new name to save under, so dropping the change is the same as keeping the files.
+    const choice: Decision = approval.action === "delete" && decision === "discard" ? "refuse" : decision;
+    const allow = choice === "allow";
     this.deciding.add(taskId);
     try {
       const kept: KeptCopy[] = [];
@@ -486,10 +496,10 @@ export class TaskRunner {
       if (current.status !== "needs-you" || current.approval?.id !== approval.id)
         return allow ? this.save({ ...current, updatedAt: this.now() }) : current;
       const next = this.save(resume(current, this.now()));
-      this.log("info", `Task ${taskId}: the user ${allow ? "allowed" : "refused"} the ${approval.action}`, {
+      this.log("info", `Task ${taskId}: the user decided "${choice}" on the ${approval.action}`, {
         paths: approval.paths,
       });
-      if (!this.engine.decide(taskId, approval.id, allow)) this.continueWith(taskId, decisionNote(approval, allow));
+      if (!this.engine.decide(taskId, approval.id, choice)) this.continueWith(taskId, decisionNote(approval, choice));
       return next;
     } finally {
       this.deciding.delete(taskId);

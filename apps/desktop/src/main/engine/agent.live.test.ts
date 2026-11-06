@@ -69,7 +69,7 @@ for (const ai of SUBSCRIPTIONS) {
 
       runner.launch(task.id);
       const final = await settle(runner, store, task.id, async (t) => {
-        if (t.approval) await runner.decide(task.id, true);
+        if (t.approval) await runner.decide(task.id, "allow");
         else if (t.question)
           runner.answer(
             task.id,
@@ -126,7 +126,7 @@ for (const ai of SUBSCRIPTIONS) {
         brief: "Create hello.md with the single line 'hello'.",
       });
       const go = async (t: Task) => {
-        if (t.approval) await runner.decide(task.id, true);
+        if (t.approval) await runner.decide(task.id, "allow");
         else if (t.question)
           runner.answer(
             task.id,
@@ -203,7 +203,7 @@ for (const ai of SUBSCRIPTIONS) {
         });
         runner.launch(task.id);
         const final = await settle(runner, store, task.id, async (t) => {
-          if (t.approval) await runner.decide(task.id, true);
+          if (t.approval) await runner.decide(task.id, "allow");
           else if (t.question)
             runner.answer(
               task.id,
@@ -267,7 +267,7 @@ for (const ai of SUBSCRIPTIONS) {
         });
         runner.launch(task.id);
         const final = await settle(runner, store, task.id, async (t) => {
-          if (t.approval) await runner.decide(task.id, false);
+          if (t.approval) await runner.decide(task.id, "refuse");
           else if (t.question)
             runner.answer(
               task.id,
@@ -322,7 +322,7 @@ for (const ai of SUBSCRIPTIONS) {
         const asked: string[] = [];
         const final = await settle(runner, store, task.id, async (t) => {
           if (t.question) asked.push(t.question.text);
-          if (t.approval) await runner.decide(task.id, false);
+          if (t.approval) await runner.decide(task.id, "refuse");
           else if (t.question)
             runner.answer(
               task.id,
@@ -375,7 +375,7 @@ for (const ai of SUBSCRIPTIONS) {
         });
         runner.launch(task.id);
         const final = await settle(runner, store, task.id, async (t) => {
-          if (t.approval) await runner.decide(task.id, true);
+          if (t.approval) await runner.decide(task.id, "allow");
           else if (t.question)
             runner.answer(
               task.id,

@@ -15,6 +15,7 @@ import {
   type BoardGroup,
   type BoardView,
   BRIEF_MAX,
+  type Decision,
   type Project,
   type Settings,
   type Task,
@@ -142,7 +143,7 @@ export function Board({
   const actions: RowActions = {
     // Starting it from a button goes to the task, to watch it work. A drag keeps the user on the board.
     start: (id, go = true) => act(api.tasks.startSaved(id), (task) => go && onOpenTask(task.id)),
-    decide: (id, allow) => act(api.tasks.decide(id, allow)),
+    decide: (id, decision) => act(api.tasks.decide(id, decision)),
     review: (id) => act(api.tasks.markReviewed(id)),
   };
   const select = (id: string) => setSelected((current) => (current === id ? null : id));
@@ -323,7 +324,7 @@ export function Board({
 
 interface RowActions {
   start: (id: string, go?: boolean) => void;
-  decide: (id: string, allow: boolean) => void;
+  decide: (id: string, decision: Decision) => void;
   review: (id: string) => void;
 }
 
@@ -436,10 +437,10 @@ function InlineActions({ task, actions }: { task: Task; actions: RowActions }) {
     const remove = task.approval.action === "delete";
     return (
       <span className="actions">
-        <button type="button" className="btn" onClick={() => actions.decide(task.id, true)}>
+        <button type="button" className="btn" onClick={() => actions.decide(task.id, "allow")}>
           {remove ? t("approval.trash") : t("approval.allowOverwrite")}
         </button>
-        <button type="button" className="btn dark" onClick={() => actions.decide(task.id, false)}>
+        <button type="button" className="btn dark" onClick={() => actions.decide(task.id, "refuse")}>
           {remove ? t("approval.keep") : t("approval.saveNew")}
         </button>
       </span>
@@ -733,10 +734,15 @@ function SidePanel({
             from the bottom, so the safe choice ends up above Open, as the dark button. */}
         {task.approval && (
           <>
-            <button type="button" className="btn dark" onClick={() => actions.decide(task.id, false)}>
+            {task.approval.action === "overwrite" && (
+              <button type="button" className="btn" onClick={() => actions.decide(task.id, "discard")}>
+                {t("approval.discard")}
+              </button>
+            )}
+            <button type="button" className="btn dark" onClick={() => actions.decide(task.id, "refuse")}>
               {task.approval.action === "delete" ? t("approval.keep") : t("approval.saveNew")}
             </button>
-            <button type="button" className="btn" onClick={() => actions.decide(task.id, true)}>
+            <button type="button" className="btn" onClick={() => actions.decide(task.id, "allow")}>
               {task.approval.action === "delete" ? t("approval.trash") : t("approval.allowOverwrite")}
             </button>
           </>

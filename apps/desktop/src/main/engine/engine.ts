@@ -1,4 +1,4 @@
-import type { AgentProvider, EngineEvent, Project, Task } from "../../shared/model";
+import type { AgentProvider, Decision, EngineEvent, Project, Task } from "../../shared/model";
 import type { ModelChoices, ModelPick } from "../../shared/modelChoice";
 
 export interface RunContext {
@@ -25,6 +25,6 @@ export interface Engine {
    * for it, because the agent ended its turn to wait: then the runner sends the answer as the next message.
    */
   answer(taskId: string, questionId: string, answer: string): boolean;
-  /** The user allowed or refused an overwrite or delete. Returns false, like `answer`, when no run is waiting. */
-  decide(taskId: string, approvalId: string, allow: boolean): boolean;
+  /** The user's decision on an overwrite or delete. Returns false, like `answer`, when no run is waiting. */
+  decide(taskId: string, approvalId: string, decision: Decision): boolean;
 }
