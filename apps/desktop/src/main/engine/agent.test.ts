@@ -680,7 +680,10 @@ describe("AgentEngine", () => {
       "allow",
       { decision: "deny", message: "Work only inside the task's folder." },
       { decision: "deny", message: "Work only inside the task's folder." },
-      expect.objectContaining({ decision: "deny", message: expect.stringMatching(/keep .*theirs\.docx as it is\. Save your version under a new name/) }),
+      expect.objectContaining({
+        decision: "deny",
+        message: expect.stringMatching(/keep .*theirs\.docx as it is\. Save your version under a new name/),
+      }),
       expect.objectContaining({ decision: "deny", message: expect.stringMatching(/Don't delete files/) }),
       "allow",
       expect.objectContaining({ decision: "deny", message: expect.stringMatching(/ask_user/) }),
