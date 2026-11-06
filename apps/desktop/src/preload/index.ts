@@ -2,7 +2,7 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { JobChange, MenuAction, SignInEvent } from "../shared/api";
 import { IPC, type TostWorkApi } from "../shared/api";
-import { type AgentProvider, PASTED_MAX_BYTES, type Settings, type Task } from "../shared/model";
+import { type AgentProvider, ATTACH_MAX, PASTED_MAX_BYTES, type Settings, type Task } from "../shared/model";
 
 // In full screen macOS hides the traffic lights, so the page drops the space it keeps for them.
 ipcRenderer.on(IPC.fullScreen, (_: unknown, on: boolean) => {
@@ -129,20 +129,23 @@ const api: TostWorkApi = {
   },
   files: {
     pick: () => ipcRenderer.invoke(IPC.filesPick),
-    // Only the preload can tell where a dropped file is on disk. A pasted screenshot has no place, so its bytes go.
-    take: async (files) =>
-      ipcRenderer.invoke(
-        IPC.filesTake,
-        await Promise.all(
-          files.map(async (file) => {
-            const path = webUtils.getPathForFile(file);
-            if (path) return { path };
-            // Too big to take: only its size goes, for the main process to say so, and the bytes are never read.
-            if (file.size > PASTED_MAX_BYTES) return { name: file.name, size: file.size };
-            return { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) };
-          }),
-        ),
-      ),
+    // Only the preload can tell where a dropped file is on disk. A pasted screenshot has no place, so its bytes go,
+    // up to the limit for all pastes together. Past it only the size goes, for the main process to refuse, and the
+    // bytes are never read.
+    take: async (files) => {
+      const items = [];
+      let left = PASTED_MAX_BYTES;
+      for (const file of files.slice(0, ATTACH_MAX)) {
+        const path = webUtils.getPathForFile(file);
+        if (path) items.push({ path });
+        else if (file.size > left) items.push({ name: file.name, size: file.size });
+        else {
+          left -= file.size;
+          items.push({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) });
+        }
+      }
+      return ipcRenderer.invoke(IPC.filesTake, items);
+    },
     read: (taskId, path) => ipcRenderer.invoke(IPC.filesRead, taskId, path),
     open: (taskId, path) => ipcRenderer.invoke(IPC.filesOpen, taskId, path),
     reveal: (taskId, path) => ipcRenderer.invoke(IPC.filesReveal, taskId, path),

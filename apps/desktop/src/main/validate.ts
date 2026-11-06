@@ -66,8 +66,8 @@ export const droppedInput = (v: unknown): Dropped[] => {
   return v.map((item: unknown): Dropped => {
     const input = (typeof item === "object" && item !== null ? item : {}) as Record<string, unknown>;
     if (input.path !== undefined) return { path: absolutePath(input.path, "path") };
-    // The window sends only the size of a paste too big to take, so its bytes are never read.
-    if (typeof input.size === "number" && input.size > PASTED_MAX_BYTES) throw new UserError("error.pasteTooBig");
+    // The window sends only the size of a paste too big to take, alone or with the others, so its bytes are never read.
+    if (input.bytes === undefined && typeof input.size === "number") throw new UserError("error.pasteTooBig");
     if (!(input.bytes instanceof Uint8Array)) throw new Error("a pasted file needs its bytes");
     if (input.bytes.byteLength > PASTED_MAX_BYTES) throw new UserError("error.pasteTooBig");
     const safe = [...text(input.name, "name", 200)].map((c) => (c < " " || '\\/:*?"<>|'.includes(c) ? "_" : c));
