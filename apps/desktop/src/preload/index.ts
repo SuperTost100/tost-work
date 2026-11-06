@@ -2,7 +2,7 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { JobChange, MenuAction, SignInEvent } from "../shared/api";
 import { IPC, type TostWorkApi } from "../shared/api";
-import type { AgentProvider, Settings, Task } from "../shared/model";
+import { type AgentProvider, PASTED_MAX_BYTES, type Settings, type Task } from "../shared/model";
 
 // In full screen macOS hides the traffic lights, so the page drops the space it keeps for them.
 ipcRenderer.on(IPC.fullScreen, (_: unknown, on: boolean) => {
@@ -136,7 +136,10 @@ const api: TostWorkApi = {
         await Promise.all(
           files.map(async (file) => {
             const path = webUtils.getPathForFile(file);
-            return path ? { path } : { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) };
+            if (path) return { path };
+            // Too big to take: only its size goes, for the main process to say so, and the bytes are never read.
+            if (file.size > PASTED_MAX_BYTES) return { name: file.name, size: file.size };
+            return { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) };
           }),
         ),
       ),

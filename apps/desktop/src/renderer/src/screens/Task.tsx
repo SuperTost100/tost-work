@@ -983,7 +983,9 @@ export function Task({
     el.scrollTop += top - box.top - 16;
   }, [live, task.messages.length]);
   // A task opened after its run ended shows its end: the last answer, the file and the check. The preview loads after
-  // the first paint and grows the page, so the page keeps to its end until the user scrolls up or a run starts.
+  // the first paint and grows the page, so the page keeps to its end until the user scrolls up, clicks or types in it,
+  // or a run starts. After a click, what grows is what the user opened, such as the folded turn, and stays in view.
+  const holdEnd = useRef(true);
   const liveNow = useRef(live);
   liveNow.current = live;
   useLayoutEffect(() => {
@@ -991,15 +993,23 @@ export function Task({
     const content = el?.firstElementChild;
     if (!el || !content || liveNow.current) return;
     const toEnd = () => {
-      if (!pinned.current || settled.current || liveNow.current) return;
+      if (!pinned.current || settled.current || liveNow.current || !holdEnd.current) return;
       el.scrollTop = el.scrollHeight;
       autoTop.current = el.scrollTop;
     };
     toEnd();
-    if (typeof ResizeObserver === "undefined") return;
-    const watch = new ResizeObserver(toEnd);
-    watch.observe(content);
-    return () => watch.disconnect();
+    const release = () => {
+      holdEnd.current = false;
+    };
+    el.addEventListener("pointerdown", release);
+    el.addEventListener("keydown", release);
+    const watch = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(toEnd);
+    watch?.observe(content);
+    return () => {
+      el.removeEventListener("pointerdown", release);
+      el.removeEventListener("keydown", release);
+      watch?.disconnect();
+    };
   }, []);
   const { before, tail, older } = activityByMessage(task.activity ?? [], task.messages.length);
   const log = useDebugLog(api, task.id, debug, task.updatedAt);
@@ -1139,7 +1149,10 @@ export function Task({
               ref={scroller}
               onScroll={(e) => {
                 const el = e.currentTarget;
-                if (el.scrollTop === autoTop.current) return;
+                // The page's own jump, which counts once: the user coming back to the same place is the user.
+                const own = el.scrollTop === autoTop.current;
+                autoTop.current = -1;
+                if (own) return;
                 pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
               }}
             >

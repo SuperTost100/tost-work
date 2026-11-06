@@ -371,6 +371,8 @@ export const DESCRIPTION_MAX = 2000;
 export const BRIEF_MAX = 100_000;
 /** How many files one message can carry. */
 export const ATTACH_MAX = 20;
+/** The biggest pasted file a message takes, such as a screenshot, so a huge paste can't fill the disk. */
+export const PASTED_MAX_BYTES = 50 * 1024 * 1024;
 
 /** One of the user's skills: a SKILL.md folder in Documents/Tost Work/Skills. */
 export interface Skill {

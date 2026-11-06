@@ -18,6 +18,7 @@ import {
   NOTIFY_LEVELS,
   type NotifyKind,
   type NotifyLevel,
+  PASTED_MAX_BYTES,
   type Project,
   SECTION_LEVEL,
   type SectionKey,
@@ -55,9 +56,6 @@ export const paths = (v: unknown, field: string, max = 20): string[] => {
   return v.map((p) => absolutePath(p, field));
 };
 
-/** The biggest pasted file a message takes, such as a screenshot, so a huge paste can't fill the disk. */
-export const PASTED_MAX_BYTES = 50 * 1024 * 1024;
-
 /**
  * Files dropped or pasted into a message: a path, or a pasted file's name and bytes. The name loses any folders and
  * characters a file name can't have, so the file is written only where Tost Work puts it.
@@ -68,6 +66,8 @@ export const droppedInput = (v: unknown): Dropped[] => {
   return v.map((item: unknown): Dropped => {
     const input = (typeof item === "object" && item !== null ? item : {}) as Record<string, unknown>;
     if (input.path !== undefined) return { path: absolutePath(input.path, "path") };
+    // The window sends only the size of a paste too big to take, so its bytes are never read.
+    if (typeof input.size === "number" && input.size > PASTED_MAX_BYTES) throw new UserError("error.pasteTooBig");
     if (!(input.bytes instanceof Uint8Array)) throw new Error("a pasted file needs its bytes");
     if (input.bytes.byteLength > PASTED_MAX_BYTES) throw new UserError("error.pasteTooBig");
     const safe = [...text(input.name, "name", 200)].map((c) => (c < " " || '\\/:*?"<>|'.includes(c) ? "_" : c));

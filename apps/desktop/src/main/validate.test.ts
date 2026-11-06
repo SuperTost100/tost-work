@@ -1,11 +1,10 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, mergeSettings, type Project } from "../shared/model";
+import { DEFAULT_SETTINGS, mergeSettings, PASTED_MAX_BYTES, type Project } from "../shared/model";
 import {
   absolutePath,
   droppedInput,
   oneLine,
-  PASTED_MAX_BYTES,
   paths,
   pickInput,
   placedTask,
@@ -64,6 +63,7 @@ describe("droppedInput", () => {
     expect(() => droppedInput([{ name: "a.png", bytes: "AAAA" }])).toThrow(/bytes/);
     expect(() => droppedInput(Array.from({ length: 21 }, () => ({ path: "/a" })))).toThrow(/at most/);
     expect(() => droppedInput([{ name: "a.png", bytes: new Uint8Array(PASTED_MAX_BYTES + 1) }])).toThrow(/too big/i);
+    expect(() => droppedInput([{ name: "a.png", size: PASTED_MAX_BYTES + 1 }])).toThrow(/too big/i);
   });
 });
 
