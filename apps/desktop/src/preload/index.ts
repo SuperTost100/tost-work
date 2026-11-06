@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import { contextBridge, ipcRenderer, webUtils } from "electron";
-import type { JobChange, MenuAction, SignInEvent } from "../shared/api";
+import type { JobChange, MenuAction, SignInEvent, WindowQuestion } from "../shared/api";
 import { IPC, type TostWorkApi } from "../shared/api";
 import { type AgentProvider, ATTACH_MAX, PASTED_MAX_BYTES, type Settings, type Task } from "../shared/model";
 
@@ -34,6 +34,20 @@ const api: TostWorkApi = {
       ipcRenderer.removeListener(IPC.menuAction, handler);
     };
   },
+  onQuestion: (listener) => {
+    // Questions asked while the page was still loading wait in the main process until it asks for them.
+    let listening = true;
+    const handler = (_: unknown, question: WindowQuestion) => listener(question);
+    ipcRenderer.on(IPC.question, handler);
+    void ipcRenderer.invoke(IPC.takeQuestions).then((waiting: unknown) => {
+      if (listening && Array.isArray(waiting)) for (const question of waiting) listener(question as WindowQuestion);
+    });
+    return () => {
+      listening = false;
+      ipcRenderer.removeListener(IPC.question, handler);
+    };
+  },
+  answerQuestion: (id, answer) => ipcRenderer.send(IPC.answerQuestion, id, answer),
   panel: {
     open: (target) => ipcRenderer.send(IPC.panelOpen, target),
     quit: () => ipcRenderer.send(IPC.panelQuit),

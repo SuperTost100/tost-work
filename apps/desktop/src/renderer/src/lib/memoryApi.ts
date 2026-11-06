@@ -7,10 +7,12 @@ import type {
   NewTaskInput,
   PanelTarget,
   ProjectMenuAction,
+  QuestionAnswer,
   SignInEvent,
   SkillMenuAction,
   TaskMenuAction,
   TostWorkApi,
+  WindowQuestion,
 } from "../../../shared/api";
 import type { LogLine } from "../../../shared/debug";
 import { guideText, translate } from "../../../shared/i18n";
@@ -69,6 +71,8 @@ export type MemoryApi = TostWorkApi & {
   pressMenu(action: MenuAction): void;
   /** As a click on a notification does. */
   openFromOutside(taskId: string): void;
+  /** Asks a question as the main process does, in the window's card, and resolves with the button pressed. */
+  askFromMain(question: Omit<WindowQuestion, "id">): Promise<QuestionAnswer>;
   /** What the window last told the menu bar about the open task. */
   menuStateNow(): MenuState;
   /** Changes settings from outside the window, as the View menu does. */
@@ -145,6 +149,9 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   const settingsListeners = new Set<(s: Settings) => void>();
   const menuListeners = new Set<(a: MenuAction) => void>();
   const openListeners = new Set<(id: string) => void>();
+  const questionListeners = new Set<(question: WindowQuestion) => void>();
+  const questionAnswers = new Map<number, (answer: QuestionAnswer) => void>();
+  let questionId = 0;
   const signInListeners = new Set<(provider: AgentProvider, e: SignInEvent) => void>();
   let n = 0;
   const now = () => new Date(Date.UTC(2026, 9, 26, 9, 0, n++)).toISOString();
@@ -282,6 +289,20 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
     openFromOutside: (id) => {
       for (const l of openListeners) l(id);
     },
+    onQuestion: (l) => {
+      questionListeners.add(l);
+      return () => questionListeners.delete(l);
+    },
+    answerQuestion: (id, answer) => {
+      questionAnswers.get(id)?.(answer);
+      questionAnswers.delete(id);
+    },
+    askFromMain: (question) =>
+      new Promise((resolve) => {
+        const id = ++questionId;
+        questionAnswers.set(id, resolve);
+        for (const l of questionListeners) l({ ...question, id });
+      }),
     pressMenu: (action) => {
       for (const l of menuListeners) l(action);
     },

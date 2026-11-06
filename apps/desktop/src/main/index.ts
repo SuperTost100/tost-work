@@ -4,7 +4,6 @@ import { createFunnel } from "cli-funnel";
 import {
   app,
   BrowserWindow,
-  dialog,
   ipcMain,
   Menu,
   Notification,
@@ -17,7 +16,7 @@ import {
   shell,
   Tray,
 } from "electron";
-import { IPC, type MenuAction, type MenuState } from "../shared/api";
+import { IPC, type MenuAction, type MenuState, type QuestionAnswer, type WindowQuestion } from "../shared/api";
 import { languageFrom, translate } from "../shared/i18n";
 import type { AgentProvider, AiId } from "../shared/model";
 import { PROVIDER_OF } from "../shared/model";
@@ -41,6 +40,7 @@ import { applyLook } from "./look";
 import { ToolServer } from "./mcp/server";
 import { confirmsNotifications, Notifier } from "./notify";
 import { pickAi } from "./pickAi";
+import { WindowQuestions } from "./questions";
 import { SkillFolder } from "./skills";
 import { SkillVersions } from "./skillVersions";
 import { Store } from "./store/store";
@@ -279,6 +279,14 @@ app.whenReady().then(async () => {
     win.focus();
   };
   const showTask = (taskId: string) => showWindow(taskId);
+  // Questions for the window's own card. It shows the window first: quitting from the menu bar can find it hidden.
+  const questions = new WindowQuestions();
+  ipcMain.handle(IPC.takeQuestions, (e) => questions.take(e.sender));
+  ipcMain.on(IPC.answerQuestion, (e, id: unknown, answer: unknown) => questions.answer(e.sender, id, answer));
+  const askInWindow = (question: Omit<WindowQuestion, "id">): Promise<QuestionAnswer> => {
+    showWindow();
+    return mainWindow ? questions.ask(mainWindow.webContents, question) : Promise.resolve("no");
+  };
   // An action for the window, such as New task from the panel. A window still loading asks for it once it listens.
   // A page that has loaded may still not be listening: only once it asks for the waiting action is it.
   let pendingMenu: MenuAction | null = null;
@@ -584,30 +592,35 @@ app.whenReady().then(async () => {
     skills,
     jobs,
     debugLogs,
+    askInWindow,
   );
-  // Quitting stops the tasks still working, so it asks first. They show as interrupted, with Resume, next time.
+  // Quitting stops the tasks still working, so it asks first, in the window's card. They show as interrupted, with
+  // Resume, next time. Quit again while the card is open only brings the window forward.
   let quitting = false;
+  let askingToQuit = false;
   app.on("before-quit", (event) => {
     const working = runner.workingCount();
     if (!quitting && working > 0) {
+      event.preventDefault();
+      if (askingToQuit) {
+        showWindow();
+        return;
+      }
+      askingToQuit = true;
       const lang = language();
-      const options = {
-        type: "question" as const,
-        buttons: [translate(lang, "quit.quit"), translate(lang, "quit.cancel")],
-        defaultId: 1,
-        cancelId: 1,
+      void askInWindow({
         message:
           working === 1 ? translate(lang, "quit.title") : translate(lang, "quit.titleMany", { n: String(working) }),
         detail: translate(lang, "quit.detail"),
-      };
-      const choice =
-        mainWindow && !mainWindow.isDestroyed()
-          ? dialog.showMessageBoxSync(mainWindow, options)
-          : dialog.showMessageBoxSync(options);
-      if (choice !== 0) {
-        event.preventDefault();
-        return;
-      }
+        yes: translate(lang, "quit.quit"),
+        danger: true,
+      }).then((answer) => {
+        askingToQuit = false;
+        if (answer !== "yes") return;
+        quitting = true;
+        app.quit();
+      });
+      return;
     }
     quitting = true;
     accounts.codex.cancel();

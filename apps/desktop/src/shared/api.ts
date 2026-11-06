@@ -107,6 +107,9 @@ export interface TostWorkApi {
   onMenu(listener: (action: MenuAction) => void): () => void;
   /** A click on a notification, or in the menu bar's icon, asks the window to show this task. */
   onOpenTask(listener: (taskId: string) => void): () => void;
+  /** A question from the main process for the app's own card, such as quitting while tasks work. */
+  onQuestion(listener: (question: WindowQuestion) => void): () => void;
+  answerQuestion(id: number, answer: QuestionAnswer): void;
   /** The menu-bar panel's buttons. */
   panel: {
     /** Opens the main window, on a task or on a new task or Settings when asked, and closes the panel. */
@@ -319,6 +322,26 @@ export type ProjectMenuAction = "rename" | "describe" | "instructions" | "reveal
 /** Where the panel's buttons take the main window. */
 export type PanelTarget = { taskId: string } | { action: "new-task" | "settings" };
 
+/**
+ * A question the main process asks in the window's card instead of a system dialog: quitting while tasks work, or a
+ * name that's already taken where a copy is saved.
+ */
+export interface WindowQuestion {
+  id: number;
+  message: string;
+  detail?: string;
+  /** The word on the button that goes ahead. */
+  yes: string;
+  /** The button is red when going ahead destroys or discards something. */
+  danger?: boolean;
+  /** A second way forward, such as "Keep both", shown as the main button. */
+  alt?: string;
+}
+
+/** Which button was pressed: `yes`, the `alt` one, or Cancel (also Esc, a closed window, or another card open). */
+export type QuestionAnswer = "yes" | "alt" | "no";
+export const QUESTION_ANSWERS: readonly QuestionAnswer[] = ["yes", "alt", "no"];
+
 /** IPC channel names, kept in one place so main and preload can't drift apart. */
 export const IPC = {
   settingsGet: "settings:get",
@@ -335,6 +358,9 @@ export const IPC = {
   openTask: "window:open-task",
   takePendingTask: "window:take-pending-task",
   takePendingMenu: "window:take-pending-menu",
+  question: "window:question",
+  takeQuestions: "window:take-questions",
+  answerQuestion: "window:answer-question",
   panelOpen: "panel:open",
   panelQuit: "panel:quit",
   panelFit: "panel:fit",

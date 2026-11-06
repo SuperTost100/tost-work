@@ -7,8 +7,10 @@ import {
   IPC,
   type NewProjectInput,
   type ProjectMenuAction,
+  type QuestionAnswer,
   type SaveResult,
   type SkillMenuAction,
+  type WindowQuestion,
 } from "../shared/api";
 import { LICENSES_DIR, LICENSES_FILE } from "../shared/credits";
 import { guideText, languageFrom, type MessageKey, translate } from "../shared/i18n";
@@ -61,6 +63,8 @@ export function registerIpc(
   skills: SkillFolder,
   jobs: Jobs,
   debug: DebugLogs,
+  /** Asks in the window's own card, showing the window first. */
+  ask: (question: Omit<WindowQuestion, "id">) => Promise<QuestionAnswer>,
 ): void {
   // A handler that fails goes to the app's debug log too, and on to the window as before.
   const handle = (channel: string, listener: Parameters<typeof ipcMain.handle>[1]) =>
@@ -248,20 +252,17 @@ export function registerIpc(
     });
     const folder = picked.canceled ? undefined : picked.filePaths[0];
     if (!folder) return null;
-    const ask = async (name: string): Promise<Conflict> => {
-      const options = {
-        type: "question" as const,
+    const clash = async (name: string): Promise<Conflict> => {
+      const answer = await ask({
         message: t("save.exists", { name }),
         detail: t("save.existsDetail"),
-        buttons: [t("save.keepBoth"), t("save.replace"), t("save.cancel")],
-        defaultId: 0,
-        cancelId: 2,
-      };
-      const win = window();
-      const { response } = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options);
-      return (["keep-both", "replace", "cancel"] as const)[response] ?? "cancel";
+        yes: t("save.replace"),
+        danger: true,
+        alt: t("save.keepBoth"),
+      });
+      return answer === "alt" ? "keep-both" : answer === "yes" ? "replace" : "cancel";
     };
-    const { saved } = await saveCopies(sources, folder, ask, (path) => shell.trashItem(path));
+    const { saved } = await saveCopies(sources, folder, clash, (path) => shell.trashItem(path));
     return { folder, saved };
   });
 
