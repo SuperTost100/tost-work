@@ -60,10 +60,15 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         # notarytool reads the API key from a file. It lives in the runner's temp folder, which is wiped after the job.
+        # The key is rewritten as a clean PEM, because notarytool rejects one with stray spaces or line breaks, as a key
+        # pasted from a browser can have. openssl checks it before Apple sees it, and prints nothing of it.
         run: |
           export APPLE_API_KEY="$RUNNER_TEMP/notary.p8"
-          printf '%s\n' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY"
+          body=$(printf '%s' "$APPLE_API_KEY_P8" | sed -e 's/-----[A-Z ]*-----//g' | tr -d ' \t\r\n')
           unset APPLE_API_KEY_P8
+          { echo "-----BEGIN PRIVATE KEY-----"; printf '%s\n' "$body" | fold -w 64; echo "-----END PRIVATE KEY-----"; } > "$APPLE_API_KEY"
+          unset body
+          openssl pkey -in "$APPLE_API_KEY" -noout || { echo "::error::APPLE_API_KEY_P8 isn't a readable private key"; exit 1; }
           pnpm --filter @tost-work/desktop exec electron-builder --mac --publish never
           rm -f "$APPLE_API_KEY"
       # An app whose signature doesn't match its contents opens on no Mac: macOS calls it "damaged".
