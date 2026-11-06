@@ -3,7 +3,7 @@ import { realpath, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
 import { translate } from "../../shared/i18n";
-import type { AgentProvider, AiId, EngineEvent, Job, KeyVendor, Review, Skill } from "../../shared/model";
+import type { AgentProvider, AiId, Decision, EngineEvent, Job, KeyVendor, Review, Skill } from "../../shared/model";
 import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
 import {
   type AiModels,
@@ -20,7 +20,7 @@ import { UserError } from "../userError";
 import { activityOf, noteText } from "./activity";
 import type { Engine, RunContext } from "./engine";
 import { instructionsFor } from "./instructions";
-import { withFiles } from "./runner";
+import { OVERWRITE_NOTE, withFiles } from "./runner";
 
 /**
  * What ask_user and request_approval tell the agent. They return at once: Codex hands a tool that runs longer than
@@ -258,7 +258,7 @@ export function isNetworkError(message: string): boolean {
  */
 export class AgentEngine implements Engine, ToolHandler {
   private live = new Map<string, Live>();
-  private waiting = new Map<string, (reply: boolean | null) => void>();
+  private waiting = new Map<string, (reply: Decision | null) => void>();
   /** Every approval put on a task, by id, so a decision that comes after the run knows its files. */
   private approvals = new Map<string, { taskId: string; action: "overwrite" | "delete"; paths: string[] }>();
   /** Files the user allowed replacing after the run that asked had ended. The next run may change them. */
@@ -560,16 +560,16 @@ export class AgentEngine implements Engine, ToolHandler {
     return false;
   }
 
-  decide(taskId: string, approvalId: string, allow: boolean): boolean {
+  decide(taskId: string, approvalId: string, decision: Decision): boolean {
     const asked = this.approvals.get(approvalId);
     this.approvals.delete(approvalId);
     const waiter = this.waiting.get(approvalId);
     if (waiter) {
-      waiter(allow);
+      waiter(decision);
       return true;
     }
     // The run that asked is over, and the next one makes the change: it may, without asking a second time.
-    if (allow && asked?.action === "overwrite") {
+    if (decision === "allow" && asked?.action === "overwrite") {
       const cleared = this.cleared.get(taskId) ?? new Set<string>();
       for (const path of asked.paths) cleared.add(path);
       this.cleared.set(taskId, cleared);
@@ -653,35 +653,35 @@ export class AgentEngine implements Engine, ToolHandler {
       .filter((c) => c.kind !== "delete" && c.kind !== "add" && !live.made.has(c.path))
       .map((c) => c.path);
     if (deletes.length) {
-      const allowed = await this.askApproval(taskId, "delete", deletes);
+      const decided = await this.askApproval(taskId, "delete", deletes);
       return {
         decision: "deny",
-        message: allowed
-          ? "The user allowed it, and Tost Work moved the files to the Trash. Don't delete them again."
-          : "The user wants to keep these files. Leave them as they are.",
+        message:
+          decided === "allow"
+            ? "The user allowed it, and Tost Work moved the files to the Trash. Don't delete them again."
+            : "The user wants to keep these files. Leave them as they are.",
       };
     }
-    if (overwrites.length && !(await this.askApproval(taskId, "overwrite", overwrites)))
-      return {
-        decision: "deny",
-        message: "The user wants to keep the file as it is. Save your version under a new name.",
-      };
-    return "allow";
+    if (!overwrites.length) return "allow";
+    const decided = (await this.askApproval(taskId, "overwrite", overwrites)) ?? "refuse";
+    return decided === "allow"
+      ? "allow"
+      : { decision: "deny", message: OVERWRITE_NOTE[decided](overwrites.join(", ")) };
   }
 
   /** Shows an approval for a file change Codex is holding, and waits for the user or for the run to end. */
-  private askApproval(taskId: string, action: "overwrite" | "delete", paths: string[]): Promise<boolean> {
+  private askApproval(taskId: string, action: "overwrite" | "delete", paths: string[]): Promise<Decision | null> {
     const live = this.live.get(taskId);
     // After Stop nothing new goes on the task: an abort that already happened never fires its listener.
-    if (!live || live.signal.aborted) return Promise.resolve(false);
+    if (!live || live.signal.aborted) return Promise.resolve(null);
     const id = randomUUID();
     this.approvals.set(id, { taskId, action, paths });
     return new Promise((resolve) => {
-      const done = (reply: boolean | null) => {
+      const done = (reply: Decision | null) => {
         this.waiting.delete(id);
         live.pending.delete(id);
         live.signal.removeEventListener("abort", stop);
-        resolve(reply === true);
+        resolve(reply);
       };
       const stop = () => done(null);
       this.waiting.set(id, done);

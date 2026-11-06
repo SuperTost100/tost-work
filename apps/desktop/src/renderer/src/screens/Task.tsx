@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ApprovalCard } from "@/components/Approval";
 import { type Attachments, attachments, Composer } from "@/components/Composer";
 import { CallDetail, DebugStrip, useDebugLog } from "@/components/DebugDetails";
@@ -23,6 +23,7 @@ import {
   type AnsweredQuestion,
   answersText,
   BRIEF_MAX,
+  type Decision,
   type FileChange,
   type Project,
   type Question,
@@ -536,25 +537,83 @@ function QuestionCard({
   );
 }
 
+/** Wheel events closer together than this are one gesture, which keeps scrolling what it started on. */
+const GESTURE_GAP_MS = 250;
+/** A step this large comes from a mouse wheel's notch, which glides; a trackpad's small steps are smooth already. */
+const NOTCH = 50;
+
 /**
  * Lets a mouse wheel scroll a row that only scrolls sideways, such as the file tabs: a trackpad scrolls it already.
- * At either end the wheel scrolls the page again.
+ * A gesture belongs to what it started on, as in macOS: a page scroll that passes over the row keeps scrolling the
+ * page, and a gesture that starts on the row, while it has room that way, moves only the row, to its end.
  */
 export const wheelSideways = (el: HTMLElement | null) => {
   if (!el) return;
-  el.addEventListener(
-    "wheel",
-    (e) => {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-      const max = el.scrollWidth - el.clientWidth;
-      const room = e.deltaY > 0 ? el.scrollLeft < max - 1 : el.scrollLeft > 0;
-      if (max <= 0 || !room) return;
-      e.preventDefault();
-      el.scrollLeft += e.deltaY;
-    },
-    { passive: false },
-  );
+  const doc = el.ownerDocument;
+  let last = Number.NEGATIVE_INFINITY;
+  let ours = false;
+  let target = 0;
+  const max = () => el.scrollWidth - el.clientWidth;
+  const upright = (e: WheelEvent) => Math.abs(e.deltaY) > Math.abs(e.deltaX);
+  // Seen first, on the way down to what's under the pointer, so every gesture is noticed wherever it starts.
+  const watch = (e: WheelEvent) => {
+    const fresh = e.timeStamp - last > GESTURE_GAP_MS;
+    last = e.timeStamp;
+    if (!fresh) return;
+    const room = e.deltaY > 0 ? el.scrollLeft < max() - 1 : el.scrollLeft > 0;
+    ours = e.target instanceof Node && el.contains(e.target) && upright(e) && max() > 0 && room;
+    target = el.scrollLeft;
+  };
+  const turn = (e: WheelEvent) => {
+    if (!ours || !upright(e)) return;
+    e.preventDefault();
+    const step =
+      e.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? e.deltaY * 16
+        : e.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? e.deltaY * el.clientWidth
+          : e.deltaY;
+    if (Math.abs(step) < NOTCH) {
+      el.scrollLeft += step;
+      target = el.scrollLeft;
+      return;
+    }
+    target = Math.min(max(), Math.max(0, target + step));
+    const to = target;
+    // Started inside the wheel event, Chromium makes the smooth scroll jump at once; on the next frame it glides.
+    requestAnimationFrame(() => el.scrollTo({ left: to, behavior: "smooth" }));
+  };
+  doc.addEventListener("wheel", watch, { capture: true, passive: true });
+  el.addEventListener("wheel", turn, { passive: false });
+  return () => {
+    doc.removeEventListener("wheel", watch, { capture: true });
+    el.removeEventListener("wheel", turn);
+  };
 };
+
+/** How many files the side panel lists before the rest fold under "Show all". */
+export const SHORT_LIST = 5;
+
+/**
+ * A list that shows its first few items and a button for the rest, so a task that made many files doesn't push
+ * everything else in the panel out of sight. One item more than the limit is shown rather than folded alone.
+ */
+function ShortList<T>({ items, render }: { items: T[]; render: (item: T) => ReactNode }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const folds = items.length > SHORT_LIST + 1;
+  return (
+    <>
+      {(folds && !open ? items.slice(0, SHORT_LIST) : items).map(render)}
+      {folds && (
+        <button type="button" className="tbtn more-files" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <Icon name="down" />
+          {open ? t("task.showLess") : t("task.allFiles", { count: String(items.length) })}
+        </button>
+      )}
+    </>
+  );
+}
 
 /** The side panel's heading: whether the task made its files, changed files that were there, or both. */
 export function madeHeading(made: { kind: FileChange["kind"] }[]): MessageKey {
@@ -826,7 +885,7 @@ export function Task({
   /** Resolves true once the instruction is sent, false when it failed and the box should keep it. */
   onFollowUp: (text: string, files: string[]) => Promise<boolean>;
   onSaveCopy: () => Promise<SaveResult | null>;
-  onDecide: (allow: boolean) => Promise<unknown>;
+  onDecide: (decision: Decision) => Promise<unknown>;
   onRestore: (path: string) => Promise<unknown>;
   onStop: () => void;
   /** Carries on with a task that stopped when Tost Work closed. */
@@ -1296,15 +1355,18 @@ export function Task({
               <div className="body">
                 <h3>{t(madeHeading(made))}</h3>
                 {made.length === 0 && <p className="empty">{t("task.noFiles")}</p>}
-                {made.map((f) => (
-                  <MadeFile
-                    key={f.path}
-                    task={task}
-                    path={f.path}
-                    onRestore={onRestore}
-                    onSelect={f.kind === "delete" ? undefined : () => showFile(f.path)}
-                  />
-                ))}
+                <ShortList
+                  items={made}
+                  render={(f) => (
+                    <MadeFile
+                      key={f.path}
+                      task={task}
+                      path={f.path}
+                      onRestore={onRestore}
+                      onSelect={f.kind === "delete" ? undefined : () => showFile(f.path)}
+                    />
+                  )}
+                />
                 {used.length > 0 && <h3>{t("task.used")}</h3>}
                 {used.map(({ path, attached }) => (
                   <FileLine key={path} path={path} sub={attached ? t("task.attachedFile") : undefined} />

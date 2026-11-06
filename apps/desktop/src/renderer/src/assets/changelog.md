@@ -15,6 +15,24 @@
   wait here until the release bumps the version.
 -->
 
+## 0.0.25-dev
+
+### en
+
+- **Don't save:** when the AI wants to replace a file, you can now turn it down altogether. The file stays as it is and the AI saves nothing in its place, not even under a new name.
+- **Long file lists:** the side panel shows the first five files a task made, then "Show all". A task that made many files no longer pushes everything else out of sight.
+- **Replies in your language:** the AI answers in the language you write in, not the app's. Until you've written something, it uses the app's language.
+- **Balanced on ChatGPT:** back to GPT-6.1 Terra at medium reasoning. High barely thought more, and the early stops it was meant to fix came from elsewhere.
+- **File tabs:** a mouse wheel moves the tabs above the preview smoothly. A page scroll that passes over them keeps scrolling the page.
+
+### it
+
+- **Non salvare:** quando l'AI vuole sostituire un file, ora puoi rifiutare del tutto. Il file resta com'è e l'AI non salva niente al suo posto, nemmeno con un altro nome.
+- **Elenchi lunghi di file:** il pannello laterale mostra i primi cinque file creati dall'attività, poi "Mostra tutti". Un'attività che crea molti file non nasconde più il resto.
+- **Risposte nella tua lingua:** l'AI risponde nella lingua in cui scrivi, non in quella dell'app. Finché non hai scritto niente, usa la lingua dell'app.
+- **Equilibrato su ChatGPT:** torna a GPT-6.1 Terra con ragionamento medio. Con quello alto ragionava appena di più, e le interruzioni che doveva evitare dipendevano da altro.
+- **Schede dei file:** la rotellina del mouse fa scorrere in modo fluido le schede sopra l'anteprima. Se stai scorrendo la pagina e passi sopra le schede, continua a scorrere la pagina.
+
 ## 0.0.24-dev
 
 ### en
@@ -23,7 +41,7 @@
 - **Files without a message:** you can send files with no text, as in a chat app. The AI looks at them and asks what you'd like done, unless the conversation already says.
 - **Attach opens where you left off:** the + button opens the folder you last picked files from with it.
 - **Worked for:** when the AI finishes, what it did on the way folds into one line, "Worked for 2 min 35 s". Open it to see the steps, the activity and the questions you answered. The time leaves out the time it waited for your answers.
-- **Equilibrato on ChatGPT:** it now runs GPT-6.1 Terra at high reasoning instead of medium, which stopped before the work was done.
+- **Balanced on ChatGPT:** it now runs GPT-6.1 Terra at high reasoning instead of medium, which stopped before the work was done.
 - **Finished tasks open at the end:** opening a task that's done shows its last answer and its files, not the top.
 - **Open questions:** after you answer one question in a round, the cursor moves to the next question's box when that one has no options.
 - **Changed files:** the side panel says "Changed by this task" when the AI only edited files that were there, and "Made and changed" when it did both.

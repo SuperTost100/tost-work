@@ -15,7 +15,9 @@ import { guideText, languageFrom, type MessageKey, translate } from "../shared/i
 import {
   type AgentProvider,
   BRIEF_MAX,
+  DECISIONS,
   DESCRIPTION_MAX,
+  type Decision,
   MAX_QUESTIONS,
   mergeSettings,
   type Project,
@@ -218,9 +220,9 @@ export function registerIpc(
   });
   handle(IPC.tasksStop, (_e, id: unknown) => runner.stop(text(id, "id", 100)));
   handle(IPC.tasksResume, (_e, id: unknown) => runner.resume(text(id, "id", 100)));
-  handle(IPC.tasksDecide, (_e, id: unknown, allow: unknown) => {
-    if (typeof allow !== "boolean") throw new Error("allow must be true or false");
-    return runner.decide(text(id, "id", 100), allow);
+  handle(IPC.tasksDecide, (_e, id: unknown, decision: unknown) => {
+    if (!DECISIONS.includes(decision as Decision)) throw new Error(`decision must be one of ${DECISIONS.join(", ")}`);
+    return runner.decide(text(id, "id", 100), decision as Decision);
   });
   handle(IPC.tasksFollowUp, (_e, id: unknown, message: unknown, files?: unknown) => {
     const taskId = text(id, "id", 100);

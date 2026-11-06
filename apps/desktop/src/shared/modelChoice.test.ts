@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  choiceFromModel,
   choiceOf,
   isModelPick,
   type ModelChoices,
@@ -37,7 +38,7 @@ describe("the three choices", () => {
       return `${found?.model.id} ${found?.effort}`;
     };
     expect(run("fast", "codex")).toBe("gpt-6-luna medium");
-    expect(run("balanced", "codex")).toBe("gpt-6.1-terra high");
+    expect(run("balanced", "codex")).toBe("gpt-6.1-terra medium");
     expect(run("thorough", "codex")).toBe("gpt-6.1-sol high");
     expect(run("fast", "claude")).toBe("claude-haiku-5-5 medium");
     expect(run("balanced", "claude")).toBe("claude-sonnet-5-5 high");
@@ -126,7 +127,7 @@ describe("pickOn", () => {
     const gone = pickOn({ ai: "claude", model: "claude-opus-4-1", effort: "high" }, choices);
     expect(gone?.model.id).toBe("gpt-6.1-terra");
     const noAi = pickOn({ ai: "key", model: "gpt-6.1-terra", effort: "high" }, choices);
-    expect([noAi?.ai, noAi?.effort]).toEqual(["chatgpt", "high"]);
+    expect([noAi?.ai, noAi?.effort]).toEqual(["chatgpt", "medium"]);
   });
 
   it("has sample models that carry every choice on both agents", () => {
@@ -237,5 +238,14 @@ describe("a model's name from its id", () => {
     ["o4-mini", "o4-mini"],
   ])("names %s as %s", (id, name) => {
     expect(nameFromId(id)).toBe(name);
+  });
+});
+
+describe("choiceFromModel", () => {
+  it("names the choice a task ran on, also for tasks saved before the choice changed", () => {
+    expect(choiceFromModel("gpt-6.1-terra", "medium")).toBe("balanced");
+    // Balanced ran at high in 0.0.24-dev only.
+    expect(choiceFromModel("gpt-6.1-terra", "high")).toBe("balanced");
+    expect(choiceFromModel("gpt-6.1-terra", "low")).toBe("custom");
   });
 });

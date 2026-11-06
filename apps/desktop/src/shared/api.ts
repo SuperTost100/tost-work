@@ -3,6 +3,7 @@ import type { InstallResult } from "./install";
 import type {
   AgentProvider,
   CourseKey,
+  Decision,
   Job,
   JobDraft,
   Project,
@@ -193,8 +194,8 @@ export interface TostWorkApi {
     markUnreviewed(id: string): Promise<Task>;
     /** One answer per question in the round, in order, with any files the user attached to them. */
     answer(id: string, answers: string[], attachments?: string[]): Promise<Task>;
-    /** Allows or refuses the overwrite or delete the task asked for. */
-    decide(id: string, allow: boolean): Promise<Task>;
+    /** The user's decision on the overwrite or delete the task asked for. */
+    decide(id: string, decision: Decision): Promise<Task>;
     /** Sends another instruction to a task that finished or stopped, and runs it again. */
     followUp(id: string, text: string, attachments?: string[]): Promise<Task>;
     /** Asks for a folder, every time, and copies the files the task made into it. Null when the user cancels. */

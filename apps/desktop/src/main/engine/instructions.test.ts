@@ -10,7 +10,8 @@ describe("instructionsFor", () => {
   it("names the folder, the language, the rules and the project's instructions", () => {
     const text = instructionsFor(task, project, "it");
     expect(text).toContain("/Users/giulia/Proposte");
-    expect(text).toContain("plain informal Italian");
+    expect(text).toContain("the language the user writes in");
+    expect(text).toContain("use Italian.");
     // A request to think or take stock gets an answer in the chat and an offer of a file; questions go through the card.
     expect(text).toContain("answer in your message");
     expect(text).toContain("Make the file only if they say yes");
@@ -108,7 +109,7 @@ describe("instructionsFor", () => {
 
   it("speaks to the user informally without emojis, and goes straight to the work without placeholders", () => {
     const text = instructionsFor(task, project, "it");
-    expect(text).toContain("plain informal Italian");
+    expect(text).toContain("plain informal language");
     expect(text).toContain("Use no emojis.");
     expect(text).toContain("no practice runs and no test files");
     expect(text).toContain("never about tools, commands or tests");

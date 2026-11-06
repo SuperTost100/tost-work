@@ -507,13 +507,15 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         emit(id, { type: "done" });
         return tasks.get(id) ?? t;
       },
-      decide: async (id, allow) => {
+      decide: async (id, decision) => {
         const t = tasks.get(id);
         if (!t?.approval) throw new Error("This task isn't waiting for a decision");
         const path = t.approval.paths[0] ?? "";
+        const allow = decision === "allow";
         const kept = allow ? [{ path, copy: `/kept/${id}`, at: now(), reason: "overwrite" as const }] : [];
         save({ ...resume(t, now()), kept: [...(t.kept ?? []), ...kept] });
-        emit(id, { type: "file", change: { path, kind: "update", role: "made" } });
+        // Turned down altogether, the task saves nothing in its place.
+        if (decision !== "discard") emit(id, { type: "file", change: { path, kind: "update", role: "made" } });
         emit(id, { type: "done" });
         return tasks.get(id) ?? t;
       },

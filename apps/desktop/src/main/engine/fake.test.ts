@@ -26,7 +26,7 @@ const run = async (engine: FakeEngine, work: string, controller = new AbortContr
   const task = { id: "t", files: [], attachments: [] } as unknown as Task;
   for await (const e of engine.run({ task, project: null, workdir: work, followUp: null, signal: controller.signal })) {
     events.push(e);
-    if (e.type === "approval") engine.decide(task.id, e.approval.id, false);
+    if (e.type === "approval") engine.decide(task.id, e.approval.id, "refuse");
   }
   return events;
 };

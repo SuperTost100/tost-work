@@ -1,7 +1,7 @@
 import { constants } from "node:fs";
 import { copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { ActivityKind, EngineEvent, Review } from "../../shared/model";
+import type { ActivityKind, Decision, EngineEvent, Review } from "../../shared/model";
 import { DEFAULT_PICK, type ModelPick, pickOn, SAMPLE_CHOICES } from "../../shared/modelChoice";
 import type { TaskLog } from "../debugLog";
 import { freeName } from "../files";
@@ -144,7 +144,7 @@ function fakeCall(kind: ActivityKind, target: string | undefined, workdir: strin
 
 /** Replays a script with a delay between steps, and waits for real answers to its questions and approvals. */
 export class FakeEngine implements Engine {
-  private waiting = new Map<string, (reply: string | boolean) => void>();
+  private waiting = new Map<string, (reply: string) => void>();
   /** Gives each tool call an id of its own, across runs, as the real agents do. */
   private calls = 0;
 
@@ -168,10 +168,10 @@ export class FakeEngine implements Engine {
   }
 
   /** Resolves with the user's reply, or null when the task is stopped first. */
-  private reply(id: string, signal: AbortSignal): Promise<string | boolean | null> {
+  private reply(id: string, signal: AbortSignal): Promise<string | null> {
     // An abort that already happened never fires its event, so it's checked here.
     if (signal.aborted) return Promise.resolve(null);
-    const replied = new Promise<string | boolean>((resolve) => this.waiting.set(id, resolve));
+    const replied = new Promise<string>((resolve) => this.waiting.set(id, resolve));
     const stopped = new Promise<null>((r) => signal.addEventListener("abort", () => r(null), { once: true }));
     return Promise.race([replied, stopped]).finally(() => this.waiting.delete(id));
   }
@@ -229,9 +229,11 @@ export class FakeEngine implements Engine {
             const id = `${task.id}-o${i}`;
             const decision = this.reply(id, signal);
             yield { type: "approval", approval: { id, action: "overwrite", paths: [path] } };
-            const allowed = await decision;
-            if (allowed === null) return yield { type: "stopped" };
-            replace = allowed === true;
+            const decided = await decision;
+            if (decided === null) return yield { type: "stopped" };
+            // Asked to save nothing, the sample isn't written and the task carries on.
+            if (decided === "discard") continue;
+            replace = decided === "allow";
           }
           if (!replace) path = free;
           await copyFile(join(this.samples, f.path), path, replace ? 0 : constants.COPYFILE_EXCL);
@@ -248,10 +250,10 @@ export class FakeEngine implements Engine {
         const id = `${task.id}-d${i}`;
         const decision = this.reply(id, signal);
         yield { type: "approval", approval: { id, action: "delete", paths: [path] } };
-        const allowed = await decision;
-        if (allowed === null) return yield { type: "stopped" };
+        const decided = await decision;
+        if (decided === null) return yield { type: "stopped" };
         // Tost Work moved the file to the Trash before passing the decision on, so the engine only reports it.
-        if (allowed) yield { type: "file", change: { path, kind: "delete", role: "made" } };
+        if (decided === "allow") yield { type: "file", change: { path, kind: "delete", role: "made" } };
       }
     }
     if (signal.aborted) return yield { type: "stopped" };
@@ -273,9 +275,9 @@ export class FakeEngine implements Engine {
     return waiter !== undefined;
   }
 
-  decide(_taskId: string, approvalId: string, allow: boolean): boolean {
+  decide(_taskId: string, approvalId: string, decision: Decision): boolean {
     const waiter = this.waiting.get(approvalId);
-    waiter?.(allow);
+    waiter?.(decision);
     return waiter !== undefined;
   }
 }

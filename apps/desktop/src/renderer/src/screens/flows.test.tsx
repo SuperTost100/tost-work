@@ -582,6 +582,74 @@ describe("approvals", () => {
   });
 });
 
+describe("turning an overwrite down", () => {
+  it("lets the user keep the file and save nothing in its place", async () => {
+    const api = createMemoryApi();
+    const decide = vi.spyOn(api.tasks, "decide");
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Update the proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: /We do/ }));
+    });
+    await screen.findByText("Check it against your brief");
+    act(() =>
+      api.emit("t1", { type: "approval", approval: { id: "a1", action: "overwrite", paths: ["/tmp/Proposta.docx"] } }),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Don't save" }));
+    });
+    expect(decide).toHaveBeenCalledWith("t1", "discard");
+    expect(screen.queryByRole("button", { name: "Allow overwrite" })).toBeNull();
+    expect(screen.queryByText("Earlier version")).toBeNull();
+  });
+
+  it("offers it only for an overwrite, not for a deletion", async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Tidy the folder" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: /We do/ }));
+    });
+    await screen.findByText("Check it against your brief");
+    act(() => api.emit("t1", { type: "approval", approval: { id: "a1", action: "delete", paths: ["/tmp/old.docx"] } }));
+    expect(await screen.findByRole("button", { name: "Move to Trash" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Don't save" })).toBeNull();
+  });
+});
+
+describe("the side panel's files", () => {
+  it("shows the first five of a long list and the rest on request", async () => {
+    const api = createMemoryApi();
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    const task = await api.tasks.start({ projectId: project.id, brief: "Write the modules", attachments: [] });
+    act(() => {
+      for (let i = 1; i <= 8; i++)
+        api.emit(task.id, {
+          type: "file",
+          change: { path: `/home/giulia/Courses/M0${i}.docx`, kind: "add", role: "made" },
+        });
+    });
+    render(<App userName="Giulia" api={api} />);
+    const [open] = await screen.findAllByText("Write the modules");
+    await act(async () => {
+      fireEvent.click(open as HTMLElement);
+    });
+    const panel = document.querySelector("aside.rp") as HTMLElement;
+    expect(within(panel).getByText("M05.docx")).toBeTruthy();
+    expect(within(panel).queryByText("M06.docx")).toBeNull();
+    fireEvent.click(within(panel).getByRole("button", { name: "Show all 8 files" }));
+    expect(within(panel).getByText("M08.docx")).toBeTruthy();
+    fireEvent.click(within(panel).getByRole("button", { name: "Show less" }));
+    expect(within(panel).queryByText("M06.docx")).toBeNull();
+  });
+});
+
 describe("what the agent is doing", () => {
   it("shows the latest actions while it works, then folds them into one line", async () => {
     const api = createMemoryApi();

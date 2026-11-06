@@ -39,7 +39,7 @@ describe("overwrite approvals", () => {
 
     await waitFor(() => status()?.approval != null);
     expect(status()?.approval).toMatchObject({ action: "overwrite", paths: [join(work, "Proposta.docx")] });
-    await runner.decide(task.id, true);
+    await runner.decide(task.id, "allow");
     await waitFor(() => status()?.question != null);
     runner.answer(task.id, ["The client pays it"]);
     const final = await done;
@@ -55,7 +55,7 @@ describe("overwrite approvals", () => {
     await writeFile(join(work, "Proposta.docx"), "old");
     const done = runner.start(task.id);
     await waitFor(() => status()?.approval != null);
-    await runner.decide(task.id, false);
+    await runner.decide(task.id, "refuse");
     await waitFor(() => status()?.question != null);
     runner.answer(task.id, ["The client pays it"]);
     const final = await done;
@@ -66,13 +66,29 @@ describe("overwrite approvals", () => {
     expect(final.kept ?? []).toHaveLength(0);
   });
 
+  it("saves nothing when the change is turned down altogether, and leaves the file alone", async () => {
+    const { runner, task, work, status } = await setup();
+    await writeFile(join(work, "Proposta.docx"), "old");
+    const done = runner.start(task.id);
+    await waitFor(() => status()?.approval != null);
+    await runner.decide(task.id, "discard");
+    await waitFor(() => status()?.question != null);
+    runner.answer(task.id, ["The client pays it"]);
+    const final = await done;
+
+    expect(await readFile(join(work, "Proposta.docx"), "utf8")).toBe("old");
+    expect(await readdir(work)).not.toContain("Proposta (2).docx");
+    expect(final.files.map((f) => f.path)).not.toContain(join(work, "Proposta.docx"));
+    expect(final.kept ?? []).toHaveLength(0);
+  });
+
   it("restores the kept copy, and restoring again undoes it", async () => {
     const { runner, task, work, status } = await setup();
     const path = join(work, "Proposta.docx");
     await writeFile(path, "old");
     const done = runner.start(task.id);
     await waitFor(() => status()?.approval != null);
-    await runner.decide(task.id, true);
+    await runner.decide(task.id, "allow");
     await waitFor(() => status()?.question != null);
     runner.answer(task.id, ["The client pays it"]);
     await done;
@@ -90,7 +106,7 @@ describe("overwrite approvals", () => {
     await writeFile(path, "old");
     const done = runner.start(task.id);
     await waitFor(() => status()?.approval != null);
-    await runner.decide(task.id, true);
+    await runner.decide(task.id, "allow");
     await waitFor(() => status()?.question != null);
     runner.answer(task.id, ["The client pays it"]);
     await done;
@@ -105,8 +121,8 @@ describe("overwrite approvals", () => {
     await writeFile(join(work, "Proposta.docx"), "old");
     void runner.start(task.id);
     await waitFor(() => status()?.approval != null);
-    const first = runner.decide(task.id, true);
-    await expect(runner.decide(task.id, true)).rejects.toThrow(/already being carried out/);
+    const first = runner.decide(task.id, "allow");
+    await expect(runner.decide(task.id, "allow")).rejects.toThrow(/already being carried out/);
     await first;
     runner.stop(task.id);
   });
@@ -132,7 +148,7 @@ describe("approvals and Stop", () => {
     (runner as unknown as { guard: typeof slow }).guard = slow;
     const done = runner.start(task.id);
     await waitFor(() => status()?.approval != null);
-    const deciding = runner.decide(task.id, true);
+    const deciding = runner.decide(task.id, "allow");
     runner.stop(task.id);
     await done;
     release();
@@ -159,7 +175,7 @@ describe("approvals and Stop", () => {
     };
     const done = runner.start(task.id);
     await waitFor(() => status()?.approval != null);
-    const deciding = runner.decide(task.id, true);
+    const deciding = runner.decide(task.id, "allow");
     runner.stop(task.id);
     await done;
     release();
@@ -185,7 +201,7 @@ describe("approvals and Stop", () => {
       },
       restore: async () => {},
     };
-    await expect(runner.decide(task.id, true)).rejects.toThrow(/locked/);
+    await expect(runner.decide(task.id, "allow")).rejects.toThrow(/locked/);
     const files = store.getTask(task.id)?.files ?? [];
     expect(files).toContainEqual({ path: a, kind: "delete", role: "made" });
     expect(files.some((f) => f.path === b)).toBe(false);
@@ -201,7 +217,7 @@ describe("approvals and Stop", () => {
       },
       restore: async () => {},
     };
-    await runner.decide(task.id, true);
+    await runner.decide(task.id, "allow");
     expect(tried).toEqual([b]);
     expect(store.getTask(task.id)?.files).toContainEqual({ path: b, kind: "delete", role: "made" });
   });
@@ -226,7 +242,7 @@ describe("approvals and Stop", () => {
     await waitFor(() => status()?.approval != null);
     // An earlier kept copy, so Restore has something to put back.
     store.saveTask({ ...(status() as Task), kept: [{ path, copy: "/kept/earlier", at: "", reason: "overwrite" }] });
-    const deciding = runner.decide(task.id, true);
+    const deciding = runner.decide(task.id, "allow");
     runner.stop(task.id);
     await done;
     await expect(runner.restore(task.id, path)).rejects.toThrow(/decision to finish/);
@@ -240,7 +256,7 @@ describe("approvals and Stop", () => {
     await writeFile(path, "old");
     const done = runner.start(task.id);
     await waitFor(() => status()?.approval != null);
-    await runner.decide(task.id, true);
+    await runner.decide(task.id, "allow");
     await waitFor(() => status()?.question != null);
     runner.answer(task.id, ["The client pays it"]);
     await done;
@@ -265,7 +281,7 @@ describe("delete approvals", () => {
     const done = runner.start(task.id);
     await waitFor(() => status()?.approval != null);
     expect(status()?.approval?.action).toBe("delete");
-    await runner.decide(task.id, true);
+    await runner.decide(task.id, "allow");
     const final = await done;
 
     expect(trashed).toHaveLength(1);
@@ -278,7 +294,7 @@ describe("delete approvals", () => {
     await writeFile(join(work, "draft.txt"), "draft");
     const done = runner.start(task.id);
     await waitFor(() => status()?.approval != null);
-    await runner.decide(task.id, false);
+    await runner.decide(task.id, "refuse");
     await done;
     expect(trashed).toEqual([]);
     expect(await readdir(work)).toEqual(["draft.txt"]);
@@ -289,7 +305,7 @@ describe("delete approvals", () => {
     await writeFile(join(work, "..", "outside.txt"), "not yours");
     void runner.start(task.id);
     await waitFor(() => status()?.approval != null);
-    await expect(runner.decide(task.id, true)).rejects.toThrow(/outside/);
+    await expect(runner.decide(task.id, "allow")).rejects.toThrow(/outside/);
     expect(trashed).toEqual([]);
     expect(status()?.approval).not.toBeNull();
     runner.stop(task.id);
