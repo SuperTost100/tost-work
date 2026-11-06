@@ -73,6 +73,7 @@ export function Composer({
   placeholder,
   sendLabel,
   disabled = false,
+  sendOff = false,
   minHeight,
   children,
   className,
@@ -87,6 +88,8 @@ export function Composer({
   placeholder: string;
   sendLabel: string;
   disabled?: boolean;
+  /** Writing and attaching stay open, but nothing goes until it's off again, for example while the AI works. */
+  sendOff?: boolean;
   minHeight?: number;
   /** Shown above the text field, for example the answer choices of a question. */
   children?: ReactNode;
@@ -103,7 +106,7 @@ export function Composer({
   const t = useT();
   const tooLong = value.length > BRIEF_MAX;
   // Files alone can be sent, as in a chat app.
-  const canSend = !disabled && !tooLong && (value.trim().length > 0 || (attach?.files.length ?? 0) > 0);
+  const canSend = !disabled && !sendOff && !tooLong && (value.trim().length > 0 || (attach?.files.length ?? 0) > 0);
   const take = useRef<(files: File[]) => void>(() => {});
   take.current = (files) => {
     if (!disabled) attach?.onDropped(files);

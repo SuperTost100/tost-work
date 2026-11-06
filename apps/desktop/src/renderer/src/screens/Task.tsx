@@ -1310,7 +1310,7 @@ export function Task({
                     <ApprovalCard approval={task.approval} t={t} onDecide={onDecide} />
                   ) : (
                     <Composer
-                      value={live ? "" : message}
+                      value={message}
                       onChange={setMessage}
                       onSubmit={() => {
                         // One at a time: copying the files takes a moment, and a second Send would run it twice.
@@ -1330,7 +1330,7 @@ export function Task({
                       }}
                       placeholder={live ? t("composer.busy") : quick ? t("composer.another") : t("composer.followup")}
                       sendLabel={t("composer.send")}
-                      disabled={live}
+                      sendOff={live}
                       minHeight={44}
                       attach={attach(messageFiles, setMessageFiles)}
                     />
