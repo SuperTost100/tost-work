@@ -74,25 +74,56 @@ describe("wheelSideways", () => {
     const el = document.createElement("div");
     Object.defineProperty(el, "scrollWidth", { value: scrollWidth });
     Object.defineProperty(el, "clientWidth", { value: 100 });
-    wheelSideways(el);
-    return el;
+    const glides: number[] = [];
+    el.scrollTo = ((options: ScrollToOptions) => glides.push(options.left ?? 0)) as typeof el.scrollTo;
+    document.body.append(el);
+    const stop = wheelSideways(el);
+    return { el, glides, stop };
   };
-  const wheel = (el: HTMLElement, deltaY: number) => {
-    const e = new WheelEvent("wheel", { deltaY, cancelable: true });
-    el.dispatchEvent(e);
+  let now = 0;
+  const wheel = (on: Element, deltaY: number, gap = 20) => {
+    now += gap;
+    const e = new WheelEvent("wheel", { deltaY, cancelable: true, bubbles: true });
+    Object.defineProperty(e, "timeStamp", { value: now });
+    on.dispatchEvent(e);
     return e.defaultPrevented;
   };
 
-  it("turns a mouse wheel into a sideways scroll while there's room, and leaves the page alone at the ends", () => {
-    const el = strip(300);
-    expect(wheel(el, -40)).toBe(false);
-    expect(wheel(el, 40)).toBe(true);
+  it("scrolls the row sideways in a gesture that starts on it, to its end, without moving the page", () => {
+    const { el, stop } = strip(300);
+    expect(wheel(el, 40, 1000)).toBe(true);
     expect(el.scrollLeft).toBe(40);
     el.scrollLeft = 200;
+    // Still the same gesture at the end: the page doesn't take over halfway.
+    expect(wheel(el, 40)).toBe(true);
+    // A new gesture with nowhere to go that way scrolls the page.
+    expect(wheel(el, 40, 1000)).toBe(false);
+    stop?.();
+  });
+
+  it("lets a page scroll that passes over the row keep scrolling the page", () => {
+    const { el, stop } = strip(300);
+    expect(wheel(document.body, 40, 1000)).toBe(false);
     expect(wheel(el, 40)).toBe(false);
+    expect(el.scrollLeft).toBe(0);
+    // Once the pointer rests on the row, the next gesture is the row's.
+    expect(wheel(el, 40, 1000)).toBe(true);
+    stop?.();
+  });
+
+  it("glides a mouse wheel's notches, adding each to where the last one is heading", async () => {
+    const { el, glides, stop } = strip(300);
+    wheel(el, 100, 1000);
+    wheel(el, 100);
+    wheel(el, 100);
+    await new Promise((r) => requestAnimationFrame(r));
+    expect(glides).toEqual([100, 200, 200]);
+    stop?.();
   });
 
   it("leaves a strip that fits alone", () => {
-    expect(wheel(strip(100), 40)).toBe(false);
+    const { el, stop } = strip(100);
+    expect(wheel(el, 40, 1000)).toBe(false);
+    stop?.();
   });
 });

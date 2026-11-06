@@ -537,24 +537,58 @@ function QuestionCard({
   );
 }
 
+/** Wheel events closer together than this are one gesture, which keeps scrolling what it started on. */
+const GESTURE_GAP_MS = 250;
+/** A step this large comes from a mouse wheel's notch, which glides; a trackpad's small steps are smooth already. */
+const NOTCH = 50;
+
 /**
  * Lets a mouse wheel scroll a row that only scrolls sideways, such as the file tabs: a trackpad scrolls it already.
- * At either end the wheel scrolls the page again.
+ * A gesture belongs to what it started on, as in macOS: a page scroll that passes over the row keeps scrolling the
+ * page, and a gesture that starts on the row, while it has room that way, moves only the row, to its end.
  */
 export const wheelSideways = (el: HTMLElement | null) => {
   if (!el) return;
-  el.addEventListener(
-    "wheel",
-    (e) => {
-      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-      const max = el.scrollWidth - el.clientWidth;
-      const room = e.deltaY > 0 ? el.scrollLeft < max - 1 : el.scrollLeft > 0;
-      if (max <= 0 || !room) return;
-      e.preventDefault();
-      el.scrollLeft += e.deltaY;
-    },
-    { passive: false },
-  );
+  const doc = el.ownerDocument;
+  let last = Number.NEGATIVE_INFINITY;
+  let ours = false;
+  let target = 0;
+  const max = () => el.scrollWidth - el.clientWidth;
+  const upright = (e: WheelEvent) => Math.abs(e.deltaY) > Math.abs(e.deltaX);
+  // Seen first, on the way down to what's under the pointer, so every gesture is noticed wherever it starts.
+  const watch = (e: WheelEvent) => {
+    const fresh = e.timeStamp - last > GESTURE_GAP_MS;
+    last = e.timeStamp;
+    if (!fresh) return;
+    const room = e.deltaY > 0 ? el.scrollLeft < max() - 1 : el.scrollLeft > 0;
+    ours = e.target instanceof Node && el.contains(e.target) && upright(e) && max() > 0 && room;
+    target = el.scrollLeft;
+  };
+  const turn = (e: WheelEvent) => {
+    if (!ours || !upright(e)) return;
+    e.preventDefault();
+    const step =
+      e.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? e.deltaY * 16
+        : e.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? e.deltaY * el.clientWidth
+          : e.deltaY;
+    if (Math.abs(step) < NOTCH) {
+      el.scrollLeft += step;
+      target = el.scrollLeft;
+      return;
+    }
+    target = Math.min(max(), Math.max(0, target + step));
+    const to = target;
+    // Started inside the wheel event, Chromium makes the smooth scroll jump at once; on the next frame it glides.
+    requestAnimationFrame(() => el.scrollTo({ left: to, behavior: "smooth" }));
+  };
+  doc.addEventListener("wheel", watch, { capture: true, passive: true });
+  el.addEventListener("wheel", turn, { passive: false });
+  return () => {
+    doc.removeEventListener("wheel", watch, { capture: true });
+    el.removeEventListener("wheel", turn);
+  };
 };
 
 /** How many files the side panel lists before the rest fold under "Show all". */

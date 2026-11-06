@@ -439,7 +439,7 @@ describe("AgentEngine", () => {
 
   it("starts the middle choice when nothing is picked, and each choice on the default AI", async () => {
     const codex = engineWithModels();
-    expect(await codex.defaults()).toMatchObject({ model: "gpt-6.1-terra", effort: "high" });
+    expect(await codex.defaults()).toMatchObject({ model: "gpt-6.1-terra", effort: "medium" });
     expect(await codex.defaults({ preset: "fast" })).toMatchObject({ model: "gpt-6-luna", effort: "medium" });
     expect(await codex.defaults({ preset: "thorough" })).toMatchObject({ model: "gpt-6.1-sol", effort: "high" });
     const claude = engineWithModels({ ai: "claude" });
