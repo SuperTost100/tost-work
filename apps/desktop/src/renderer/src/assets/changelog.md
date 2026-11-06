@@ -19,6 +19,7 @@
 
 ### en
 
+- **Signed and notarized:** the app now carries an Apple Developer ID signature and Apple's notarization, so it opens straight away. No more Open Anyway in Privacy & Security.
 - **Don't save:** when the AI wants to replace a file, you can now turn it down altogether. The file stays as it is and the AI saves nothing in its place, not even under a new name.
 - **Long file lists:** the side panel shows the first five files a task made, then "Show all". A task that made many files no longer pushes everything else out of sight.
 - **Replies in your language:** the AI answers in the language you write in, not the app's. Until you've written something, it uses the app's language.
@@ -27,6 +28,7 @@
 
 ### it
 
+- **Firmata e notarizzata:** l'app ora ha la firma Apple Developer ID e la notarizzazione di Apple, quindi si apre subito. Non serve più «Apri comunque» in Privacy e sicurezza.
 - **Non salvare:** quando l'AI vuole sostituire un file, ora puoi rifiutare del tutto. Il file resta com'è e l'AI non salva niente al suo posto, nemmeno con un altro nome.
 - **Elenchi lunghi di file:** il pannello laterale mostra i primi cinque file creati dall'attività, poi "Mostra tutti". Un'attività che crea molti file non nasconde più il resto.
 - **Risposte nella tua lingua:** l'AI risponde nella lingua in cui scrivi, non in quella dell'app. Finché non hai scritto niente, usa la lingua dell'app.
