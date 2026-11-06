@@ -1,7 +1,12 @@
 name: Package
 
-# Builds the Mac app, ad-hoc signed. It runs by hand, and on pull requests that change the packaging, so a broken build
-# shows up before a release needs it. It publishes nothing: the DMGs are workflow artifacts.
+# Builds the Mac app. On pull requests that change the packaging it signs ad-hoc, with no certificate or secret, so a
+# broken build shows up before a release needs it. Started by hand (Actions > Package > Run workflow), it signs with the
+# Developer ID certificate and has Apple notarize the app: that's the build a release ships. It publishes nothing: the
+# DMGs are workflow artifacts.
+#
+# shortcut: the signing secrets are repository secrets, so a workflow changed on a branch could reach them. Only Tost and
+# his agents push here. Move them to a "release" environment limited to main once anyone else gets write access.
 on:
   workflow_dispatch:
   pull_request:
@@ -16,15 +21,12 @@ permissions:
 
 jobs:
   mac:
-    name: Mac app (ad-hoc signed)
+    name: Mac app
     runs-on: macos-latest
     env:
       # electron-builder downloads its own Electron for the target, so the dev binary isn't needed.
       ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
-      CSC_IDENTITY_AUTO_DISCOVERY: "false"
-      # electron-builder skips signing on pull requests unless told otherwise. The signature is ad-hoc, so no
-      # certificate or secret is involved.
-      CSC_FOR_PULL_REQUEST: "true"
+      SIGNED: ${{ github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,7 +40,37 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tost-work/desktop build
       - run: node apps/desktop/scripts/fetch-officecli.mjs mac-arm64 mac-x64
-      - run: pnpm --filter @tost-work/desktop exec electron-builder --mac --publish never
+      - name: Package, signed ad-hoc
+        if: env.SIGNED != 'true'
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          # electron-builder skips signing on pull requests unless told otherwise.
+          CSC_FOR_PULL_REQUEST: "true"
+        # Without any signature macOS calls the downloaded app "damaged". With an ad-hoc one the hardened runtime blocks
+        # Electron's own libraries, and Apple notarizes only Developer ID signatures.
+        run: >-
+          pnpm --filter @tost-work/desktop exec electron-builder --mac --publish never
+          -c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false
+      - name: Package, signed with the Developer ID and notarized
+        if: env.SIGNED == 'true'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        # notarytool reads the API key from a file. It lives in the runner's temp folder, which is wiped after the job.
+        # The key is rewritten as a clean PEM, because notarytool rejects one with stray spaces or line breaks, as a key
+        # pasted from a browser can have. openssl checks it before Apple sees it, and prints nothing of it.
+        run: |
+          export APPLE_API_KEY="$RUNNER_TEMP/notary.p8"
+          body=$(printf '%s' "$APPLE_API_KEY_P8" | sed -e 's/-----[A-Z ]*-----//g' | tr -d ' \t\r\n')
+          unset APPLE_API_KEY_P8
+          { echo "-----BEGIN PRIVATE KEY-----"; printf '%s\n' "$body" | fold -w 64; echo "-----END PRIVATE KEY-----"; } > "$APPLE_API_KEY"
+          unset body
+          openssl pkey -in "$APPLE_API_KEY" -noout || { echo "::error::APPLE_API_KEY_P8 isn't a readable private key"; exit 1; }
+          pnpm --filter @tost-work/desktop exec electron-builder --mac --publish never
+          rm -f "$APPLE_API_KEY"
       # An app whose signature doesn't match its contents opens on no Mac: macOS calls it "damaged".
       - name: Check the apps' signatures
         working-directory: apps/desktop/release
@@ -48,6 +80,17 @@ jobs:
             # OfficeCLI must still carry its own signature, or a downloaded copy won't run on a Mac.
             codesign --verify --strict --verbose=2 "$app/Contents/Resources/bin/officecli"
             codesign -dvv "$app/Contents/Resources/bin/officecli" 2>&1 | grep "Authority=Developer ID Application"
+          done
+      # A release build must carry Tost's Developer ID and Apple's ticket, or Gatekeeper blocks its first launch.
+      - name: Check the signature and the notarization
+        if: env.SIGNED == 'true'
+        working-directory: apps/desktop/release
+        run: |
+          for app in "mac-arm64/Tost Work.app" "mac/Tost Work.app"; do
+            codesign -dvv "$app" 2>&1 | grep "Authority=Developer ID Application: TOMMASO BARBERA (T7U74299G3)"
+            codesign -dvv "$app" 2>&1 | grep "flags=0x10000(runtime)"
+            xcrun stapler validate "$app"
+            spctl --assess --type execute --verbose=4 "$app" 2>&1 | tee /dev/stderr | grep "source=Notarized Developer ID"
           done
       - name: Check that the bundled OfficeCLI runs
         working-directory: apps/desktop/release

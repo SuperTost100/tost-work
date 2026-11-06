@@ -82,7 +82,7 @@ Download the file for your Mac from the [releases page](https://github.com/Super
 | Apple silicon (M1 and later) | `Tost.Work-<version>-arm64.dmg` |
 | Intel | `Tost.Work-<version>.dmg` |
 
-The app isn't signed with an Apple Developer ID yet, so macOS blocks the first launch. Open the `.dmg`, drag Tost Work to Applications and open it once. Then go to System Settings > Privacy & Security, scroll to the message about Tost Work and choose Open Anyway.
+Open the `.dmg` and drag Tost Work to Applications. From 0.0.25-dev on, the app is signed with an Apple Developer ID and notarized by Apple, so it opens like any other app. Builds before that need one extra step on their first launch: open the app once, then go to System Settings > Privacy & Security and choose Open Anyway.
 
 Tost Work doesn't update itself yet. Until 0.1.0, download each new build from the releases page.
 
