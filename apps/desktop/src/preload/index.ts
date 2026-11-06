@@ -9,6 +9,9 @@ ipcRenderer.on(IPC.fullScreen, (_: unknown, on: boolean) => {
   document.documentElement.toggleAttribute("data-full-screen", on === true);
 });
 
+// Questions taken for a listener that had gone by the time they arrived. See onQuestion.
+const unclaimed: WindowQuestion[] = [];
+
 const api: TostWorkApi = {
   platform: process.platform as TostWorkApi["platform"],
   versions: { app: __APP_VERSION__, electron: process.versions.electron ?? "" },
@@ -35,12 +38,17 @@ const api: TostWorkApi = {
     };
   },
   onQuestion: (listener) => {
-    // Questions asked while the page was still loading wait in the main process until it asks for them.
+    // Questions asked while the page was still loading wait in the main process until it asks for them. The main
+    // process counts them as delivered once taken, so any that arrive after this listener has gone (React mounts
+    // twice in development) wait here for the next one.
     let listening = true;
     const handler = (_: unknown, question: WindowQuestion) => listener(question);
     ipcRenderer.on(IPC.question, handler);
+    for (const question of unclaimed.splice(0)) listener(question);
     void ipcRenderer.invoke(IPC.takeQuestions).then((waiting: unknown) => {
-      if (listening && Array.isArray(waiting)) for (const question of waiting) listener(question as WindowQuestion);
+      if (!Array.isArray(waiting)) return;
+      if (listening) for (const question of waiting) listener(question as WindowQuestion);
+      else unclaimed.push(...(waiting as WindowQuestion[]));
     });
     return () => {
       listening = false;
