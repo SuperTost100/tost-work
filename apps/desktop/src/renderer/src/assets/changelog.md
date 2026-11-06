@@ -15,6 +15,36 @@
   wait here until the release bumps the version.
 -->
 
+## 0.0.24-dev
+
+### en
+
+- **Drag and paste files:** drop files anywhere on the window, or paste them with ⌘V, to attach them. A copied screenshot attaches too.
+- **Files without a message:** you can send files with no text, as in a chat app. The AI looks at them and asks what you'd like done, unless the conversation already says.
+- **Attach opens where you left off:** the + button opens the folder you last picked files from with it.
+- **Worked for:** when the AI finishes, what it did on the way folds into one line, "Worked for 2 min 35 s". Open it to see the steps, the activity and the questions you answered. The time leaves out the time it waited for your answers.
+- **Equilibrato on ChatGPT:** it now runs GPT-6.1 Terra at high reasoning instead of medium, which stopped before the work was done.
+- **Finished tasks open at the end:** opening a task that's done shows its last answer and its files, not the top.
+- **Open questions:** after you answer one question in a round, the cursor moves to the next question's box when that one has no options.
+- **Changed files:** the side panel says "Changed by this task" when the AI only edited files that were there, and "Made and changed" when it did both.
+- **What's new in Settings:** a "What's new" item sits just above About in the Settings list.
+- **Long briefs on Home:** the box stops growing after about eight lines and scrolls, so the greeting stays put.
+- **File tabs:** a mouse wheel scrolls the tabs above the preview, not only a trackpad.
+
+### it
+
+- **Trascina e incolla i file:** trascina i file in un punto qualsiasi della finestra, o incollali con ⌘V, per allegarli. Si allega anche uno screenshot copiato.
+- **File senza messaggio:** puoi mandare file senza scrivere niente, come in una chat. L'AI li guarda e ti chiede cosa vuoi farne, se non lo dice già la conversazione.
+- **Allega riparte da dove eri:** il pulsante + apre la cartella da cui hai scelto i file l'ultima volta con lo stesso pulsante.
+- **Ha lavorato per:** quando l'AI finisce, quello che ha fatto per arrivarci si chiude in una riga, "Ha lavorato per 2 min 35 s". Aprila per vedere i passaggi, le attività e le domande a cui hai risposto. Il tempo non conta l'attesa delle tue risposte.
+- **Equilibrato su ChatGPT:** ora usa GPT-6.1 Terra con ragionamento alto invece che medio, che si fermava prima di finire il lavoro.
+- **Le attività finite si aprono in fondo:** aprire un'attività conclusa mostra l'ultima risposta e i file, non l'inizio.
+- **Domande aperte:** dopo aver risposto a una domanda di un giro, il cursore passa nella casella della domanda successiva quando questa non ha opzioni.
+- **File modificati:** il pannello laterale dice "Modificati da questa attività" quando l'AI ha solo cambiato file che c'erano già, e "Creati e modificati" quando ha fatto entrambe le cose.
+- **Novità nelle Impostazioni:** la voce "Novità" è nella lista delle Impostazioni, subito sopra Informazioni.
+- **Richieste lunghe nella Home:** la casella smette di crescere dopo circa otto righe e scorre, così il saluto resta al suo posto.
+- **Schede dei file:** anche la rotella del mouse fa scorrere le schede sopra l'anteprima, non solo il trackpad.
+
 ## 0.0.23-dev
 
 ### en

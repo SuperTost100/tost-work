@@ -37,6 +37,17 @@ describe("About", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Level and sections");
   });
 
+  it("has What's new in Settings' list, just above About", async () => {
+    render(<Root api={createMemoryApi()} />);
+    await click("Settings");
+    const nav = screen.getByRole("navigation", { name: "Settings" });
+    expect(within(nav).getAllByRole("button").at(-2)?.textContent).toBe("What's new");
+    await act(async () => {
+      fireEvent.click(within(nav).getByRole("button", { name: "What's new" }));
+    });
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("What's new");
+  });
+
   it("opens from the app menu", async () => {
     const api = createMemoryApi();
     render(<Root api={api} />);

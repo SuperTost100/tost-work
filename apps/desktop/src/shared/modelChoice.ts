@@ -44,14 +44,14 @@ export interface ModelChoices {
 /** The reasoning levels the picker offers, lowest first. Others, such as "ultra", are left out. */
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 
-/** What each choice runs on (Tost's decision, #196). */
+/** What each choice runs on (Tost's decision, #196). Balanced on ChatGPT went from medium to high in 0.0.24-dev: at medium it stopped before the work was done. */
 export const PRESET_MODELS: Record<Preset, Record<AgentProvider, { model: string; effort: string }>> = {
   fast: {
     codex: { model: "gpt-6-luna", effort: "medium" },
     claude: { model: "claude-haiku-5-5", effort: "medium" },
   },
   balanced: {
-    codex: { model: "gpt-6.1-terra", effort: "medium" },
+    codex: { model: "gpt-6.1-terra", effort: "high" },
     claude: { model: "claude-sonnet-5-5", effort: "high" },
   },
   thorough: {
@@ -254,10 +254,17 @@ export function choiceOf(pick: ModelPick | undefined, ran: RanOn): Choice {
  */
 export function choiceFromModel(model: string, effort: string): Choice {
   const preset = PRESETS.find((p) =>
-    Object.values(PRESET_MODELS[p]).some((m) => m.model === model && m.effort === effort),
+    [...Object.values(PRESET_MODELS[p]), ...(EARLIER_MODELS[p] ?? [])].some(
+      (m) => m.model === model && m.effort === effort,
+    ),
   );
   return preset ?? "custom";
 }
+
+/** What a choice ran on before it changed, so older tasks still show the choice they were started on. */
+const EARLIER_MODELS: Partial<Record<Preset, { model: string; effort: string }[]>> = {
+  balanced: [{ model: "gpt-6.1-terra", effort: "medium" }],
+};
 
 /**
  * A model's name from its id alone, for a task whose model list isn't at hand: "gpt-6.1-terra" is "GPT-6.1 Terra",

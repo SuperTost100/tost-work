@@ -51,6 +51,20 @@ export class Store {
       .run(JSON.stringify(settings));
   }
 
+  /** A small value the app keeps for itself, such as the folder files were last attached from. Null when unset. */
+  value(key: string): string | null {
+    const row = this.db.prepare("select value from settings where key = ?").get(`value:${key}`) as
+      | { value: string }
+      | undefined;
+    return row?.value ?? null;
+  }
+
+  saveValue(key: string, value: string): void {
+    this.db
+      .prepare("insert into settings (key, value) values (?, ?) on conflict(key) do update set value = excluded.value")
+      .run(`value:${key}`, value);
+  }
+
   saveProject(project: Project): void {
     this.db
       .prepare(

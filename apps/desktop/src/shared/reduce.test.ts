@@ -20,6 +20,21 @@ describe("applyEvent withdrawn", () => {
   });
 });
 
+describe("applyEvent file", () => {
+  it("lists each file once, and a file the task made and then changed still counts as made", () => {
+    const base = { status: "running", files: [] } as unknown as Task;
+    const file = (path: string, kind: "add" | "update") =>
+      ({ type: "file", change: { path, kind, role: "made" } }) as const;
+    let task = applyEvent(base, file("/w/a.docx", "add"), "t");
+    task = applyEvent(task, file("/w/b.docx", "update"), "t");
+    task = applyEvent(task, file("/w/a.docx", "update"), "t");
+    expect(task.files).toEqual([
+      { path: "/w/b.docx", kind: "update", role: "made" },
+      { path: "/w/a.docx", kind: "add", role: "made" },
+    ]);
+  });
+});
+
 describe("applyEvent activity", () => {
   const task = { activity: [], messages: [{ from: "user", text: "brief", at: "t0" }] } as unknown as Task;
 

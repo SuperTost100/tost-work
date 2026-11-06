@@ -8,7 +8,7 @@ import { Store } from "../store/store";
 import { UserError } from "../userError";
 import type { Engine, RunContext } from "./engine";
 import { FakeEngine, PROPOSAL_SCRIPT } from "./fake";
-import { RESUME_PROMPT, TaskRunner, titleFrom, withFiles } from "./runner";
+import { FILES_ONLY, RESUME_PROMPT, TaskRunner, taskTitle, titleFrom, withFiles } from "./runner";
 
 function setup() {
   const store = new Store(":memory:");
@@ -106,7 +106,8 @@ describe("TaskRunner with the fake engine", () => {
 
     expect(final.status).toBe("done");
     expect(final.messages.at(-1)?.text).toBe("Done, I made the change.");
-    expect(final.files.at(-1)).toEqual({ path: "/tmp/p/prezzi.xlsx", kind: "update", role: "made" });
+    // The task made the file in its first run, so changing it later still counts as making it.
+    expect(final.files.at(-1)).toEqual({ path: "/tmp/p/prezzi.xlsx", kind: "add", role: "made" });
   });
 
   it("keeps files attached to answers and follow-ups with their message and the task's files", async () => {
@@ -139,6 +140,15 @@ describe("TaskRunner with the fake engine", () => {
     expect(withFiles("Use the new logo", ["/Users/g/logo.png"])).toBe(
       "Use the new logo\n\nFiles I attached to this message:\n- /Users/g/logo.png",
     );
+  });
+
+  it("tells the agent when files came without a message, and names such a task after its first file", () => {
+    expect(withFiles("", ["/Users/g/shot.png"])).toBe(`${FILES_ONLY}\n- /Users/g/shot.png`);
+    expect(taskTitle("", ["/Users/g/shot.png", "/Users/g/b.pdf"])).toBe("shot.png");
+    expect(taskTitle("Sum up\nthe call", ["/Users/g/shot.png"])).toBe("Sum up");
+    const { runner } = setup();
+    const task = runner.create({ projectId: null, brief: "", workdir: "/tmp/p", attachments: ["/Users/g/shot.png"] });
+    expect(task.title).toBe("shot.png");
   });
 
   it("refuses a follow-up while the task works or waits", async () => {

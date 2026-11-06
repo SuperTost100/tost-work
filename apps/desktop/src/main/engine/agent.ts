@@ -20,6 +20,7 @@ import { UserError } from "../userError";
 import { activityOf, noteText } from "./activity";
 import type { Engine, RunContext } from "./engine";
 import { instructionsFor } from "./instructions";
+import { withFiles } from "./runner";
 
 /**
  * What ask_user and request_approval tell the agent. They return at once: Codex hands a tool that runs longer than
@@ -445,7 +446,8 @@ export class AgentEngine implements Engine, ToolHandler {
         cwd: workdir,
         access: "supervised",
       },
-      prompt: followUp ?? task.brief,
+      // Files sent without a message come with a note that says so, in place of an empty prompt.
+      prompt: followUp ?? (task.brief || withFiles("", task.attachments)),
       system: instructionsFor(
         task,
         project,

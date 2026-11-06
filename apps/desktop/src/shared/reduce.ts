@@ -38,9 +38,12 @@ export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
       // Live words aren't part of the saved task.
       return task;
     case "file": {
-      // A later change to the same path replaces the earlier one, so each file is listed once.
+      // A later change to the same path replaces the earlier one, so each file is listed once. A file the task made
+      // and then edited still counts as made.
       const others = task.files.filter((f) => f.path !== event.change.path);
-      return { ...next, files: [...others, event.change] };
+      const before = task.files.find((f) => f.path === event.change.path);
+      const made = before?.kind === "add" && before.role === "made" && event.change.kind === "update";
+      return { ...next, files: [...others, made ? { ...event.change, kind: "add" as const } : event.change] };
     }
     case "question":
       return { ...next, status: "needs-you", question: event.question };

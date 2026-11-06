@@ -790,6 +790,11 @@ h3 {
 :root[data-theme="dark"] .composer {
   box-shadow: none;
 }
+/* Files dragged over the box, which takes them, as the window around it does. */
+.composer.dropping {
+  outline: 1.5px dashed var(--t3);
+  outline-offset: 3px;
+}
 /* Text boxes grow with their text, up to a limit where they scroll, instead of a corner to drag. */
 textarea {
   field-sizing: content;
@@ -809,6 +814,11 @@ textarea {
 }
 .composer textarea:focus {
   outline: none;
+}
+/* On Home the box stops at about eight lines and scrolls, so a long brief doesn't push the greeting and the box off
+   the middle of the window. */
+.home-col .composer textarea {
+  max-height: calc(8lh + 20px);
 }
 .composer textarea::placeholder {
   color: var(--t3);
@@ -3563,7 +3573,7 @@ ol.editable li::before {
   gap: 2px;
 }
 /* About sits at the bottom of the list, apart from the settings themselves. */
-.snav .about {
+.snav .news {
   margin-top: auto;
 }
 .snav a,
@@ -4760,6 +4770,15 @@ label.opt input {
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+/* A turn that ended, folded into one line: opened, what it holds sits behind the same rule as an answered round. */
+.worked-body {
+  margin: 4px 0 0 7px;
+  padding: 0 0 4px 19px;
+  border-left: 2px solid var(--line);
+}
+.worked-body > :first-child {
+  margin-top: 8px;
 }
 /* The activity log shares the answered round's line; its entries are single lines with the action's icon. */
 .activity ol {

@@ -222,6 +222,11 @@ export interface TostWorkApi {
   files: {
     /** Opens the system file picker. Resolves to the chosen paths, empty when the user cancels. */
     pick(): Promise<string[]>;
+    /**
+     * The paths to attach for files dropped or pasted into a message. A pasted file with no place on disk, such as a
+     * screenshot, is saved first. Fails on a folder.
+     */
+    take(files: File[]): Promise<string[]>;
     /** Reads a file the task made, used or was given, for a preview. Null when the file isn't there. */
     read(taskId: string, path: string): Promise<FileContent | null>;
     /** Opens the file in its usual app, for example Word. */
@@ -393,6 +398,7 @@ export const IPC = {
   taskText: "tasks:text",
   tasksDraft: "tasks:draft",
   filesPick: "files:pick",
+  filesTake: "files:take",
   filesRead: "files:read",
   filesOpen: "files:open",
   filesReveal: "files:reveal",

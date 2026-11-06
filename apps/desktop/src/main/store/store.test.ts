@@ -25,6 +25,15 @@ const task = (id: string, status: Task["status"], updatedAt: string): Task => ({
 });
 
 describe("Store", () => {
+  it("keeps the app's own small values apart from the settings", () => {
+    const s = new Store(":memory:");
+    expect(s.value("attachFolder")).toBeNull();
+    s.saveValue("attachFolder", "/Users/g/Documents");
+    s.saveValue("attachFolder", "/Users/g/Desktop");
+    expect(s.value("attachFolder")).toBe("/Users/g/Desktop");
+    expect(s.getSettings()).toEqual(DEFAULT_SETTINGS);
+  });
+
   it("saves projects and lists them in creation order", () => {
     const s = new Store(":memory:");
     s.saveProject({ id: "b", name: "B", description: "", folder: "/b", instructions: "", createdAt: "2026-10-02" });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { Attachments } from "@/components/Composer";
+import { type Attachments, attachments } from "@/components/Composer";
 import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { ModelPicker } from "@/components/ModelPicker";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
@@ -267,7 +267,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
 
   const start = async (text: string, inProject: string | null, attachments: string[], clear: () => void) => {
     // Enter and the send button can both fire before the first start returns.
-    if (!api || !text.trim() || starting.current) return;
+    if (!api || (!text.trim() && !attachments.length) || starting.current) return;
     starting.current = true;
     setError(null);
     try {
@@ -282,7 +282,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
   };
   // Saved without starting, to wait in the board's Drafts. The user stays where they are, with an empty box.
   const saveLater = async (text: string, inProject: string | null, attachments: string[], clear: () => void) => {
-    if (!api || !text.trim() || starting.current) return;
+    if (!api || (!text.trim() && !attachments.length) || starting.current) return;
     starting.current = true;
     setError(null);
     try {
@@ -296,15 +296,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
   };
 
   const attach = (list: string[], set: (update: (prev: string[]) => string[]) => void): Attachments | undefined =>
-    api && {
-      files: list,
-      onAdd: () =>
-        void api.files
-          .pick()
-          .then((picked) => set((prev) => [...new Set([...prev, ...picked])].slice(0, ATTACH_MAX)))
-          .catch(report),
-      onRemove: (path) => set((prev) => prev.filter((p) => p !== path)),
-    };
+    api && attachments(api, list, set, report);
 
   // A section turned off in Settings while it's open goes back to Home, so nothing of it stays usable.
   const shownSection = route.name === "soon" ? route.section : null;
@@ -606,6 +598,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
         settings={current}
         onChange={(next) => onSettings?.(next)}
         onAbout={() => setRoute({ name: "about", page: "home" })}
+        onNews={() => setRoute({ name: "about", page: "news" })}
       />
     ) : null;
   } else if (route.name === "about") {
