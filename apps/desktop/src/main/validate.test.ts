@@ -1,7 +1,18 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, mergeSettings, type Project } from "../shared/model";
-import { absolutePath, oneLine, paths, pickInput, placedTask, settingsPatch, taskInput, text } from "./validate";
+import {
+  absolutePath,
+  droppedInput,
+  oneLine,
+  PASTED_MAX_BYTES,
+  paths,
+  pickInput,
+  placedTask,
+  settingsPatch,
+  taskInput,
+  text,
+} from "./validate";
 
 describe("taskInput", () => {
   it("takes a brief, a project or none, and files, the same for starting now or later", () => {
@@ -13,11 +24,46 @@ describe("taskInput", () => {
     expect(taskInput({ brief: "Sum up" })).toEqual({ brief: "Sum up", projectId: null, attachments: [] });
   });
 
+  it("takes files without a brief, as a chat app does, but not neither", () => {
+    expect(taskInput({ brief: " ", attachments: ["/shot.png"] })).toEqual({
+      brief: "",
+      projectId: null,
+      attachments: ["/shot.png"],
+    });
+    expect(() => taskInput({ brief: "", attachments: [] })).toThrow(/needs a brief/);
+  });
+
   it("refuses an empty brief, odd projects and relative files", () => {
     expect(() => taskInput({ brief: "   " })).toThrow(/needs a brief/);
     expect(() => taskInput(null)).toThrow(/brief must be text/);
     expect(() => taskInput({ brief: "x", projectId: 3 })).toThrow(/projectId/);
     expect(() => taskInput({ brief: "x", attachments: ["notes.txt"] })).toThrow(/absolute/);
+  });
+});
+
+describe("droppedInput", () => {
+  it("takes paths and pasted files, with names that can only land in the folder they're written to", () => {
+    const bytes = new Uint8Array([1, 2]);
+    expect(
+      droppedInput([
+        { path: "/Users/g/a.docx" },
+        { name: "../../etc/passwd", bytes },
+        { name: "..", bytes },
+        { name: "shot\u0007:1.png", bytes },
+      ]),
+    ).toEqual([
+      { path: "/Users/g/a.docx" },
+      { name: ".._.._etc_passwd", bytes },
+      { name: "pasted", bytes },
+      { name: "shot__1.png", bytes },
+    ]);
+  });
+
+  it("refuses relative paths, missing bytes, too many files and a paste too big", () => {
+    expect(() => droppedInput([{ path: "a.docx" }])).toThrow(/absolute/);
+    expect(() => droppedInput([{ name: "a.png", bytes: "AAAA" }])).toThrow(/bytes/);
+    expect(() => droppedInput(Array.from({ length: 21 }, () => ({ path: "/a" })))).toThrow(/at most/);
+    expect(() => droppedInput([{ name: "a.png", bytes: new Uint8Array(PASTED_MAX_BYTES + 1) }])).toThrow(/too big/i);
   });
 });
 

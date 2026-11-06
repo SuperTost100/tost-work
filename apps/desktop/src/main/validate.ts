@@ -3,6 +3,7 @@ import type { NewTaskInput } from "../shared/api";
 import {
   AIS,
   type AiId,
+  ATTACH_MAX,
   BOARD_GROUPS,
   BOARD_VIEWS,
   type BoardGroup,
@@ -27,6 +28,7 @@ import {
   type Theme,
 } from "../shared/model";
 import { isModelPick, type ModelPick } from "../shared/modelChoice";
+import type { Dropped } from "./files";
 import { UserError } from "./userError";
 
 /** Checks for values that come from the interface, because IPC is a trust boundary. */
@@ -53,6 +55,27 @@ export const paths = (v: unknown, field: string, max = 20): string[] => {
   return v.map((p) => absolutePath(p, field));
 };
 
+/** The biggest pasted file a message takes, such as a screenshot, so a huge paste can't fill the disk. */
+export const PASTED_MAX_BYTES = 50 * 1024 * 1024;
+
+/**
+ * Files dropped or pasted into a message: a path, or a pasted file's name and bytes. The name loses any folders and
+ * characters a file name can't have, so the file is written only where Tost Work puts it.
+ */
+export const droppedInput = (v: unknown): Dropped[] => {
+  if (!Array.isArray(v)) throw new Error("files must be a list");
+  if (v.length > ATTACH_MAX) throw new Error(`files can have at most ${ATTACH_MAX} files`);
+  return v.map((item: unknown): Dropped => {
+    const input = (typeof item === "object" && item !== null ? item : {}) as Record<string, unknown>;
+    if (input.path !== undefined) return { path: absolutePath(input.path, "path") };
+    if (!(input.bytes instanceof Uint8Array)) throw new Error("a pasted file needs its bytes");
+    if (input.bytes.byteLength > PASTED_MAX_BYTES) throw new UserError("error.pasteTooBig");
+    const safe = [...text(input.name, "name", 200)].map((c) => (c < " " || '\\/:*?"<>|'.includes(c) ? "_" : c));
+    const name = safe.join("").trim();
+    return { name: name && name !== "." && name !== ".." ? name : "pasted", bytes: input.bytes };
+  });
+};
+
 /** A new task's brief, project and files, checked the same way whether it starts now or is saved for later. */
 export type PlacedInput = Required<Pick<NewTaskInput, "brief" | "projectId" | "attachments">>;
 
@@ -67,9 +90,11 @@ export const pickInput = (v: unknown): ModelPick | undefined => {
 export const taskInput = (v: unknown): PlacedInput => {
   const input = (typeof v === "object" && v !== null ? v : {}) as Record<string, unknown>;
   const brief = text(input.brief, "brief", BRIEF_MAX).trim();
-  if (!brief) throw new UserError("error.briefNeeded");
+  const attachments = paths(input.attachments, "attachments");
+  // Files alone are enough, as in a chat app: the agent is told the user sent them without a message.
+  if (!brief && !attachments.length) throw new UserError("error.briefNeeded");
   const projectId = input.projectId == null ? null : text(input.projectId, "projectId", 100);
-  return { brief, projectId, attachments: paths(input.attachments, "attachments") };
+  return { brief, projectId, attachments };
 };
 
 /**

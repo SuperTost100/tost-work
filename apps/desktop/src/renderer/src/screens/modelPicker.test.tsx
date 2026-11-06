@@ -44,7 +44,7 @@ describe("the model picker under the task box", () => {
     async (level) => {
       await open({ level });
       expect((await choice(/Fast/)).textContent).toContain("GPT-6 Luna · medium");
-      expect((await choice(/Balanced/)).textContent).toContain("GPT-6.1 Terra · medium");
+      expect((await choice(/Balanced/)).textContent).toContain("GPT-6.1 Terra · high");
       expect((await choice(/Thorough/)).textContent).toContain("GPT-6.1 Sol · high");
     },
   );
@@ -65,7 +65,7 @@ describe("the model picker under the task box", () => {
     await screen.findByRole("button", { name: /AI for this task: Balanced/ });
     await start("Write a proposal for Alpi Logistica");
     const [task] = await api.tasks.list();
-    expect(task).toMatchObject({ model: "gpt-6.1-terra", effort: "medium" });
+    expect(task).toMatchObject({ model: "gpt-6.1-terra", effort: "high" });
   });
 
   it("offers the last pick again in the next session", async () => {

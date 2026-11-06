@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { copyFile, lstat, realpath, rm, stat } from "node:fs/promises";
+import { copyFile, lstat, mkdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, relative } from "node:path";
 import type { Task } from "../shared/model";
 import { UserError } from "./userError";
@@ -119,6 +119,29 @@ export async function copyInto(paths: string[], folder: string): Promise<string[
     throw err;
   }
   return copies;
+}
+
+/** A file dropped or pasted into a message: where it is on disk, or the bytes of one with no place, such as a screenshot. */
+export type Dropped = { path: string } | { name: string; bytes: Uint8Array };
+
+/**
+ * The paths to attach for files dropped or pasted into a message. A file on disk is attached where it is, as one
+ * picked in the file dialog is; one without a place is written into `folder` first. A folder isn't taken.
+ */
+export async function takeDropped(items: Dropped[], folder: string): Promise<string[]> {
+  const taken: string[] = [];
+  for (const item of items) {
+    if ("path" in item) {
+      if (!(await stat(item.path)).isFile()) throw new UserError("error.notAFile", { name: basename(item.path) });
+      taken.push(item.path);
+      continue;
+    }
+    await mkdir(folder, { recursive: true });
+    const target = await freeName(folder, item.name);
+    await writeFile(target, item.bytes, { flag: "wx" });
+    taken.push(target);
+  }
+  return taken;
 }
 
 /** Removes copies made for a message that was then refused. */

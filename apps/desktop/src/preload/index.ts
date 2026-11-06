@@ -129,6 +129,17 @@ const api: TostWorkApi = {
   },
   files: {
     pick: () => ipcRenderer.invoke(IPC.filesPick),
+    // Only the preload can tell where a dropped file is on disk. A pasted screenshot has no place, so its bytes go.
+    take: async (files) =>
+      ipcRenderer.invoke(
+        IPC.filesTake,
+        await Promise.all(
+          files.map(async (file) => {
+            const path = webUtils.getPathForFile(file);
+            return path ? { path } : { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) };
+          }),
+        ),
+      ),
     read: (taskId, path) => ipcRenderer.invoke(IPC.filesRead, taskId, path),
     open: (taskId, path) => ipcRenderer.invoke(IPC.filesOpen, taskId, path),
     reveal: (taskId, path) => ipcRenderer.invoke(IPC.filesReveal, taskId, path),

@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { App } from "@/App";
+import { acceptDroppedFiles } from "@/components/Composer";
 import { versionLabel } from "@/lib/changelog";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { DEFAULT_SETTINGS } from "../../../shared/model";
@@ -342,6 +343,25 @@ describe("the answer draft", () => {
     expect(sent).toEqual(["A dinner for twenty"]);
   });
 
+  it("puts the cursor in the box when the round moves on to an open question", async () => {
+    const { api } = await startAndWait();
+    act(() =>
+      api.emit("t1", {
+        type: "question",
+        question: {
+          id: "q2",
+          text: "Which venue?",
+          options: ["Hall", "Garden"],
+          more: [{ text: "Describe the event", options: [] }],
+        },
+      }),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Hall/ }));
+    });
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Write your answer" }));
+  });
+
   it("keeps what was typed while the answer was sending", async () => {
     const { api, box } = await startAndWait();
     // The send succeeds later, and the question stays open, so the box stays on screen.
@@ -474,12 +494,52 @@ describe("quick edit", () => {
       fireEvent.click(screen.getByRole("button", { name: "Send" }));
     });
     expect(await screen.findByText("Done, I made the change.")).toBeTruthy();
-    // The new run's steps sit under the instruction that started it.
+    // The ended run's steps fold into its line, which sits under the instruction that started it.
+    expect(screen.queryByText("Make the change")).toBeNull();
+    const worked = screen.getAllByRole("button", { name: /^Worked for|^How it got there/ }).at(-1) as HTMLElement;
+    fireEvent.click(worked);
     const instruction = screen.getByText("Make it shorter");
     const step = screen.getByText("Make the change");
     expect(instruction.compareDocumentPosition(step) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // The old review checked the old brief, so it's gone.
     expect(screen.queryByText("Check it against your brief")).toBeNull();
+  });
+});
+
+describe("files without a message", () => {
+  const png = () => new File([new Uint8Array([1])], "shot.png", { type: "image/png" });
+
+  it("starts a task from files alone, named after the first one, with nothing to copy", async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    const start = screen.getByRole("button", { name: "Start task" }) as HTMLButtonElement;
+    expect(start.disabled).toBe(true);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Attach files" }));
+    });
+    expect(start.disabled).toBe(false);
+    await act(async () => {
+      fireEvent.click(start);
+    });
+    const [task] = await api.tasks.list();
+    expect(task).toMatchObject({ brief: "", title: "letter-bank.docx" });
+    expect(screen.queryByRole("button", { name: /^Copy/ })).toBeNull();
+  });
+
+  it("attaches a file pasted into the box, and one dropped anywhere on the window", async () => {
+    acceptDroppedFiles(document);
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    const box = screen.getByRole("textbox");
+    await act(async () => {
+      fireEvent.paste(box, { clipboardData: { files: [png()], types: ["Files"] } });
+    });
+    expect(await screen.findByText("shot.png")).toBeTruthy();
+    const dropped = new File([new Uint8Array([1])], "plan.pdf");
+    await act(async () => {
+      fireEvent.drop(document.body, { dataTransfer: { files: [dropped], types: ["Files"] } });
+    });
+    expect(await screen.findByText("plan.pdf")).toBeTruthy();
   });
 });
 
@@ -976,7 +1036,8 @@ describe("an answer as it's written", () => {
       api.emit(task.id, { type: "message", text: "The quote is ready." });
       api.emit(task.id, { type: "done" });
     });
-    // The note stays in what it did, after the end.
+    // The note stays in what it did, folded with the rest of the turn after the end.
+    fireEvent.click(await screen.findByRole("button", { name: /^Worked for|^How it got there/ }));
     const folded = await screen.findByRole("button", { name: /What it did \(2\)/ });
     await act(async () => {
       fireEvent.click(folded);

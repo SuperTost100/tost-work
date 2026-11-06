@@ -201,7 +201,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
     return save({
       id: `t${++taskCount}`,
       projectId: input.projectId,
-      title: input.brief.split("\n")[0] ?? "",
+      title: input.brief.split("\n")[0] || (input.attachments?.[0]?.split("/").pop() ?? ""),
       brief: input.brief,
       attachments: input.attachments ?? [],
       workdir: "/tmp/quick",
@@ -437,7 +437,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       },
       saveForLater: async (input: NewTaskInput) => {
         // The same checks as the main process, so the screen tests meet the real rules.
-        if (!input.brief.trim()) throw new Error("A task needs a brief");
+        if (!input.brief.trim() && !input.attachments?.length) throw new Error("A task needs a brief");
         if (input.projectId && !projects.some((p) => p.id === input.projectId))
           throw new Error("That project doesn't exist");
         return created(input);
@@ -454,7 +454,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         if (!t) throw new Error("That task doesn't exist");
         if (t.status !== "draft") throw new Error("This task has already started");
         const brief = input.brief.trim();
-        if (!brief) throw new Error("A task needs a brief");
+        if (!brief && !input.attachments?.length) throw new Error("A task needs a brief");
         if (input.projectId && !projects.some((p) => p.id === input.projectId))
           throw new Error("That project doesn't exist");
         const title = (text: string) => text.split("\n")[0] ?? "";
@@ -726,6 +726,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
     },
     files: {
       pick: async () => ["/Users/giulia/Documents/letter-bank.docx"],
+      take: async (files) => files.map((f) => `/Users/giulia/Downloads/${f.name}`),
       read: async (_taskId, path) => ({
         name: path.split("/").pop() ?? path,
         ext: "md",

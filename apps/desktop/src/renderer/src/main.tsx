@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { acceptDroppedFiles } from "./components/Composer";
 import { trackKeyboardNav } from "./lib/keyboardNav";
 import { Root } from "./Root";
 import { Panel } from "./shell/Panel";
@@ -9,6 +10,7 @@ const root = document.getElementById("root");
 if (!root) throw new Error("Missing #root");
 
 trackKeyboardNav();
+acceptDroppedFiles(document);
 
 createRoot(root).render(
   <StrictMode>

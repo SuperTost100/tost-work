@@ -28,14 +28,23 @@ import type { Accounts } from "./accounts";
 import type { DebugLogs } from "./debugLog";
 import { type TaskRunner, withFiles } from "./engine/runner";
 import { buildInfo, logsZip, logsZipName, within } from "./exportLogs";
-import { type Conflict, copyInto, describe, readablePath, removeCopies, savablePaths, saveCopies } from "./files";
+import {
+  type Conflict,
+  copyInto,
+  describe,
+  readablePath,
+  removeCopies,
+  savablePaths,
+  saveCopies,
+  takeDropped,
+} from "./files";
 import type { Installer } from "./installer";
 import { type Jobs, jobDraft } from "./jobs";
 import type { KeyStore } from "./keys";
 import type { GuideText, SkillFolder } from "./skills";
 import type { Store } from "./store/store";
 import { UserError, userMessage } from "./userError";
-import { absolutePath, oneLine, paths, pickInput, placedTask, settingsPatch, text } from "./validate";
+import { absolutePath, droppedInput, oneLine, paths, pickInput, placedTask, settingsPatch, text } from "./validate";
 
 /** Validates everything that comes from the interface, because IPC is a trust boundary. */
 export function registerIpc(
@@ -216,7 +225,7 @@ export function registerIpc(
   handle(IPC.tasksFollowUp, (_e, id: unknown, message: unknown, files?: unknown) => {
     const taskId = text(id, "id", 100);
     const body = text(message, "message", BRIEF_MAX).trim();
-    if (!body) throw new UserError("error.changeFirst");
+    if (!body && !paths(files, "attachments").length) throw new UserError("error.changeFirst");
     return withAttached(taskId, files, (attached) => {
       const task = runner.followUp(taskId, body, attached);
       runner.launch(taskId, withFiles(body, attached));
@@ -537,10 +546,24 @@ export function registerIpc(
     return skillMenu();
   });
 
+  // The picker opens where the user last picked files from, even after a restart.
   handle(IPC.filesPick, async () => {
-    const result = await openDialog({ title: t("attach.pick"), properties: ["openFile", "multiSelections"] });
-    return result.canceled ? [] : result.filePaths;
+    const result = await openDialog({
+      title: t("attach.pick"),
+      properties: ["openFile", "multiSelections"],
+      defaultPath: store.value("attachFolder") ?? undefined,
+    });
+    const first = result.filePaths[0];
+    if (result.canceled || !first) return [];
+    store.saveValue("attachFolder", dirname(first));
+    return result.filePaths;
   });
+  // Pasted files without a place on disk, such as a screenshot, are kept with the app's data, so a task that comes
+  // back to them later still finds them.
+  // shortcut: they stay until the user removes the app's data; clean them up with their tasks if they pile up.
+  handle(IPC.filesTake, (_e, items: unknown) =>
+    takeDropped(droppedInput(items), join(app.getPath("userData"), "pasted", randomUUID())),
+  );
 
   const fileOf = async (taskId: unknown, path: unknown, limitSize = true) => {
     const task = store.getTask(text(taskId, "taskId", 100));

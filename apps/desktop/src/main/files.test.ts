@@ -4,7 +4,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Task } from "../shared/model";
-import { copyInto, freeName, MAX_PREVIEW_BYTES, readablePath, savablePaths, saveCopies, writablePath } from "./files";
+import {
+  copyInto,
+  freeName,
+  MAX_PREVIEW_BYTES,
+  readablePath,
+  savablePaths,
+  saveCopies,
+  takeDropped,
+  writablePath,
+} from "./files";
 
 let root = "";
 let work = "";
@@ -37,6 +46,23 @@ beforeAll(async () => {
   await writeFile(join(root, "secret.txt"), "secret");
   await symlink(join(root, "secret.txt"), join(work, "link.txt"));
   await writeFile(join(root, "notes.docx"), "notes");
+});
+
+describe("takeDropped", () => {
+  it("attaches dropped files where they are, and writes pasted ones into the folder under a free name", async () => {
+    const pasted = join(root, "pasted");
+    const bytes = new Uint8Array([104, 105]);
+    const taken = await takeDropped(
+      [{ path: join(root, "notes.docx") }, { name: "image.png", bytes }, { name: "image.png", bytes }],
+      pasted,
+    );
+    expect(taken).toEqual([join(root, "notes.docx"), join(pasted, "image.png"), join(pasted, "image (2).png")]);
+    expect(await readFile(join(pasted, "image (2).png"), "utf8")).toBe("hi");
+  });
+
+  it("refuses a dropped folder", async () => {
+    await expect(takeDropped([{ path: work }], join(root, "pasted"))).rejects.toThrow(/isn't a file/);
+  });
 });
 
 describe("readablePath", () => {

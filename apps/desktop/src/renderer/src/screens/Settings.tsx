@@ -73,11 +73,14 @@ export function Settings({
   settings,
   onChange,
   onAbout,
+  onNews,
 }: {
   api: TostWorkApi;
   settings: SettingsData;
   onChange: (settings: SettingsData) => void;
   onAbout: () => void;
+  /** Opens What's new, from its own row just above About. */
+  onNews: () => void;
 }) {
   const t = useT();
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +127,11 @@ export function Settings({
               <span className="sr">{t("settings.integrations.when")}</span>
             </span>
           </span>
-          {/* At the bottom of the list: it opens a page of its own. */}
+          {/* At the bottom of the list: each opens a page of its own. */}
+          <button type="button" className="news" onClick={onNews}>
+            <Icon name="sparkles" />
+            {t("news.title")}
+          </button>
           <button type="button" className="about" onClick={onAbout}>
             <Icon name="information" />
             {t("about.crumb")}

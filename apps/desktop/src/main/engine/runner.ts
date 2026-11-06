@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { lstat } from "node:fs/promises";
+import { basename } from "node:path";
 import type { Language } from "../../shared/i18n";
 import type { AgentProvider, Approval, KeptCopy, Project, Task } from "../../shared/model";
 import { answersText, BRIEF_MAX, questionItems } from "../../shared/model";
@@ -57,10 +58,20 @@ export function decisionNote(approval: Approval, allow: boolean): string {
 /** The task's files with a message's added, each once. */
 const joined = (had: string[], more: string[]) => [...new Set([...had, ...more])];
 
-/** The user's message to the agent, with the files they attached to it. */
+/** The user's message to the agent, with the files they attached to it. Files sent alone come with a note saying so. */
 export function withFiles(text: string, files: string[]): string {
-  return files.length ? `${text}\n\nFiles I attached to this message:\n${files.map((p) => `- ${p}`).join("\n")}` : text;
+  if (!files.length) return text;
+  const list = files.map((p) => `- ${p}`).join("\n");
+  return text ? `${text}\n\nFiles I attached to this message:\n${list}` : `${FILES_ONLY}\n${list}`;
 }
+
+/** What the agent reads when the user sends files without writing anything, as a chat app allows. */
+export const FILES_ONLY =
+  "I sent these files without writing a message. If the conversation already makes clear what to do with them, do it. If not, look at them and ask me what I'd like done:";
+
+/** A task's title: the first line of its brief, or the first file's name when the user sent only files. */
+export const taskTitle = (brief: string, files: string[]): string =>
+  titleFrom(brief) || titleFrom(basename(files[0] ?? ""));
 
 export const RESUME_PROMPT =
   "Tost Work closed while you were working on this task, so your last turn was cut short. Check what you had already done in the folder, then carry on where you left off.";
@@ -120,7 +131,7 @@ export class TaskRunner {
     const task: Task = {
       id: randomUUID(),
       projectId: input.projectId,
-      title: input.title ?? titleFrom(input.brief),
+      title: input.title ?? taskTitle(input.brief, input.attachments ?? []),
       brief: input.brief,
       attachments: input.attachments ?? [],
       workdir: input.workdir,
@@ -290,10 +301,11 @@ export class TaskRunner {
     // A start under way is copying the files it read before this edit, and would run the old brief.
     if (this.starting.has(taskId)) throw new UserError("error.alreadyStarting");
     const brief = input.brief.trim();
-    if (!brief) throw new UserError("error.briefNeeded");
+    if (!brief && !input.attachments.length) throw new UserError("error.briefNeeded");
     if (input.projectId && this.removing.has(input.projectId)) throw new UserError("error.noProject");
     // A task keeps no mark of a rename, so a title other than the one its old brief gives counts as the user's.
-    const title = task.title === titleFrom(task.brief) ? titleFrom(brief) : task.title;
+    const title =
+      task.title === taskTitle(task.brief, task.attachments) ? taskTitle(brief, input.attachments) : task.title;
     const at = this.now();
     const [first, ...rest] = task.messages;
     const { attachments: _old, ...message } = first ?? { from: "user" as const, text: "", at };

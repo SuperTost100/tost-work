@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ApprovalCard } from "@/components/Approval";
-import { type Attachments, Composer } from "@/components/Composer";
+import { type Attachments, attachments, Composer } from "@/components/Composer";
 import { CallDetail, DebugStrip, useDebugLog } from "@/components/DebugDetails";
 import { FileLine, fileName } from "@/components/FileLine";
 import { ModelUsed } from "@/components/ModelPicker";
@@ -21,7 +21,6 @@ import {
   type Activity,
   type ActivityKind,
   type AnsweredQuestion,
-  ATTACH_MAX,
   answersText,
   BRIEF_MAX,
   type FileChange,
@@ -431,11 +430,13 @@ function QuestionCard({
   const [at, setAt] = useUnsent(`${round}:at`, 0);
   const [tooLong, setTooLong] = useState(false);
   // After Next or Back the old question's buttons are gone, so keyboard focus moves to the new question: its block
-  // is keyed by the question, so it mounts again and takes focus. The callback is stable, so typing (which renders
-  // the card again) doesn't pull focus out of the box.
+  // is keyed by the question, so it mounts again and takes focus. An open question is answered in the box, so the
+  // box takes it instead. The callback is stable, so typing (which renders the card again) doesn't pull focus out.
   const moved = useRef(false);
   const takeFocus = useCallback((el: HTMLDivElement | null) => {
-    if (el && moved.current) el.focus();
+    if (!el || !moved.current) return;
+    const box = el.closest(".composer")?.querySelector("textarea");
+    (el.dataset.open !== undefined && box ? box : el).focus();
   }, []);
   const item = items[at] ?? items[0];
   if (!item) return null;
@@ -485,7 +486,7 @@ function QuestionCard({
       minHeight={item.options.length ? 44 : 88}
       attach={attach}
     >
-      <div className="q" key={at} ref={takeFocus} tabIndex={-1}>
+      <div className="q" key={at} ref={takeFocus} tabIndex={-1} data-open={item.options.length ? undefined : ""}>
         {items.length > 1 && (
           <span className="qnav">
             <span className="grow">{t("task.questionOf", { n: String(at + 1), total: String(items.length) })}</span>
@@ -536,9 +537,32 @@ function QuestionCard({
 }
 
 /**
- * A round of questions the user answered: one grey line between the agent's messages, like the steps, that opens to
- * show each question with its answer.
+ * Lets a mouse wheel scroll a row that only scrolls sideways, such as the file tabs: a trackpad scrolls it already.
+ * At either end the wheel scrolls the page again.
  */
+export const wheelSideways = (el: HTMLElement | null) => {
+  if (!el) return;
+  el.addEventListener(
+    "wheel",
+    (e) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const max = el.scrollWidth - el.clientWidth;
+      const room = e.deltaY > 0 ? el.scrollLeft < max - 1 : el.scrollLeft > 0;
+      if (max <= 0 || !room) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    },
+    { passive: false },
+  );
+};
+
+/** The side panel's heading: whether the task made its files, changed files that were there, or both. */
+export function madeHeading(made: { kind: FileChange["kind"] }[]): MessageKey {
+  const added = made.some((f) => f.kind === "add");
+  const changed = made.some((f) => f.kind !== "add");
+  return added && changed ? "task.madeChanged" : changed ? "task.changed" : "task.made";
+}
+
 /** The files attached to one of the user's messages, under its text. */
 function AttachedFiles({ paths = [] }: { paths?: string[] }) {
   if (paths.length === 0) return null;
@@ -561,6 +585,86 @@ const firstFiles = (task: TaskT) => {
   return task.attachments.filter((p) => !later.has(p));
 };
 
+/** A turn: the user's message at `start` that begins it, and the messages up to `to`, where the next one begins. */
+interface Turn {
+  start: number;
+  to: number;
+  latest: boolean;
+}
+
+/** The task's turns: the brief's, then one per instruction sent after a turn ended. */
+export function turnsOf(messages: { followUp?: boolean }[]): Turn[] {
+  const starts = [0, ...messages.flatMap((m, i) => (i > 0 && m.followUp ? [i] : []))];
+  return starts.map((start, k) => ({ start, to: starts[k + 1] ?? messages.length, latest: k === starts.length - 1 }));
+}
+
+/** The turn's last answer: its last message, when the agent wrote it. -1 when the turn ended on the user's side. */
+export function turnAnswer(messages: { from: string; answers?: unknown }[], start: number, to: number): number {
+  const last = to - 1;
+  const m = messages[last];
+  return last > start && m?.from === "agent" && !m.answers ? last : -1;
+}
+
+/**
+ * How long the agent worked on a turn, from its first message to its last answer, without the time it waited for
+ * the user's answers: each wait runs from the agent's last sign of work to the answers.
+ */
+export function workedMs(
+  messages: { from: string; at: string; answers?: unknown }[],
+  activity: { at: string }[][],
+  start: number,
+  last: number,
+): number {
+  let total = 0;
+  let from = Date.parse(messages[start]?.at ?? "");
+  let seen = from;
+  for (let i = start + 1; i <= last; i++) {
+    for (const a of activity[i] ?? []) seen = Math.max(seen, Date.parse(a.at));
+    const m = messages[i];
+    if (!m) continue;
+    if (m.from === "agent") {
+      seen = Math.max(seen, Date.parse(m.at));
+      continue;
+    }
+    // The user answered: the work up to the agent's last sign counts, and the next stretch starts with the answers.
+    total += Math.max(0, seen - from);
+    from = Date.parse(m.at);
+    seen = from;
+  }
+  total += Math.max(0, seen - from);
+  return Number.isFinite(total) ? total : 0;
+}
+
+/** "45 s", "2 min 35 s" or "1 h 5 min", the same in both languages. */
+export function duration(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s} s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return s % 60 ? `${m} min ${s % 60} s` : `${m} min`;
+  const h = Math.floor(m / 60);
+  return m % 60 ? `${h} h ${m % 60} min` : `${h} h`;
+}
+
+/** A turn that has ended, folded: one grey line, like an answered round, that opens onto how the agent got there. */
+function WorkedLine({ ms, children }: { ms: number; children: React.ReactNode }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="answered worked">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icon name="time" />
+        {ms >= 1000 ? t("task.workedFor", { time: duration(ms) }) : t("task.worked")}
+        <Icon name="down" className="chev" />
+      </button>
+      {open && <div className="worked-body">{children}</div>}
+    </div>
+  );
+}
+
+/**
+ * A round of questions the user answered: one grey line between the agent's messages, like the steps, that opens to
+ * show each question with its answer.
+ */
 function AnswerLine({ answers, files, at }: { answers: AnsweredQuestion[]; files?: string[]; at?: string }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -633,7 +737,7 @@ function Artifact({
     <div className="artifact">
       <div className="head">
         {files.length > 1 ? (
-          <div className="ftabs" role="tablist">
+          <div className="ftabs" role="tablist" ref={wheelSideways}>
             {files.map((f) => (
               <button
                 type="button"
@@ -752,15 +856,8 @@ export function Task({
   // Files for the answers and for the next instruction, each sent with its own message.
   const [answerFiles, setAnswerFiles] = useUnsent<string[]>(`${task.id}:answerFiles`, []);
   const [messageFiles, setMessageFiles] = useUnsent<string[]>(`${task.id}:messageFiles`, []);
-  const attach = (files: string[], set: (update: (prev: string[]) => string[]) => void): Attachments => ({
-    files,
-    onAdd: () =>
-      void api.files
-        .pick()
-        .then((picked) => set((prev) => [...new Set([...prev, ...picked])].slice(0, ATTACH_MAX)))
-        .catch(onError),
-    onRemove: (path) => set((prev) => prev.filter((p) => p !== path)),
-  });
+  const attach = (files: string[], set: (update: (prev: string[]) => string[]) => void): Attachments =>
+    attachments(api, files, set, onError);
   // One answer at a time: a second click before the first returns would be refused and shown as an error.
   const sending = useRef(false);
   const send = (answers: string[]) => {
@@ -806,9 +903,14 @@ export function Task({
   const pinned = useRef(true);
   // Set when a run ends with the user at the bottom: the page then holds the start of the last answer at its top.
   const settled = useRef(false);
+  // Where the page last scrolled itself to. Its scroll event can come after the page has grown again, and must not
+  // count as the user leaving the bottom.
+  const autoTop = useRef(-1);
   const follow = useCallback(() => {
     const el = scroller.current;
-    if (el && pinned.current && !settled.current) el.scrollTop = el.scrollHeight;
+    if (!el || !pinned.current || settled.current) return;
+    el.scrollTop = el.scrollHeight;
+    autoTop.current = el.scrollTop;
   }, []);
   const followDraft = useCallback(
     (n: number) => {
@@ -880,6 +982,25 @@ export function Task({
     settled.current = true;
     el.scrollTop += top - box.top - 16;
   }, [live, task.messages.length]);
+  // A task opened after its run ended shows its end: the last answer, the file and the check. The preview loads after
+  // the first paint and grows the page, so the page keeps to its end until the user scrolls up or a run starts.
+  const liveNow = useRef(live);
+  liveNow.current = live;
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    const content = el?.firstElementChild;
+    if (!el || !content || liveNow.current) return;
+    const toEnd = () => {
+      if (!pinned.current || settled.current || liveNow.current) return;
+      el.scrollTop = el.scrollHeight;
+      autoTop.current = el.scrollTop;
+    };
+    toEnd();
+    if (typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(toEnd);
+    watch.observe(content);
+    return () => watch.disconnect();
+  }, []);
   const { before, tail, older } = activityByMessage(task.activity ?? [], task.messages.length);
   const log = useDebugLog(api, task.id, debug, task.updatedAt);
   // The thinking after the last tool call goes under the newest line, wherever that line shows.
@@ -896,10 +1017,10 @@ export function Task({
       {t("review.mark")}
     </button>
   );
-  const note = (i: number) => {
+  const note = (i: number, withActivity = true) => {
     const m = task.messages[i];
     if (!m) return null;
-    const done = before[i] ?? [];
+    const done = withActivity ? (before[i] ?? []) : [];
     return (
       <Fragment key={i}>
         {done.length > 0 && <ActivityLog activity={done} live={false} debug={log} thinking={thinkingAfter(done)} />}
@@ -907,11 +1028,12 @@ export function Task({
           <AnswerLine answers={m.answers} files={m.attachments} at={m.at} />
         ) : m.from === "user" ? (
           <div className="msg mine" style={{ marginTop: 18 }}>
+            {/* Files sent without a message show alone, with nothing to copy. */}
             <div className="you">
-              <LongText text={m.text} />
+              {m.text && <LongText text={m.text} />}
               <AttachedFiles paths={m.attachments} />
             </div>
-            <CopyButton text={() => m.text} at={m.at} />
+            {m.text && <CopyButton text={() => m.text} at={m.at} />}
           </div>
         ) : typing?.index === i ? (
           <TypedMessage text={m.text} from={typing.from} onShown={follow} at={m.at} />
@@ -923,6 +1045,44 @@ export function Task({
   };
   const range = (from: number, to: number) => Array.from({ length: Math.max(0, to - from) }, (_, k) => note(from + k));
   const end = task.messages.length;
+  const stepsBlock = task.steps.length > 0 && (
+    <div className="steps" key="steps">
+      {live && current >= 0 && (
+        <p className="t3" style={{ fontSize: 13, margin: 0 }}>
+          {t("task.step", { n: String(current + 1), total: String(task.steps.length) })}
+        </p>
+      )}
+      {keyed(task.steps, (s) => s.text).map(([key, s]) => (
+        <div key={key} className={s.status === "in_progress" ? "now" : undefined}>
+          <Icon name={s.status === "done" ? "check" : s.status === "in_progress" ? "pencil" : "time"} />
+          {s.text}
+        </div>
+      ))}
+    </div>
+  );
+  // Each turn, after the user's message that starts it. A turn that has ended folds what came before its last answer
+  // (the activity, the notes between steps, the questions answered) into one line that opens. The steps belong to the
+  // latest turn.
+  const turn = ({ start, to, latest }: Turn) => {
+    const last = turnAnswer(task.messages, start, to);
+    const folded = last > 0 && !(latest && live) && (last > start + 1 || (before[last]?.length ?? 0) > 0 || latest);
+    if (!folded) return [latest && stepsBlock, ...range(start + 1, to)];
+    return [
+      <WorkedLine key={`worked-${start}`} ms={workedMs(task.messages, before, start, last)}>
+        {latest && stepsBlock}
+        {range(start + 1, last)}
+        {(before[last]?.length ?? 0) > 0 && (
+          <ActivityLog
+            activity={before[last] ?? []}
+            live={false}
+            debug={log}
+            thinking={thinkingAfter(before[last] ?? [])}
+          />
+        )}
+      </WorkedLine>,
+      note(last, false),
+    ];
+  };
 
   return (
     <div className="main">
@@ -979,6 +1139,7 @@ export function Task({
               ref={scroller}
               onScroll={(e) => {
                 const el = e.currentTarget;
+                if (el.scrollTop === autoTop.current) return;
                 pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
               }}
             >
@@ -986,28 +1147,17 @@ export function Task({
                 {debug && <DebugStrip task={task} view={log} />}
                 <div className="msg mine">
                   <div className="you">
-                    <LongText text={task.brief} />
+                    {task.brief && <LongText text={task.brief} />}
                     <AttachedFiles paths={task.messages[0]?.attachments ?? firstFiles(task)} />
                   </div>
-                  <CopyButton text={() => task.brief} at={task.messages[0]?.at ?? task.createdAt} />
+                  {task.brief && <CopyButton text={() => task.brief} at={task.messages[0]?.at ?? task.createdAt} />}
                 </div>
-                {runStart > 0 && range(1, runStart + 1)}
-                {task.steps.length > 0 && (
-                  <div className="steps">
-                    {live && current >= 0 && (
-                      <p className="t3" style={{ fontSize: 13, margin: 0 }}>
-                        {t("task.step", { n: String(current + 1), total: String(task.steps.length) })}
-                      </p>
-                    )}
-                    {keyed(task.steps, (s) => s.text).map(([key, s]) => (
-                      <div key={key} className={s.status === "in_progress" ? "now" : undefined}>
-                        <Icon name={s.status === "done" ? "check" : s.status === "in_progress" ? "pencil" : "time"} />
-                        {s.text}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {range(runStart > 0 ? runStart + 1 : 1, end)}
+                {turnsOf(task.messages).map((r) => (
+                  <Fragment key={r.start}>
+                    {r.start > 0 && note(r.start)}
+                    {turn(r)}
+                  </Fragment>
+                ))}
                 {older.length > 0 && (
                   <ActivityLog key="older" activity={older} live={false} debug={log} thinking={thinkingAfter(older)} />
                 )}
@@ -1131,7 +1281,7 @@ export function Task({
           ) : (
             <aside className="rp">
               <div className="body">
-                <h3>{t("task.made")}</h3>
+                <h3>{t(madeHeading(made))}</h3>
                 {made.length === 0 && <p className="empty">{t("task.noFiles")}</p>}
                 {made.map((f) => (
                   <MadeFile
