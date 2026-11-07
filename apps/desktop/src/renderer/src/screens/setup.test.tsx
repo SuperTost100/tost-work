@@ -12,6 +12,19 @@ const click = async (name: string | RegExp) => {
 };
 
 describe("first-run setup", () => {
+  it("leaves the first step's focus alone, then puts it on each new step's title, forward and back", async () => {
+    render(<Root api={createMemoryApi({})} />);
+    const name = await screen.findByLabelText("Your name");
+    expect(document.activeElement?.tagName).not.toBe("H1");
+    fireEvent.change(name, { target: { value: "Giulia" } });
+    await click("Next");
+    expect(document.activeElement?.tagName).toBe("H1");
+    expect(screen.getByText("Step 2 of 6")).toBeTruthy();
+    await click("Back");
+    expect(document.activeElement?.tagName).toBe("H1");
+    expect(screen.getByText("Step 1 of 6")).toBeTruthy();
+  });
+
   it("goes through name, about you, level, ChatGPT sign-in and a first project, then opens the app", async () => {
     const api = createMemoryApi({});
     render(<Root api={api} />);

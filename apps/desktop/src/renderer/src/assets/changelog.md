@@ -23,6 +23,11 @@
 - **Report a problem:** in Settings, above What's new, and in the Help menu. It opens GitHub's bug form with the version and the system already filled in, and can export the logs.
 - **Pages line up:** every page starts at the left, so the titles of Projects, Jobs and the Board sit in the same place, in any view and at any window size.
 - **Keyboard focus rings whole:** recent tasks, their … button, skills, the file tabs and the task box now show the full ring when you move with Tab.
+- **What a task asks, on the board:** a row says it in one line. Open the row and the side panel has the choices, and answers a single question in place.
+- **Jobs as a table:** the list has column names, which stay in view as it scrolls.
+- **Text size preview:** Piccolo, Normale and Grande show their names at the size they give.
+- **Setup stays put:** the name, the steps and the title no longer move between steps, and each step starts with the focus on its title.
+- **Skill attachments:** the files a skill brings along are now called that.
 
 ### it
 
@@ -30,6 +35,11 @@
 - **Segnala un problema:** nelle Impostazioni, sopra Novità, e nel menu Aiuto. Apre il modulo per i problemi su GitHub con la versione e il sistema già scritti, e può esportare i log.
 - **Pagine allineate:** ogni pagina parte da sinistra, così i titoli di Progetti, Lavori pianificati e Bacheca stanno nello stesso punto, in ogni vista e con qualsiasi larghezza della finestra.
 - **Bordo di selezione intero:** le attività recenti, il loro pulsante …, le skill, le schede dei file e la casella dell'attività mostrano tutto il bordo quando ti sposti con Tab.
+- **Cosa chiede un'attività, nella bacheca:** la riga lo dice in una frase. Apri la riga e il pannello laterale ha le scelte, e risponde lì a una domanda singola.
+- **Lavori pianificati come tabella:** l'elenco ha i nomi delle colonne, che restano visibili mentre scorre.
+- **Anteprima della dimensione del testo:** Piccolo, Normale e Grande mostrano il loro nome alla dimensione che danno.
+- **La configurazione resta ferma:** il nome, i passi e il titolo non si spostano più da un passo all'altro, e ogni passo parte con il cursore sul titolo.
+- **Allegati della skill:** i file che una skill porta con sé ora si chiamano così.
 
 ## 0.0.27-dev
 
