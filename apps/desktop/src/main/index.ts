@@ -30,6 +30,7 @@ import { AgentEngine } from "./engine/agent";
 import type { Engine } from "./engine/engine";
 import { FakeEngine } from "./engine/fake";
 import { type AppLog, TaskRunner } from "./engine/runner";
+import { EventLog } from "./eventLog";
 import { fileGuard } from "./guard";
 import { findInstalledCodex, Installer } from "./installer";
 import { registerIpc } from "./ipc";
@@ -200,6 +201,14 @@ app.whenReady().then(async () => {
     () => [keys.get()?.key],
   );
   appLog = (level, message, detail) => debugLogs.app(level, message, detail);
+  // Test builds keep a log of events, with nothing the user wrote or named, for problem reports.
+  const events = new EventLog(
+    join(app.getPath("userData"), "logs", "events.log"),
+    /-(dev|alpha|beta)$/.test(__APP_VERSION__),
+  );
+  void events
+    .prune()
+    .then(() => events.app("started", { version: __APP_VERSION__, build: __APP_BUILD__, platform: process.platform }));
   appLog("info", `Tost Work ${__APP_VERSION__} (build ${__APP_BUILD__}) started`, {
     platform: process.platform,
     electron: process.versions.electron,
@@ -207,10 +216,14 @@ app.whenReady().then(async () => {
   });
   // The monitor only watches, so an uncaught exception still behaves as Electron makes it. Electron warns about an
   // unhandled rejection and carries on; a listener replaces that warning, so the console still gets it.
-  process.on("uncaughtExceptionMonitor", (err, origin) => appLog("error", `Uncaught exception (${origin})`, err));
+  process.on("uncaughtExceptionMonitor", (err, origin) => {
+    appLog("error", `Uncaught exception (${origin})`, err);
+    events.error("uncaught", err);
+  });
   process.on("unhandledRejection", (reason) => {
     console.error("Unhandled promise rejection", reason);
     appLog("error", "Unhandled promise rejection", reason);
+    events.error("rejection", reason);
   });
   store.stopInterrupted(new Date().toISOString());
   // Before the window, so its background colour already follows the chosen theme.
@@ -373,6 +386,7 @@ app.whenReady().then(async () => {
     (task) => {
       // On Mac the app outlives its window, so a task can change after the window is gone.
       toWindows(IPC.taskChanged, task);
+      events.task(task);
       notifier.changed(task);
       trayChanged();
     },
@@ -424,6 +438,7 @@ app.whenReady().then(async () => {
     void jobs.tick().catch((err: unknown) => {
       console.error("Jobs couldn't run", err);
       appLog("error", "Jobs couldn't run", err);
+      events.error("jobs", err);
     });
   setInterval(lookAtJobs, 30_000);
   powerMonitor.on("resume", lookAtJobs);
@@ -593,6 +608,7 @@ app.whenReady().then(async () => {
     jobs,
     debugLogs,
     askInWindow,
+    events,
   );
   // Quitting stops the tasks still working, so it asks first, in the window's card. They show as interrupted, with
   // Resume, next time. Quit again while the card is open only brings the window forward.

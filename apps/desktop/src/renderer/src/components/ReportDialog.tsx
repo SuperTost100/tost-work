@@ -1,5 +1,5 @@
 import { Dialog } from "@base-ui/react/dialog";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { versionLabel } from "@/lib/changelog";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
@@ -14,15 +14,38 @@ import { bugReportUrl, OS_NAME } from "../../../shared/feedback";
 export function ReportDialog({
   api,
   open,
+  detailed,
   onOpenChange,
 }: {
   api: TostWorkApi;
   open: boolean;
+  /** The detailed debug logs are on, so there are some to export and attach by hand. */
+  detailed: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useT();
   const [error, setError] = useState<string | null>(null);
-  const url = bugReportUrl({ version: __APP_VERSION__, build: __APP_BUILD__, platform: api.platform });
+  // The events log, read each time the card opens, so the report has what happened up to now. Null while it's read: the
+  // link waits for it rather than carry the last opening's events.
+  const [events, setEvents] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    setEvents(null);
+    api.debug.events().then(
+      (text) => live && setEvents(text),
+      () => live && setEvents(""),
+    );
+    return () => {
+      live = false;
+    };
+  }, [api, open]);
+  const url = bugReportUrl({
+    version: __APP_VERSION__,
+    build: __APP_BUILD__,
+    platform: api.platform,
+    logs: events ?? undefined,
+  });
   return (
     <Dialog.Root
       open={open}
@@ -50,27 +73,40 @@ export function ReportDialog({
             <dd>{OS_NAME[api.platform]}</dd>
           </dl>
           <p className="report-p">{t("report.public")}</p>
-          <div className="report-logs">
-            <p className="report-logs-text">
-              <b className="report-logs-title">{t("report.logsTitle")}</b>
-              {t("report.logs")}
-            </p>
-            <button
-              type="button"
-              className="btn"
-              onClick={() => {
-                setError(null);
-                api.debug.exportLogs().catch((err: unknown) => setError(errorText(err)));
-              }}
-            >
-              <Icon name="download-2" />
-              {t("settings.exportLogs")}
-            </button>
-          </div>
+          {events && <p className="report-p">{t("report.events")}</p>}
+          {detailed && (
+            <div className="report-logs">
+              <p className="report-logs-text">
+                <b className="report-logs-title">{t("report.logsTitle")}</b>
+                {t("report.logs")}
+              </p>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setError(null);
+                  api.debug.exportLogs().catch((err: unknown) => setError(errorText(err)));
+                }}
+              >
+                <Icon name="download-2" />
+                {t("settings.exportLogs")}
+              </button>
+            </div>
+          )}
           {error && <p className="fld-error">{error}</p>}
           <div className="report-acts">
             <Dialog.Close className="btn">{t("dialog.cancel")}</Dialog.Close>
-            <a className="btn dark" href={url} target="_blank" rel="noreferrer" onClick={() => onOpenChange(false)}>
+            <a
+              className="btn dark"
+              href={events === null ? undefined : url}
+              target="_blank"
+              rel="noreferrer"
+              aria-disabled={events === null}
+              onClick={(e) => {
+                if (events === null) e.preventDefault();
+                else onOpenChange(false);
+              }}
+            >
               <Icon name="github" />
               {t("report.open")}
               <Icon name="external-link" />

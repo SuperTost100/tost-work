@@ -92,7 +92,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
     ...DEFAULT_SETTINGS,
     name: userName,
     setupDone: true,
-    welcomed: stageOf(__APP_VERSION__),
+    welcomed: __APP_VERSION__,
   };
   const quickEdit = sectionOn(current, "quickEdit");
   const boardOn = sectionOn(current, "board");
@@ -400,11 +400,15 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
   // A pre-release greets the user on Home once per stage, after setup.
   const stage = stageOf(__APP_VERSION__);
   const welcoming =
-    route.name === "home" && current.setupDone && stage !== "stable" && current.welcomed !== stage && !welcomeClosed;
+    route.name === "home" &&
+    current.setupDone &&
+    stage !== "stable" &&
+    current.welcomed !== __APP_VERSION__ &&
+    !welcomeClosed;
   const closeWelcome = () => {
     setWelcomeClosed(true);
     if (api && stage !== "stable")
-      void api.settings.update({ welcomed: stage }).then((next) => onSettings?.(next), report);
+      void api.settings.update({ welcomed: __APP_VERSION__ }).then((next) => onSettings?.(next), report);
   };
   const openStatus = openTask?.status;
   useEffect(() => {
@@ -776,7 +780,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
           onOpenProject={(id) => setRoute({ name: "project", id })}
         />
       )}
-      {api && <ReportDialog api={api} open={reportOpen} onOpenChange={setReportOpen} />}
+      {api && <ReportDialog api={api} open={reportOpen} detailed={current.debug} onOpenChange={setReportOpen} />}
       {api && stage !== "stable" && (
         <WelcomeCard
           stage={stage}

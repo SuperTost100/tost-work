@@ -1,7 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "@/App";
-import { stageOf } from "@/lib/changelog";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { DEFAULT_SETTINGS, type JobDraft } from "../../../shared/model";
 
@@ -10,7 +9,7 @@ const settings = {
   name: "Giulia",
   level: "intermediate" as const,
   setupDone: true,
-  welcomed: stageOf(__APP_VERSION__),
+  welcomed: __APP_VERSION__,
 };
 
 const JOB: JobDraft = {

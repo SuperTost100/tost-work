@@ -187,6 +187,7 @@ const api: TostWorkApi = {
     revealAppLog: () => ipcRenderer.invoke(IPC.debugRevealAppLog),
     exportLogs: () => ipcRenderer.invoke(IPC.debugExportLogs),
     screen: (route) => ipcRenderer.send(IPC.debugScreen, route),
+    events: () => ipcRenderer.invoke(IPC.debugEvents),
   },
   jobs: {
     list: () => ipcRenderer.invoke(IPC.jobsList),

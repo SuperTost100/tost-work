@@ -3656,6 +3656,15 @@ ol.editable li::before {
   font-size: 13px;
   color: var(--t3);
 }
+/* The line under the names spans the columns, not the row's hover padding on each side. */
+.jrow.jhead::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  border-bottom: 1px solid var(--line-2);
+}
 .jrow.jhead:hover {
   background: var(--canvas);
 }
@@ -3691,11 +3700,11 @@ ol.editable li::before {
 .jrow.off .what {
   color: var(--t3);
 }
+/* The group's name; the line under the column names above already separates the list. */
 .jgh {
   font-size: 13px;
   color: var(--t3);
   padding: 22px 0 4px;
-  border-bottom: 1px solid var(--line-2);
 }
 /* The card's left part opens the builder; it reads as text, not as a button. */
 .jrow .jmain {
@@ -4668,13 +4677,13 @@ button.item {
   display: inline-block;
   width: 150px;
   height: 86px;
-  margin: -4px 0 -58px 12px;
+  margin: 6px 0 -68px 12px;
   vertical-align: top;
   background: var(--ink);
   mask: no-repeat left center / contain;
 }
 .welcome-body {
-  padding-bottom: 62px;
+  padding-bottom: 72px;
 }
 .welcome-acts {
   display: flex;
