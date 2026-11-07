@@ -175,11 +175,8 @@ export interface TostWorkApi {
     listActive(): Promise<Task[]>;
     /** Every task of one project. */
     listForProject(projectId: string): Promise<Task[]>;
-<<<<<<< Updated upstream
     /** Every task of every project, newest first, for the board. */
     listAll(): Promise<Task[]>;
-=======
->>>>>>> Stashed changes
     /** Tasks whose title or brief holds every word of the query, newest first, at most 20. */
     search(query: string): Promise<Task[]>;
     get(id: string): Promise<Task | null>;
@@ -405,10 +402,7 @@ export const IPC = {
   tasksList: "tasks:list",
   tasksListActive: "tasks:list-active",
   tasksListForProject: "tasks:list-for-project",
-<<<<<<< Updated upstream
   tasksListAll: "tasks:list-all",
-=======
->>>>>>> Stashed changes
   tasksSearch: "tasks:search",
   tasksGet: "tasks:get",
   tasksStart: "tasks:start",

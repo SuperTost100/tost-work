@@ -4,10 +4,7 @@ import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { ModelPicker } from "@/components/ModelPicker";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
 import { ProjectInstructionsDialog } from "@/components/ProjectInstructionsDialog";
-<<<<<<< Updated upstream
 import { SavedToast } from "@/components/SavedToast";
-=======
->>>>>>> Stashed changes
 import { SearchDialog } from "@/components/SearchDialog";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
@@ -409,11 +406,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
         setSearchOpen((open) => !open);
         return;
       }
-<<<<<<< Updated upstream
       if (e.target instanceof Element && e.target.closest(BOLDS)) return;
-=======
-      if (e.target instanceof Element && e.target.closest(EDITABLE)) return;
->>>>>>> Stashed changes
       e.preventDefault();
       toggleHandler.current();
     };
@@ -428,7 +421,6 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
     routeNow.current = route;
   }, [route]);
   const opening = useRef(0);
-<<<<<<< Updated upstream
   const openLoaded = useCallback(
     (id: string) => {
       const ticket = ++opening.current;
@@ -443,28 +435,6 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
       );
     },
     [loadTask, report, t],
-=======
-  // A task the search found may be older than the recent list, so it's loaded before the route turns to it.
-  const openFound = (id: string) => {
-    if (tasks.some((x) => x.id === id)) setRoute({ name: "task", id });
-    else loadTask(id).then((found) => (found ? setRoute({ name: "task", id }) : setError(t("task.gone"))), report);
-  };
-  useEffect(
-    () =>
-      api?.onOpenTask((id) => {
-        const ticket = ++opening.current;
-        const from = routeNow.current;
-        loadTask(id).then(
-          (found) => {
-            if (ticket !== opening.current || routeNow.current !== from) return;
-            if (found) setRoute({ name: "task", id });
-            else setError(t("task.gone"));
-          },
-          (err: unknown) => ticket === opening.current && report(err),
-        );
-      }),
-    [api, loadTask, report, t],
->>>>>>> Stashed changes
   );
   useEffect(() => api?.onOpenTask(openLoaded), [api, openLoaded]);
   // A task the search found may be older than the recent list too. One that's in it opens at once, and a click
@@ -710,7 +680,6 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
         if (id && !pinned) setRoute({ name: "task", id });
         setRenaming(id);
       }}
-<<<<<<< Updated upstream
       search={
         api && {
           api,
@@ -720,10 +689,6 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
           onOpenProject: (id) => setRoute({ name: "project", id }),
         }
       }
-=======
-      onDeleteTask={(id) => void deleteTask(id)}
-      onSearch={() => setSearchOpen(true)}
->>>>>>> Stashed changes
     />
   );
   return (

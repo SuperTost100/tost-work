@@ -4236,12 +4236,8 @@ button.item {
   align-items: center;
   gap: 10px;
   height: 52px;
-<<<<<<< Updated upstream
   /* The close button's own box makes up the rest, so its icon is as far from the edge as the search icon. */
   padding: 0 12px 0 18px;
-=======
-  padding: 0 18px;
->>>>>>> Stashed changes
   color: var(--t3);
 }
 .search-field input {

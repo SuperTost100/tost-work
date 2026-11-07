@@ -42,11 +42,7 @@ export function Sidebar({
   onRenameTask,
   renaming: renamingProp,
   onRenamingChange,
-<<<<<<< Updated upstream
   search,
-=======
-  onSearch,
->>>>>>> Stashed changes
 }: {
   current: Section | null;
   onNavigate: (s: Section) => void;
@@ -68,13 +64,8 @@ export function Sidebar({
   /** The task whose title is being edited, when the parent holds that state. */
   renaming?: string | null;
   onRenamingChange?: (id: string | null) => void;
-<<<<<<< Updated upstream
   /** What the search field looks through and opens. */
   search?: ComponentProps<typeof SearchBox>;
-=======
-  /** Opens the search. */
-  onSearch?: () => void;
->>>>>>> Stashed changes
 }) {
   const t = useT();
   const [ownRenaming, setOwnRenaming] = useState<string | null>(null);
@@ -87,39 +78,9 @@ export function Sidebar({
     e.preventDefault();
     menu(id);
   };
-<<<<<<< Updated upstream
   // While the search field has words, its results take the place of these.
   const items = (
     <>
-=======
-  return (
-    <aside className="side">
-      <div className="chrome">
-        {isMac && <span className="lights-space" />}
-        <span className="grow" />
-        {/* Over the page, the logo keeps it open, as it does on the rail. */}
-        {pinned && (
-          <button
-            type="button"
-            className="iconbtn"
-            title={withShortcut(t("nav.collapse"), "B", isMac)}
-            aria-label={t("nav.collapse")}
-            onClick={onCollapse}
-          >
-            <Icon name="layout-leftbar-close" />
-          </button>
-        )}
-      </div>
-      <div className="brand">
-        {pinned ? <Logo /> : <LogoButton label={t("nav.keepOpen")} isMac={isMac} onClick={onCollapse} />}
-        <b>Tost Work</b>
-      </div>
-      <button type="button" className="search" data-nav="search" onClick={onSearch}>
-        <Icon name="search" />
-        {t("nav.search")}
-        <kbd>{isMac ? "⌘K" : "Ctrl K"}</kbd>
-      </button>
->>>>>>> Stashed changes
       <nav aria-label="Sections">
         {NAV.filter((n) => !n.section || showSection(n.section)).map((n) => (
           <button
@@ -466,10 +427,6 @@ export function SidebarRail({
       className={current === id ? "railbtn on" : "railbtn"}
       aria-current={current === id ? "page" : undefined}
       aria-label={label}
-<<<<<<< Updated upstream
-=======
-      title={id === "search" ? withShortcut(label, "K", isMac) : label}
->>>>>>> Stashed changes
       onClick={onClick}
     >
       <Icon name={icon} />

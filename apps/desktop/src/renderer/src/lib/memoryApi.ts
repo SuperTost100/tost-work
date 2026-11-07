@@ -42,10 +42,7 @@ import { removalText } from "../../../shared/projectText";
 import { applyEvent, resume } from "../../../shared/reduce";
 import { nextRun } from "../../../shared/schedule";
 import { matchesWords, SEARCH_LIMIT, searchWords } from "../../../shared/search";
-<<<<<<< Updated upstream
 import { taskMenuItems } from "../../../shared/taskMenu";
-=======
->>>>>>> Stashed changes
 
 /** The built-in guide the memory API lists, as Tost Work lists its Word, Excel, PowerPoint and PDF guides. */
 const WORD_GUIDE: Skill = {
@@ -453,10 +450,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
           .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
           .slice(0, SEARCH_LIMIT);
       },
-<<<<<<< Updated upstream
       listAll: async () => [...tasks.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-=======
->>>>>>> Stashed changes
       get: async (id) => tasks.get(id) ?? null,
       start: async (input: NewTaskInput) => {
         const t = created(input);
