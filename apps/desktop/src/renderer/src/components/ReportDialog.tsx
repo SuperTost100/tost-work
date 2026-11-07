@@ -98,7 +98,7 @@ export function ReportDialog({
             <Dialog.Close className="btn">{t("dialog.cancel")}</Dialog.Close>
             <a
               className="btn dark"
-              href={url}
+              href={events === null ? undefined : url}
               target="_blank"
               rel="noreferrer"
               aria-disabled={events === null}
