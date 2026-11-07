@@ -12,8 +12,12 @@ const en = {
   "search.label": "Search tasks and projects",
   "search.tasks": "Tasks",
   "search.none": "Nothing matches “{query}”.",
+<<<<<<< Updated upstream
   "search.failed": "The search didn't work. Try again.",
   "nav.recent": "Recent tasks",
+=======
+  "nav.recent": "Recent",
+>>>>>>> Stashed changes
   "nav.settings": "Settings",
   "nav.profile": "About you",
   "profile.title": "About you",
@@ -689,8 +693,12 @@ const it: Record<MessageKey, string> = {
   "search.label": "Cerca attività e progetti",
   "search.tasks": "Attività",
   "search.none": "Nessun risultato per «{query}».",
+<<<<<<< Updated upstream
   "search.failed": "La ricerca non è riuscita. Riprova.",
   "nav.recent": "Attività recenti",
+=======
+  "nav.recent": "Recenti",
+>>>>>>> Stashed changes
   "nav.settings": "Impostazioni",
   "nav.profile": "Su di te",
   "profile.title": "Su di te",
