@@ -1,7 +1,7 @@
 {
   "name": "@tost-work/desktop",
   "productName": "Tost Work",
-  "version": "0.0.26-dev",
+  "version": "0.0.27-dev",
   "private": true,
   "type": "module",
   "main": "out/main/index.js",
