@@ -35,6 +35,8 @@
   --page-shadow: 0 1px 2px rgba(27, 23, 18, 0.06), 0 6px 18px rgba(27, 23, 18, 0.07);
   /* The selected item in a list or a toggle sits raised on the paper colour, as the selected tab does in Safari. */
   --raised: 0 0 0 1px rgba(27, 23, 18, 0.05), 0 1px 3px rgba(27, 23, 18, 0.12);
+  /* The edge of a field you type into. Light keeps the divider colour, which Increase contrast darkens to 3.3:1. */
+  --field-line: var(--line);
   --bubble: #24211d;
   color-scheme: light;
 }
@@ -59,6 +61,7 @@
   --danger: #ec8a7a;
   --page-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.35);
   --raised: 0 0 0 1px rgba(255, 250, 240, 0.06), 0 1px 3px rgba(0, 0, 0, 0.45);
+  --field-line: #807869;
   --bubble: #3b3732;
   color-scheme: dark;
 }
@@ -84,6 +87,7 @@
     --danger: #ec8a7a;
     --page-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.35);
     --raised: 0 0 0 1px rgba(255, 250, 240, 0.06), 0 1px 3px rgba(0, 0, 0, 0.45);
+    --field-line: #807869;
     --bubble: #3b3732;
     color-scheme: dark;
   }
@@ -254,14 +258,13 @@ h3 {
   padding: 0 10px;
   border-radius: 8px;
   background: var(--canvas);
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   color: var(--t3);
   font-size: 14px;
   margin-bottom: 8px;
 }
 :root[data-theme="dark"] .search {
   background: var(--panel);
-  border-color: transparent;
 }
 .search input {
   flex: 1;
@@ -911,7 +914,7 @@ h3 {
 /* Composer, Claude style: quiet box, settings below as text */
 .composer {
   background: var(--paper);
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: 16px;
   box-shadow:
     0 1px 2px rgba(27, 23, 18, 0.04),
@@ -4021,6 +4024,9 @@ fieldset.fld > legend {
   background: var(--paper);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
+.switch:not(.on) {
+  box-shadow: inset 0 0 0 1px var(--field-line);
+}
 .switch.on {
   background: var(--ink);
 }
@@ -4482,7 +4488,7 @@ button.item {
   height: 36px;
   padding: 0 11px;
   border-radius: 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   background: var(--paper);
   color: var(--ink);
   font:
