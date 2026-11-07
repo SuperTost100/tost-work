@@ -611,7 +611,7 @@ app.whenReady().then(async () => {
       void askInWindow({
         message:
           working === 1 ? translate(lang, "quit.title") : translate(lang, "quit.titleMany", { n: String(working) }),
-        detail: translate(lang, "quit.detail"),
+        detail: translate(lang, working === 1 ? "quit.detail" : "quit.detailMany"),
         yes: translate(lang, "quit.quit"),
         danger: true,
       })
