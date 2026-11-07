@@ -12,7 +12,7 @@ export function NotesLimit({ length }: { length: number }) {
   if (length < NOTES_MAX * 0.9) return null;
   const n = (x: number) => x.toLocaleString(lang);
   return (
-    <span className="t3" role="status" style={{ fontSize: 12.5 }}>
+    <span className="t3" role="status" style={{ fontSize: 13 }}>
       {t("profile.notesLimit", { n: n(length), max: n(NOTES_MAX) })}
     </span>
   );
