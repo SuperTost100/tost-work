@@ -21,14 +21,24 @@ describe("PDF pages", () => {
     expect(pageSize("<html></html>", "docx")).toEqual({ width: 8.27, height: 11.69 });
   });
 
-  it("blocks every script with a policy at the top, and puts the fonts and print rules in the head", () => {
+  it("blocks every script with a policy first in the head, and puts the fonts and print rules in the head", () => {
     const page = printable(DOCX, "docx", "@font-face{}");
-    expect(page.startsWith(NO_SCRIPTS)).toBe(true);
+    expect(page.startsWith(`<html><head>${NO_SCRIPTS}`)).toBe(true);
     expect(NO_SCRIPTS).toContain("script-src 'none'");
     expect(page).toMatch(/<style>@font-face\{\}\n[\s\S]*\.page \{ box-shadow: none[\s\S]*<\/style><\/head>/);
   });
 
-  it("blocks scripts in a page without a head too", () => {
+  it("keeps the doctype first, so the page isn't drawn in quirks mode", () => {
+    const page = printable(
+      `<!DOCTYPE html>\n<html lang="it">\n<head>\n<meta charset="UTF-8"></head><body></body></html>`,
+      "docx",
+      "",
+    );
+    expect(page.startsWith(`<!DOCTYPE html>\n<html lang="it">\n<head>${NO_SCRIPTS}`)).toBe(true);
+  });
+
+  it("blocks scripts in a page without a head too, after its doctype", () => {
     expect(printable("<p>Ciao</p><script>x()</script>", "docx", "").startsWith(NO_SCRIPTS)).toBe(true);
+    expect(printable("<!doctype html><p>Ciao</p>", "docx", "").startsWith(`<!doctype html>${NO_SCRIPTS}`)).toBe(true);
   });
 });
