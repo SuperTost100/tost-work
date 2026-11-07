@@ -60,7 +60,7 @@ export function Profile({
   };
 
   return (
-    <div className="main">
+    <main className="main">
       <div className="top" />
       <div className="scroll">
         <form
@@ -110,6 +110,6 @@ export function Profile({
           </div>
         </form>
       </div>
-    </div>
+    </main>
   );
 }

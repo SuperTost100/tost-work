@@ -178,7 +178,7 @@ export function About({
   ];
 
   return (
-    <div className="main">
+    <main className="main">
       <div className="top">
         <nav className="crumb" aria-label={t("about.crumb")}>
           {trail.map((step, i) => (
@@ -253,6 +253,6 @@ export function About({
           </svg>
         </div>
       )}
-    </div>
+    </main>
   );
 }

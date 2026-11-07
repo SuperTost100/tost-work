@@ -50,20 +50,40 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onEscape, true);
   }, [open]);
 
+  // Over another dialog, such as the job editor, the two would each keep focus to themselves, and Tab left the card.
+  // While the card is open everything else on the page is inert, so Tab and clicks stay in it.
+  const popup = useRef<HTMLDivElement>(null);
+  const isOpen = open !== null;
+  useEffect(() => {
+    if (!isOpen) return;
+    const own = popup.current?.closest("body > *");
+    const others = [...document.body.children].filter(
+      (el): el is HTMLElement => el instanceof HTMLElement && el !== own && !el.inert,
+    );
+    for (const el of others) el.inert = true;
+    return () => {
+      for (const el of others) el.inert = false;
+    };
+  }, [isOpen]);
+
+  // The last question stays drawn while the card closes.
+  const last = useRef<Confirmation | null>(null);
+  if (open) last.current = open.question;
+  const shown = open?.question ?? last.current;
+
   return (
     <ConfirmContext.Provider value={ask}>
       {children}
-      {open && (
-        <AlertDialog.Root open onOpenChange={(isOpen) => !isOpen && open.answer("no")}>
-          <AlertDialog.Portal>
-            <AlertDialog.Backdrop className="dlg-backdrop" />
-            <AlertDialog.Popup className="modal confirmmodal" initialFocus={cancel}>
+      {/* Mounted all along and opened, as the search dialog is: a dialog created already open didn't keep Tab inside. */}
+      <AlertDialog.Root open={open !== null} onOpenChange={(isOpen) => !isOpen && open?.answer("no")}>
+        <AlertDialog.Portal>
+          <AlertDialog.Backdrop className="dlg-backdrop" />
+          {shown && (
+            <AlertDialog.Popup ref={popup} className="modal confirmmodal" initialFocus={cancel}>
               <div className="cb">
-                <AlertDialog.Title render={<b />}>{open.question.message}</AlertDialog.Title>
-                {open.question.detail && (
-                  <AlertDialog.Description render={<p className="t2" />}>
-                    {open.question.detail}
-                  </AlertDialog.Description>
+                <AlertDialog.Title render={<b />}>{shown.message}</AlertDialog.Title>
+                {shown.detail && (
+                  <AlertDialog.Description render={<p className="t2" />}>{shown.detail}</AlertDialog.Description>
                 )}
               </div>
               <div className="mf">
@@ -73,21 +93,21 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 </AlertDialog.Close>
                 <button
                   type="button"
-                  className={`btn${open.question.danger ? " danger fill" : open.question.alt ? "" : " dark"}`}
-                  onClick={() => open.answer("yes")}
+                  className={`btn${shown.danger ? " danger fill" : shown.alt ? "" : " dark"}`}
+                  onClick={() => open?.answer("yes")}
                 >
-                  {open.question.yes}
+                  {shown.yes}
                 </button>
-                {open.question.alt && (
-                  <button type="button" className="btn dark" onClick={() => open.answer("alt")}>
-                    {open.question.alt}
+                {shown.alt && (
+                  <button type="button" className="btn dark" onClick={() => open?.answer("alt")}>
+                    {shown.alt}
                   </button>
                 )}
               </div>
             </AlertDialog.Popup>
-          </AlertDialog.Portal>
-        </AlertDialog.Root>
-      )}
+          )}
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
     </ConfirmContext.Provider>
   );
 }

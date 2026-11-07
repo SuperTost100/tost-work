@@ -58,7 +58,7 @@ export function Home({
   const todo = tasks.filter((x) => x.status === "draft");
   const projectName = (id: string | null) => projects.find((p) => p.id === id)?.name;
   return (
-    <div className="main">
+    <main className="main">
       <div className="top" />
       <div className="scroll">
         <div className="col home-col">
@@ -133,6 +133,6 @@ export function Home({
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }

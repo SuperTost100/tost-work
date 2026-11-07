@@ -41,7 +41,7 @@ export function Projects({
     onMenu(id);
   };
   return (
-    <div className="main">
+    <main className="main">
       <div className="top" />
       <div className="scroll">
         <div className="wcol">
@@ -131,6 +131,6 @@ export function Projects({
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

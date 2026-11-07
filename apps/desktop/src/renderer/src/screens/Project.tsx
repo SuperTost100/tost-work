@@ -60,7 +60,7 @@ export function Project({
     onMenu();
   };
   return (
-    <div className="main">
+    <main className="main">
       <div className="top">
         <span className="crumb">
           <button type="button" className="link" onClick={onBack}>
@@ -169,6 +169,6 @@ export function Project({
           </aside>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -99,7 +99,7 @@ export function Settings({
   };
 
   return (
-    <div className="main">
+    <main className="main">
       <div className="top">
         <span className="crumb">
           <b>{t("nav.settings")}</b>
@@ -414,6 +414,6 @@ export function Settings({
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

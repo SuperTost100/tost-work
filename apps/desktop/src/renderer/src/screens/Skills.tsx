@@ -349,7 +349,7 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
   );
 
   return (
-    <div className={dropping ? "main dropping" : "main"} {...dropZone}>
+    <main className={dropping ? "main dropping" : "main"} {...dropZone}>
       {dropping && (
         <div className="dropzone" aria-hidden="true">
           <Icon name="upload-2" />
@@ -540,6 +540,6 @@ export function Skills({ api, tasks = [] }: { api: TostWorkApi; tasks?: Task[] }
           </aside>
         </div>
       )}
-    </div>
+    </main>
   );
 }
