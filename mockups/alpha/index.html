@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tost Work · alpha welcome and bug reports</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+  /* The app's own tokens (apps/desktop/src/renderer/src/styles/app.css). */
+  :root {
+    --canvas: #faf8f4; --side: #f3f0ea; --panel: #efebe3; --paper: #ffffff; --line: #e6e1d8; --line-2: #eeeae3;
+    --hover: rgba(27, 23, 18, 0.045); --ink: #1b1712; --t2: #57504a; --t3: #6b6255; --taupe: #9c8b73;
+    --btn: #1b1712; --on-btn: #faf8f4; --need: #9a5b0b;
+    --page-shadow: 0 1px 2px rgba(27, 23, 18, 0.06), 0 6px 18px rgba(27, 23, 18, 0.07);
+    --card-shadow: 0 0 0 1px var(--line), 0 24px 70px rgba(27, 23, 18, 0.16);
+    --veil: rgba(250, 248, 244, 0.7);
+  }
+  body[data-theme="dark"] {
+    --canvas: #22201d; --side: #1b1917; --panel: #2c2925; --paper: #2a2723; --line: #36322d; --line-2: #2f2b27;
+    --hover: rgba(255, 250, 240, 0.045); --ink: #eeeae3; --t2: #b7afa4; --t3: #9d958a; --taupe: #b9a88f;
+    --btn: #eeeae3; --on-btn: #1b1712; --need: #e3a452;
+    --page-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.35);
+    --card-shadow: 0 0 0 1px var(--line), 0 24px 70px rgba(0, 0, 0, 0.5);
+    --veil: rgba(20, 18, 16, 0.7);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--side); color: var(--ink); font: 400 14px/1.5 "Schibsted Grotesk", system-ui, sans-serif; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .bar { position: sticky; top: 0; z-index: 10; display: flex; gap: 10px; align-items: center; padding: 10px 24px; background: var(--paper); border-bottom: 1px solid var(--line); font-size: 13px; color: var(--t2); }
+  .bar b { color: var(--ink); font-weight: 600; }
+  .bar .grow { flex: 1; }
+  .bar button { height: 28px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: none; }
+  .bar button.on { background: var(--ink); color: var(--canvas); border-color: var(--ink); }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 32px 24px 80px; }
+  .wrap > h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
+  .lead { color: var(--t2); font-size: 15px; max-width: 820px; margin: 8px 0 28px; }
+  section.v { margin-bottom: 40px; }
+  section.v h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 4px; }
+  section.v p.why { color: var(--t2); font-size: 14px; max-width: 860px; margin: 0 0 14px; }
+
+  /* A real screenshot of the app, 1280×820, scaled to the page. */
+  .stage { position: relative; width: 100%; aspect-ratio: 1280 / 820; border-radius: 12px; overflow: hidden; box-shadow: 0 0 0 1px var(--line), 0 12px 30px rgba(0,0,0,.08); }
+  .stage > .app { position: absolute; left: 0; top: 0; width: 1280px; height: 820px; transform-origin: 0 0; background-size: cover; }
+  .veil { position: absolute; inset: 0; background: var(--veil); }
+  .dlg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--canvas); border-radius: 16px; box-shadow: var(--card-shadow); overflow: hidden; }
+
+  .btn { height: 32px; padding: 0 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; border: 1px solid var(--line); background: var(--paper); white-space: nowrap; }
+  .btn:hover { border-color: var(--t3); }
+  .btn.dark { background: var(--btn); color: var(--on-btn); border-color: var(--btn); }
+  .btn.dark:hover { opacity: .88; }
+  .btn.quiet { border-color: transparent; background: none; color: var(--t2); padding: 0 8px; }
+  .btn.quiet:hover { color: var(--ink); background: var(--hover); }
+  i[data-i] { display: inline-block; width: 16px; height: 16px; flex: none; background: currentColor; -webkit-mask: no-repeat center / contain; mask: no-repeat center / contain; }
+  .mono { font: 500 11px/1 "IBM Plex Mono", monospace; letter-spacing: .04em; text-transform: uppercase; }
+
+  /* A · the note */
+  .note { width: 470px; padding: 30px 32px 22px; }
+  .note .stamp { display: inline-block; padding: 6px 9px 5px; border: 1.5px solid var(--need); color: var(--need); border-radius: 6px; transform: rotate(-4deg); margin-bottom: 18px; }
+  .note h3 { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; margin: 0 0 12px; }
+  .note h3 span { color: var(--taupe); }
+  .note p { font-size: 15px; line-height: 1.6; color: var(--t2); margin: 0 0 10px; }
+  .note .sig { margin: 16px 0 0; color: var(--ink); font-size: 15px; }
+  .note .acts { display: flex; gap: 8px; justify-content: flex-end; margin: 22px -12px 0; padding: 14px 12px 0; border-top: 1px solid var(--line-2); }
+  .note .acts .btn.quiet { margin-right: auto; }
+
+  /* B · the cover */
+  .cover { width: 700px; display: grid; grid-template-columns: 250px 1fr; }
+  .cover .art { position: relative; background: var(--panel); border-right: 1px solid var(--line-2); min-height: 380px; overflow: hidden; }
+  .cover .sheet { position: absolute; left: 50%; top: 52%; width: 132px; height: 172px; background: var(--paper); border-radius: 4px; box-shadow: var(--page-shadow); padding: 18px 14px; transform: translate(-50%, -50%) rotate(-5deg); }
+  .cover .sheet.back { transform: translate(-42%, -54%) rotate(4deg); opacity: .7; }
+  .cover .sheet b { display: block; height: 7px; border-radius: 2px; background: var(--ink); width: 46%; margin-bottom: 12px; }
+  .cover .sheet u { display: block; height: 4px; border-radius: 2px; background: var(--line); margin-bottom: 7px; }
+  .cover .sheet u:nth-child(4) { width: 82%; } .cover .sheet u:nth-child(6) { width: 64%; }
+  .cover .stamp { position: absolute; left: 50%; top: 66%; transform: translate(-50%, -50%) rotate(-9deg); padding: 7px 11px 6px; border: 2px solid var(--need); color: var(--need); border-radius: 7px; background: color-mix(in srgb, var(--paper) 82%, transparent); font-size: 13px; }
+  .cover .logo { position: absolute; left: 22px; top: 20px; display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; }
+  .cover .logo span { width: 22px; height: 22px; border-radius: 5px; background: var(--ink); color: var(--canvas); display: grid; place-items: center; font-size: 13px; font-weight: 800; }
+  .cover .txt { padding: 30px 30px 20px; display: flex; flex-direction: column; }
+  .cover h3 { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15; margin: 0 0 10px; }
+  .cover h3 span { color: var(--taupe); }
+  .cover p { font-size: 15px; line-height: 1.6; color: var(--t2); margin: 0 0 14px; }
+  .cover dl { margin: 0; display: grid; gap: 10px; }
+  .cover dt { font-weight: 600; font-size: 14px; }
+  .cover dd { margin: 1px 0 0; color: var(--t2); font-size: 14px; line-height: 1.5; }
+  .cover .acts { display: flex; gap: 8px; justify-content: flex-end; margin-top: auto; padding-top: 20px; }
+  .cover .acts .btn.quiet { margin-right: auto; margin-left: -8px; }
+
+  /* The report card */
+  .report { width: 500px; }
+  .report .mh { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--line-2); }
+  .report .mh b { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; flex: 1; }
+  .report .mh button { width: 28px; height: 28px; border-radius: 7px; border: 0; background: none; display: grid; place-items: center; color: var(--t2); }
+  .report .mb { padding: 18px 20px 6px; }
+  .report .mb p { margin: 0 0 12px; color: var(--t2); font-size: 15px; line-height: 1.55; }
+  .report .facts { margin: 4px 0 16px; padding: 12px 14px; border-radius: 10px; background: var(--panel); display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14px; }
+  .report .facts span { color: var(--t3); }
+  .report .logs { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0 4px; border-top: 1px solid var(--line-2); }
+  .report .logs div { flex: 1; color: var(--t2); font-size: 14px; line-height: 1.5; }
+  .report .logs b { display: block; color: var(--ink); font-weight: 600; }
+  .report .mf { display: flex; gap: 8px; justify-content: flex-end; padding: 14px 20px; border-top: 1px solid var(--line-2); margin-top: 14px; }
+  .toast { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--btn); color: var(--on-btn); border-radius: 10px; padding: 10px 16px; font-size: 14px; display: none; }
+  .toast.show { display: block; }
+  .hide { display: none; }
+</style>
+</head>
+<body data-theme="light">
+<div class="bar"><b>Alpha: benvenuto e segnalazioni</b><span class="grow"></span><button data-t="light" class="on">Light</button><button data-t="dark">Dark</button></div>
+<div class="wrap">
+  <h1>The alpha welcome, and a way to report problems</h1>
+  <p class="lead">The backgrounds are screenshots of the real app; the cards on top are the proposal. Every button works: "Segnala un problema" opens the report card, and its buttons say what would happen. Pick A or B for the welcome.</p>
+
+  <section class="v">
+    <h2>A · A note from you</h2>
+    <p class="why">A small card, like a handwritten note: an amber "alpha" stamp, two short paragraphs and your signature. It appears once, the first time someone reaches Home in an alpha build.</p>
+    <div class="stage"><div class="app" data-bg="home">
+      <div class="veil"></div>
+      <div class="dlg note" role="dialog" aria-labelledby="a-t">
+        <span class="stamp mono">Alpha · 0.1</span>
+        <h3 id="a-t">Benvenuto nell'alpha.<br><span>Grazie per provarla.</span></h3>
+        <p>Tost Work è ancora in costruzione: qualcosa può non funzionare, e alcune cose cambieranno da una versione all'altra.</p>
+        <p>Se trovi un problema, segnalalo. Leggo ogni segnalazione, e le correzioni arrivano nella versione dopo.</p>
+        <p class="sig">— Tost</p>
+        <div class="acts">
+          <button class="btn quiet" data-open="report"><i data-i="chat-3"></i>Segnala un problema</button>
+          <button class="btn dark" data-close>Inizia</button>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="v">
+    <h2>B · A cover page</h2>
+    <p class="why">A wider card with a picture on the left: the app's tilted document, with the "alpha" stamp across it. On the right, what to expect in three lines. Same moment, same buttons.</p>
+    <div class="stage"><div class="app" data-bg="home">
+      <div class="veil"></div>
+      <div class="dlg cover" role="dialog" aria-labelledby="b-t">
+        <div class="art" aria-hidden="true">
+          <div class="logo"><span>T</span>Tost Work</div>
+          <div class="sheet back"><b></b><u></u><u></u><u></u><u></u><u></u></div>
+          <div class="sheet"><b></b><u></u><u></u><u></u><u></u><u></u><u></u><u></u></div>
+          <div class="stamp mono">Alpha</div>
+        </div>
+        <div class="txt">
+          <h3 id="b-t">Benvenuto nell'alpha.<br><span>Grazie per provarla.</span></h3>
+          <p>Tost Work è ancora in costruzione. Ecco cosa aspettarti.</p>
+          <dl>
+            <div><dt>Qualcosa può non funzionare</dt><dd>È normale in un'alpha: per questo la stai provando.</dd></div>
+            <div><dt>Le cose cambiano</dt><dd>Sezioni e pulsanti possono spostarsi da una versione all'altra. Novità, nelle Impostazioni, dice cosa è cambiato.</dd></div>
+            <div><dt>Ogni segnalazione conta</dt><dd>La trovi sempre in Impostazioni › Segnala un problema.</dd></div>
+          </dl>
+          <div class="acts">
+            <button class="btn quiet" data-open="report"><i data-i="chat-3"></i>Segnala un problema</button>
+            <button class="btn dark" data-close>Inizia</button>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="v">
+    <h2>Report a problem, from Settings</h2>
+    <p class="why">A new item under Novità and Informazioni (and the same in the Help menu). It opens this card. "Apri GitHub" opens the bug form already filled with the version and the system; the person writes what happened. Logs stay optional and are exported to a file they can check first.</p>
+    <div class="stage"><div class="app" data-bg="settings">
+      <div class="veil"></div>
+      <div class="dlg report" role="dialog" aria-labelledby="r-t">
+        <div class="mh"><b id="r-t">Segnala un problema</b><button aria-label="Chiudi" data-close><i data-i="close"></i></button></div>
+        <div class="mb">
+          <p>Si apre il modulo per i problemi su GitHub, già compilato con questi dati. Tu scrivi cosa è successo e, se puoi, come farlo succedere di nuovo.</p>
+          <div class="facts"><span>Versione</span>0.1.0 alpha · build 0e4d050<span>Sistema</span>macOS 26.1</div>
+          <p>Serve un account GitHub, gratuito. Quello che scrivi è pubblico: non metterci dati di clienti.</p>
+          <div class="logs">
+            <div><b>Il problema è in un'attività?</b>I log aiutano a capire cosa è andato storto. Esportali, controllali e trascinali nel modulo.</div>
+            <button class="btn" data-say="Salva lo zip dei log, con le chiavi nascoste, e lo mostra nel Finder."><i data-i="download-2"></i>Esporta i log</button>
+          </div>
+        </div>
+        <div class="mf">
+          <button class="btn" data-close>Annulla</button>
+          <button class="btn dark" data-say="Apre github.com/SuperTost100/tost-work/issues/new con il modulo Bug report, versione e sistema già scritti."><i data-i="github"></i>Apri GitHub<i data-i="external-link"></i></button>
+        </div>
+      </div>
+      <div class="toast"></div>
+    </div></div>
+  </section>
+</div>
+<script>
+  const icon = (el) => { const n = el.dataset.i; el.style.webkitMaskImage = el.style.maskImage = `url(icons/${n}.svg)`; };
+  document.querySelectorAll("i[data-i]").forEach(icon);
+  const theme = () => document.body.dataset.theme;
+  const paint = () => document.querySelectorAll(".app").forEach((a) => { a.style.backgroundImage = `url(${a.dataset.bg}-${theme()}.png)`; });
+  const fit = () => document.querySelectorAll(".stage").forEach((s) => { s.firstElementChild.style.transform = `scale(${s.clientWidth / 1280})`; });
+  addEventListener("resize", fit);
+  const reportStage = document.querySelectorAll(".stage")[2];
+  // Each stage can be reset: closing a card leaves the app; clicking the stage again brings the card back.
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    const stage = e.target.closest(".stage");
+    if (b?.dataset.t) {
+      document.body.dataset.theme = b.dataset.t;
+      document.querySelectorAll("[data-t]").forEach((x) => x.classList.toggle("on", x === b));
+      paint();
+      return;
+    }
+    if (!stage) return;
+    if (b?.dataset.close !== undefined) { stage.querySelectorAll(".veil, .dlg").forEach((x) => x.classList.add("hide")); return; }
+    if (b?.dataset.open === "report") {
+      // The welcome card hands over to the report card.
+      stage.querySelectorAll(".veil, .dlg").forEach((x) => x.classList.add("hide"));
+      reportStage.scrollIntoView({ behavior: "smooth", block: "center" });
+      reportStage.querySelectorAll(".veil, .dlg").forEach((x) => x.classList.remove("hide"));
+      return;
+    }
+    if (b?.dataset.say) {
+      const t = stage.querySelector(".toast");
+      t.textContent = b.dataset.say;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 3200);
+      return;
+    }
+    if (!b) stage.querySelectorAll(".veil, .dlg").forEach((x) => x.classList.remove("hide"));
+  });
+  paint();
+  fit();
+</script>
+</body>
+</html>
