@@ -41,7 +41,9 @@
   section.v p.why { color: var(--t2); font-size: 14px; max-width: 860px; margin: 0 0 14px; }
 
   /* A real screenshot of the app, 1280×820, scaled to the page. */
+  /* On a phone the app stays at 70% or more, so the cards stay readable, and the stage scrolls sideways. */
   .stage { position: relative; width: 100%; aspect-ratio: 1280 / 820; border-radius: 12px; overflow: hidden; box-shadow: 0 0 0 1px var(--line), 0 12px 30px rgba(0,0,0,.08); }
+  .stage::after { content: ""; display: block; width: var(--w, 100%); height: 1px; }
   .stage > .app { position: absolute; left: 0; top: 0; width: 1280px; height: 820px; transform-origin: 0 0; background-size: cover; }
   .veil { position: absolute; inset: 0; background: var(--veil); }
   .dlg { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--canvas); border-radius: 16px; box-shadow: var(--card-shadow); overflow: hidden; }
@@ -102,6 +104,8 @@
   .toast { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--btn); color: var(--on-btn); border-radius: 10px; padding: 10px 16px; font-size: 14px; display: none; }
   .toast.show { display: block; }
   .hide { display: none; }
+  section.v h2 { display: flex; align-items: center; gap: 10px; }
+  .reopen { height: 26px; font-size: 13px; }
 </style>
 </head>
 <body data-theme="light">
@@ -111,7 +115,7 @@
   <p class="lead">The backgrounds are screenshots of the real app; the cards on top are the proposal. Every button works: "Segnala un problema" opens the report card, and its buttons say what would happen. Pick A or B for the welcome.</p>
 
   <section class="v">
-    <h2>A · A note from you</h2>
+    <h2>A · A note from you <button class="btn quiet reopen" data-reopen>Riapri la scheda</button></h2>
     <p class="why">A small card, like a handwritten note: an amber "alpha" stamp, two short paragraphs and your signature. It appears once, the first time someone reaches Home in an alpha build.</p>
     <div class="stage"><div class="app" data-bg="home">
       <div class="veil"></div>
@@ -130,7 +134,7 @@
   </section>
 
   <section class="v">
-    <h2>B · A cover page</h2>
+    <h2>B · A cover page <button class="btn quiet reopen" data-reopen>Riapri la scheda</button></h2>
     <p class="why">A wider card with a picture on the left: the app's tilted document, with the "alpha" stamp across it. On the right, what to expect in three lines. Same moment, same buttons.</p>
     <div class="stage"><div class="app" data-bg="home">
       <div class="veil"></div>
@@ -159,7 +163,7 @@
   </section>
 
   <section class="v">
-    <h2>Report a problem, from Settings</h2>
+    <h2>Report a problem, from Settings <button class="btn quiet reopen" data-reopen>Riapri la scheda</button></h2>
     <p class="why">A new item under Novità and Informazioni (and the same in the Help menu). It opens this card. "Apri GitHub" opens the bug form already filled with the version and the system; the person writes what happened. Logs stay optional and are exported to a file they can check first.</p>
     <div class="stage"><div class="app" data-bg="settings">
       <div class="veil"></div>
@@ -188,7 +192,15 @@
   document.querySelectorAll("i[data-i]").forEach(icon);
   const theme = () => document.body.dataset.theme;
   const paint = () => document.querySelectorAll(".app").forEach((a) => { a.style.backgroundImage = `url(${a.dataset.bg}-${theme()}.png)`; });
-  const fit = () => document.querySelectorAll(".stage").forEach((s) => { s.firstElementChild.style.transform = `scale(${s.clientWidth / 1280})`; });
+  const fit = () => document.querySelectorAll(".stage").forEach((s) => {
+    const k = Math.max(s.clientWidth / 1280, 0.7);
+    s.firstElementChild.style.transform = `scale(${k})`;
+    s.style.aspectRatio = "auto";
+    s.style.height = `${820 * k}px`;
+    s.style.overflowX = k > s.clientWidth / 1280 ? "auto" : "hidden";
+    s.style.setProperty("--w", `${1280 * k}px`);
+    s.scrollLeft = (1280 * k - s.clientWidth) / 2;
+  });
   addEventListener("resize", fit);
   const reportStage = document.querySelectorAll(".stage")[2];
   // Each stage can be reset: closing a card leaves the app; clicking the stage again brings the card back.
@@ -201,6 +213,12 @@
       paint();
       return;
     }
+    if (b?.dataset.reopen !== undefined) {
+      const st = b.closest("section").querySelector(".stage");
+      st.querySelectorAll(".veil, .dlg").forEach((x) => x.classList.remove("hide"));
+      st.querySelector(".dlg button")?.focus();
+      return;
+    }
     if (!stage) return;
     if (b?.dataset.close !== undefined) { stage.querySelectorAll(".veil, .dlg").forEach((x) => x.classList.add("hide")); return; }
     if (b?.dataset.open === "report") {
@@ -208,6 +226,7 @@
       stage.querySelectorAll(".veil, .dlg").forEach((x) => x.classList.add("hide"));
       reportStage.scrollIntoView({ behavior: "smooth", block: "center" });
       reportStage.querySelectorAll(".veil, .dlg").forEach((x) => x.classList.remove("hide"));
+      reportStage.querySelector(".report .mf .btn.dark").focus({ preventScroll: true });
       return;
     }
     if (b?.dataset.say) {
