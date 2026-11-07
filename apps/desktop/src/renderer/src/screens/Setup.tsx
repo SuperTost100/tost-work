@@ -47,10 +47,17 @@ export function Setup({
 }) {
   const t = useT();
   const [step, setStep] = useState(0);
-  // Each step starts at the top, where its title is, even when the step before was scrolled in a short window.
+  // Each step starts at the top, where its title is, even when the step before was scrolled in a short window. After a
+  // step change the title takes the focus, so the next Tab goes through the new step's fields; the first step is left
+  // as the app opens it.
   const page = useRef<HTMLDivElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  // The step the page last showed, so only a real change moves the focus, also when React runs the effect twice.
+  const shown = useRef(step);
   useEffect(() => {
-    if (step >= 0) page.current?.scrollTo?.(0, 0);
+    page.current?.scrollTo?.(0, 0);
+    if (shown.current !== step) heading.current?.focus();
+    shown.current = step;
   }, [step]);
   const [name, setName] = useState(settings.name);
   const [work, setWork] = useState(settings.work);
@@ -126,7 +133,7 @@ export function Setup({
             ))}
             <span style={{ marginLeft: 6 }}>{t("setup.step", { n: String(step + 1), total: String(TOTAL) })}</span>
           </div>
-          <h1>
+          <h1 ref={heading} tabIndex={-1}>
             {t(title)}
             <br />
             <span>{t(sub)}</span>
