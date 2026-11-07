@@ -64,9 +64,12 @@ export function WelcomeCard({
             </Dialog.Title>
             <Dialog.Description render={<div />} className="welcome-body">
               <p className="welcome-p">{t("welcome.building")}</p>
-              <p className="welcome-p">{t("welcome.report")}</p>
+              <p className="welcome-p">
+                {t("welcome.report")}
+                {/* Signed right after the last word, as at the end of a note. */}
+                <i className="welcome-sign" role="img" aria-label="Tost" style={{ maskImage: `url(${signature})` }} />
+              </p>
             </Dialog.Description>
-            <i className="welcome-sign" role="img" aria-label="Tost" style={{ maskImage: `url(${signature})` }} />
             <div className="welcome-acts">
               <button type="button" className="btn quiet" onClick={onReport}>
                 <Icon name="bug" />

@@ -320,6 +320,8 @@ export const keyVendor = (key: string): KeyVendor | null => {
 export const LEVELS: Level[] = ["beginner", "intermediate", "advanced", "expert"];
 export type TextSize = "small" | "normal" | "large";
 export const TEXT_SIZES: TextSize[] = ["small", "normal", "large"];
+/** The window zoom for each text size. The styles use pixel sizes, so zoom is what scales them all. */
+export const TEXT_ZOOM: Record<TextSize, number> = { small: 0.9, normal: 1, large: 1.15 };
 export type Theme = "light" | "dark" | "system";
 export const THEMES: Theme[] = ["light", "dark", "system"];
 

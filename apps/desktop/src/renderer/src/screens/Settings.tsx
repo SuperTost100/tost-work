@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { type CSSProperties, useCallback, useState } from "react";
 import { AccountRow } from "@/components/AccountRow";
 import { KeyRow } from "@/components/KeyRow";
 import { Switch } from "@/components/Switch";
@@ -22,6 +22,7 @@ import {
   SUBSCRIPTIONS,
   sectionOn,
   TEXT_SIZES,
+  TEXT_ZOOM,
   THEMES,
 } from "../../../shared/model";
 
@@ -46,6 +47,7 @@ function Choice<T extends string>({
   options,
   value,
   text,
+  look,
   onChange,
 }: {
   label: string;
@@ -53,6 +55,8 @@ function Choice<T extends string>({
   options: readonly T[];
   value: T;
   text: (option: T) => string;
+  /** How an option's own label looks, when it can show what it does. */
+  look?: (option: T) => CSSProperties;
   onChange: (option: T) => void;
 }) {
   return (
@@ -60,7 +64,9 @@ function Choice<T extends string>({
       {options.map((option) => (
         <label key={option}>
           <input type="radio" className="sr" name={name} checked={value === option} onChange={() => onChange(option)} />
-          <span className={value === option ? "on" : undefined}>{text(option)}</span>
+          <span className={value === option ? "on" : undefined} style={look?.(option)}>
+            {text(option)}
+          </span>
         </label>
       ))}
     </div>
@@ -288,6 +294,8 @@ export function Settings({
                     options={TEXT_SIZES}
                     value={settings.textSize}
                     text={(size) => t(`settings.textSize.${size}` as MessageKey)}
+                    // Each option's label at the size it gives: the window is already zoomed for the current one.
+                    look={(size) => ({ fontSize: `${(14 * TEXT_ZOOM[size]) / TEXT_ZOOM[settings.textSize]}px` })}
                     onChange={(textSize) => save({ textSize })}
                   />
                 </div>

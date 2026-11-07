@@ -3644,6 +3644,24 @@ ol.editable li::before {
 .jrow:hover {
   background: var(--hover);
 }
+/* The column names, in the row's own grid so they sit over their columns, and kept at the top as a long list scrolls. */
+.jrow.jhead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--canvas);
+  padding-top: 18px;
+  padding-bottom: 8px;
+  border-radius: 0;
+  font-size: 13px;
+  color: var(--t3);
+}
+.jrow.jhead:hover {
+  background: var(--canvas);
+}
+.jrow.jhead > :last-child {
+  justify-self: end;
+}
 .jrow .when {
   font-weight: 600;
   font-size: 15px;
@@ -4152,6 +4170,15 @@ fieldset.fld > legend {
   position: relative;
   z-index: 1;
 }
+/* Setup starts at the same height on every step, so the name, the steps and the title don't move as the step's content
+   grows or shrinks. A tall step scrolls rather than being cut. */
+.solo:has(> .setup) {
+  align-items: start;
+  overflow: auto;
+}
+.solo > .setup {
+  margin: clamp(40px, 16vh, 150px) 0 40px;
+}
 .setup .brand2 {
   display: flex;
   align-items: center;
@@ -4635,14 +4662,19 @@ button.item {
   font-size: 15px;
   line-height: 1.6;
 }
-/* Tost's signature, drawn in the text colour so it reads in both themes. */
+/* Tost's signature, drawn in the text colour so it reads in both themes. It follows the last word and rises into its
+   line; the room it takes below is left under the note. */
 .welcome-sign {
-  display: block;
-  width: 116px;
-  height: 67px;
-  margin: 4px 0 0 -4px;
+  display: inline-block;
+  width: 150px;
+  height: 86px;
+  margin: -4px 0 -58px 12px;
+  vertical-align: top;
   background: var(--ink);
   mask: no-repeat left center / contain;
+}
+.welcome-body {
+  padding-bottom: 62px;
 }
 .welcome-acts {
   display: flex;

@@ -129,6 +129,15 @@ export function Jobs({
               <p>{projects.length === 0 ? t("jobs.needProject") : t("jobs.emptyBody")}</p>
             </div>
           )}
+          {/* Column names over the rows, which line up as a table does. Each cell also says what it is, for screen readers. */}
+          {jobs && jobs.length > 0 && (
+            <div className="jrow jhead" aria-hidden="true">
+              <span>{t("jobs.col.job")}</span>
+              <span>{t("jobs.col.next")}</span>
+              <span>{t("jobs.col.last")}</span>
+              <span>{t("jobs.on")}</span>
+            </div>
+          )}
           {JOB_GROUPS.filter((g) => groups.has(g)).map((group) => (
             <section key={group} aria-label={t(`jobs.group.${group}` as MessageKey)}>
               <div className="jgh">{t(`jobs.group.${group}` as MessageKey)}</div>
@@ -206,7 +215,10 @@ function JobRow({
       <div className="col2">
         {next ? (
           <>
-            <span>{t("jobs.next", { when: whenText(lang, next, now) })}</span>
+            <span>
+              <span className="sr">{t("jobs.col.next")}: </span>
+              {whenText(lang, next, now)}
+            </span>
             {skipping && <span className="t3">{t("jobs.skipping", { when: whenText(lang, skipping, now) })}</span>}
             <button type="button" className="tbtn" onClick={onSkip}>
               <Icon name="skip-forward" />
@@ -216,10 +228,13 @@ function JobRow({
         ) : null}
       </div>
       <div className="col3">
+        {/* The column's name for screen readers, inside the button when there is one, so Tab reads it too. */}
+        {!(last && "taskId" in last) && <span className="sr">{t("jobs.col.last")}: </span>}
         {!last ? (
           <span className="t3">{t("jobs.last.never")}</span>
         ) : "taskId" in last ? (
           <button type="button" className="jlast" onClick={() => onOpenTask(last.taskId)}>
+            <span className="sr">{t("jobs.col.last")}: </span>
             {lastTask && <TaskTag task={lastTask} />}
             <span>{whenText(lang, new Date(last.at), now)}</span>
           </button>
