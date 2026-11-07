@@ -1,4 +1,8 @@
 /** @vitest-environment node */
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, type Job, type Task } from "../../shared/model";
 import { Store } from "./store";
@@ -246,5 +250,98 @@ describe("Store", () => {
       store.saveTask(task(`d${i}`, "done", `2026-10-28T09:${String(i).padStart(2, "0")}:00Z`));
     store.saveTask(task("now", "running", "2026-10-28T11:00:00Z"));
     expect(store.listActiveTasks().map((t) => t.id)).toEqual(["now", "old"]);
+  });
+
+  it("keeps a task's steps, files and messages in their own tables, in order, and replaces them on save", () => {
+    const store = new Store(":memory:");
+    const full: Task = {
+      ...task("t", "done", "2026-11-07T09:00:00Z"),
+      projectId: "p",
+      steps: [
+        { text: "Read the notes", status: "done" },
+        { text: "Write the proposal", status: "in_progress" },
+      ],
+      files: [
+        { path: "/p/notes.txt", kind: "update", role: "used" },
+        { path: "/p/Proposta.docx", kind: "add", role: "made" },
+      ],
+      messages: [
+        { from: "user", text: "Write it", at: "2026-11-07T08:00:00Z", attachments: ["/p/notes.txt"] },
+        { from: "agent", text: "Done", at: "2026-11-07T08:30:00Z" },
+        { from: "user", text: "Shorter", at: "2026-11-07T08:40:00Z", followUp: true },
+      ],
+    };
+    store.saveTask(full);
+    expect(store.getTask("t")).toEqual(full);
+    expect(store.listTasks()).toEqual([full]);
+    expect(store.listAllTasks()).toEqual([full]);
+    expect(store.listProjectTasks("p")).toEqual([full]);
+    expect(store.projectOverviews().p?.lastResult).toMatchObject({ name: "Proposta.docx" });
+
+    const fewer = { ...full, files: [full.files[1] as Task["files"][number]], steps: [] };
+    store.saveTask(fewer);
+    expect(store.getTask("t")).toEqual(fewer);
+  });
+
+  it("removes a task's steps, files and messages with it", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "tw-store-")), "tost-work.db");
+    try {
+      const store = new Store(path);
+      store.saveTask({ ...task("t", "done", "2026-11-07T09:00:00Z"), steps: [{ text: "s", status: "done" }] });
+      store.deleteTask("t");
+      store.close();
+      const db = new DatabaseSync(path);
+      expect(db.prepare("select count(*) as n from task_steps").get()).toEqual({ n: 0 });
+      db.close();
+    } finally {
+      rmSync(join(path, ".."), { recursive: true, force: true });
+    }
+  });
+
+  it("moves tasks saved before 0.1 into the new tables, after copying the database", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tw-store-"));
+    const path = join(dir, "tost-work.db");
+    try {
+      // The database as 0.0.25 left it: each task whole in one JSON column.
+      const old: Task = {
+        ...task("old", "done", "2026-11-01T09:00:00Z"),
+        steps: [{ text: "Read", status: "done" }],
+        files: [{ path: "/tmp/out.docx", kind: "add", role: "made" }],
+        messages: [{ from: "user", text: "Fix the typos", at: "2026-11-01T08:00:00Z" }],
+      };
+      const db = new DatabaseSync(path);
+      db.exec(`create table tasks (id text primary key, project_id text, status text not null, data text not null,
+        updated_at text not null)`);
+      db.prepare("insert into tasks values (?, ?, ?, ?, ?)").run(
+        "old",
+        null,
+        "done",
+        JSON.stringify(old),
+        old.updatedAt,
+      );
+      db.close();
+
+      const store = new Store(path);
+      expect(store.getTask("old")).toEqual(old);
+      store.close();
+      expect(existsSync(`${path}.before-0.1`)).toBe(true);
+
+      const after = new DatabaseSync(path);
+      const row = after.prepare("select data from tasks").get() as { data: string };
+      expect(JSON.parse(row.data).steps).toBeUndefined();
+      expect(after.prepare("pragma user_version").get()).toEqual({ user_version: 1 });
+      after.close();
+      const copy = new DatabaseSync(`${path}.before-0.1`);
+      const kept = copy.prepare("select data from tasks").get() as { data: string };
+      expect(JSON.parse(kept.data).steps).toEqual(old.steps);
+      copy.close();
+
+      // Opened again, nothing moves twice.
+      const again = new Store(path);
+      expect(again.getTask("old")).toEqual(old);
+      again.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
