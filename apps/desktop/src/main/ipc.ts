@@ -245,13 +245,16 @@ export function registerIpc(
     if (runner.isRunning(task.id)) throw new UserError("error.waitToSave");
     const sources = await savablePaths(task);
     if (sources.length === 0) throw new UserError("error.noFilesYet");
+    // It opens where the user last saved a copy, even after a restart, as the file picker does.
     const picked = await openDialog({
       title: t("save.pick"),
       buttonLabel: t("save.here"),
       properties: ["openDirectory", "createDirectory"],
+      defaultPath: store.value("saveFolder") ?? undefined,
     });
     const folder = picked.canceled ? undefined : picked.filePaths[0];
     if (!folder) return null;
+    store.saveValue("saveFolder", folder);
     const clash = async (name: string): Promise<Conflict> => {
       const answer = await ask({
         message: t("save.exists", { name }),
