@@ -9,8 +9,17 @@ ipcRenderer.on(IPC.fullScreen, (_: unknown, on: boolean) => {
   document.documentElement.toggleAttribute("data-full-screen", on === true);
 });
 
-// Questions taken for a listener that had gone by the time they arrived. See onQuestion.
+// The main process counts a question as delivered once it's sent or taken, so each one goes to the newest listener
+// when it arrives, whichever subscription asked for it (React mounts twice in development), and waits here for the
+// next listener when there's none.
+const questionListeners: ((question: WindowQuestion) => void)[] = [];
 const unclaimed: WindowQuestion[] = [];
+let questionsHeard = false;
+function deliverQuestion(question: WindowQuestion): void {
+  const listener = questionListeners.at(-1);
+  if (listener) listener(question);
+  else unclaimed.push(question);
+}
 
 const api: TostWorkApi = {
   platform: process.platform as TostWorkApi["platform"],
@@ -38,21 +47,18 @@ const api: TostWorkApi = {
     };
   },
   onQuestion: (listener) => {
-    // Questions asked while the page was still loading wait in the main process until it asks for them. The main
-    // process counts them as delivered once taken, so any that arrive after this listener has gone (React mounts
-    // twice in development) wait here for the next one.
-    let listening = true;
-    const handler = (_: unknown, question: WindowQuestion) => listener(question);
-    ipcRenderer.on(IPC.question, handler);
+    questionListeners.push(listener);
+    if (!questionsHeard) {
+      questionsHeard = true;
+      ipcRenderer.on(IPC.question, (_: unknown, question: WindowQuestion) => deliverQuestion(question));
+    }
     for (const question of unclaimed.splice(0)) listener(question);
+    // Questions asked while the page was still loading wait in the main process until it asks for them.
     void ipcRenderer.invoke(IPC.takeQuestions).then((waiting: unknown) => {
-      if (!Array.isArray(waiting)) return;
-      if (listening) for (const question of waiting) listener(question as WindowQuestion);
-      else unclaimed.push(...(waiting as WindowQuestion[]));
+      if (Array.isArray(waiting)) for (const question of waiting) deliverQuestion(question as WindowQuestion);
     });
     return () => {
-      listening = false;
-      ipcRenderer.removeListener(IPC.question, handler);
+      questionListeners.splice(questionListeners.indexOf(listener), 1);
     };
   },
   answerQuestion: (id, answer) => ipcRenderer.send(IPC.answerQuestion, id, answer),

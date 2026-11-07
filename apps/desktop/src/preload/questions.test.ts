@@ -41,6 +41,22 @@ describe("questions from the main process, in the preload", () => {
     expect(second).toHaveBeenCalledWith(QUIT);
   });
 
+  it("hands questions that arrive after a remount to the listener that's there now", async () => {
+    const api = exposed.api as TostWorkApi;
+    const first = vi.fn();
+    const stop = api.onQuestion(first);
+    const takeFirst = releaseTake;
+    // React in development: unmount and mount again before the first answer from the main process arrives.
+    stop();
+    const second = vi.fn();
+    api.onQuestion(second);
+    takeFirst([QUIT]);
+    releaseTake([]);
+    await Promise.resolve();
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledWith(QUIT);
+  });
+
   it("hands them to a listener that's still there", async () => {
     const api = exposed.api as TostWorkApi;
     const listener = vi.fn();
