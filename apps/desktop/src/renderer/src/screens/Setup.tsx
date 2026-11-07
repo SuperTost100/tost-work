@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AccountRow } from "@/components/AccountRow";
 import { KeyRow } from "@/components/KeyRow";
 import { Sprigs } from "@/components/Sprigs";
@@ -47,6 +47,11 @@ export function Setup({
 }) {
   const t = useT();
   const [step, setStep] = useState(0);
+  // Each step starts at the top, where its title is, even when the step before was scrolled in a short window.
+  const page = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (step >= 0) page.current?.scrollTo?.(0, 0);
+  }, [step]);
   const [name, setName] = useState(settings.name);
   const [work, setWork] = useState(settings.work);
   const [notes, setNotes] = useState(settings.notes);
@@ -109,7 +114,7 @@ export function Setup({
 
   return (
     <main className="main">
-      <div className="solo">
+      <div className="solo" ref={page}>
         <div className="setup">
           <div className="brand2">
             <Logo size={28} />
