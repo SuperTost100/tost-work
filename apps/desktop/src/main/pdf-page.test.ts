@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { officeKind, pageSize, printable } from "./pdf-page";
+import { NO_SCRIPTS, officeKind, pageSize, printable } from "./pdf-page";
 
 // Excerpts of the HTML OfficeCLI 1.0.158 writes for each kind of file.
 const DOCX = `<html><head><style>.page{}</style></head><body><div class="page-wrapper"><div class="page" data-page="1" style="width:595.3pt;min-height:841.9pt;padding:72pt 90pt 72pt 90pt;"></div></div><script>scale()</script></body></html>`;
@@ -21,9 +21,14 @@ describe("PDF pages", () => {
     expect(pageSize("<html></html>", "docx")).toEqual({ width: 8.27, height: 11.69 });
   });
 
-  it("takes the viewer's scripts out and puts the fonts and print rules in the head", () => {
+  it("blocks every script with a policy at the top, and puts the fonts and print rules in the head", () => {
     const page = printable(DOCX, "docx", "@font-face{}");
-    expect(page).not.toContain("<script");
+    expect(page.startsWith(NO_SCRIPTS)).toBe(true);
+    expect(NO_SCRIPTS).toContain("script-src 'none'");
     expect(page).toMatch(/<style>@font-face\{\}\n[\s\S]*\.page \{ box-shadow: none[\s\S]*<\/style><\/head>/);
+  });
+
+  it("blocks scripts in a page without a head too", () => {
+    expect(printable("<p>Ciao</p><script>x()</script>", "docx", "").startsWith(NO_SCRIPTS)).toBe(true);
   });
 });

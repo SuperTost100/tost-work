@@ -46,9 +46,16 @@ export function printCss(kind: OfficeKind): string {
 .sheet-content:last-child { break-after: auto; }`;
 }
 
-/** OfficeCLI's HTML with its viewer scripts taken out, and the fonts and print rules put in. */
+/**
+ * OfficeCLI's HTML with the fonts and print rules put in, and no script allowed to run. Its viewer scripts would
+ * rescale the pages, and a document's own text could hold markup. A policy at the top blocks every script and
+ * event handler, which no pattern for taking scripts out can promise. The main process can still run its own code
+ * in the page, to wait for the fonts.
+ */
 export function printable(html: string, kind: OfficeKind, fonts: string): string {
   const style = `<style>${fonts}\n${printCss(kind)}</style>`;
-  const clean = html.replace(/<script\b[\s\S]*?<\/script>/gi, "");
-  return clean.includes("</head>") ? clean.replace("</head>", `${style}</head>`) : style + clean;
+  const page = html.includes("</head>") ? html.replace("</head>", `${style}</head>`) : style + html;
+  return `${NO_SCRIPTS}${page}`;
 }
+
+export const NO_SCRIPTS = `<meta http-equiv="Content-Security-Policy" content="script-src 'none'">`;
