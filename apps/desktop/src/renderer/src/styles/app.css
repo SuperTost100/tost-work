@@ -3637,7 +3637,7 @@ ol.editable li::before {
   color: var(--t3);
 }
 .jrow.jhead:hover {
-  background: none;
+  background: var(--canvas);
 }
 .jrow.jhead > :last-child {
   justify-self: end;
