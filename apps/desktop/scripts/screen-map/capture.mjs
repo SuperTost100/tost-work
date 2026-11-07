@@ -38,12 +38,13 @@ const launch = async (settings) => {
   const app = await _electron.launch({
     executablePath: electronPath,
     args: [APP, "--no-sandbox", `--user-data-dir=${data}`],
-    // The home folder is the throwaway one too, so the skills in Documents/Tost Work/Skills are its own, never the
-    // operator's. shortcut: on macOS the Documents folder doesn't follow HOME; capture on Linux, as the README says.
+    // The home and config folders are the throwaway one too (Documents comes from the config's user-dirs.dirs, or
+    // else the home), so the skills in Documents/Tost Work/Skills are its own, never the operator's.
+    // shortcut: on macOS the Documents folder doesn't follow HOME; capture on Linux, as the README says.
     env: {
       ...process.env,
       HOME: data,
-      XDG_DOCUMENTS_DIR: join(data, "Documents"),
+      XDG_CONFIG_HOME: join(data, ".config"),
       TOST_WORK_ENGINE: "fake",
       TZ: "Europe/Rome",
     },
