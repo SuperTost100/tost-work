@@ -59,8 +59,8 @@ export function printable(html: string, kind: OfficeKind, fonts: string): string
   const head = /<head\b[^>]*>/i.exec(html);
   if (head) {
     const at = head.index + head[0].length;
-    if (!html.includes("</head>")) return html.slice(0, at) + NO_SCRIPTS + style + html.slice(at);
-    return (html.slice(0, at) + NO_SCRIPTS + html.slice(at)).replace("</head>", `${style}</head>`);
+    if (!/<\/head>/i.test(html)) return html.slice(0, at) + NO_SCRIPTS + style + html.slice(at);
+    return (html.slice(0, at) + NO_SCRIPTS + html.slice(at)).replace(/<\/head>/i, (end) => style + end);
   }
   const at = /^\s*<!doctype[^>]*>/i.exec(html)?.[0].length ?? 0;
   return html.slice(0, at) + NO_SCRIPTS + style + html.slice(at);

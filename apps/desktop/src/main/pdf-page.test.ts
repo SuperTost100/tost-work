@@ -37,6 +37,12 @@ describe("PDF pages", () => {
     expect(page.startsWith(`<!DOCTYPE html>\n<html lang="it">\n<head>${NO_SCRIPTS}`)).toBe(true);
   });
 
+  it("puts the print style at the end of a head written in capitals too", () => {
+    expect(printable("<HTML><HEAD><STYLE>p{}</STYLE></HEAD></HTML>", "docx", "@x{}")).toMatch(
+      /<STYLE>p\{\}<\/STYLE><style>@x\{\}[\s\S]*<\/style><\/HEAD>/,
+    );
+  });
+
   it("blocks scripts in a page without a head too, after its doctype", () => {
     expect(printable("<p>Ciao</p><script>x()</script>", "docx", "").startsWith(NO_SCRIPTS)).toBe(true);
     expect(printable("<!doctype html><p>Ciao</p>", "docx", "").startsWith(`<!doctype html>${NO_SCRIPTS}`)).toBe(true);
