@@ -15,6 +15,26 @@
   wait here until the release bumps the version.
 -->
 
+## 0.0.27-dev
+
+### en
+
+- **The selected item stands out:** in the sidebar, Settings, the board and every toggle, the selected item sits on a light raised card, as the selected tab does in Safari.
+- **Fewer text sizes:** the app uses ten sizes instead of nineteen. Sizes that were half a pixel apart now match, and no text got smaller.
+- **Bigger switches**, and in dark mode the edges of fields you type into are easier to see.
+- **The board lines up** with Projects and Jobs, and stays centred with them in a wide window.
+- **Quitting with one task working** now says "it stops" instead of "they stop".
+- **Save a copy** opens in the folder where you last saved one, even after a restart.
+
+### it
+
+- **L'elemento scelto si vede meglio:** nella barra laterale, nelle Impostazioni, nella bacheca e in ogni selettore, l'elemento scelto sta su una scheda chiara in rilievo, come la scheda attiva in Safari.
+- **Meno dimensioni di testo:** l'app ne usa dieci invece di diciannove. Le dimensioni che differivano di mezzo pixel ora coincidono, e nessun testo è diventato più piccolo.
+- **Interruttori più grandi**, e nel tema scuro i bordi dei campi in cui scrivi si vedono meglio.
+- **La bacheca è allineata** a Progetti e Lavori pianificati, e in una finestra larga resta centrata come loro.
+- **Uscire con un'attività in corso** ora dice «si interrompe» invece di «si interrompono».
+- **Salva una copia** si apre nella cartella dove hai salvato l'ultima volta, anche dopo un riavvio.
+
 ## 0.0.26-dev
 
 ### en
