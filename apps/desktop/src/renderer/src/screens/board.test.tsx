@@ -128,26 +128,32 @@ describe("the board", () => {
     expect((await api.tasks.get(ids.later))?.status).toBe("needs-you");
   });
 
-  it("answers an approval in place, with the task screen's words", async () => {
+  it("shows what a task asks as one line in its row, and its choices only in the side panel", async () => {
     const { api, ids } = await seeded();
     const decide = vi.spyOn(api.tasks, "decide");
     await openBoard(api);
     const needsYou = await group("Needs you");
-    expect(within(needsYou).getByRole("button", { name: "Allow overwrite" })).toBeTruthy();
-    await click(within(needsYou).getByRole("button", { name: "Save as new file" }));
-    expect(decide).toHaveBeenCalledWith(ids.approving, "refuse");
-    await waitFor(() =>
-      expect(within(screen.getByRole("region", { name: "Needs you" })).queryByText(/Supplier/)).toBeNull(),
-    );
+    expect(within(needsYou).getByText(/contracts\.xlsx/)).toBeTruthy();
+    expect(within(needsYou).queryByRole("button", { name: "Allow overwrite" })).toBeNull();
+    expect(within(needsYou).queryByRole("button", { name: "Don't save" })).toBeNull();
+    await click(row("Supplier contracts summary"));
+    const panel = await screen.findByRole("complementary", { name: "Supplier contracts summary" });
+    await click(within(panel).getByRole("button", { name: "Don't save" }));
+    expect(decide).toHaveBeenCalledWith(ids.approving, "discard");
   });
 
-  it("turns an overwrite down in place, saving nothing", async () => {
+  it("answers a single question from the side panel", async () => {
     const { api, ids } = await seeded();
-    const decide = vi.spyOn(api.tasks, "decide");
+    const answer = vi.spyOn(api.tasks, "answer");
+    const asked = (await api.tasks.get(ids.asking))?.question;
+    const option = asked?.options[0] ?? "";
+    expect(option).not.toBe("");
     await openBoard(api);
-    const needsYou = await group("Needs you");
-    await click(within(needsYou).getByRole("button", { name: "Don't save" }));
-    expect(decide).toHaveBeenCalledWith(ids.approving, "discard");
+    await click(row("Proposal for Alpi"));
+    const panel = await screen.findByRole("complementary", { name: "Proposal for Alpi" });
+    expect(within(panel).getByText(asked?.text ?? "")).toBeTruthy();
+    await click(within(panel).getByRole("button", { name: option }));
+    expect(answer).toHaveBeenCalledWith(ids.asking, [option]);
   });
 
   it("answers an approval from the side panel too", async () => {
