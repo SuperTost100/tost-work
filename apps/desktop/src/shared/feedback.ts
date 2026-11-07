@@ -31,12 +31,14 @@ export function feedbackUrl(info: FeedbackInfo): string {
  * The repository's bug form, with the version and the system already filled in, so the person only says what happened.
  * GitHub fills a form field from the query parameter named after its id (`.github/ISSUE_TEMPLATE/bug.yml`).
  */
-export function bugReportUrl(info: Omit<FeedbackInfo, "language">): string {
+export function bugReportUrl(info: Omit<FeedbackInfo, "language"> & { logs?: string }): string {
   const params = new URLSearchParams({
     template: "bug.yml",
     version: `${info.version} · build ${info.build}`,
     os: OS_NAMES[info.platform],
   });
+  // The events log of a test build: nothing the user wrote or named, so it can go in a public report.
+  if (info.logs) params.set("logs", `Events before the report, times in UTC:\n\n\`\`\`\n${info.logs}\n\`\`\``);
   return `${REPO_URL}/issues/new?${params}`;
 }
 

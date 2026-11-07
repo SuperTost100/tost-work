@@ -52,6 +52,7 @@ describe("the pre-release welcome card", () => {
     const url = new URL(link.getAttribute("href") ?? "");
     expect(url.searchParams.get("template")).toBe("bug.yml");
     expect(url.searchParams.get("version")).toContain(__APP_VERSION__);
+    await waitFor(() => expect(new URL(link.getAttribute("href") ?? "").searchParams.get("logs")).toContain("started"));
     expect((await api.settings.get()).welcomed).toBe(__APP_VERSION__);
   });
 });

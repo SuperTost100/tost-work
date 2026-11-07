@@ -31,6 +31,7 @@ import { type MenuItem, taskMenuItems } from "../shared/taskMenu";
 import type { Accounts } from "./accounts";
 import type { DebugLogs } from "./debugLog";
 import { type TaskRunner, withFiles } from "./engine/runner";
+import type { EventLog } from "./eventLog";
 import { buildInfo, logsZip, logsZipName, within } from "./exportLogs";
 import {
   type Conflict,
@@ -50,6 +51,9 @@ import type { Store } from "./store/store";
 import { UserError, userMessage } from "./userError";
 import { absolutePath, droppedInput, oneLine, paths, pickInput, placedTask, settingsPatch, text } from "./validate";
 
+/** How much of the events log a problem report carries, so the bug form's link stays under GitHub's limit. */
+const EVENTS_IN_REPORT = 3000;
+
 /** Validates everything that comes from the interface, because IPC is a trust boundary. */
 export function registerIpc(
   store: Store,
@@ -65,6 +69,8 @@ export function registerIpc(
   debug: DebugLogs,
   /** Asks in the window's own card, showing the window first. */
   ask: (question: Omit<WindowQuestion, "id">) => Promise<QuestionAnswer>,
+  /** The events log of a test build, which a problem report carries. */
+  events: EventLog,
 ): void {
   // A handler that fails goes to the app's debug log too, and on to the window as before.
   const handle = (channel: string, listener: Parameters<typeof ipcMain.handle>[1]) =>
@@ -407,6 +413,8 @@ export function registerIpc(
     const error = await shell.openPath(file);
     if (error) throw new Error(error);
   });
+  // The newest events that fit in a report's link: GitHub refuses links much longer than 8,000 characters.
+  handle(IPC.debugEvents, () => events.tail(EVENTS_IN_REPORT));
   handle(IPC.debugRevealAppLog, async () => shell.showItemInFolder(await debug.touchApp()));
   handle(IPC.debugExportLogs, async () => {
     const settings = store.getSettings();

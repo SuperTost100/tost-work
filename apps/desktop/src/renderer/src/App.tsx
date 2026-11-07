@@ -780,7 +780,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
           onOpenProject={(id) => setRoute({ name: "project", id })}
         />
       )}
-      {api && <ReportDialog api={api} open={reportOpen} onOpenChange={setReportOpen} />}
+      {api && <ReportDialog api={api} open={reportOpen} detailed={current.debug} onOpenChange={setReportOpen} />}
       {api && stage !== "stable" && (
         <WelcomeCard
           stage={stage}

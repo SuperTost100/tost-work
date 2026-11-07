@@ -253,6 +253,8 @@ export interface TostWorkApi {
     revealAppLog(): Promise<void>;
     /** Asks where to save, then writes a zip with the app log, the task logs and info.json. Nothing if the user cancels. */
     exportLogs(): Promise<void>;
+    /** The newest lines of a test build's events log, for a problem report: no text the user wrote, no file names. */
+    events(): Promise<string>;
     /** Tells the app log which screen opened, while debug is on: its name and ids, never a title or a file. */
     screen(route: Record<string, string>): void;
   };
@@ -437,5 +439,6 @@ export const IPC = {
   debugRevealAppLog: "debug:reveal-app-log",
   debugExportLogs: "debug:export-logs",
   debugScreen: "debug:screen",
+  debugEvents: "debug:events",
   licensesOpen: "licenses:open",
 } as const;

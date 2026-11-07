@@ -42,8 +42,10 @@ const en = {
   "report.version": "Version",
   "report.system": "System",
   "report.public": "You need a free GitHub account. What you write is public, so leave out your clients' details.",
-  "report.logsTitle": "Is the problem in a task?",
-  "report.logs": "The logs help find out what went wrong. Export them, check them, and drag them into the form.",
+  "report.events":
+    "The form also carries this build's events log: what happened and when, without your tasks' text or file names.",
+  "report.logsTitle": "Detailed logs are on",
+  "report.logs": "They help most with a problem in a task. Export them, check them, and drag them into the form.",
   "report.open": "Open GitHub",
   "welcome.title.dev": "This is a test build.",
   "welcome.title.alpha": "This is the alpha.",
@@ -744,8 +746,10 @@ const it: Record<MessageKey, string> = {
   "report.system": "Sistema",
   "report.public":
     "Serve un account GitHub, gratuito. Quello che scrivi è pubblico: non metterci dati dei tuoi clienti.",
-  "report.logsTitle": "Il problema è in un'attività?",
-  "report.logs": "I log aiutano a capire cosa è andato storto. Esportali, controllali e trascinali nel modulo.",
+  "report.events":
+    "Il modulo porta anche il registro degli eventi di questa versione: cosa è successo e quando, senza i testi delle tue attività né i nomi dei file.",
+  "report.logsTitle": "I log dettagliati sono attivi",
+  "report.logs": "Servono soprattutto per un problema in un'attività. Esportali, controllali e trascinali nel modulo.",
   "report.open": "Apri GitHub",
   "welcome.title.dev": "Questa è una versione di test.",
   "welcome.title.alpha": "Questa è l'alpha.",

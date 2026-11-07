@@ -726,6 +726,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       },
     },
     debug: {
+      events: async () => "2026-11-07 20:00:00 started version=0.0.28-dev platform=darwin",
       taskLog: async (id) => {
         if (!tasks.has(id)) throw new Error("That task doesn't exist");
         return logs.get(id) ?? null;

@@ -27,5 +27,18 @@ describe("bugReportUrl", () => {
     expect(u.searchParams.get("template")).toBe("bug.yml");
     expect(u.searchParams.get("version")).toBe("0.0.28-dev · build ab12cd3");
     expect(u.searchParams.get("os")).toBe("macOS");
+    expect(u.searchParams.has("logs")).toBe(false);
+  });
+
+  it("puts the events log in the form's Logs field, as a block", () => {
+    const u = new URL(
+      bugReportUrl({
+        version: "0.0.28-dev",
+        build: "ab12cd3",
+        platform: "darwin",
+        logs: "2026-11-07 20:00:00 started",
+      }),
+    );
+    expect(u.searchParams.get("logs")).toBe("Events before the report, times in UTC:\n\n```\n2026-11-07 20:00:00 started\n```");
   });
 });
