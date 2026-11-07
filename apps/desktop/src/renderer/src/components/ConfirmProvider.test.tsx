@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { type Confirm, useConfirm } from "@/lib/useConfirm";
 import { LanguageContext } from "@/lib/useT";
 import { ConfirmProvider } from "./ConfirmProvider";
@@ -81,6 +81,31 @@ describe("the confirmation card", () => {
     });
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(answers()).toBe("false");
+  });
+
+  it("makes the rest of the page inert while it's open, so Tab can't leave it, and gives it back after", async () => {
+    // Another dialog's portal, as the job editor's is when the card opens over it.
+    const other = document.createElement("div");
+    document.body.append(other);
+    const card = await open();
+    const own = card.closest("body > *");
+    expect(other.inert).toBe(true);
+    expect((own as HTMLElement).inert).not.toBe(true);
+    await act(async () => {
+      fireEvent.click(within(card).getByRole("button", { name: "Cancel" }));
+    });
+    expect(other.inert).toBe(false);
+    other.remove();
+  });
+
+  it("keeps the app's shortcuts, such as Cmd+K, from acting while it's open", async () => {
+    const shortcut = vi.fn();
+    window.addEventListener("keydown", shortcut);
+    const card = await open();
+    fireEvent.keyDown(card, { key: "k", metaKey: true });
+    fireEvent.keyDown(card, { key: "k", ctrlKey: true });
+    expect(shortcut).not.toHaveBeenCalled();
+    window.removeEventListener("keydown", shortcut);
   });
 
   it("answers true on the action button", async () => {

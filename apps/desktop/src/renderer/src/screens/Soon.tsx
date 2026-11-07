@@ -4,7 +4,7 @@ import { useT } from "@/lib/useT";
 export function Soon({ section }: { section: string }) {
   const t = useT();
   return (
-    <div className="main">
+    <main className="main">
       <div className="top" />
       <div className="scroll">
         <div className="col" style={{ paddingTop: 120 }}>
@@ -16,6 +16,6 @@ export function Soon({ section }: { section: string }) {
           </p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

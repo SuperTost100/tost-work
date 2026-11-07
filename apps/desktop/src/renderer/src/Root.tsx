@@ -25,13 +25,13 @@ export function Root({ api = window.tostWork }: { api?: TostWorkApi }) {
   if (!api) screen = <App api={api} />;
   else if (error)
     screen = (
-      <div className="main">
+      <main className="main">
         <div className="solo">
           <p role="alert">{translate(lang, "setup.failed", { error })}</p>
         </div>
-      </div>
+      </main>
     );
-  else if (!settings) screen = <div className="main" />;
+  else if (!settings) screen = <main className="main" />;
   else if (!settings.setupDone) screen = <Setup api={api} settings={settings} onChange={setSettings} />;
   else screen = <App api={api} userName={settings.name} settings={settings} onSettings={setSettings} />;
 

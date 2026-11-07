@@ -708,7 +708,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
       ) : (
         sidebar(true)
       )}
-      {screen ?? <div className="main" />}
+      {screen ?? <main className="main" />}
       <div className="toasts">
         {error && (
           <div className="toast" role="alert">

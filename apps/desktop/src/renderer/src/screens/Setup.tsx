@@ -108,7 +108,7 @@ export function Setup({
   const [title, sub] = titles[step] ?? ["setup.name.title", "setup.name.sub"];
 
   return (
-    <div className="main">
+    <main className="main">
       <div className="solo">
         <div className="setup">
           <div className="brand2">
@@ -351,6 +351,6 @@ export function Setup({
         </div>
         <Sprigs />
       </div>
-    </div>
+    </main>
   );
 }

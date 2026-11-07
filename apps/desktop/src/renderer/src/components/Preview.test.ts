@@ -42,6 +42,14 @@ describe("preview loading", () => {
     expect(short.kind === "table" && short.more).toBe(0);
   });
 
+  it("keeps a main element in Markdown out of the page, with its text, so there's one main landmark", async () => {
+    const bytes = new TextEncoder().encode("<main>\n\nThe offer\n\n</main>");
+    const loaded = await load({ name: "x.md", ext: "md", bytes });
+    if (loaded.kind !== "html") throw new Error("expected html");
+    expect(loaded.html).not.toMatch(/<main/);
+    expect(loaded.html).toMatch(/The offer/);
+  });
+
   it("sanitises Markdown written by an agent", async () => {
     const bytes = new TextEncoder().encode('# Title\n\n<img src=x onerror="alert(1)"><script>alert(2)</script>');
     const loaded = await load({ name: "x.md", ext: "md", bytes });

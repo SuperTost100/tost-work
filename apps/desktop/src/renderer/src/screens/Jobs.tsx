@@ -106,7 +106,7 @@ export function Jobs({
   const act = (work: Promise<unknown>) => void work.catch(onError);
 
   return (
-    <div className="main">
+    <main className="main">
       <div className="top" />
       <div className="scroll">
         <div className="wcol">
@@ -164,7 +164,7 @@ export function Jobs({
           }}
         />
       )}
-    </div>
+    </main>
   );
 }
 

@@ -1154,7 +1154,7 @@ export function Task({
   };
 
   return (
-    <div className="main">
+    <main className="main">
       <div className="top">
         <span className="crumb">
           {quick && (
@@ -1391,7 +1391,7 @@ export function Task({
           )}
         </div>
       )}
-    </div>
+    </main>
   );
 }
 

@@ -251,7 +251,7 @@ export function Board({
 
   return (
     // The side panel is a sidebar on the right, beside the page rather than over it, so it never covers a task.
-    <div className="main board">
+    <main className="main board">
       <div className="board-page">
         <div className="top">
           <span className="grow" />
@@ -318,7 +318,7 @@ export function Board({
           onSaved={onSavedForLater}
         />
       )}
-    </div>
+    </main>
   );
 }
 
