@@ -25,5 +25,7 @@ release. The map lives in the Figma file [Tost Work · screen map](https://www.f
    capture order. Then it calls `upload_assets` with those ids and posts each PNG from `/tmp/screens/<theme>/`, in
    `manifest.json` order, to the matching upload URL.
 
-The capture runs on the fake engine with throwaway data, in Italian. A screen it can't reach is skipped with a `SKIP`
+Run it on Linux. The capture's data and home folder are throwaway, so your own skills in `Documents/Tost Work/Skills`
+never reach the screenshots; on macOS the Documents folder doesn't follow the home folder. The capture runs on the fake
+engine, in Italian. A screen it can't reach is skipped with a `SKIP`
 line, and the rest still come out.

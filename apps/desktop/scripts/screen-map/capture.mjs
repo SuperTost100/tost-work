@@ -38,7 +38,15 @@ const launch = async (settings) => {
   const app = await _electron.launch({
     executablePath: electronPath,
     args: [APP, "--no-sandbox", `--user-data-dir=${data}`],
-    env: { ...process.env, TOST_WORK_ENGINE: "fake", TZ: "Europe/Rome" },
+    // The home folder is the throwaway one too, so the skills in Documents/Tost Work/Skills are its own, never the
+    // operator's. shortcut: on macOS the Documents folder doesn't follow HOME; capture on Linux, as the README says.
+    env: {
+      ...process.env,
+      HOME: data,
+      XDG_DOCUMENTS_DIR: join(data, "Documents"),
+      TOST_WORK_ENGINE: "fake",
+      TZ: "Europe/Rome",
+    },
   });
   const page = await app.firstWindow();
   await page.setViewportSize({ width: 1280, height: 820 });
@@ -214,9 +222,13 @@ await page.waitForSelector("text=Tost");
   await shot(page, "projects");
   await safe("new project", async () => {
     await menu("new-project");
-    await page.waitForTimeout(500);
-    await shot(page, "new-project");
-    await page.keyboard.press("Escape");
+    try {
+      await page.waitForTimeout(500);
+      await shot(page, "new-project");
+    } finally {
+      // Closed even when the shot fails, so the dialog doesn't cover the screens after it.
+      await page.keyboard.press("Escape");
+    }
   });
   await safe("project page", async () => {
     await page.locator(".pcard").first().click({ timeout: 3000 });
