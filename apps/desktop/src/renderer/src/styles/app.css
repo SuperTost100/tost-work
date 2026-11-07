@@ -2467,9 +2467,29 @@ label.opt input {
 .bpanel .foot2 .btn {
   justify-content: center;
 }
+/* A question in the panel: its options stacked full width, so a long one wraps instead of being cut. */
+.bask {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 14px;
+}
+.bask .bwait {
+  margin: 0;
+}
+.bask-opts {
+  display: grid;
+  gap: 6px;
+}
+.bask-opt {
+  height: auto;
+  min-height: 32px;
+  padding: 6px 12px;
+  white-space: normal;
+  text-align: left;
+}
 /* What the task waits for, above the brief, so the buttons below say what they answer. */
 .bpanel .bwait {
-  margin: 0 0 14px;
+  margin: 4px 0 14px;
   font-size: 14px;
   font-weight: 500;
 }

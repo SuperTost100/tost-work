@@ -17,6 +17,8 @@ import {
   BRIEF_MAX,
   type Decision,
   type Project,
+  type Question,
+  questionItems,
   type Settings,
   type Task,
   toReview,
@@ -145,6 +147,7 @@ export function Board({
     start: (id, go = true) => act(api.tasks.startSaved(id), (task) => go && onOpenTask(task.id)),
     decide: (id, decision) => act(api.tasks.decide(id, decision)),
     review: (id) => act(api.tasks.markReviewed(id)),
+    answer: (id, answer) => act(api.tasks.answer(id, [answer])),
   };
   const select = (id: string) => setSelected((current) => (current === id ? null : id));
   const menu = (id: string, inPanel = false) => onTaskMenu(id, () => setRenaming({ id, inPanel }));
@@ -326,6 +329,7 @@ interface RowActions {
   start: (id: string, go?: boolean) => void;
   decide: (id: string, decision: Decision) => void;
   review: (id: string) => void;
+  answer: (id: string, answer: string) => void;
 }
 
 function ViewButton({
@@ -430,27 +434,12 @@ function TaskThumb({ task }: { task: Task }) {
   return <Thumb path={path} />;
 }
 
-/** The buttons a row or card answers in place: an approval, or Start for a task saved for later. */
+/**
+ * The one button a row or card has in place: Start, for a task saved for later. What a task asks (a question, a file to
+ * replace) shows as one line in the row, and its choices are in the side panel, which opens with the row.
+ */
 function InlineActions({ task, actions }: { task: Task; actions: RowActions }) {
   const t = useT();
-  if (task.approval) {
-    const remove = task.approval.action === "delete";
-    return (
-      <span className="actions">
-        {!remove && (
-          <button type="button" className="btn" onClick={() => actions.decide(task.id, "discard")}>
-            {t("approval.discard")}
-          </button>
-        )}
-        <button type="button" className="btn" onClick={() => actions.decide(task.id, "allow")}>
-          {remove ? t("approval.trash") : t("approval.allowOverwrite")}
-        </button>
-        <button type="button" className="btn dark" onClick={() => actions.decide(task.id, "refuse")}>
-          {remove ? t("approval.keep") : t("approval.saveNew")}
-        </button>
-      </span>
-    );
-  }
   if (task.status === "draft")
     return (
       <span className="actions">
@@ -722,6 +711,9 @@ function SidePanel({
           <TaskTag task={task} />
         </p>
         {task.approval && <p className="bwait">{approvalTitle(t, task.approval)}</p>}
+        {task.question && (
+          <PanelQuestion question={task.question} onAnswer={(a) => actions.answer(task.id, a)} onOpen={onOpenTask} />
+        )}
         <h3>{t("task.asked")}</h3>
         <p className="bbrief">{brief}</p>
         <h3>{t("task.made")}</h3>
@@ -766,6 +758,43 @@ function SidePanel({
         )}
       </div>
     </aside>
+  );
+}
+
+/**
+ * What the task asks, in the panel. A single question with options is answered here; a round of several, or one that
+ * wants the user's own words, is answered in the task, where there's room for it.
+ */
+function PanelQuestion({
+  question,
+  onAnswer,
+  onOpen,
+}: {
+  question: Question;
+  onAnswer: (answer: string) => void;
+  onOpen: () => void;
+}) {
+  const t = useT();
+  const items = questionItems(question);
+  const here = items.length === 1 && question.options.length > 0;
+  return (
+    <div className="bask">
+      <p className="bwait">{question.text}</p>
+      {here ? (
+        <div className="bask-opts">
+          {question.options.map((option) => (
+            <button type="button" key={option} className="btn bask-opt" onClick={() => onAnswer(option)}>
+              {option}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <button type="button" className="btn dark" onClick={onOpen}>
+          <Icon name="arrow-right" />
+          {t("board.answerInTask")}
+        </button>
+      )}
+    </div>
   );
 }
 
