@@ -15,6 +15,26 @@
   wait here until the release bumps the version.
 -->
 
+## 0.0.26-dev
+
+### en
+
+- **Write while the AI works:** the task box stays open during a turn, so you can write your next message and attach files. Send turns on when the turn ends.
+- **Quitting and saving in the app's own card:** quitting while a task works, and saving a copy over a file that's already in the folder, now ask in the same card as every other question. Saving offers "Keep both", "Replace" and "Cancel".
+- **Don't save on the board too:** a board row or card that asks to replace a file has the same three choices as the task screen. In a narrow window the buttons wrap instead of overlapping.
+- **Easier to read:** secondary text, placeholders and your initial in the sidebar have more contrast, small buttons are a little bigger, and macOS "Increase contrast" now makes the app's secondary text and lines stronger.
+- **Keyboard:** Tab stays inside a question card until you answer it, and ⌘K doesn't open the search on top of it.
+- **Tasks stored a new way:** the first start converts your tasks, after keeping a copy of the old database next to it.
+
+### it
+
+- **Scrivi mentre l'AI lavora:** la casella resta aperta durante un turno, così puoi scrivere il messaggio successivo e allegare file. Invia si attiva quando il turno finisce.
+- **Uscire e salvare nella scheda dell'app:** uscire mentre un'attività lavora, e salvare una copia sopra un file che c'è già nella cartella, ora chiedono nella stessa scheda di tutte le altre domande. Il salvataggio offre «Tienili tutti e due», «Sostituisci» e «Annulla».
+- **Non salvare anche nella bacheca:** una riga o una scheda della bacheca che chiede di sostituire un file ha le stesse tre scelte della schermata dell'attività. In una finestra stretta i pulsanti vanno a capo invece di sovrapporsi.
+- **Più leggibile:** il testo secondario, i testi di esempio nei campi e la tua iniziale nella barra laterale hanno più contrasto, i pulsanti piccoli sono un po' più grandi, e «Aumenta contrasto» di macOS ora rende più marcati il testo secondario e le linee dell'app.
+- **Tastiera:** Tab resta nella scheda di una domanda finché non rispondi, e ⌘K non apre la ricerca sopra di essa.
+- **Attività salvate in un modo nuovo:** al primo avvio l'app converte le tue attività, dopo aver tenuto una copia del vecchio database accanto.
+
 ## 0.0.25-dev
 
 ### en
