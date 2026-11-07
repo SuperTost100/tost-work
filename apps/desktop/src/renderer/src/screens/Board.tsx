@@ -437,6 +437,11 @@ function InlineActions({ task, actions }: { task: Task; actions: RowActions }) {
     const remove = task.approval.action === "delete";
     return (
       <span className="actions">
+        {!remove && (
+          <button type="button" className="btn" onClick={() => actions.decide(task.id, "discard")}>
+            {t("approval.discard")}
+          </button>
+        )}
         <button type="button" className="btn" onClick={() => actions.decide(task.id, "allow")}>
           {remove ? t("approval.trash") : t("approval.allowOverwrite")}
         </button>
