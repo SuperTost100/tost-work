@@ -7,8 +7,23 @@ const KEEP_DAYS = 7;
 /** Past this the oldest lines go, so the file stays small whatever the app does. */
 const MAX_BYTES = 512 * 1024;
 
-/** A file's type from its name, without the name: "docx", or "file" when it has none. */
-const typeOf = (path: string) => /\.([A-Za-z0-9]{1,8})$/.exec(path)?.[1]?.toLowerCase() ?? "file";
+/** The file types the log names. Anything after a dot that isn't one of these could be part of a name. */
+const TYPES = new Set(
+  "doc docx odt rtf txt md pdf xls xlsx ods csv tsv ppt pptx odp key pages numbers html htm css js ts json xml yaml yml png jpg jpeg gif webp svg heic mp3 mp4 mov wav zip eml msg ics vcf".split(
+    " ",
+  ),
+);
+
+/**
+ * A file's type from its name, without the name: "docx", "other" for a type the log doesn't know, or "file" when it has
+ * none. A name that only starts with a dot, such as ".secret", is all name and no type.
+ */
+const typeOf = (path: string) => {
+  const name = path.split(/[\\/]/).pop() ?? "";
+  const type = /^.+\.([^.]+)$/.exec(name)?.[1]?.toLowerCase();
+  if (!type) return "file";
+  return TYPES.has(type) ? type : "other";
+};
 
 /** The text of one event: the time, what happened, and plain fields, never the user's words. */
 type Fields = Record<string, string | number | boolean | undefined>;
