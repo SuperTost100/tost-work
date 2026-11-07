@@ -91,11 +91,17 @@ describe("the confirmation card", () => {
     const own = card.closest("body > *");
     expect(other.inert).toBe(true);
     expect((own as HTMLElement).inert).not.toBe(true);
+    // A dialog opened while the card is up, from the menu bar for example.
+    const later = document.createElement("div");
+    document.body.append(later);
+    await waitFor(() => expect(later.inert).toBe(true));
     await act(async () => {
       fireEvent.click(within(card).getByRole("button", { name: "Cancel" }));
     });
     expect(other.inert).toBe(false);
+    expect(later.inert).toBe(false);
     other.remove();
+    later.remove();
   });
 
   it("keeps the app's shortcuts, such as Cmd+K, from acting while it's open", async () => {

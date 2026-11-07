@@ -57,19 +57,33 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 
   // Over another dialog, such as the job editor, the two would each keep focus to themselves, and Tab left the card.
   // While the card is open everything else on the page is inert, so Tab and clicks stay in it.
-  const popup = useRef<HTMLDivElement>(null);
+  // The card's own layer at the top of the page, so it's known before the card is drawn into it.
+  const [layer] = useState(() => document.createElement("div"));
+  useEffect(() => {
+    document.body.append(layer);
+    return () => layer.remove();
+  }, [layer]);
   const isOpen = open !== null;
   useEffect(() => {
     if (!isOpen) return;
-    const own = popup.current?.closest("body > *");
-    const others = [...document.body.children].filter(
-      (el): el is HTMLElement => el instanceof HTMLElement && el !== own && !el.inert,
-    );
-    for (const el of others) el.inert = true;
+    const own = layer;
+    const others: HTMLElement[] = [];
+    const quiet = (el: Element) => {
+      if (!(el instanceof HTMLElement) || el === own || el.inert) return;
+      el.inert = true;
+      others.push(el);
+    };
+    for (const el of document.body.children) quiet(el);
+    // A dialog opened meanwhile, say from the menu bar, adds its own layer: it waits behind the card too.
+    const added = new MutationObserver((changes) => {
+      for (const change of changes) for (const node of change.addedNodes) if (node instanceof Element) quiet(node);
+    });
+    added.observe(document.body, { childList: true });
     return () => {
+      added.disconnect();
       for (const el of others) el.inert = false;
     };
-  }, [isOpen]);
+  }, [isOpen, layer]);
 
   // The last question stays drawn while the card closes.
   const last = useRef<Confirmation | null>(null);
@@ -81,10 +95,10 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {children}
       {/* Mounted all along and opened, as the search dialog is: a dialog created already open didn't keep Tab inside. */}
       <AlertDialog.Root open={open !== null} onOpenChange={(isOpen) => !isOpen && open?.answer("no")}>
-        <AlertDialog.Portal>
+        <AlertDialog.Portal container={layer}>
           <AlertDialog.Backdrop className="dlg-backdrop" />
           {shown && (
-            <AlertDialog.Popup ref={popup} className="modal confirmmodal" initialFocus={cancel}>
+            <AlertDialog.Popup className="modal confirmmodal" initialFocus={cancel}>
               <div className="cb">
                 <AlertDialog.Title render={<b />}>{shown.message}</AlertDialog.Title>
                 {shown.detail && (
