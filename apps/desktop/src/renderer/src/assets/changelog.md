@@ -15,6 +15,20 @@
   wait here until the release bumps the version.
 -->
 
+## 0.0.29-dev
+
+### en
+
+- **The welcome card after every update:** each new test build greets you once, so you know it arrived. It now says "test build", which no longer sounds like a trial.
+- **Problem reports carry what happened:** test builds keep an events log, with no task text and no file names, and Report a problem puts it in the form for you. The form's System field is filled in too.
+- **Jobs:** the columns read "Next run" and "Last run", with one line under their names.
+
+### it
+
+- **La scheda di benvenuto a ogni aggiornamento:** ogni nuova versione di test ti saluta una volta, così sai che è arrivata. Ora dice «versione di test», che non suona più come una prova gratuita.
+- **Le segnalazioni portano cosa è successo:** le versioni di test tengono un registro degli eventi, senza i testi delle attività né i nomi dei file, e Segnala un problema lo mette nel modulo per te. Anche il campo Sistema del modulo è già compilato.
+- **Lavori pianificati:** le colonne si chiamano «Prossima esecuzione» e «Ultima esecuzione», con una sola linea sotto i loro nomi.
+
 ## 0.0.28-dev
 
 ### en
