@@ -228,11 +228,13 @@ function JobRow({
         ) : null}
       </div>
       <div className="col3">
-        <span className="sr">{t("jobs.col.last")}: </span>
+        {/* The column's name for screen readers, inside the button when there is one, so Tab reads it too. */}
+        {!(last && "taskId" in last) && <span className="sr">{t("jobs.col.last")}: </span>}
         {!last ? (
           <span className="t3">{t("jobs.last.never")}</span>
         ) : "taskId" in last ? (
           <button type="button" className="jlast" onClick={() => onOpenTask(last.taskId)}>
+            <span className="sr">{t("jobs.col.last")}: </span>
             {lastTask && <TaskTag task={lastTask} />}
             <span>{whenText(lang, new Date(last.at), now)}</span>
           </button>

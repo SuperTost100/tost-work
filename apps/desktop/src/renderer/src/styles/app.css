@@ -3624,8 +3624,12 @@ ol.editable li::before {
 .jrow:hover {
   background: var(--hover);
 }
-/* The column names, in the row's own grid so they sit over their columns. */
+/* The column names, in the row's own grid so they sit over their columns, and kept at the top as a long list scrolls. */
 .jrow.jhead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--canvas);
   padding-top: 18px;
   padding-bottom: 8px;
   border-radius: 0;
