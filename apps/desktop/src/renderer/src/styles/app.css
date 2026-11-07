@@ -1937,8 +1937,9 @@ textarea {
   color: var(--ink);
 }
 /* ===== Board, Craft style list ===== */
+/* The title sits where the Projects and Jobs titles do: 28px below the bar, 40px in with the board's 8px. */
 .bhead {
-  padding: 22px 32px 18px;
+  padding: 28px 32px 18px;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -4326,8 +4327,26 @@ select:focus-visible {
 :root [tabindex="-1"]:focus-visible {
   outline: none;
 }
-textarea:focus-visible {
+/* A text box shows its focus on its own frame, so the keyboard ring above stays off it. */
+:root[data-keys] textarea:focus-visible {
   outline: none;
+}
+:root[data-keys] .composer:has(textarea:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+/* Rows that cut off what overflows them (a recent task, a skill) and the file tabs, which fade at their ends: the
+   ring goes inside, where it can't be cut. The row's own button rings the whole row. */
+:root[data-keys] :is(.rec, .slist .sitem):has(> .open:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+:root[data-keys] :is(.rec, .slist .sitem) > .open:focus-visible {
+  outline: none;
+}
+:root[data-keys] :is(.rec, .slist .sitem, .ftabs) :focus-visible,
+:root[data-keys] .rec:focus-visible {
+  outline-offset: -2px;
 }
 .side .nav {
   width: 100%;
