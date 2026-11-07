@@ -614,12 +614,15 @@ app.whenReady().then(async () => {
         detail: translate(lang, "quit.detail"),
         yes: translate(lang, "quit.quit"),
         danger: true,
-      }).then((answer) => {
-        askingToQuit = false;
-        if (answer !== "yes") return;
-        quitting = true;
-        app.quit();
-      });
+      })
+        // A question that can't be asked answers Cancel, so the next quit asks again.
+        .catch((): QuestionAnswer => "no")
+        .then((answer) => {
+          askingToQuit = false;
+          if (answer !== "yes") return;
+          quitting = true;
+          app.quit();
+        });
       return;
     }
     quitting = true;
