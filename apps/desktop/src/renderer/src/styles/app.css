@@ -12,6 +12,7 @@
   font-display: swap;
 }
 
+/* Text sizes: 12, 13, 14, 15 and 16px, headings 18, 22, 26 and 30px, and 11px only for mono labels. */
 :root {
   --desk: #ddd8cf;
   --canvas: #faf8f4;
@@ -32,6 +33,10 @@
   --done: #4f7a3a;
   --danger: #b23a2b;
   --page-shadow: 0 1px 2px rgba(27, 23, 18, 0.06), 0 6px 18px rgba(27, 23, 18, 0.07);
+  /* The selected item in a list or a toggle sits raised on the paper colour, as the selected tab does in Safari. */
+  --raised: 0 0 0 1px rgba(27, 23, 18, 0.05), 0 1px 3px rgba(27, 23, 18, 0.12);
+  /* The edge of a field you type into. Light keeps the divider colour, which Increase contrast darkens to 3.3:1. */
+  --field-line: var(--line);
   --bubble: #24211d;
   color-scheme: light;
 }
@@ -55,6 +60,8 @@
   --done: #9cbf7f;
   --danger: #ec8a7a;
   --page-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.35);
+  --raised: 0 0 0 1px rgba(255, 250, 240, 0.06), 0 1px 3px rgba(0, 0, 0, 0.45);
+  --field-line: #807869;
   --bubble: #3b3732;
   color-scheme: dark;
 }
@@ -79,6 +86,8 @@
     --done: #9cbf7f;
     --danger: #ec8a7a;
     --page-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 22px rgba(0, 0, 0, 0.35);
+    --raised: 0 0 0 1px rgba(255, 250, 240, 0.06), 0 1px 3px rgba(0, 0, 0, 0.45);
+    --field-line: #807869;
     --bubble: #3b3732;
     color-scheme: dark;
   }
@@ -249,14 +258,13 @@ h3 {
   padding: 0 10px;
   border-radius: 8px;
   background: var(--canvas);
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   color: var(--t3);
-  font-size: 13.5px;
+  font-size: 14px;
   margin-bottom: 8px;
 }
 :root[data-theme="dark"] .search {
   background: var(--panel);
-  border-color: transparent;
 }
 .search input {
   flex: 1;
@@ -295,7 +303,7 @@ h3 {
 }
 .search-h {
   padding: 12px 10px 4px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--t3);
 }
@@ -316,7 +324,7 @@ h3 {
   gap: 8px;
   height: 30px;
   padding: 0 8px;
-  font-size: 13.5px;
+  font-size: 14px;
 }
 .search-none {
   margin: 0;
@@ -346,12 +354,13 @@ h3 {
   background: var(--hover);
 }
 .nav.on {
-  background: var(--sel);
+  background: var(--paper);
+  box-shadow: var(--raised);
   font-weight: 500;
 }
 .side h4 {
   margin: 18px 8px 4px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--t3);
 }
@@ -361,7 +370,7 @@ h3 {
   line-height: 30px;
   padding: 0 8px;
   border-radius: 8px;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--t2);
   white-space: nowrap;
   overflow: hidden;
@@ -372,7 +381,8 @@ h3 {
   color: var(--ink);
 }
 .rec.on {
-  background: var(--sel);
+  background: var(--paper);
+  box-shadow: var(--raised);
   color: var(--ink);
 }
 .rec .wait {
@@ -620,7 +630,7 @@ h3 {
   font-size: 12px;
 }
 .me .who {
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.2;
 }
 .alts span {
@@ -639,7 +649,7 @@ h3 {
   border-radius: 8px;
   display: inline-flex;
   align-items: center;
-  font-size: 13.5px;
+  font-size: 14px;
   box-shadow: 0 0 0 1px var(--line);
   background: var(--paper);
 }
@@ -673,7 +683,7 @@ h3 {
 }
 /* The line under a step starts where its name does, past the icon (15px) and the gap (8px). */
 .msteps li b + span {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
   padding-left: 23px;
 }
@@ -749,7 +759,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--t2);
 }
 .tbtn:hover {
@@ -763,7 +773,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 500;
   border: 1px solid var(--line);
   background: var(--paper);
@@ -845,11 +855,11 @@ h3 {
   padding-bottom: 7px;
   border-bottom: 2px solid #1b1712;
   font-weight: 700;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .draft .h span {
   font:
-    500 10.5px / 1 "IBM Plex Mono",
+    500 11px / 1 "IBM Plex Mono",
     monospace;
   color: #807769;
 }
@@ -867,7 +877,7 @@ h3 {
 .draft .l em {
   white-space: nowrap;
   font:
-    500 10.5px / 1 "IBM Plex Mono",
+    500 11px / 1 "IBM Plex Mono",
     monospace;
   font-style: normal;
   padding: 3px 6px;
@@ -904,7 +914,7 @@ h3 {
 /* Composer, Claude style: quiet box, settings below as text */
 .composer {
   background: var(--paper);
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   border-radius: 16px;
   box-shadow:
     0 1px 2px rgba(27, 23, 18, 0.04),
@@ -1180,7 +1190,7 @@ textarea {
   font-weight: 500;
 }
 .model-d {
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.4;
   color: var(--t2);
 }
@@ -1214,7 +1224,7 @@ textarea {
   padding: 5px 8px;
   border-radius: 6px;
   text-align: center;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
   cursor: default;
   outline: none;
@@ -1240,7 +1250,7 @@ textarea {
   margin-top: 30px;
 }
 .notice .k {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--need);
   grid-column: 1 / -1;
@@ -1251,7 +1261,7 @@ textarea {
 }
 .notice p {
   color: var(--t2);
-  font-size: 13.5px;
+  font-size: 14px;
 }
 
 /* Status tag, from tost.one: small mono label, ink when it's on you */
@@ -1327,7 +1337,7 @@ textarea {
   justify-content: space-between;
   align-items: baseline;
   margin: 40px 0 6px;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--t3);
 }
 .sec a:hover {
@@ -1377,7 +1387,7 @@ textarea {
 .item.todo .where {
   flex: 0 1000 auto;
   min-width: 0;
-  font-size: 13.5px;
+  font-size: 14px;
 }
 .item.todo:hover .ttl {
   text-decoration: none;
@@ -1403,7 +1413,7 @@ textarea {
   padding: 0 8px;
   border: 1px solid var(--line);
   border-radius: 7px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
   background: var(--paper);
 }
@@ -1447,7 +1457,7 @@ textarea {
   margin: 26px 0 0;
   display: grid;
   gap: 9px;
-  font-size: 14.5px;
+  font-size: 15px;
   color: var(--t2);
 }
 .steps div {
@@ -1491,7 +1501,7 @@ textarea {
 }
 .acct b {
   font-weight: 500;
-  font-size: 14.5px;
+  font-size: 15px;
   color: var(--ink);
   display: block;
 }
@@ -1586,7 +1596,7 @@ textarea {
 }
 .asking .q span {
   display: block;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
   margin-bottom: 3px;
 }
@@ -1598,7 +1608,7 @@ textarea {
   text-align: left;
   padding: 8px 16px;
   border-top: 1px solid var(--line-2);
-  font-size: 14.5px;
+  font-size: 15px;
 }
 .asking .o:hover {
   background: var(--hover);
@@ -1754,7 +1764,7 @@ textarea {
   margin-top: 2px;
 }
 .rp h3 {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--t3);
   margin: 14px 0 8px;
@@ -1869,7 +1879,7 @@ textarea {
   background: var(--line);
 }
 .fileline .nm {
-  font-size: 13.5px;
+  font-size: 14px;
 }
 .fileline .sb {
   font-size: 12px;
@@ -1885,7 +1895,7 @@ textarea {
 }
 .setrow .k {
   display: block;
-  font-size: 13.5px;
+  font-size: 14px;
 }
 .setrow .v {
   display: block;
@@ -1955,15 +1965,19 @@ textarea {
   background: var(--paper);
   color: var(--ink);
   font-weight: 500;
-  box-shadow: 0 0 0 1px var(--line);
+  box-shadow: var(--raised);
 }
 .bhead h1 {
   font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.03em;
 }
+/* Centred at the width the Projects and Jobs pages use, with its title and rows 40px in, where theirs are. */
 .board-wrap {
-  max-width: 1060px;
+  width: 100%;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 8px;
 }
 .thead,
 .brow {
@@ -1983,7 +1997,7 @@ textarea {
 }
 .gh {
   padding: 18px 32px 6px;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--t3);
 }
 .board-wrap {
@@ -2019,7 +2033,7 @@ textarea {
   text-overflow: ellipsis;
 }
 .brow .c {
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--t2);
 }
 .brow .actions {
@@ -2060,10 +2074,11 @@ textarea {
   background: var(--paper);
   color: var(--ink);
   font-weight: 500;
-  box-shadow: 0 0 0 1px var(--line);
+  box-shadow: var(--raised);
 }
 .top .iconbtn.on {
-  background: var(--sel);
+  background: var(--paper);
+  box-shadow: var(--raised);
   color: var(--ink);
 }
 h2.gh {
@@ -2259,7 +2274,7 @@ h2.gh {
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 6px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
 }
 .bcard .clip {
@@ -2305,7 +2320,7 @@ h2.gh {
   overflow: auto;
 }
 .bpanel h3 {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--t3);
   margin: 14px 0 8px;
@@ -2369,7 +2384,7 @@ h2.gh {
   border: 0;
   background: none;
   font: inherit;
-  font-size: 14.5px;
+  font-size: 15px;
   color: var(--t2);
   cursor: pointer;
 }
@@ -2429,7 +2444,7 @@ label.opt input {
   align-items: center;
   gap: 8px;
   margin: 0;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--t2);
 }
 .bpanel .bbrief {
@@ -2461,13 +2476,13 @@ label.opt input {
 /* The display menu's heading and its note on the order. */
 .menu-label {
   padding: 6px 10px 4px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
 }
 .menu-note {
   margin: 0;
   padding: 6px 10px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
 }
 .menu-item[data-disabled] {
@@ -2596,7 +2611,7 @@ label.opt input {
 }
 .pcard .describe {
   margin-right: 30px;
-  font-size: 13.5px;
+  font-size: 14px;
 }
 .proj .describe {
   width: 100%;
@@ -2623,14 +2638,14 @@ label.opt input {
   font-size: 15px;
 }
 .pcard p {
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--t2);
 }
 .pcard .meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
 }
 .pcard .tag:not(.mine) {
@@ -2725,7 +2740,7 @@ label.opt input {
   background: var(--line-2);
 }
 .ocard .nm {
-  font-size: 13.5px;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2736,7 +2751,7 @@ label.opt input {
   margin-top: -6px;
 }
 .sidecol h3 {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--t3);
   margin: 6px 0 4px;
@@ -2757,14 +2772,14 @@ label.opt input {
   align-items: start;
   padding: 9px 0;
   border-bottom: 1px solid var(--line-2);
-  font-size: 14.5px;
+  font-size: 15px;
 }
 .chk .ic.ok {
   color: var(--ink);
 }
 .chk .sub {
   display: block;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
 }
 .chk .act:hover {
@@ -2772,7 +2787,7 @@ label.opt input {
   color: var(--ink);
 }
 .grp-k {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
   margin: 18px 0 2px;
 }
@@ -2833,7 +2848,7 @@ label.opt input {
 .ftabs a.on {
   background: var(--paper);
   color: var(--ink);
-  box-shadow: 0 0 0 1px var(--line);
+  box-shadow: var(--raised);
 }
 
 /* Quick edit: one panel lists what changed. 360px while it lists files; the change cards will need the mockup's 440px. */
@@ -2878,7 +2893,7 @@ label.opt input {
 .changes li {
   padding: 12px 0;
   border-bottom: 1px solid var(--line-2);
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.55;
   color: var(--t2);
 }
@@ -2887,7 +2902,7 @@ label.opt input {
   align-items: center;
   gap: 9px;
   min-width: 0;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--t2);
 }
 .agent li + li {
@@ -2993,11 +3008,11 @@ label.opt input {
   justify-self: stretch;
 }
 .chg .ba {
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.5;
 }
 .chg .why {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
 }
 .chg .acts {
@@ -3055,7 +3070,7 @@ ins {
   border-bottom: 0;
 }
 .wc h3 {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--t3);
   margin: 16px 0 6px;
@@ -3107,7 +3122,8 @@ ins {
   background: var(--hover);
 }
 .slist .sitem.on {
-  background: var(--sel);
+  background: var(--paper);
+  box-shadow: var(--raised);
   font-weight: 500;
 }
 /* Each row holds the open button and the … button, as Recent's do. */
@@ -3131,7 +3147,7 @@ ins {
 }
 .editor .title-input {
   min-width: min(100%, 220px);
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.03em;
   border: 0;
@@ -3236,7 +3252,7 @@ ins {
   margin-top: 0;
 }
 .smeta p {
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--t2);
 }
 .jempty p {
@@ -3306,12 +3322,12 @@ ins {
   margin: 0 0 10px;
 }
 .editor h1 {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.03em;
 }
 .smeta h3 {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--t3);
   margin: 18px 0 6px;
@@ -3336,7 +3352,7 @@ ins {
   letter-spacing: -0.03em;
 }
 .about h1 {
-  font-size: 34px;
+  font-size: 30px;
   line-height: 1.08;
   font-weight: 800;
   letter-spacing: -0.035em;
@@ -3371,10 +3387,10 @@ ins {
   font-size: 22px;
 }
 .md-editor .ProseMirror h2 {
-  font-size: 19px;
+  font-size: 18px;
 }
 .md-editor .ProseMirror h3 {
-  font-size: 16.5px;
+  font-size: 16px;
 }
 .md-editor .ProseMirror h4 {
   font-size: 15px;
@@ -3477,7 +3493,7 @@ ins {
 }
 .doc-h {
   display: block;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
   margin: 26px 0 6px;
 }
@@ -3585,7 +3601,7 @@ ol.editable li::before {
 }
 .md {
   font:
-    12.5px / 1.6 "IBM Plex Mono",
+    13px / 1.6 "IBM Plex Mono",
     monospace;
   background: var(--panel);
   border-radius: 10px;
@@ -3611,13 +3627,13 @@ ol.editable li::before {
 }
 .jrow .when {
   font-weight: 600;
-  font-size: 14.5px;
+  font-size: 15px;
 }
 .jrow .what {
-  font-size: 14.5px;
+  font-size: 15px;
 }
 .jrow .meta {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
 }
 /* One column that can't grow past its track, so a long file name shortens instead of running under the switch. */
@@ -3709,7 +3725,7 @@ ol.editable li::before {
   padding: 20px 20px 18px;
 }
 .confirmmodal .cb b {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -3728,7 +3744,7 @@ ol.editable li::before {
   min-height: 280px;
   padding: 16px 20px;
   overflow: auto;
-  font-size: 13.5px;
+  font-size: 14px;
 }
 /* The instructions sit in a field, as other inputs do, so the example inside reads apart from the hint above it. */
 .instrmodal .md-editor .ProseMirror {
@@ -3784,7 +3800,7 @@ ol.editable li::before {
 fieldset.fld > legend {
   padding: 0;
   margin-bottom: 6px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
 }
 .jobmodal .mform .fld > legend {
@@ -3864,7 +3880,7 @@ fieldset.fld > legend {
   border-bottom: 1px solid var(--line-2);
 }
 .modal .mh b {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -3883,7 +3899,8 @@ fieldset.fld > legend {
   align-content: start;
 }
 .msteps li.on {
-  background: var(--sel);
+  background: var(--paper);
+  box-shadow: var(--raised);
 }
 .mform {
   padding: 18px 22px;
@@ -3892,7 +3909,7 @@ fieldset.fld > legend {
   align-content: start;
 }
 .mform label {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
   display: block;
   margin-bottom: 6px;
@@ -3942,7 +3959,8 @@ fieldset.fld > legend {
 }
 .snav a.on,
 .snav button.on {
-  background: var(--sel);
+  background: var(--paper);
+  box-shadow: var(--raised);
   color: var(--ink);
   font-weight: 500;
 }
@@ -3972,7 +3990,7 @@ fieldset.fld > legend {
 .srow .lbl b {
   display: block;
   font-weight: 500;
-  font-size: 14.5px;
+  font-size: 15px;
 }
 .srow .lbl span {
   display: block;
@@ -3988,9 +4006,9 @@ fieldset.fld > legend {
   margin: 10px 0 0;
 }
 .switch {
-  width: 34px;
-  height: 20px;
-  border-radius: 10px;
+  width: 38px;
+  height: 22px;
+  border-radius: 11px;
   background: var(--line);
   position: relative;
   flex: none;
@@ -4000,17 +4018,20 @@ fieldset.fld > legend {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--paper);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.switch:not(.on) {
+  box-shadow: inset 0 0 0 1px var(--field-line);
 }
 .switch.on {
   background: var(--ink);
 }
 .switch.on::after {
-  left: 16px;
+  left: 18px;
   background: var(--canvas);
 }
 /* Four across where they fit, two by two in a small window, so no card is cut off at the edge. */
@@ -4029,7 +4050,7 @@ fieldset.fld > legend {
   align-content: start;
 }
 .lv .d {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
   line-height: 1.45;
 }
@@ -4130,7 +4151,7 @@ fieldset.fld > legend {
   display: flex;
   gap: 6px;
   align-items: center;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
 }
 .dots i.on {
@@ -4197,7 +4218,7 @@ fieldset.fld > legend {
   gap: 10px;
   padding: 11px 2px;
   border-bottom: 1px solid var(--line-2);
-  font-size: 14.5px;
+  font-size: 15px;
 }
 .links :is(a, button):hover {
   color: var(--ink);
@@ -4229,7 +4250,7 @@ fieldset.fld > legend {
 .legal {
   padding-bottom: 48px;
   color: var(--t2);
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.6;
 }
 .md-editor .ProseMirror li + li {
@@ -4443,18 +4464,18 @@ button.item {
   gap: 6px;
 }
 .fld > span:first-child {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
 }
 .jobmodal .mform .fld > legend,
 .jobmodal .mform .fld > span:first-child {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t3);
 }
 .fld-path {
   flex: 1;
   min-width: 0;
-  font-size: 13.5px;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4467,11 +4488,11 @@ button.item {
   height: 36px;
   padding: 0 11px;
   border-radius: 8px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--field-line);
   background: var(--paper);
   color: var(--ink);
   font:
-    400 14.5px "Schibsted Grotesk",
+    400 15px "Schibsted Grotesk",
     sans-serif;
 }
 .input:focus {
@@ -4569,7 +4590,7 @@ fieldset.fld {
 .ftabs button.on {
   background: var(--paper);
   color: var(--ink);
-  box-shadow: 0 0 0 1px var(--line);
+  box-shadow: var(--raised);
 }
 .page.pv {
   height: auto;
@@ -4582,18 +4603,18 @@ fieldset.fld {
 .pv-note {
   padding: 20px 24px;
   color: var(--t3);
-  font-size: 13.5px;
+  font-size: 14px;
 }
 .pv-md {
   padding: 26px 36px;
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.65;
 }
 .pv-text {
   margin: 0;
   padding: 20px 24px;
   font:
-    12.5px / 1.6 "IBM Plex Mono",
+    13px / 1.6 "IBM Plex Mono",
     monospace;
   white-space: pre-wrap;
 }
@@ -4770,7 +4791,7 @@ label.opt:hover:not(.on) {
   color: var(--t3);
 }
 .opt .soon {
-  font-size: 12.5px;
+  font-size: 13px;
   white-space: nowrap;
 }
 .opt .d.ok {
@@ -4800,7 +4821,7 @@ label.opt:hover:not(.on) {
   background: var(--panel);
   color: var(--ink);
   font:
-    400 12.5px / 1.4 "IBM Plex Mono",
+    400 13px / 1.4 "IBM Plex Mono",
     monospace;
   user-select: all;
 }
@@ -4968,7 +4989,7 @@ label.opt:hover:not(.on) {
   display: grid;
   gap: 4px;
   margin: 6px 0 4px 24px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
 }
 .dbg + .dbg {
@@ -5000,7 +5021,7 @@ label.opt:hover:not(.on) {
   padding: 8px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .dbg-strip dl {
   display: flex;
@@ -5033,7 +5054,7 @@ label.opt:hover:not(.on) {
 /* Skills list: the built-in guides under their own heading, and Import at the end. */
 .slist .sgroup {
   margin: 14px 10px 4px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--t3);
 }
@@ -5121,7 +5142,7 @@ html:has(.panel) body {
   height: 20px;
 }
 .panel .brand b {
-  font-size: 14.5px;
+  font-size: 15px;
 }
 .srow.sub .lbl b {
   font-size: 14px;
@@ -5146,7 +5167,7 @@ html:has(.panel) body {
   gap: 6px;
   margin: 0 0 2px;
   padding: 0 8px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--t2);
 }
@@ -5157,7 +5178,7 @@ html:has(.panel) body {
   border-radius: 999px;
   background: var(--need);
   color: var(--paper);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   display: inline-grid;
   place-items: center;
@@ -5206,7 +5227,7 @@ html:has(.panel) body {
   display: grid;
   flex: 1;
   min-width: 0;
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.35;
 }
 .pmeta {
@@ -5215,7 +5236,7 @@ html:has(.panel) body {
 }
 .pwhen {
   flex: none;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--t2);
 }
 .panel .psec.quiet p {
@@ -5311,7 +5332,8 @@ html:has(.panel) body {
   color: var(--ink);
 }
 .railbtn.on {
-  background: var(--sel);
+  background: var(--paper);
+  box-shadow: var(--raised);
   color: var(--ink);
 }
 /* The search sits a little apart from the sections, as its box does in the sidebar. */
