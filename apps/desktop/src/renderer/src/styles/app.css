@@ -5427,13 +5427,18 @@ html:has(.panel) body {
   :root {
     --t3: var(--t2);
     --line: #8f877b;
+    --line-2: #8f877b;
   }
   :root[data-theme="dark"] {
+    --t3: var(--t2);
     --line: #807869;
+    --line-2: #807869;
   }
 }
 @media (prefers-contrast: more) and (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    --t3: var(--t2);
     --line: #807869;
+    --line-2: #807869;
   }
 }
