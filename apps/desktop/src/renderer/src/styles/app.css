@@ -274,6 +274,12 @@ h3 {
 :root .search:focus-within {
   border-color: var(--ink);
 }
+.search-hits {
+  max-height: min(380px, 56vh);
+  overflow: auto;
+  padding: 0 8px 8px;
+  border-top: 1px solid var(--line-2);
+}
 /* In the sidebar, the results take the place of the sections and Recent, at the size of Recent's rows. */
 .side .search-hits {
   flex: 0 1 auto;
@@ -282,8 +288,24 @@ h3 {
   padding: 0;
   border-top: 0;
 }
+.search-h {
+  padding: 12px 10px 4px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--t3);
+}
 .side .search-h {
   padding: 10px 8px 4px;
+}
+.search-hit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
 }
 .side .search-hit {
   gap: 8px;
@@ -291,23 +313,16 @@ h3 {
   padding: 0 8px;
   font-size: 13.5px;
 }
-.side .search-hit .ic {
-  width: 16px;
-  height: 16px;
+.search-none {
+  margin: 0;
+  padding: 14px 18px 18px;
+  border-top: 1px solid var(--line-2);
+  font-size: 14px;
 }
 .side .search-none {
   padding: 8px;
   border-top: 0;
   font-size: 13px;
-}
-/* Rows that light up under the pointer keep apart, so two lit at once never touch. */
-.nav + .nav,
-.rec + .rec,
-.slist .sitem + .sitem,
-.menu-item + .menu-item,
-.search-hit + .search-hit,
-.prow + .prow {
-  margin-top: 2px;
 }
 .nav {
   display: flex;
@@ -399,6 +414,57 @@ h3 {
   cursor: pointer;
   opacity: 0;
 }
+/* The … comes on top of the row's end without moving anything. A row with a status icon swaps the icon for it; a row
+   without one fades its title out under it. */
+.rec .more {
+  position: absolute;
+  top: 3px;
+  right: 2px;
+}
+.brow .actions,
+.bcard .actions,
+.brow .rename,
+.bcard .rename,
+.board .more {
+  position: relative;
+  z-index: 1;
+}
+/* The … of a row, a card or the panel: there under the pointer, on the selected task, and when the keyboard reaches
+   it, as in Recent. */
+.board .more {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--t3);
+  opacity: 0;
+}
+.bpanel .more {
+  opacity: 1;
+}
+.pcard .more {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--t3);
+  cursor: pointer;
+  opacity: 0;
+}
+:is(.brow, .bcard):is(:hover, .sel) .more,
+.board .more:focus-visible {
+  opacity: 1;
+}
 .rec:hover .more,
 .rec .more:focus-visible,
 .sitem:hover .more,
@@ -410,15 +476,16 @@ h3 {
   background: var(--hover);
   color: var(--ink);
 }
-/* The … comes on top of the row's end without moving anything. A row with a status icon swaps the icon for it; a row
-   without one fades its title out under it. */
-.rec .more {
-  position: absolute;
-  top: 3px;
-  right: 2px;
-}
 .rec:is(:hover, :has(.more:focus-visible)) .open:not(:has(.st)) {
   mask-image: linear-gradient(to left, transparent 28px, #000 44px);
+}
+/* A task's state in Recent, in the slot the … takes on hover. */
+.st {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
 }
 /* Out of sight but still in the row's accessible name, so a screen reader hears the state while the … has focus. */
 .rec:is(:hover, :has(.more:focus-visible)) .st {
@@ -428,14 +495,6 @@ h3 {
 /* While a title is renamed, the field has the whole row. */
 .rec:has(.rename) .more {
   display: none;
-}
-/* A task's state in Recent, in the slot the … takes on hover. */
-.st {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 24px;
-  height: 24px;
 }
 .st .ic {
   width: 15px;
@@ -454,6 +513,10 @@ h3 {
 }
 .st.run {
   color: var(--taupe);
+}
+.logo-btn svg {
+  width: 24px;
+  height: 24px;
 }
 .st.run svg {
   animation: spin 1.6s linear infinite;
@@ -554,6 +617,60 @@ h3 {
   font-size: 13.5px;
   line-height: 1.2;
 }
+.alts span {
+  height: 26px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 7px;
+  background: var(--paper);
+  box-shadow: 0 0 0 1px var(--line);
+  font-size: 13px;
+}
+.choice span {
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 13.5px;
+  box-shadow: 0 0 0 1px var(--line);
+  background: var(--paper);
+}
+.acct span {
+  font-size: 13px;
+  color: var(--t3);
+}
+.hello h1 span {
+  color: var(--taupe);
+}
+.seg a span {
+  color: var(--t3);
+}
+.seg label > span {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--t2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.setup h1 span {
+  color: var(--taupe);
+}
+.about h1 span {
+  color: var(--taupe);
+}
+/* The line under a step starts where its name does, past the icon (15px) and the gap (8px). */
+.msteps li b + span {
+  font-size: 12.5px;
+  color: var(--t3);
+  padding-left: 23px;
+}
 .me .who span {
   display: block;
   font-size: 12px;
@@ -593,6 +710,9 @@ h3 {
 }
 .crumb > :not(b) {
   flex: none;
+}
+.link {
+  color: var(--t2);
 }
 /* The detail after a title gives way first. */
 .crumb > .truncate,
@@ -691,9 +811,6 @@ h3 {
   line-height: 1.1;
   font-weight: 700;
   letter-spacing: -0.025em;
-}
-.hello h1 span {
-  color: var(--taupe);
 }
 /* The home image: a tilted draft card, as on tost.one */
 .draft.float {
@@ -868,6 +985,94 @@ textarea {
   background: var(--hover);
   color: var(--ink);
 }
+.send .ic {
+  width: 16px;
+  height: 16px;
+}
+.pick .ic {
+  width: 13px;
+  height: 13px;
+}
+.out .ic {
+  width: 14px;
+  height: 14px;
+  color: var(--t3);
+}
+.steps .ic {
+  color: var(--t3);
+}
+.setrow > .ic {
+  color: var(--t2);
+}
+.btn .ic {
+  width: 15px;
+  height: 15px;
+}
+.tbtn .ic {
+  width: 15px;
+  height: 15px;
+}
+.chk .ic {
+  margin-top: 2px;
+  color: var(--t3);
+}
+.md-bubble .ic {
+  width: 17px;
+  height: 17px;
+}
+.md-slash .ic {
+  color: var(--t2);
+}
+.field .ic {
+  width: 13px;
+  height: 13px;
+  margin-left: auto;
+  color: var(--t3);
+}
+.lock .ic {
+  width: 12px;
+  height: 12px;
+}
+.starter .ic {
+  color: var(--t3);
+}
+.search-hit .ic {
+  color: var(--t2);
+}
+.prow > .ic {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--t3);
+}
+.logo-btn .ic {
+  opacity: 0;
+}
+/* Larger than the sidebar's icons, so the rail doesn't look empty. Each keeps its row's height. */
+.railbtn .ic {
+  width: 20px;
+  height: 20px;
+}
+.snav a .ic,
+.snav button .ic {
+  color: var(--t3);
+}
+.links :is(a, button) .ic {
+  color: var(--t3);
+}
+.answered > button .ic {
+  color: var(--t3);
+}
+.activity li .ic {
+  width: 15px;
+  height: 15px;
+  color: var(--t3);
+}
+.msteps li b .ic {
+  width: 15px;
+  height: 15px;
+  color: var(--t3);
+}
 .attached .x .ic {
   width: 12px;
   height: 12px;
@@ -881,10 +1086,6 @@ textarea {
   color: var(--on-btn);
   display: grid;
   place-items: center;
-}
-.send .ic {
-  width: 16px;
-  height: 16px;
 }
 .under {
   display: flex;
@@ -910,17 +1111,13 @@ textarea {
   font-weight: 500;
   color: var(--ink);
 }
-.pick .ic {
-  width: 13px;
-  height: 13px;
+.model-pick {
+  max-width: 100%;
+  white-space: nowrap;
 }
 /* The AI and model for the task about to start: at the right end of the row under the task box. */
 .under .model-pick {
   margin-left: auto;
-}
-.model-pick {
-  max-width: 100%;
-  white-space: nowrap;
 }
 .menu.model-menu {
   width: 340px;
@@ -951,6 +1148,11 @@ textarea {
 }
 .menu-item.model-item[data-checked] {
   background: var(--sel);
+}
+.menu-check {
+  margin-left: auto;
+  width: 15px;
+  height: 15px;
 }
 .model-item .menu-check {
   align-self: center;
@@ -1066,16 +1268,16 @@ textarea {
   background: var(--ink);
   color: var(--canvas);
 }
-.tag .pulse {
-  margin-right: 6px;
-}
-
 /* Three dots that pulse one after the other while a task runs. */
 .pulse {
   display: inline-flex;
   gap: 3px;
   flex: none;
 }
+.tag .pulse {
+  margin-right: 6px;
+}
+
 .pulse i {
   width: 4px;
   height: 4px;
@@ -1130,6 +1332,10 @@ textarea {
   padding: 13px 2px;
   border-bottom: 1px solid var(--line-2);
 }
+.item .ttl {
+  flex: 1;
+  font-size: 15px;
+}
 .item:hover .ttl {
   text-decoration: underline;
   text-decoration-color: var(--line);
@@ -1139,10 +1345,6 @@ textarea {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-.item .ttl {
-  flex: 1;
-  font-size: 15px;
 }
 .item .when {
   font-size: 13px;
@@ -1159,17 +1361,12 @@ textarea {
   gap: 12px;
   padding: 8px 2px;
 }
-.item.todo .open {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 5px 0;
-  text-align: left;
-}
 .item.todo .ttl {
   flex: 0 1 auto;
+}
+.search-hit .where {
+  max-width: 35%;
+  font-size: 13px;
 }
 .item.todo .where {
   flex: 0 1000 auto;
@@ -1203,11 +1400,6 @@ textarea {
   font-size: 12.5px;
   color: var(--t2);
   background: var(--paper);
-}
-.out .ic {
-  width: 14px;
-  height: 14px;
-  color: var(--t3);
 }
 
 /* ===== Task ===== */
@@ -1257,9 +1449,6 @@ textarea {
   gap: 10px;
   align-items: center;
 }
-.steps .ic {
-  color: var(--t3);
-}
 .steps .now {
   color: var(--ink);
 }
@@ -1281,12 +1470,51 @@ textarea {
   gap: 10px;
   padding: 10px 12px 10px 14px;
 }
+.check-h b {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.summary b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.lv b {
+  font-size: 15px;
+  font-weight: 700;
+}
+.acct b {
+  font-weight: 500;
+  font-size: 14.5px;
+  color: var(--ink);
+  display: block;
+}
+.opt b {
+  display: block;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+}
+.msteps li b {
+  font-weight: 500;
+  font-size: 14px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.changes li b {
+  font-weight: 600;
+  color: var(--ink);
+}
 .artifact .head b {
   font-weight: 500;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.pfoot .tbtn {
+  font-size: 13px;
 }
 .artifact .head .tbtn {
   flex: none;
@@ -1374,6 +1602,15 @@ textarea {
   background: var(--hover);
   font-weight: 500;
 }
+.seg .n,
+.gh .n {
+  color: var(--t3);
+  font-weight: 400;
+}
+.tbl .n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 .asking .o .n {
   width: 18px;
   color: var(--t3);
@@ -1386,18 +1623,21 @@ textarea {
   gap: 2px;
   margin: -6px -8px 3px 0;
 }
+.pcard .meta .grow {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .asking .q .qnav .grow {
   margin: 0;
+}
+.iconbtn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 .asking .q .qnav .iconbtn:disabled {
   opacity: 0.35;
   pointer-events: none;
-}
-.asking .q .d {
-  margin: 4px 0 0;
-}
-.asking .q .err {
-  color: var(--need);
 }
 .approve .acts {
   display: flex;
@@ -1405,10 +1645,6 @@ textarea {
   justify-content: flex-end;
   gap: 8px;
   padding: 0 16px 14px;
-}
-/* A label never breaks inside its button: in a narrow window the buttons wrap instead. */
-.approve .acts > button {
-  white-space: nowrap;
 }
 /* Turning the change down altogether: a quiet button on the left, apart from the two ways of saving it. */
 .approve .acts .discard {
@@ -1424,11 +1660,6 @@ textarea {
 .fileline .grow:has(.kept) {
   padding-right: 4px;
 }
-/* Restore sits beside the note: a narrow button leaves the note its whole width in a narrow panel. */
-.fileline .grow:has(.kept) ~ .tbtn {
-  padding: 0 6px;
-  margin-right: -6px;
-}
 .asking .o.own {
   color: var(--t3);
 }
@@ -1436,6 +1667,11 @@ textarea {
    what it lists. The page runs under it to the window's edge, so its scrollbar sits there and not beside the card. */
 :is(.task, .qe) > .mid {
   grid-area: 1 / 1 / 2 / -1;
+}
+/* The columns reach the bottom of the window, so an empty one is a drop target along its whole height. */
+.board-page > .scroll {
+  display: flex;
+  flex-direction: column;
 }
 :is(.task, .qe) > .mid > .scroll {
   display: flex;
@@ -1473,6 +1709,9 @@ textarea {
   padding: 6px 16px 16px;
   overflow: auto;
 }
+.setrow:last-child {
+  border-bottom: 0;
+}
 /* The card's padding is the space under the last row, as on its sides, rather than added to the row's own. */
 .rp .body > .setrow:last-child {
   padding-bottom: 0;
@@ -1481,8 +1720,32 @@ textarea {
 .rp .more-files {
   margin: 2px 0 0 -10px;
 }
-.rp .more-files[aria-expanded="true"] .ic {
-  transform: rotate(180deg);
+.jobmodal .outfield .ic {
+  color: var(--t2);
+}
+.msg-tools .iconbtn .ic {
+  width: 15px;
+  height: 15px;
+}
+.logo-btn:is(:hover, :focus-visible) .ic {
+  opacity: 1;
+}
+.side .search-hit .ic {
+  width: 16px;
+  height: 16px;
+}
+.snav .off .ic {
+  color: var(--t3);
+}
+.toast.saved > .ic {
+  color: var(--t2);
+}
+.links :is(a, button) .grow + .ic {
+  width: 14px;
+  height: 14px;
+}
+.activity li:has(.note) .ic {
+  margin-top: 2px;
 }
 .rp h3 {
   font-size: 12.5px;
@@ -1564,6 +1827,13 @@ textarea {
   background: var(--canvas);
   box-shadow: 0 0 0 1px var(--line);
 }
+.dots i {
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line);
+  display: block;
+}
 .thumb.brief i {
   background: var(--line);
 }
@@ -1607,9 +1877,6 @@ textarea {
   padding: 9px 0;
   border-bottom: 1px solid var(--line-2);
 }
-.setrow:last-child {
-  border-bottom: 0;
-}
 .setrow .k {
   display: block;
   font-size: 13.5px;
@@ -1621,9 +1888,6 @@ textarea {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.setrow > .ic {
-  color: var(--t2);
 }
 .setrow .act {
   font-size: 13px;
@@ -1645,6 +1909,12 @@ textarea {
   color: inherit;
   text-align: left;
   cursor: pointer;
+}
+.chk .act {
+  font-size: 13px;
+  color: var(--t2);
+  padding: 2px 6px;
+  border-radius: 6px;
 }
 .setrow.press:hover .act {
   background: var(--hover);
@@ -1674,9 +1944,6 @@ textarea {
   gap: 4px;
   font-size: 13px;
   color: var(--t2);
-}
-.seg a span {
-  color: var(--t3);
 }
 .seg a.on {
   background: var(--paper);
@@ -1766,11 +2033,6 @@ textarea {
   display: flex;
   flex-direction: column;
 }
-/* The columns reach the bottom of the window, so an empty one is a drop target along its whole height. */
-.board-page > .scroll {
-  display: flex;
-  flex-direction: column;
-}
 .board-wrap.wide {
   max-width: none;
   flex: 1 0 auto;
@@ -1780,35 +2042,19 @@ textarea {
 .bhead {
   flex-wrap: wrap;
 }
-.seg label > span {
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 6px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-  color: var(--t2);
-  cursor: pointer;
-  white-space: nowrap;
-}
 .seg label > span:hover {
   color: var(--ink);
+}
+.choice span.on {
+  background: var(--btn);
+  color: var(--on-btn);
+  box-shadow: none;
 }
 .seg label > span.on {
   background: var(--paper);
   color: var(--ink);
   font-weight: 500;
   box-shadow: 0 0 0 1px var(--line);
-}
-.seg .n,
-.gh .n {
-  color: var(--t3);
-  font-weight: 400;
-}
-:root[data-keys] .seg label:has(input:focus-visible) > span {
-  outline: 2px solid var(--ink);
-  outline-offset: 1px;
 }
 .top .iconbtn.on {
   background: var(--sel);
@@ -1838,35 +2084,9 @@ h2.gh {
 .bcard .hit[draggable="true"] {
   cursor: grab;
 }
-.brow .actions,
-.bcard .actions,
-.brow .rename,
-.bcard .rename,
-.board .more {
-  position: relative;
-  z-index: 1;
-}
-/* The … of a row, a card or the panel: there under the pointer, on the selected task, and when the keyboard reaches
-   it, as in Recent. */
-.board .more {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border-radius: 6px;
-  color: var(--t3);
-  opacity: 0;
-}
 .board .more:hover {
   background: var(--hover);
   color: var(--ink);
-}
-:is(.brow, .bcard):is(:hover, .sel) .more,
-.board .more:focus-visible,
-.bpanel .more {
-  opacity: 1;
 }
 .board .rename {
   min-width: 0;
@@ -2094,6 +2314,91 @@ h2.gh {
   padding: 10px 10px 4px 16px;
   -webkit-app-region: drag;
 }
+.snav a,
+.snav button,
+.snav .off {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--t2);
+  text-align: left;
+  white-space: nowrap;
+}
+.md-bubble button {
+  width: 32px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #f3efe8;
+  cursor: pointer;
+}
+.links button {
+  width: 100%;
+  text-align: left;
+}
+.ftabs button {
+  flex: none;
+  max-width: 200px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--t2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.answered > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 4px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--t2);
+  cursor: pointer;
+}
+.top button,
+.top a {
+  -webkit-app-region: no-drag;
+}
+/* A label never breaks inside its button: in a narrow window the buttons wrap instead. */
+.approve .acts > button {
+  white-space: nowrap;
+}
+.side .chrome button {
+  -webkit-app-region: no-drag;
+}
+.lv input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.search-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+/* The radio stays in the page for the keyboard and screen readers; the card shows the choice. */
+label.opt input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
 .bpanel .head button,
 .bpanel .head input {
   -webkit-app-region: no-drag;
@@ -2105,11 +2410,9 @@ h2.gh {
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
-.bpanel .head .rename {
-  flex: 1;
-  margin-left: -7px;
-  font-weight: 600;
-  font-size: 15px;
+.msg-tools .iconbtn {
+  width: 26px;
+  height: 26px;
 }
 .bpanel .head .iconbtn {
   width: 24px;
@@ -2206,14 +2509,6 @@ h2.gh {
   color: var(--t3);
   font-size: 14px;
 }
-.btn .ic {
-  width: 15px;
-  height: 15px;
-}
-.tbtn .ic {
-  width: 15px;
-  height: 15px;
-}
 
 /* Projects */
 /* Two cards a row, one when the window is too narrow for two. */
@@ -2247,24 +2542,17 @@ h2.gh {
   text-align: left;
   cursor: pointer;
 }
+.item.todo .open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 0;
+  text-align: left;
+}
 .pcard div.open {
   cursor: default;
-}
-.pcard .more {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 7px;
-  background: none;
-  color: var(--t3);
-  cursor: pointer;
-  opacity: 0;
 }
 .pcard:hover .more,
 .pcard .more:focus-visible {
@@ -2322,6 +2610,12 @@ h2.gh {
   font-weight: 800;
   letter-spacing: -0.03em;
 }
+.bpanel .head .rename {
+  flex: 1;
+  margin-left: -7px;
+  font-weight: 600;
+  font-size: 15px;
+}
 .pcard p {
   font-size: 13.5px;
   color: var(--t2);
@@ -2335,11 +2629,6 @@ h2.gh {
 }
 .pcard .tag:not(.mine) {
   background: var(--paper);
-}
-.pcard .meta .grow {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .pcard .meta > :not(.grow) {
   flex: none;
@@ -2455,11 +2744,6 @@ h2.gh {
   gap: 10px;
   margin: 28px 0 4px;
 }
-.check-h b {
-  font-weight: 700;
-  font-size: 16px;
-  letter-spacing: -0.01em;
-}
 .chk {
   display: grid;
   grid-template-columns: 20px 1fr auto;
@@ -2469,10 +2753,6 @@ h2.gh {
   border-bottom: 1px solid var(--line-2);
   font-size: 14.5px;
 }
-.chk .ic {
-  margin-top: 2px;
-  color: var(--t3);
-}
 .chk .ic.ok {
   color: var(--ink);
 }
@@ -2480,12 +2760,6 @@ h2.gh {
   display: block;
   font-size: 12.5px;
   color: var(--t3);
-}
-.chk .act {
-  font-size: 13px;
-  color: var(--t2);
-  padding: 2px 6px;
-  border-radius: 6px;
 }
 .chk .act:hover {
   background: var(--hover);
@@ -2589,6 +2863,27 @@ h2.gh {
 .agent ol {
   padding-left: 22px;
 }
+.msteps li {
+  padding: 9px 10px;
+  border-radius: 8px;
+  display: grid;
+  gap: 1px;
+}
+.changes li {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line-2);
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--t2);
+}
+.activity li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--t2);
+}
 .agent li + li {
   margin-top: 4px;
 }
@@ -2613,6 +2908,19 @@ h2.gh {
   font-weight: 600;
   color: var(--t2);
   border-bottom-color: var(--line);
+}
+.tbl td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line-2);
+}
+.pv-table td {
+  white-space: nowrap;
+}
+.md-editor .ProseMirror td {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
 }
 .agent tr:last-child td {
   border-bottom: 0;
@@ -2666,14 +2974,6 @@ h2.gh {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-}
-/* What happens to the original, or where the copy went: a line of its own above the button when the panel is narrow,
-   never cut to a letter. */
-.wc .foot2 .note {
-  flex: 1 1 12em;
-  min-width: 0;
-  font-size: 13px;
-  overflow-wrap: anywhere;
 }
 .chg {
   padding: 12px 0;
@@ -2731,16 +3031,6 @@ ins {
   gap: 6px;
   flex-wrap: wrap;
 }
-.alts span {
-  height: 26px;
-  padding: 0 9px;
-  display: inline-flex;
-  align-items: center;
-  border-radius: 7px;
-  background: var(--paper);
-  box-shadow: 0 0 0 1px var(--line);
-  font-size: 13px;
-}
 .tbl {
   width: 100%;
   border-collapse: collapse;
@@ -2753,14 +3043,6 @@ ins {
   color: var(--t3);
   padding: 6px 8px;
   border-bottom: 1px solid var(--line);
-}
-.tbl td {
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--line-2);
-}
-.tbl .n {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
 }
 .tbl tr.tot td {
   font-weight: 600;
@@ -2892,26 +3174,11 @@ ins {
 .md-bubble.below {
   transform: translate(-50%, 8px);
 }
-.md-bubble button {
-  width: 32px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: #f3efe8;
-  cursor: pointer;
-}
 .md-bubble button:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 .md-bubble button[aria-pressed="true"] {
   background: rgba(255, 255, 255, 0.18);
-}
-.md-bubble .ic {
-  width: 17px;
-  height: 17px;
 }
 .md-body {
   position: relative;
@@ -2943,9 +3210,6 @@ ins {
 .md-slash .menu-item:hover {
   background: var(--hover);
 }
-.md-slash .ic {
-  color: var(--t2);
-}
 .md-editor .ProseMirror {
   min-height: 10lh;
   padding: 6px 8px;
@@ -2957,8 +3221,76 @@ ins {
   line-height: 1.7;
   color: var(--ink);
 }
+.pv-md > :first-child {
+  margin-top: 0;
+}
+.worked-body > :first-child {
+  margin-top: 8px;
+}
 .md-editor .ProseMirror > :first-child {
   margin-top: 0;
+}
+.smeta p {
+  font-size: 13.5px;
+  color: var(--t2);
+}
+.jempty p {
+  margin: 4px 0 0;
+  color: var(--t2);
+  font-size: 14px;
+}
+.about p {
+  color: var(--t2);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.legal p,
+.legal ul {
+  margin: 0 0 10px;
+}
+.dbg p {
+  margin: 0;
+}
+.dbg-strip p {
+  margin: 6px 0 0;
+}
+.sbody > p,
+.sbody > section > p {
+  color: var(--t3);
+  margin-bottom: 18px;
+}
+.legal h1 + p {
+  color: var(--t3);
+  font-size: 14px;
+}
+.legal ul {
+  padding-left: 20px;
+}
+.answered ol {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 0 7px;
+  padding: 2px 0 2px 19px;
+  border-left: 2px solid var(--line);
+  list-style: none;
+}
+/* The activity log shares the answered round's line; its entries are single lines with the action's icon. */
+.activity ol {
+  gap: 6px;
+}
+.dbg pre {
+  max-height: 320px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--panel);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
 }
 .md-editor .ProseMirror p,
 .md-editor .ProseMirror ul,
@@ -2967,6 +3299,60 @@ ins {
 .md-editor .ProseMirror pre,
 .md-editor .ProseMirror table {
   margin: 0 0 10px;
+}
+.editor h1 {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.smeta h3 {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--t3);
+  margin: 18px 0 6px;
+}
+.sbody h1 {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 4px;
+}
+.sgroup h2 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.setup h1 {
+  font-size: 30px;
+  line-height: 1.12;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.about h1 {
+  font-size: 34px;
+  line-height: 1.08;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+.doc h1 {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 4px;
+}
+.legal h2 {
+  margin: 28px 0 8px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+.pv-md h1,
+.pv-md h2,
+.pv-md h3 {
+  font-size: 16px;
+  margin: 16px 0 6px;
 }
 .md-editor .ProseMirror h1,
 .md-editor .ProseMirror h2,
@@ -2992,6 +3378,11 @@ ins {
 .md-editor .ProseMirror ol {
   padding-left: 24px;
 }
+.confirmmodal .cb p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
 .md-editor .ProseMirror li > p {
   margin: 0;
 }
@@ -3000,13 +3391,23 @@ ins {
   font-variant-numeric: normal;
   color: var(--t2);
 }
-.md-editor .ProseMirror li + li {
-  margin-top: 3px;
-}
 .md-editor .ProseMirror blockquote {
   padding-left: 14px;
   border-left: 2px solid var(--line);
   color: var(--t2);
+}
+.legal code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.92em;
+}
+.dbg-k code,
+.dbg-strip code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--t2);
+}
+.dbg-strip dd code {
+  user-select: all;
+  overflow-wrap: anywhere;
 }
 .md-editor .ProseMirror code {
   font:
@@ -3036,8 +3437,7 @@ ins {
   border-collapse: collapse;
   font-size: 14px;
 }
-.md-editor .ProseMirror th,
-.md-editor .ProseMirror td {
+.md-editor .ProseMirror th {
   padding: 6px 10px;
   border: 1px solid var(--line);
   text-align: left;
@@ -3045,6 +3445,11 @@ ins {
 }
 .md-editor .ProseMirror th {
   font-weight: 600;
+}
+.legal a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .md-editor .ProseMirror a {
   color: inherit;
@@ -3064,11 +3469,6 @@ ins {
 .editor {
   overflow: auto;
   padding: 28px clamp(20px, 3.5vw, 44px) 64px;
-}
-.editor h1 {
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
 }
 .doc-h {
   display: block;
@@ -3113,18 +3513,14 @@ ol.editable li::before {
   overflow: auto;
   padding: 18px 16px;
 }
-.smeta h3 {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--t3);
-  margin: 18px 0 6px;
-}
 .smeta h3:first-child {
   margin-top: 0;
 }
-.smeta p {
-  font-size: 13.5px;
-  color: var(--t2);
+.dbg-strip dl > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 /* Every row is the same height, whether it ends in Restore or in the current version's mark. */
 .smeta .vers div {
@@ -3264,6 +3660,11 @@ ol.editable li::before {
 .jrow .col2 .tbtn {
   margin-left: -10px;
 }
+/* Restore sits beside the note: a narrow button leaves the note its whole width in a narrow panel. */
+.fileline .grow:has(.kept) ~ .tbtn {
+  padding: 0 6px;
+  margin-right: -6px;
+}
 /* The tag and the time stay whole: in a narrow column the time moves under the tag rather than breaking in two. */
 .jrow .jlast {
   display: inline-flex;
@@ -3292,11 +3693,6 @@ ol.editable li::before {
   border: 1px dashed var(--line);
   border-radius: 12px;
 }
-.jempty p {
-  margin: 4px 0 0;
-  color: var(--t2);
-  font-size: 14px;
-}
 /* A question before something that can't be undone: the message, what follows from it, and two buttons. */
 .modal.confirmmodal {
   position: fixed;
@@ -3311,11 +3707,6 @@ ol.editable li::before {
   font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.01em;
-}
-.confirmmodal .cb p {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
 }
 /* The project's instructions: a page of formatted text in a dialog. */
 .modal.instrmodal {
@@ -3360,6 +3751,9 @@ ol.editable li::before {
   min-height: 380px;
   overflow: auto;
 }
+.legal li + li {
+  margin-top: 4px;
+}
 .jobmodal .msteps li {
   padding: 0;
 }
@@ -3377,18 +3771,16 @@ ol.editable li::before {
   text-align: left;
   cursor: pointer;
 }
-.jobmodal .msteps li:not(.on) button:hover {
-  background: var(--hover);
-}
-.jobmodal .mform .fld > legend,
-.jobmodal .mform .fld > span:first-child {
-  font-size: 12.5px;
-  color: var(--t3);
-}
 .jobmodal .mform fieldset {
   margin: 0;
   padding: 0;
   border: 0;
+}
+fieldset.fld > legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  color: var(--t3);
 }
 .jobmodal .mform .fld > legend {
   margin-bottom: 6px;
@@ -3421,12 +3813,17 @@ ol.editable li::before {
   gap: 8px;
   padding-right: 4px;
 }
-.jobmodal .outfield .ic {
-  color: var(--t2);
-}
 .jobmodal .outfield .btn {
   height: 26px;
   padding: 0 10px;
+}
+.summary {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--t2);
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--panel);
 }
 .jobmodal .summary {
   margin: 0;
@@ -3480,30 +3877,6 @@ ol.editable li::before {
   gap: 2px;
   align-content: start;
 }
-.msteps li {
-  padding: 9px 10px;
-  border-radius: 8px;
-  display: grid;
-  gap: 1px;
-}
-.msteps li b {
-  font-weight: 500;
-  font-size: 14px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.msteps li b .ic {
-  width: 15px;
-  height: 15px;
-  color: var(--t3);
-}
-/* The line under a step starts where its name does, past the icon (15px) and the gap (8px). */
-.msteps li b + span {
-  font-size: 12.5px;
-  color: var(--t3);
-  padding-left: 23px;
-}
 .msteps li.on {
   background: var(--sel);
 }
@@ -3524,21 +3897,6 @@ ol.editable li::before {
   gap: 6px;
   flex-wrap: wrap;
 }
-.choice span {
-  height: 30px;
-  padding: 0 11px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  font-size: 13.5px;
-  box-shadow: 0 0 0 1px var(--line);
-  background: var(--paper);
-}
-.choice span.on {
-  background: var(--btn);
-  color: var(--on-btn);
-  box-shadow: none;
-}
 .field {
   height: 34px;
   display: inline-flex;
@@ -3550,24 +3908,6 @@ ol.editable li::before {
   background: var(--paper);
   font-size: 14px;
   min-width: 120px;
-}
-.field .ic {
-  width: 13px;
-  height: 13px;
-  margin-left: auto;
-  color: var(--t3);
-}
-.summary {
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--t2);
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: var(--panel);
-}
-.summary b {
-  color: var(--ink);
-  font-weight: 600;
 }
 .modal .mf {
   display: flex;
@@ -3595,25 +3935,6 @@ ol.editable li::before {
 .snav .news {
   margin-top: auto;
 }
-.snav a,
-.snav button,
-.snav .off {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 32px;
-  padding: 0 10px;
-  border-radius: 8px;
-  font-size: 14px;
-  color: var(--t2);
-  text-align: left;
-  white-space: nowrap;
-}
-.snav a .ic,
-.snav button .ic,
-.snav .off .ic {
-  color: var(--t3);
-}
 .snav a.on,
 .snav button.on {
   background: var(--sel);
@@ -3627,26 +3948,8 @@ ol.editable li::before {
   max-width: 760px;
   padding: 28px 44px 64px;
 }
-.sbody h1 {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  margin-bottom: 4px;
-}
-.sbody > p,
-.sbody > section > p {
-  color: var(--t3);
-  margin-bottom: 18px;
-}
 .sgroup {
   margin-top: 30px;
-}
-.sgroup h2 {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--line);
 }
 .srow {
   display: flex;
@@ -3674,10 +3977,6 @@ ol.editable li::before {
 /* A setting that belongs to the one above it, such as each kind of notification. */
 .srow.sub {
   padding-left: 18px;
-}
-.srow.sub .lbl b {
-  font-size: 14px;
-  color: var(--t2);
 }
 .sbody .note {
   font-size: 13px;
@@ -3724,10 +4023,6 @@ ol.editable li::before {
   gap: 6px;
   align-content: start;
 }
-.lv b {
-  font-size: 15px;
-  font-weight: 700;
-}
 .lv .d {
   font-size: 12.5px;
   color: var(--t2);
@@ -3745,26 +4040,12 @@ ol.editable li::before {
   padding: 12px 0;
   border-bottom: 1px solid var(--line-2);
 }
-.acct b {
-  font-weight: 500;
-  font-size: 14.5px;
-  color: var(--ink);
-  display: block;
-}
-.acct span {
-  font-size: 13px;
-  color: var(--t3);
-}
 .lock {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: 12px;
   color: var(--t3);
-}
-.lock .ic {
-  width: 12px;
-  height: 12px;
 }
 
 .snav .off {
@@ -3777,11 +4058,6 @@ ol.editable li::before {
 .lv {
   position: relative;
   cursor: pointer;
-}
-.lv input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
 }
 :root[data-keys] :is(.lv:has(input:focus-visible), .switch:focus-visible, .choice input:focus-visible + span) {
   outline: 2px solid var(--ink);
@@ -3799,12 +4075,12 @@ ol.editable li::before {
   color: var(--need);
   margin-top: 4px;
 }
+.asking .q .err {
+  color: var(--need);
+}
 
 .opt.wide {
   grid-template-columns: 1fr;
-}
-.acct .keybox {
-  max-width: 420px;
 }
 
 /* First-run setup, About and empty states */
@@ -3852,24 +4128,8 @@ ol.editable li::before {
   font-size: 12.5px;
   color: var(--t3);
 }
-.dots i {
-  width: 22px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--line);
-  display: block;
-}
 .dots i.on {
   background: var(--ink);
-}
-.setup h1 {
-  font-size: 30px;
-  line-height: 1.12;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-}
-.setup h1 span {
-  color: var(--taupe);
 }
 .setup .lede {
   color: var(--t2);
@@ -3886,16 +4146,13 @@ ol.editable li::before {
   box-shadow: 0 0 0 1px var(--line);
   background: var(--paper);
 }
-.opt b {
-  display: block;
-  font-weight: 600;
-  font-size: 15px;
-  color: var(--ink);
-}
 .opt .d {
   display: block;
   font-size: 13px;
   color: var(--t3);
+}
+.asking .q .d {
+  margin: 4px 0 0;
 }
 .opt.on {
   box-shadow: 0 0 0 2px var(--ink);
@@ -3905,6 +4162,9 @@ ol.editable li::before {
   gap: 8px;
   align-items: center;
   margin-top: 10px;
+}
+.acct .keybox {
+  max-width: 420px;
 }
 .keybox .field {
   flex: 1;
@@ -3917,24 +4177,10 @@ ol.editable li::before {
   position: relative;
   z-index: 1;
 }
-.about h1 {
-  font-size: 34px;
-  line-height: 1.08;
-  font-weight: 800;
-  letter-spacing: -0.035em;
-}
-.about h1 span {
-  color: var(--taupe);
-}
 .about .ver {
   display: flex;
   gap: 8px;
   align-items: center;
-}
-.about p {
-  color: var(--t2);
-  font-size: 15px;
-  line-height: 1.6;
 }
 .links {
   display: grid;
@@ -3947,13 +4193,6 @@ ol.editable li::before {
   padding: 11px 2px;
   border-bottom: 1px solid var(--line-2);
   font-size: 14.5px;
-}
-.links button {
-  width: 100%;
-  text-align: left;
-}
-.links :is(a, button) .ic {
-  color: var(--t3);
 }
 .links :is(a, button):hover {
   color: var(--ink);
@@ -3973,12 +4212,6 @@ ol.editable li::before {
 .doc {
   padding-top: 48px;
 }
-.doc h1 {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  margin-bottom: 4px;
-}
 .doc .sub {
   color: var(--t3);
   font-size: 14px;
@@ -3994,58 +4227,17 @@ ol.editable li::before {
   font-size: 14.5px;
   line-height: 1.6;
 }
-.legal h1 + p {
-  color: var(--t3);
-  font-size: 14px;
-}
-.legal h2 {
-  margin: 28px 0 8px;
-  color: var(--ink);
-  font-size: 16px;
-  font-weight: 700;
-}
-.legal p,
-.legal ul {
-  margin: 0 0 10px;
-}
-.legal ul {
-  padding-left: 20px;
-}
-.legal li + li {
-  margin-top: 4px;
+.md-editor .ProseMirror li + li {
+  margin-top: 3px;
 }
 .legal :is(strong, b) {
   color: var(--ink);
   font-weight: 600;
 }
-.legal code {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.92em;
-}
-.legal a {
-  color: var(--ink);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
 .changes {
   list-style: none;
   margin: 0;
   padding: 0;
-}
-.changes li {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--line-2);
-  font-size: 14.5px;
-  line-height: 1.55;
-  color: var(--t2);
-}
-.changes li b {
-  font-weight: 600;
-  color: var(--ink);
-}
-.links :is(a, button) .grow + .ic {
-  width: 14px;
-  height: 14px;
 }
 .starters {
   display: grid;
@@ -4058,9 +4250,6 @@ ol.editable li::before {
   padding: 12px 2px;
   border-bottom: 1px solid var(--line-2);
   font-size: 15px;
-}
-.starter .ic {
-  color: var(--t3);
 }
 .starter span.t3 {
   font-size: 13px;
@@ -4092,11 +4281,6 @@ ol.editable li::before {
 .side .chrome,
 .top {
   -webkit-app-region: drag;
-}
-.side .chrome button,
-.top button,
-.top a {
-  -webkit-app-region: no-drag;
 }
 .lights-space {
   width: 64px;
@@ -4148,9 +4332,6 @@ button.item {
   border: 0;
   border-bottom: 1px solid var(--line-2);
 }
-.link {
-  color: var(--t2);
-}
 .link:hover {
   color: var(--ink);
   text-decoration: underline;
@@ -4158,10 +4339,6 @@ button.item {
 }
 .btn:disabled {
   opacity: 0.4;
-  cursor: default;
-}
-.iconbtn:disabled {
-  opacity: 0.35;
   cursor: default;
 }
 .composer textarea:disabled {
@@ -4192,11 +4369,6 @@ button.item {
 }
 .menu-item[data-highlighted] {
   background: var(--hover);
-}
-.menu-check {
-  margin-left: auto;
-  width: 15px;
-  height: 15px;
 }
 .menu-sep {
   height: 1px;
@@ -4247,59 +4419,14 @@ button.item {
   padding: 0 12px 0 18px;
   color: var(--t3);
 }
-.search-field input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: none;
-  color: var(--ink);
-  font: inherit;
-  font-size: 16px;
-}
 .search-field input::placeholder {
   color: var(--t3);
-}
-.search-hits {
-  max-height: min(380px, 56vh);
-  overflow: auto;
-  padding: 0 8px 8px;
-  border-top: 1px solid var(--line-2);
 }
 .search-hits:empty {
   display: none;
 }
-.search-h {
-  padding: 12px 10px 4px;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--t3);
-}
-.search-hit {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 36px;
-  padding: 0 10px;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-}
-.search-hit .ic {
-  color: var(--t2);
-}
 .search-hit.on {
   background: var(--hover);
-}
-.search-hit .where {
-  max-width: 35%;
-  font-size: 13px;
-}
-.search-none {
-  margin: 0;
-  padding: 14px 18px 18px;
-  border-top: 1px solid var(--line-2);
-  font-size: 14px;
 }
 .dlg-title {
   margin: 0;
@@ -4312,6 +4439,11 @@ button.item {
   gap: 6px;
 }
 .fld > span:first-child {
+  font-size: 12.5px;
+  color: var(--t3);
+}
+.jobmodal .mform .fld > legend,
+.jobmodal .mform .fld > span:first-child {
   font-size: 12.5px;
   color: var(--t3);
 }
@@ -4356,12 +4488,6 @@ fieldset.fld {
   padding: 0;
   border: 0;
   min-width: 0;
-}
-fieldset.fld > legend {
-  padding: 0;
-  margin-bottom: 6px;
-  font-size: 12.5px;
-  color: var(--t3);
 }
 
 /* Thin scrollbars in the palette, on every platform. */
@@ -4431,26 +4557,11 @@ fieldset.fld > legend {
 .toast.saved {
   padding-left: 14px;
 }
-.toast.saved > .ic {
-  color: var(--t2);
-}
 .toast.saved .btn {
   height: 30px;
 }
 
 /* ===== File previews ===== */
-.ftabs button {
-  flex: none;
-  max-width: 200px;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 7px;
-  font-size: 13px;
-  color: var(--t2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 .ftabs button.on {
   background: var(--paper);
   color: var(--ink);
@@ -4474,15 +4585,6 @@ fieldset.fld > legend {
   font-size: 14.5px;
   line-height: 1.65;
 }
-.pv-md h1,
-.pv-md h2,
-.pv-md h3 {
-  font-size: 16px;
-  margin: 16px 0 6px;
-}
-.pv-md > :first-child {
-  margin-top: 0;
-}
 .pv-text {
   margin: 0;
   padding: 20px 24px;
@@ -4499,9 +4601,6 @@ fieldset.fld > legend {
 .pv-table {
   padding: 8px 14px 14px;
   overflow: auto;
-}
-.pv-table td {
-  white-space: nowrap;
 }
 .pv-pdf {
   display: grid;
@@ -4650,12 +4749,6 @@ label.opt {
 label.opt:hover:not(.on) {
   box-shadow: 0 0 0 1px var(--t3);
 }
-/* The radio stays in the page for the keyboard and screen readers; the card shows the choice. */
-label.opt input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
 :root[data-keys] label.opt:has(input:focus-visible) {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
@@ -4721,8 +4814,18 @@ label.opt input {
   top: 14px;
   right: 4px;
 }
+.panel .brand {
+  padding: 0;
+  gap: 8px;
+}
 [data-full-screen] .side .brand {
   padding-top: 16px;
+}
+.rail-chrome {
+  flex: none;
+  width: 100%;
+  height: 44px;
+  -webkit-app-region: drag;
 }
 /* The rail's logo stays level with the sidebar's. */
 [data-full-screen] .rail-chrome {
@@ -4731,18 +4834,6 @@ label.opt input {
 /* A round of answered questions: one grey line like the steps, which opens onto each question and its answer. */
 .answered {
   margin-top: 20px;
-}
-.answered > button {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 8px 4px 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  font-size: 14.5px;
-  color: var(--t2);
-  cursor: pointer;
 }
 .answered > button:hover {
   color: var(--ink);
@@ -4755,27 +4846,32 @@ label.opt input {
   opacity: 0;
   transition: opacity 0.12s;
 }
+.msg-tools .sent {
+  align-self: center;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--t3);
+  white-space: nowrap;
+}
 .answered:is(:hover, :focus-within) > .sent {
   opacity: 1;
-}
-.answered > button .ic {
-  color: var(--t3);
 }
 .answered .chev {
   width: 14px;
   height: 14px;
   transition: transform 0.15s;
 }
+.prow .chev {
+  width: 14px;
+  height: 14px;
+  opacity: 0;
+}
+.prow:hover .chev,
+.prow:focus-visible .chev {
+  opacity: 1;
+}
 .answered > button[aria-expanded="true"] .chev {
   transform: rotate(180deg);
-}
-.answered ol {
-  display: grid;
-  gap: 12px;
-  margin: 8px 0 0 7px;
-  padding: 2px 0 2px 19px;
-  border-left: 2px solid var(--line);
-  list-style: none;
 }
 .answered .q {
   display: block;
@@ -4796,25 +4892,8 @@ label.opt input {
   padding: 0 0 4px 19px;
   border-left: 2px solid var(--line);
 }
-.worked-body > :first-child {
-  margin-top: 8px;
-}
-/* The activity log shares the answered round's line; its entries are single lines with the action's icon. */
-.activity ol {
-  gap: 6px;
-}
-.activity li {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-  font-size: 13.5px;
-  color: var(--t2);
-}
-.activity li .ic {
-  width: 15px;
-  height: 15px;
-  color: var(--t3);
+.rp .more-files[aria-expanded="true"] .ic {
+  transform: rotate(180deg);
 }
 .activity li:last-child {
   color: var(--ink);
@@ -4823,15 +4902,20 @@ label.opt input {
 .activity li:has(.note) {
   align-items: flex-start;
 }
-.activity li:has(.note) .ic {
-  margin-top: 2px;
-}
 .activity .note {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   overflow: hidden;
   line-height: 1.45;
+}
+/* What happens to the original, or where the copy went: a line of its own above the button when the panel is narrow,
+   never cut to a letter. */
+.wc .foot2 .note {
+  flex: 1 1 12em;
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 /* Debug mode: a line with tool calls behind it is a button that opens onto them, under the line. */
 .activity li.dbg-line {
@@ -4854,6 +4938,9 @@ label.opt input {
 .activity li.dbg-line > button:hover {
   color: var(--ink);
 }
+.jobmodal .msteps li:not(.on) button:hover {
+  background: var(--hover);
+}
 .activity li.dbg-line > button[aria-expanded="true"] .chev {
   transform: rotate(180deg);
 }
@@ -4868,6 +4955,10 @@ label.opt input {
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+:root[data-keys] .seg label:has(input:focus-visible) > span {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
 }
 .dbg {
   display: grid;
@@ -4884,30 +4975,8 @@ label.opt input {
   font-size: 12px;
   color: var(--t3);
 }
-.dbg-k code,
-.dbg-strip code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--t2);
-}
-.dbg pre {
-  max-height: 320px;
-  margin: 0;
-  padding: 8px 10px;
-  overflow: auto;
-  border-radius: 6px;
-  background: var(--panel);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: var(--ink);
-}
 .dbg pre.dbg-err {
   color: var(--danger);
-}
-.dbg p {
-  margin: 0;
 }
 .dbg .dbg-think {
   color: var(--t3);
@@ -4935,12 +5004,6 @@ label.opt input {
   gap: 4px 20px;
   margin: 0;
 }
-.dbg-strip dl > div {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
 .dbg-strip dt {
   color: var(--t3);
 }
@@ -4951,16 +5014,17 @@ label.opt input {
   margin: 0;
   color: var(--t2);
 }
-.dbg-strip dd code {
-  user-select: all;
-  overflow-wrap: anywhere;
+/* The button takes no room of its own: it sits in the gap above whatever comes next, so spacing stays as it was. */
+.msg-tools {
+  display: flex;
+  /* The 15px icon sits in a 26px button: pulling the row left by the padding puts the glyph under the text's edge. */
+  margin: 2px 0 -20px -5.5px;
+  opacity: 0;
+  transition: opacity 0.12s;
 }
 .dbg-strip .msg-tools {
   margin: 0;
   opacity: 1;
-}
-.dbg-strip p {
-  margin: 6px 0 0;
 }
 /* Skills list: the built-in guides under their own heading, and Import at the end. */
 .slist .sgroup {
@@ -5017,38 +5081,15 @@ label.opt input {
 .msg.mine .you {
   margin-left: 0;
 }
-/* The button takes no room of its own: it sits in the gap above whatever comes next, so spacing stays as it was. */
-.msg-tools {
-  display: flex;
-  /* The 15px icon sits in a 26px button: pulling the row left by the padding puts the glyph under the text's edge. */
-  margin: 2px 0 -20px -5.5px;
-  opacity: 0;
-  transition: opacity 0.12s;
-}
 .msg:hover .msg-tools,
 .msg-tools:focus-within {
   opacity: 1;
-}
-.msg-tools .iconbtn {
-  width: 26px;
-  height: 26px;
-}
-.msg-tools .iconbtn .ic {
-  width: 15px;
-  height: 15px;
 }
 /* Under the user's own message, the copy button keeps the bubble's right edge and the time sits before it. */
 .msg.mine .msg-tools {
   flex-direction: row-reverse;
   margin-left: 0;
   margin-right: -5.5px;
-}
-.msg-tools .sent {
-  align-self: center;
-  padding: 0 4px;
-  font-size: 12px;
-  color: var(--t3);
-  white-space: nowrap;
 }
 
 /* ===== Menu-bar panel ===== */
@@ -5071,16 +5112,16 @@ html:has(.panel) body {
   justify-content: space-between;
   padding: 2px 2px 4px 4px;
 }
-.panel .brand {
-  padding: 0;
-  gap: 8px;
-}
 .panel .brand svg {
   width: 20px;
   height: 20px;
 }
 .panel .brand b {
   font-size: 14.5px;
+}
+.srow.sub .lbl b {
+  font-size: 14px;
+  color: var(--t2);
 }
 .panel .ph .btn {
   height: 28px;
@@ -5131,6 +5172,15 @@ html:has(.panel) body {
   text-align: left;
   cursor: pointer;
 }
+/* Rows that light up under the pointer keep apart, so two lit at once never touch. */
+.nav + .nav,
+.rec + .rec,
+.slist .sitem + .sitem,
+.menu-item + .menu-item,
+.search-hit + .search-hit,
+.prow + .prow {
+  margin-top: 2px;
+}
 .prow:hover {
   background: var(--hover);
 }
@@ -5139,21 +5189,6 @@ html:has(.panel) body {
 }
 .prow.still:hover {
   background: none;
-}
-.prow > .ic {
-  width: 16px;
-  height: 16px;
-  flex: none;
-  color: var(--t3);
-}
-.prow .chev {
-  width: 14px;
-  height: 14px;
-  opacity: 0;
-}
-.prow:hover .chev,
-.prow:focus-visible .chev {
-  opacity: 1;
 }
 .prow .dot {
   width: 8px;
@@ -5191,9 +5226,6 @@ html:has(.panel) body {
   gap: 2px;
   padding: 2px 0 0;
 }
-.pfoot .tbtn {
-  font-size: 13px;
-}
 
 /* The collapsed sidebar: a rail of icons, which opens the whole sidebar over the page on a resting pointer. */
 /* On a Mac the rail is wide enough for the window buttons to sit on it. */
@@ -5218,12 +5250,6 @@ html:has(.panel) body {
   padding: 0 0 10px;
   background: var(--side);
   border-right: 1px solid var(--line-2);
-}
-.rail-chrome {
-  flex: none;
-  width: 100%;
-  height: 44px;
-  -webkit-app-region: drag;
 }
 .rail-logo {
   display: grid;
@@ -5251,22 +5277,12 @@ html:has(.panel) body {
   grid-area: 1 / 1;
   transition: opacity 120ms;
 }
-.logo-btn svg {
-  width: 24px;
-  height: 24px;
-}
-.logo-btn .ic {
-  opacity: 0;
-}
 .logo-btn:is(:hover, :focus-visible) {
   background: var(--hover);
   color: var(--ink);
 }
 .logo-btn:is(:hover, :focus-visible) svg {
   opacity: 0;
-}
-.logo-btn:is(:hover, :focus-visible) .ic {
-  opacity: 1;
 }
 .railbtn {
   display: grid;
@@ -5278,10 +5294,9 @@ html:has(.panel) body {
   color: var(--t2);
   cursor: pointer;
 }
-/* Larger than the sidebar's icons, so the rail doesn't look empty. Each keeps its row's height. */
-.railbtn .ic {
-  width: 20px;
-  height: 20px;
+/* The icons' names, beside the shut rail. Once the sidebar opens, its labels say the same. */
+.railbtn {
+  position: relative;
 }
 /* Apart as the sidebar's sections are, so each icon stays at its row's height. */
 .railbtn:not([data-nav="search"], :has(.avatar)) + .railbtn {
@@ -5336,10 +5351,6 @@ html:has(.panel) body {
   left: var(--peek-w);
   z-index: 20;
   width: 10px;
-}
-/* The icons' names, beside the shut rail. Once the sidebar opens, its labels say the same. */
-.railbtn {
-  position: relative;
 }
 .railbtn .tip {
   position: absolute;

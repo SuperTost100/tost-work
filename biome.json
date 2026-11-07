@@ -29,17 +29,5 @@
     "formatter": {
       "quoteStyle": "double"
     }
-  },
-  "overrides": [
-    {
-      "includes": ["**/*.css"],
-      "linter": {
-        "rules": {
-          "style": {
-            "noDescendingSpecificity": "off"
-          }
-        }
-      }
-    }
-  ]
+  }
 }
