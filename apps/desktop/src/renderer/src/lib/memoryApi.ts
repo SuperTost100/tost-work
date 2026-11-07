@@ -1,4 +1,3 @@
-import { stageOf } from "@/lib/changelog";
 import type {
   AgentAccount,
   JobChange,
@@ -140,7 +139,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   const tasks = new Map<string, Task>();
   const listeners = new Set<(t: Task) => void>();
   // A user who has seen this stage's welcome card, unless a test asks for one who hasn't.
-  let settings: Settings = { ...DEFAULT_SETTINGS, welcomed: stageOf(__APP_VERSION__), ...initial };
+  let settings: Settings = { ...DEFAULT_SETTINGS, welcomed: __APP_VERSION__, ...initial };
   // The guide as the real app lists it: with its title, description and steps in the settings' language.
   const wordGuide = (): Skill => ({ ...WORD_GUIDE, ...guideText(settings.language ?? "en", "word") });
   const accounts: Record<AgentProvider, AgentAccount> = {

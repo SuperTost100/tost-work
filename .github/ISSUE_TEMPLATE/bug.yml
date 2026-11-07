@@ -25,11 +25,12 @@ body:
       description: Shown in Impostazioni > Informazioni, for example "0.0.23 dev · build 5ecd853".
     validations:
       required: true
-  - type: dropdown
+  # A text field rather than a dropdown, because GitHub fills text fields from the link the app opens, not dropdowns.
+  - type: input
     id: os
     attributes:
       label: System
-      options: [macOS, Windows, Linux]
+      description: macOS, Windows or Linux. Report a problem in the app fills it in.
     validations:
       required: true
   - type: dropdown

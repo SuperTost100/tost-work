@@ -111,7 +111,7 @@ const { app, page, data } = await launch({
   language: "it",
   theme: THEME,
   level: "expert",
-  welcomed: stage,
+  welcomed: stage ? version : null,
 });
 await page.waitForSelector("text=Tost", { timeout: 20000 });
 const send = (channel, arg) =>
