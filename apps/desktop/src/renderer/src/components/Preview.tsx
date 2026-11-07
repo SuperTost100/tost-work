@@ -56,7 +56,9 @@ export async function load(file: FileContent): Promise<Loaded> {
   if (ext === "md" || ext === "markdown") {
     const [{ marked }, { default: DOMPurify }] = await Promise.all([import("marked"), import("dompurify")]);
     // Agents write this Markdown, so its HTML is sanitised before it reaches the page.
-    return { kind: "html", html: DOMPurify.sanitize(await marked.parse(new TextDecoder().decode(bytes))) };
+    // A main element in the file would be a second main landmark inside the app's own.
+    const html = DOMPurify.sanitize(await marked.parse(new TextDecoder().decode(bytes)), { FORBID_TAGS: ["main"] });
+    return { kind: "html", html };
   }
   if (IMAGE.has(ext)) return { kind: "image", url: URL.createObjectURL(new Blob([bytes as BlobPart])) };
   if (TEXT.has(ext)) return { kind: "text", text: new TextDecoder().decode(bytes).slice(0, 200_000) };

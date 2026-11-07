@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { type Confirm, useConfirm } from "@/lib/useConfirm";
 import { LanguageContext } from "@/lib/useT";
 import { ConfirmProvider } from "./ConfirmProvider";
@@ -96,6 +96,16 @@ describe("the confirmation card", () => {
     });
     expect(other.inert).toBe(false);
     other.remove();
+  });
+
+  it("keeps the app's shortcuts, such as Cmd+K, from acting while it's open", async () => {
+    const shortcut = vi.fn();
+    window.addEventListener("keydown", shortcut);
+    const card = await open();
+    fireEvent.keyDown(card, { key: "k", metaKey: true });
+    fireEvent.keyDown(card, { key: "k", ctrlKey: true });
+    expect(shortcut).not.toHaveBeenCalled();
+    window.removeEventListener("keydown", shortcut);
   });
 
   it("answers true on the action button", async () => {

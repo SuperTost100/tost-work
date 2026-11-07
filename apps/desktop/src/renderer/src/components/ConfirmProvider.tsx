@@ -41,6 +41,11 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!open) return;
     const onEscape = (e: KeyboardEvent) => {
+      // The app's own shortcuts, such as Cmd+K for search, wait until the card is answered. Copying text still works.
+      if (e.metaKey || e.ctrlKey) {
+        e.stopPropagation();
+        return;
+      }
       if (e.key !== "Escape") return;
       e.preventDefault();
       e.stopPropagation();
