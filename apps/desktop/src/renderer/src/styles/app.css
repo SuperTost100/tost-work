@@ -1973,11 +1973,10 @@ textarea {
   font-weight: 800;
   letter-spacing: -0.03em;
 }
-/* Centred at the width the Projects and Jobs pages use, with its title and rows 40px in, where theirs are. */
+/* At the width the Projects and Jobs pages use, with its title and rows 40px in, where theirs are. */
 .board-wrap {
   width: 100%;
   max-width: 1040px;
-  margin: 0 auto;
   padding: 0 8px;
 }
 .thead,
@@ -2510,10 +2509,10 @@ label.opt input {
   justify-content: flex-end;
 }
 
-/* ===== Wide pages (projects, skills, jobs, settings) ===== */
+/* ===== Wide pages (projects, skills, jobs, settings) =====
+   Every page starts at the left of the main area, so titles line up whatever the view and the window's width. */
 .wcol {
   max-width: 1040px;
-  margin: 0 auto;
   padding: 28px 40px 64px;
 }
 .phead {
@@ -2672,7 +2671,6 @@ label.opt input {
   grid-template-columns: 1fr 300px;
   gap: 48px;
   max-width: 1080px;
-  margin: 0 auto;
   padding: 32px 40px 64px;
 }
 @container (max-width: 700px) {
@@ -3954,8 +3952,8 @@ fieldset.fld > legend {
   flex-direction: column;
   gap: 2px;
 }
-/* About sits at the bottom of the list, apart from the settings themselves. */
-.snav .news {
+/* Report a problem, What's new and About sit at the bottom of the list, apart from the settings themselves. */
+.snav .report {
   margin-top: auto;
 }
 .snav a.on,
@@ -4444,6 +4442,206 @@ button.item {
   box-shadow:
     0 0 0 1px var(--line),
     0 24px 70px rgba(0, 0, 0, 0.18);
+}
+/* A button with no frame until hovered, for the quieter of two actions. */
+.btn.quiet {
+  border-color: transparent;
+  background: none;
+  color: var(--t2);
+  padding: 0 8px;
+}
+.btn.quiet:hover {
+  border-color: transparent;
+  background: var(--hover);
+  color: var(--ink);
+}
+
+/* Report a problem: what the bug form will know, the public warning, and the logs. */
+.dlg.report {
+  gap: 12px;
+}
+.report-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -4px -6px 0 0;
+}
+.report-p {
+  margin: 0;
+  color: var(--t2);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.report-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--panel);
+  font-size: 14px;
+}
+.report-facts dt {
+  color: var(--t3);
+}
+.report-facts dd {
+  margin: 0;
+}
+.report-logs {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-2);
+}
+.report-logs-text {
+  flex: 1;
+  margin: 0;
+  color: var(--t2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.report-logs-title {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+}
+.report-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+/* The welcome card of a pre-release: a cover with the tilted document and the stage's stamp, and a note from Tost. */
+.dlg.welcome {
+  width: min(700px, calc(100vw - 48px));
+  grid-template-columns: 250px 1fr;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.welcome-art {
+  position: relative;
+  min-height: 400px;
+  background: var(--panel);
+  border-right: 1px solid var(--line-2);
+  overflow: hidden;
+}
+.welcome-logo {
+  position: absolute;
+  left: 22px;
+  top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.welcome-sheet {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: 132px;
+  height: 172px;
+  padding: 18px 14px;
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: var(--page-shadow);
+  transform: translate(-50%, -50%) rotate(-5deg);
+}
+.welcome-sheet.back {
+  opacity: 0.7;
+  transform: translate(-42%, -54%) rotate(4deg);
+}
+.welcome-line {
+  display: block;
+  border-radius: 2px;
+}
+.welcome-line.head {
+  width: 46%;
+  height: 7px;
+  margin-bottom: 12px;
+  background: var(--ink);
+}
+.welcome-line:not(.head) {
+  height: 4px;
+  margin-bottom: 7px;
+  background: var(--line);
+}
+.welcome-line:nth-child(4) {
+  width: 82%;
+}
+.welcome-line:nth-child(6) {
+  width: 64%;
+}
+.welcome-stamp {
+  position: absolute;
+  left: 50%;
+  top: 66%;
+  padding: 7px 11px 6px;
+  border: 2px solid var(--need);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  color: var(--need);
+  font:
+    500 13px / 1 "IBM Plex Mono",
+    monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(-9deg);
+}
+.welcome-text {
+  display: flex;
+  flex-direction: column;
+  padding: 30px 30px 20px;
+}
+.welcome-title {
+  margin: 0 0 12px;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+.welcome-thanks {
+  display: block;
+  color: var(--taupe);
+}
+.welcome-p {
+  margin: 0 0 10px;
+  color: var(--t2);
+  font-size: 15px;
+  line-height: 1.6;
+}
+/* Tost's signature, drawn in the text colour so it reads in both themes. */
+.welcome-sign {
+  display: block;
+  width: 116px;
+  height: 67px;
+  margin: 4px 0 0 -4px;
+  background: var(--ink);
+  mask: no-repeat left center / contain;
+}
+.welcome-acts {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 18px;
+}
+.welcome-acts .btn.quiet {
+  margin: 0 auto 0 -8px;
+}
+/* In a narrow window the picture goes, and the note keeps the card. */
+@media (max-width: 640px) {
+  .dlg.welcome {
+    grid-template-columns: 1fr;
+  }
+  .welcome-art {
+    display: none;
+  }
 }
 /* Search: high on the window, so the results grow down from where the eye already is. */
 .search-dlg {

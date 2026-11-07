@@ -26,3 +26,18 @@ export function feedbackUrl(info: FeedbackInfo): string {
   ].join("\n");
   return `${REPO_URL}/issues/new?${new URLSearchParams({ title: "", body })}`;
 }
+
+/**
+ * The repository's bug form, with the version and the system already filled in, so the person only says what happened.
+ * GitHub fills a form field from the query parameter named after its id (`.github/ISSUE_TEMPLATE/bug.yml`).
+ */
+export function bugReportUrl(info: Omit<FeedbackInfo, "language">): string {
+  const params = new URLSearchParams({
+    template: "bug.yml",
+    version: `${info.version} · build ${info.build}`,
+    os: OS_NAMES[info.platform],
+  });
+  return `${REPO_URL}/issues/new?${params}`;
+}
+
+export const OS_NAME = OS_NAMES;

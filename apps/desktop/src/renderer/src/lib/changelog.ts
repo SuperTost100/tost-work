@@ -1,4 +1,5 @@
 import type { Language } from "../../../shared/i18n";
+import type { Stage } from "../../../shared/model";
 import source from "../assets/changelog.md?raw";
 
 export interface ChangelogEntry {
@@ -47,7 +48,7 @@ export function parseChangelog(text: string): ChangelogEntry[] {
 /** A version as the app writes it: the numbers, then the stage for any build before 1.0.0, such as "0.1.0-alpha". */
 const VERSION = /^\d+\.\d+\.\d+(?:-(?:dev|alpha|beta))?$/;
 
-export type Stage = "dev" | "alpha" | "beta" | "stable";
+export type { Stage };
 
 /** The stage a version belongs to: "0.0.23-dev" is a dev build, and a version without a stage is a stable release. */
 export function stageOf(version: string): Stage {

@@ -1,12 +1,19 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "@/App";
+import { stageOf } from "@/lib/changelog";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
 import { DEFAULT_SETTINGS } from "../../../shared/model";
 import { insideProject } from "./Jobs";
 
-const settings = { ...DEFAULT_SETTINGS, name: "Giulia", level: "intermediate" as const, setupDone: true };
+const settings = {
+  ...DEFAULT_SETTINGS,
+  name: "Giulia",
+  level: "intermediate" as const,
+  setupDone: true,
+  welcomed: stageOf(__APP_VERSION__),
+};
 
 // Find first, then act: waiting inside act holds back the updates the wait is for.
 const click = async (name: string | RegExp, role: "button" | "switch" | "radio" | "checkbox" = "button") => {

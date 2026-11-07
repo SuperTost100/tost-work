@@ -276,7 +276,13 @@ export interface Settings {
    */
   debug: boolean;
   setupDone: boolean;
+  /** The pre-release stage whose welcome card the user closed, so the card comes back only at the next stage. */
+  welcomed: Stage | null;
 }
+
+/** A release's stage, from its version: "0.0.28-dev", "0.1.0-alpha", "0.6.0-beta", then "1.0.0" for stable. */
+export type Stage = "dev" | "alpha" | "beta" | "stable";
+export const STAGES: Stage[] = ["dev", "alpha", "beta", "stable"];
 
 /** What a notification is about: a task or job that needs the user, failed, or finished. */
 export type NotifyKind = "needsYou" | "failed" | "done";
@@ -366,6 +372,7 @@ export const DEFAULT_SETTINGS: Settings = {
   boardGroup: "status",
   debug: false,
   setupDone: false,
+  welcomed: null,
 };
 
 /** The longest "what else to know" note the AI gets with every task. */
