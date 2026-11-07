@@ -24,7 +24,7 @@
   --sel: rgba(27, 23, 18, 0.07);
   --ink: #1b1712;
   --t2: #57504a;
-  --t3: #807769;
+  --t3: #6b6255;
   --taupe: #9c8b73;
   --btn: #1b1712;
   --on-btn: #faf8f4;
@@ -47,7 +47,7 @@
   --sel: rgba(255, 250, 240, 0.08);
   --ink: #eeeae3;
   --t2: #b7afa4;
-  --t3: #8e8679;
+  --t3: #9d958a;
   --taupe: #b9a88f;
   --btn: #eeeae3;
   --on-btn: #1b1712;
@@ -71,7 +71,7 @@
     --sel: rgba(255, 250, 240, 0.08);
     --ink: #eeeae3;
     --t2: #b7afa4;
-    --t3: #8e8679;
+    --t3: #9d958a;
     --taupe: #b9a88f;
     --btn: #eeeae3;
     --on-btn: #1b1712;
@@ -82,6 +82,11 @@
     --bubble: #3b3732;
     color-scheme: dark;
   }
+}
+/* Every field's placeholder in the secondary text color. Without it, fields fell back to Chromium's grey. */
+::placeholder {
+  color: var(--t3);
+  opacity: 1;
 }
 /* Tost Work, full mockup. Calm like the Claude app, branded like tost.one: paper, ink, taupe, Schibsted Grotesk, MingCute icons. */
 * {
@@ -404,8 +409,8 @@ h3 {
   display: grid;
   place-items: center;
   flex: none;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 0;
   border-radius: 6px;
@@ -418,7 +423,7 @@ h3 {
    without one fades its title out under it. */
 .rec .more {
   position: absolute;
-  top: 3px;
+  top: 1px;
   right: 2px;
 }
 .brow .actions,
@@ -607,7 +612,8 @@ h3 {
   height: 26px;
   border-radius: 50%;
   background: var(--taupe);
-  color: #fff;
+  /* Dark on the taupe in both themes: white read at 3.3:1 in light and 2.3:1 in dark. */
+  color: #1b1712;
   display: grid;
   place-items: center;
   font-weight: 600;
@@ -1099,7 +1105,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 26px;
+  height: 28px;
   padding: 0 6px;
   border-radius: 6px;
 }
@@ -2411,8 +2417,8 @@ label.opt input {
   overflow-wrap: anywhere;
 }
 .msg-tools .iconbtn {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
 }
 .bpanel .head .iconbtn {
   width: 24px;
@@ -3196,7 +3202,6 @@ ins {
   display: block;
   margin-top: 2px;
   font-size: 13px;
-  opacity: 0.75;
 }
 /* The slash menu: the app's menu, under the "/" or over it when there's no room below. */
 .md-slash {
@@ -4295,7 +4300,6 @@ input:not([type="radio"], [type="checkbox"]):focus-visible,
 select:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
-  border-radius: 6px;
 }
 /* What the app focuses itself, such as the next question after an answer, is there for screen readers to read out. */
 :root [tabindex="-1"]:focus-visible {
@@ -5416,5 +5420,25 @@ html:has(.panel) body {
   .peek,
   .peek.folding {
     transition: none;
+  }
+}
+/* macOS "Increase contrast": secondary text as strong as the second level, and dividers and field edges at 3:1. */
+@media (prefers-contrast: more) {
+  :root {
+    --t3: var(--t2);
+    --line: #8f877b;
+    --line-2: #8f877b;
+  }
+  :root[data-theme="dark"] {
+    --t3: var(--t2);
+    --line: #807869;
+    --line-2: #807869;
+  }
+}
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --t3: var(--t2);
+    --line: #807869;
+    --line-2: #807869;
   }
 }
