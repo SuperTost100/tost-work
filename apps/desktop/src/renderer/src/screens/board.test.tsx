@@ -141,6 +141,15 @@ describe("the board", () => {
     );
   });
 
+  it("turns an overwrite down in place, saving nothing", async () => {
+    const { api, ids } = await seeded();
+    const decide = vi.spyOn(api.tasks, "decide");
+    await openBoard(api);
+    const needsYou = await group("Needs you");
+    await click(within(needsYou).getByRole("button", { name: "Don't save" }));
+    expect(decide).toHaveBeenCalledWith(ids.approving, "discard");
+  });
+
   it("answers an approval from the side panel too", async () => {
     const { api, ids } = await seeded();
     const decide = vi.spyOn(api.tasks, "decide");
