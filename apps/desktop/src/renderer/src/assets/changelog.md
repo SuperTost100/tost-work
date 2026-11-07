@@ -15,6 +15,22 @@
   wait here until the release bumps the version.
 -->
 
+## 0.0.28-dev
+
+### en
+
+- **A welcome for testers:** the first time you reach Home in a test build, a card says what to expect and how to report a problem, signed by Tost. It shows once per stage.
+- **Report a problem:** in Settings, above What's new, and in the Help menu. It opens GitHub's bug form with the version and the system already filled in, and can export the logs.
+- **Pages line up:** every page starts at the left, so the titles of Projects, Jobs and the Board sit in the same place, in any view and at any window size.
+- **Keyboard focus rings whole:** recent tasks, their … button, skills, the file tabs and the task box now show the full ring when you move with Tab.
+
+### it
+
+- **Un benvenuto per chi prova l'app:** la prima volta che arrivi alla Home in una versione di prova, una scheda dice cosa aspettarti e come segnalare un problema, con la firma di Tost. Compare una volta per fase.
+- **Segnala un problema:** nelle Impostazioni, sopra Novità, e nel menu Aiuto. Apre il modulo per i problemi su GitHub con la versione e il sistema già scritti, e può esportare i log.
+- **Pagine allineate:** ogni pagina parte da sinistra, così i titoli di Progetti, Lavori pianificati e Bacheca stanno nello stesso punto, in ogni vista e con qualsiasi larghezza della finestra.
+- **Bordo di selezione intero:** le attività recenti, il loro pulsante …, le skill, le schede dei file e la casella dell'attività mostrano tutto il bordo quando ti sposti con Tab.
+
 ## 0.0.27-dev
 
 ### en
