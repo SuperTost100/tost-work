@@ -8,7 +8,7 @@ import { SavedToast } from "@/components/SavedToast";
 import { SearchDialog } from "@/components/SearchDialog";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
-import { useConfirm } from "@/lib/useConfirm";
+import { useAsk, useConfirm } from "@/lib/useConfirm";
 import { useT } from "@/lib/useT";
 import { About, type AboutPage } from "@/screens/About";
 import { Board } from "@/screens/Board";
@@ -62,9 +62,23 @@ interface AppProps {
 export function App(props: AppProps) {
   return (
     <ConfirmProvider>
+      <MainQuestions api={props.api ?? window.tostWork} />
       <AppScreens {...props} />
     </ConfirmProvider>
   );
+}
+
+/** Questions from the main process, such as quitting while tasks work, asked in the same card as the window's own. */
+function MainQuestions({ api }: { api?: TostWorkApi }) {
+  const ask = useAsk();
+  useEffect(
+    () =>
+      api?.onQuestion(({ id, ...question }) => {
+        void ask(question).then((answer) => api.answerQuestion(id, answer));
+      }),
+    [api, ask],
+  );
+  return null;
 }
 
 function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSettings }: AppProps) {

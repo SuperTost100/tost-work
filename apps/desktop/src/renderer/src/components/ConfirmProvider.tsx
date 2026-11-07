@@ -1,11 +1,12 @@
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { type Confirm, type Confirmation, ConfirmContext } from "@/lib/useConfirm";
+import { type Ask, type Confirmation, ConfirmContext } from "@/lib/useConfirm";
 import { useT } from "@/lib/useT";
+import type { QuestionAnswer } from "../../../shared/api";
 
 interface Open {
   question: Confirmation;
-  answer: (yes: boolean) => void;
+  answer: (answer: QuestionAnswer) => void;
 }
 
 /**
@@ -20,16 +21,16 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const busy = useRef(false);
   const cancel = useRef<HTMLButtonElement>(null);
 
-  const confirm = useCallback<Confirm>((question) => {
-    if (busy.current) return Promise.resolve(false);
+  const ask = useCallback<Ask>((question) => {
+    if (busy.current) return Promise.resolve("no");
     busy.current = true;
-    return new Promise<boolean>((resolve) => {
+    return new Promise<QuestionAnswer>((resolve) => {
       setOpen({
         question,
-        answer: (yes) => {
+        answer: (answer) => {
           busy.current = false;
           setOpen(null);
-          resolve(yes);
+          resolve(answer);
         },
       });
     });
@@ -43,17 +44,17 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       if (e.key !== "Escape") return;
       e.preventDefault();
       e.stopPropagation();
-      open.answer(false);
+      open.answer("no");
     };
     window.addEventListener("keydown", onEscape, true);
     return () => window.removeEventListener("keydown", onEscape, true);
   }, [open]);
 
   return (
-    <ConfirmContext.Provider value={confirm}>
+    <ConfirmContext.Provider value={ask}>
       {children}
       {open && (
-        <AlertDialog.Root open onOpenChange={(isOpen) => !isOpen && open.answer(false)}>
+        <AlertDialog.Root open onOpenChange={(isOpen) => !isOpen && open.answer("no")}>
           <AlertDialog.Portal>
             <AlertDialog.Backdrop className="dlg-backdrop" />
             <AlertDialog.Popup className="modal confirmmodal" initialFocus={cancel}>
@@ -72,11 +73,16 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 </AlertDialog.Close>
                 <button
                   type="button"
-                  className={`btn ${open.question.danger ? "danger fill" : "dark"}`}
-                  onClick={() => open.answer(true)}
+                  className={`btn${open.question.danger ? " danger fill" : open.question.alt ? "" : " dark"}`}
+                  onClick={() => open.answer("yes")}
                 >
                   {open.question.yes}
                 </button>
+                {open.question.alt && (
+                  <button type="button" className="btn dark" onClick={() => open.answer("alt")}>
+                    {open.question.alt}
+                  </button>
+                )}
               </div>
             </AlertDialog.Popup>
           </AlertDialog.Portal>

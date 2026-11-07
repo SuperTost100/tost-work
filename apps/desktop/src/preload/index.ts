@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 import { contextBridge, ipcRenderer, webUtils } from "electron";
-import type { JobChange, MenuAction, SignInEvent } from "../shared/api";
+import type { JobChange, MenuAction, SignInEvent, WindowQuestion } from "../shared/api";
 import { IPC, type TostWorkApi } from "../shared/api";
 import { type AgentProvider, ATTACH_MAX, PASTED_MAX_BYTES, type Settings, type Task } from "../shared/model";
 
@@ -8,6 +8,18 @@ import { type AgentProvider, ATTACH_MAX, PASTED_MAX_BYTES, type Settings, type T
 ipcRenderer.on(IPC.fullScreen, (_: unknown, on: boolean) => {
   document.documentElement.toggleAttribute("data-full-screen", on === true);
 });
+
+// The main process counts a question as delivered once it's sent or taken, so each one goes to the newest listener
+// when it arrives, whichever subscription asked for it (React mounts twice in development), and waits here for the
+// next listener when there's none.
+const questionListeners: ((question: WindowQuestion) => void)[] = [];
+const unclaimed: WindowQuestion[] = [];
+let questionsHeard = false;
+function deliverQuestion(question: WindowQuestion): void {
+  const listener = questionListeners.at(-1);
+  if (listener) listener(question);
+  else unclaimed.push(question);
+}
 
 const api: TostWorkApi = {
   platform: process.platform as TostWorkApi["platform"],
@@ -34,6 +46,22 @@ const api: TostWorkApi = {
       ipcRenderer.removeListener(IPC.menuAction, handler);
     };
   },
+  onQuestion: (listener) => {
+    questionListeners.push(listener);
+    if (!questionsHeard) {
+      questionsHeard = true;
+      ipcRenderer.on(IPC.question, (_: unknown, question: WindowQuestion) => deliverQuestion(question));
+    }
+    for (const question of unclaimed.splice(0)) listener(question);
+    // Questions asked while the page was still loading wait in the main process until it asks for them.
+    void ipcRenderer.invoke(IPC.takeQuestions).then((waiting: unknown) => {
+      if (Array.isArray(waiting)) for (const question of waiting) deliverQuestion(question as WindowQuestion);
+    });
+    return () => {
+      questionListeners.splice(questionListeners.indexOf(listener), 1);
+    };
+  },
+  answerQuestion: (id, answer) => ipcRenderer.send(IPC.answerQuestion, id, answer),
   panel: {
     open: (target) => ipcRenderer.send(IPC.panelOpen, target),
     quit: () => ipcRenderer.send(IPC.panelQuit),
