@@ -25,11 +25,13 @@ export function ReportDialog({
 }) {
   const t = useT();
   const [error, setError] = useState<string | null>(null);
-  // The events log, read each time the card opens, so the report has what happened up to now.
-  const [events, setEvents] = useState("");
+  // The events log, read each time the card opens, so the report has what happened up to now. Null while it's read: the
+  // link waits for it rather than carry the last opening's events.
+  const [events, setEvents] = useState<string | null>(null);
   useEffect(() => {
     if (!open) return;
     let live = true;
+    setEvents(null);
     api.debug.events().then(
       (text) => live && setEvents(text),
       () => live && setEvents(""),
@@ -38,7 +40,12 @@ export function ReportDialog({
       live = false;
     };
   }, [api, open]);
-  const url = bugReportUrl({ version: __APP_VERSION__, build: __APP_BUILD__, platform: api.platform, logs: events });
+  const url = bugReportUrl({
+    version: __APP_VERSION__,
+    build: __APP_BUILD__,
+    platform: api.platform,
+    logs: events ?? undefined,
+  });
   return (
     <Dialog.Root
       open={open}
@@ -89,7 +96,17 @@ export function ReportDialog({
           {error && <p className="fld-error">{error}</p>}
           <div className="report-acts">
             <Dialog.Close className="btn">{t("dialog.cancel")}</Dialog.Close>
-            <a className="btn dark" href={url} target="_blank" rel="noreferrer" onClick={() => onOpenChange(false)}>
+            <a
+              className="btn dark"
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              aria-disabled={events === null}
+              onClick={(e) => {
+                if (events === null) e.preventDefault();
+                else onOpenChange(false);
+              }}
+            >
               <Icon name="github" />
               {t("report.open")}
               <Icon name="external-link" />
