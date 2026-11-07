@@ -39,6 +39,8 @@ describe("bugReportUrl", () => {
         logs: "2026-11-07 20:00:00 started",
       }),
     );
-    expect(u.searchParams.get("logs")).toBe("Events before the report, times in UTC:\n\n```\n2026-11-07 20:00:00 started\n```");
+    expect(u.searchParams.get("logs")).toBe(
+      "Events before the report, times in UTC:\n\n```\n2026-11-07 20:00:00 started\n```",
+    );
   });
 });
