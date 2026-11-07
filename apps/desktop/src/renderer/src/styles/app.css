@@ -1401,9 +1401,14 @@ textarea {
 }
 .approve .acts {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   padding: 0 16px 14px;
+}
+/* A label never breaks inside its button: in a narrow window the buttons wrap instead. */
+.approve .acts > button {
+  white-space: nowrap;
 }
 /* Turning the change down altogether: a quiet button on the left, apart from the two ways of saving it. */
 .approve .acts .discard {
@@ -1746,6 +1751,7 @@ textarea {
 }
 .brow .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
 }
