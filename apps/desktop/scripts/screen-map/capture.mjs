@@ -20,8 +20,11 @@ const dir = join(OUT, THEME);
 mkdirSync(dir, { recursive: true });
 const electronPath = createRequire(join(APP, "package.json"))("electron");
 const manifest = [];
-// The throwaway data folders, removed at the end.
+// The throwaway data folders, removed on the way out, whether the capture finished or not.
 const made = [];
+process.on("exit", () => {
+  for (const d of made) rmSync(d, { recursive: true, force: true });
+});
 const STILL =
   "*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}";
 
@@ -55,6 +58,8 @@ const flow = (name) => {
     const file = `${String(flowIndex).padStart(2, "0")}-${name}__${String(n).padStart(2, "0")}-${screen}.png`;
     await page.screenshot({ path: join(dir, file) });
     manifest.push({ flow: name, n, screen, note, file });
+    // Saved after every screen, so a step that fails later still leaves a usable capture.
+    writeFileSync(join(dir, "manifest.json"), JSON.stringify(manifest, null, 1));
   };
 };
 const safe = async (label, fn) => {
@@ -300,8 +305,6 @@ await safe("cards", async () => {
   await page.getByRole("alertdialog").getByRole("button", { name: "Annulla" }).click();
 });
 
-writeFileSync(join(dir, "manifest.json"), JSON.stringify(manifest, null, 1));
 console.log(`captured ${manifest.length} screens`);
 process.kill(app.process().pid, "SIGKILL");
-for (const d of made) rmSync(d, { recursive: true, force: true });
 process.exit(0);
