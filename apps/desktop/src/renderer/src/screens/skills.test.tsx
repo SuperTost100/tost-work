@@ -33,7 +33,8 @@ const stepsBox = async () => {
 /** Puts text in the formatted editor as a paste does, formatting included. */
 const typeSteps = async (html: string) => {
   const box = await stepsBox();
-  const text = html.replace(/<[^>]+>/g, "");
+  // The plain-text copy a paste also carries, read the way a browser reads it.
+  const text = new DOMParser().parseFromString(html, "text/html").body.textContent ?? "";
   await act(async () => {
     fireEvent.paste(box, {
       clipboardData: {

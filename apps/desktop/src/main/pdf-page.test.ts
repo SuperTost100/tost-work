@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
-import { officeKind, pageSize, printable } from "./pdf-page";
+import { NO_SCRIPTS, officeKind, pageSize, printable } from "./pdf-page";
 
 // Excerpts of the HTML OfficeCLI 1.0.158 writes for each kind of file.
 const DOCX = `<html><head><style>.page{}</style></head><body><div class="page-wrapper"><div class="page" data-page="1" style="width:595.3pt;min-height:841.9pt;padding:72pt 90pt 72pt 90pt;"></div></div><script>scale()</script></body></html>`;
@@ -21,9 +21,30 @@ describe("PDF pages", () => {
     expect(pageSize("<html></html>", "docx")).toEqual({ width: 8.27, height: 11.69 });
   });
 
-  it("takes the viewer's scripts out and puts the fonts and print rules in the head", () => {
+  it("blocks every script with a policy first in the head, and puts the fonts and print rules in the head", () => {
     const page = printable(DOCX, "docx", "@font-face{}");
-    expect(page).not.toContain("<script");
+    expect(page.startsWith(`<html><head>${NO_SCRIPTS}`)).toBe(true);
+    expect(NO_SCRIPTS).toContain("script-src 'none'");
     expect(page).toMatch(/<style>@font-face\{\}\n[\s\S]*\.page \{ box-shadow: none[\s\S]*<\/style><\/head>/);
+  });
+
+  it("keeps the doctype first, so the page isn't drawn in quirks mode", () => {
+    const page = printable(
+      `<!DOCTYPE html>\n<html lang="it">\n<head>\n<meta charset="UTF-8"></head><body></body></html>`,
+      "docx",
+      "",
+    );
+    expect(page.startsWith(`<!DOCTYPE html>\n<html lang="it">\n<head>${NO_SCRIPTS}`)).toBe(true);
+  });
+
+  it("puts the print style at the end of a head written in capitals too", () => {
+    expect(printable("<HTML><HEAD><STYLE>p{}</STYLE></HEAD></HTML>", "docx", "@x{}")).toMatch(
+      /<STYLE>p\{\}<\/STYLE><style>@x\{\}[\s\S]*<\/style><\/HEAD>/,
+    );
+  });
+
+  it("blocks scripts in a page without a head too, after its doctype", () => {
+    expect(printable("<p>Ciao</p><script>x()</script>", "docx", "").startsWith(NO_SCRIPTS)).toBe(true);
+    expect(printable("<!doctype html><p>Ciao</p>", "docx", "").startsWith(`<!doctype html>${NO_SCRIPTS}`)).toBe(true);
   });
 });

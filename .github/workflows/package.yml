@@ -15,6 +15,9 @@ on:
       - apps/desktop/package.json
       - .github/workflows/package.yml
       - apps/desktop/scripts/fetch-officecli.mjs
+      # A lockfile or override change can break packaging, as a dependency fix for electron-builder's tools would.
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
 
 permissions:
   contents: read

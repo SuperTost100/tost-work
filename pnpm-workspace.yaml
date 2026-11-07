@@ -6,3 +6,7 @@ allowBuilds:
   electron: true
   esbuild: true
   electron-winstaller: false
+# electron-builder's dependencies still ask for minimatch 9 and 10, which have a denial-of-service bug fixed in 11.0.1
+# (GHSA via Dependabot alert #2). Remove this once electron-builder depends on 11.0.1 or later.
+overrides:
+  minimatch@>=7.0.0 <11.0.1: 11.0.1

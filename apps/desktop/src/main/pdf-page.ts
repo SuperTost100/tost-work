@@ -46,9 +46,24 @@ export function printCss(kind: OfficeKind): string {
 .sheet-content:last-child { break-after: auto; }`;
 }
 
-/** OfficeCLI's HTML with its viewer scripts taken out, and the fonts and print rules put in. */
+/**
+ * OfficeCLI's HTML with the fonts and print rules put in, and no script allowed to run. Its viewer scripts would
+ * rescale the pages, and a document's own text could hold markup. A policy at the top blocks every script and
+ * event handler, which no pattern for taking scripts out can promise. The main process can still run its own code
+ * in the page, to wait for the fonts.
+ */
 export function printable(html: string, kind: OfficeKind, fonts: string): string {
   const style = `<style>${fonts}\n${printCss(kind)}</style>`;
-  const clean = html.replace(/<script\b[\s\S]*?<\/script>/gi, "");
-  return clean.includes("</head>") ? clean.replace("</head>", `${style}</head>`) : style + clean;
+  // The policy goes as early as it can and the style last in the head, where it wins over the page's own. Nothing
+  // goes before the doctype, which would put the page in quirks mode.
+  const head = /<head\b[^>]*>/i.exec(html);
+  if (head) {
+    const at = head.index + head[0].length;
+    if (!/<\/head>/i.test(html)) return html.slice(0, at) + NO_SCRIPTS + style + html.slice(at);
+    return (html.slice(0, at) + NO_SCRIPTS + html.slice(at)).replace(/<\/head>/i, (end) => style + end);
+  }
+  const at = /^\s*<!doctype[^>]*>/i.exec(html)?.[0].length ?? 0;
+  return html.slice(0, at) + NO_SCRIPTS + style + html.slice(at);
 }
+
+export const NO_SCRIPTS = `<meta http-equiv="Content-Security-Policy" content="script-src 'none'">`;

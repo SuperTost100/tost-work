@@ -45,7 +45,8 @@ const setup = async (open: "projects" | "project" = "projects") => {
 const typeInstructions = async (html: string) => {
   const box = await screen.findByRole("textbox", { name: "Instructions" });
   await waitFor(() => expect(box.getAttribute("contenteditable")).not.toBeNull());
-  const text = html.replace(/<[^>]+>/g, "");
+  // The plain-text copy a paste also carries, read the way a browser reads it.
+  const text = new DOMParser().parseFromString(html, "text/html").body.textContent ?? "";
   await act(async () => {
     fireEvent.paste(box, {
       clipboardData: {
