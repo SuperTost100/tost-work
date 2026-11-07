@@ -87,6 +87,9 @@ describe("the sidebar", () => {
   it("toggles with Ctrl+B from the task box, but leaves it to the Skills editor, where it makes text bold", async () => {
     const api = createMemoryApi();
     render(<Root api={api} />);
+    // The text box is drawn before the app listens for its shortcuts, so wait for the app as the menu test does.
+    await screen.findByRole("button", { name: "Start task" });
+    await act(async () => {});
     const box = await screen.findByRole("textbox", { name: /./ });
     await press(box, { ctrlKey: true });
     expect(sections()).toBeNull();
