@@ -168,6 +168,7 @@ describe("Store", () => {
       boardGroup: "status",
       debug: false,
       setupDone: false,
+      welcomed: null,
     });
     store.saveSettings({ ...DEFAULT_SETTINGS, name: "Giulia", level: "advanced", language: "it", setupDone: true });
     expect(store.getSettings().name).toBe("Giulia");

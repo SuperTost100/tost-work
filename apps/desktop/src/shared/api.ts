@@ -82,7 +82,8 @@ export type MenuAction =
   | "stop"
   | "rename"
   | "reveal"
-  | "toggle-sidebar";
+  | "toggle-sidebar"
+  | "report";
 
 /** What the confirmation says before a project is removed: the question, and what goes with it. */
 export interface RemovalText {

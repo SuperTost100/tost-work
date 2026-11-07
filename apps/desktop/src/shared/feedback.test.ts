@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { feedbackUrl, REPO_URL } from "./feedback";
+import { bugReportUrl, feedbackUrl, REPO_URL } from "./feedback";
 
 describe("feedbackUrl", () => {
   const url = (platform: "darwin" | "win32" | "linux", language: "en" | "it") =>
@@ -17,5 +17,15 @@ describe("feedbackUrl", () => {
     );
     expect(url("win32", "en").searchParams.get("body")).toContain("OS: Windows\nLanguage: English");
     expect(url("linux", "en").searchParams.get("body")).toContain("OS: Linux");
+  });
+});
+
+describe("bugReportUrl", () => {
+  it("opens the bug form with the version, build and system filled in", () => {
+    const u = new URL(bugReportUrl({ version: "0.0.28-dev", build: "ab12cd3", platform: "darwin" }));
+    expect(`${u.origin}${u.pathname}`).toBe(`${REPO_URL}/issues/new`);
+    expect(u.searchParams.get("template")).toBe("bug.yml");
+    expect(u.searchParams.get("version")).toBe("0.0.28-dev · build ab12cd3");
+    expect(u.searchParams.get("os")).toBe("macOS");
   });
 });

@@ -4,8 +4,11 @@ import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { ModelPicker } from "@/components/ModelPicker";
 import { NewProjectDialog } from "@/components/NewProjectDialog";
 import { ProjectInstructionsDialog } from "@/components/ProjectInstructionsDialog";
+import { ReportDialog } from "@/components/ReportDialog";
 import { SavedToast } from "@/components/SavedToast";
 import { SearchDialog } from "@/components/SearchDialog";
+import { WelcomeCard } from "@/components/WelcomeCard";
+import { stageOf } from "@/lib/changelog";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { useAsk, useConfirm } from "@/lib/useConfirm";
@@ -84,7 +87,13 @@ function MainQuestions({ api }: { api?: TostWorkApi }) {
 function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSettings }: AppProps) {
   const t = useT();
   const confirm = useConfirm();
-  const current = settings ?? { ...DEFAULT_SETTINGS, name: userName, setupDone: true };
+  // Without settings (the tests' default) the user is set up and has seen this stage's welcome card.
+  const current = settings ?? {
+    ...DEFAULT_SETTINGS,
+    name: userName,
+    setupDone: true,
+    welcomed: stageOf(__APP_VERSION__),
+  };
   const quickEdit = sectionOn(current, "quickEdit");
   const boardOn = sectionOn(current, "board");
   const {
@@ -119,6 +128,9 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
   const [projectId, setProjectId] = useState<string | null | undefined>(undefined);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  // Closed here at once; the setting that keeps it closed for this stage follows.
+  const [welcomeClosed, setWelcomeClosed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const starting = useRef(false);
   // What the next new task runs on. Settings remembers it; it changes here at once and is saved behind it.
@@ -363,6 +375,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
     } else if (action === "new-project") setDialogOpen(true);
     else if (action === "settings") setRoute({ name: "settings" });
     else if (action === "about") setRoute({ name: "about", page: "home" });
+    else if (action === "report") setReportOpen(true);
     else if (action === "quick-edit") {
       if (!api || !quickEdit) return;
       void api.files.pick().then((picked) => {
@@ -383,6 +396,15 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
       const last = openTask.files.filter((f) => f.kind !== "delete" && f.role === "made").at(-1);
       void (last ? api.files.reveal(openTask.id, last.path) : api.tasks.reveal(openTask.id)).catch(report);
     }
+  };
+  // A pre-release greets the user on Home once per stage, after setup.
+  const stage = stageOf(__APP_VERSION__);
+  const welcoming =
+    route.name === "home" && current.setupDone && stage !== "stable" && current.welcomed !== stage && !welcomeClosed;
+  const closeWelcome = () => {
+    setWelcomeClosed(true);
+    if (api && stage !== "stable")
+      void api.settings.update({ welcomed: stage }).then((next) => onSettings?.(next), report);
   };
   const openStatus = openTask?.status;
   useEffect(() => {
@@ -613,6 +635,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
         onChange={(next) => onSettings?.(next)}
         onAbout={() => setRoute({ name: "about", page: "home" })}
         onNews={() => setRoute({ name: "about", page: "news" })}
+        onReport={() => setReportOpen(true)}
       />
     ) : null;
   } else if (route.name === "about") {
@@ -751,6 +774,18 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
           recent={tasks}
           onOpenTask={openFound}
           onOpenProject={(id) => setRoute({ name: "project", id })}
+        />
+      )}
+      {api && <ReportDialog api={api} open={reportOpen} onOpenChange={setReportOpen} />}
+      {api && stage !== "stable" && (
+        <WelcomeCard
+          stage={stage}
+          open={welcoming}
+          onClose={closeWelcome}
+          onReport={() => {
+            closeWelcome();
+            setReportOpen(true);
+          }}
         />
       )}
       {api && (

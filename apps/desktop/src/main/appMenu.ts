@@ -107,7 +107,11 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
   const help: MenuItemConstructorOptions = {
     label: t("appMenu.help"),
     role: "help",
-    submenu: [{ label: "tost.one", click: o.openSite }, ...(isMac ? [] : [{ type: "separator" } as const, about])],
+    submenu: [
+      { label: t("report.menu"), click: action("report") },
+      { label: "tost.one", click: o.openSite },
+      ...(isMac ? [] : [{ type: "separator" } as const, about]),
+    ],
   };
 
   if (!isMac) return [file, edit, view, task, window, help];

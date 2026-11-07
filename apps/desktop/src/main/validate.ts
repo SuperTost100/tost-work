@@ -23,6 +23,8 @@ import {
   SECTION_LEVEL,
   type SectionKey,
   type Settings,
+  STAGES,
+  type Stage,
   TEXT_SIZES,
   type TextSize,
   THEMES,
@@ -179,6 +181,9 @@ export const settingsPatch = (v: unknown): Partial<Settings> => {
     } else if (key === "boardGroup") {
       if (!BOARD_GROUPS.includes(value as BoardGroup)) throw new Error("boardGroup must be status or project");
       patch.boardGroup = value as BoardGroup;
+    } else if (key === "welcomed") {
+      if (value !== null && !STAGES.includes(value as Stage)) throw new Error("welcomed must be a stage or null");
+      patch.welcomed = value as Stage | null;
     } else if (key === "setupDone") {
       if (typeof value !== "boolean") throw new Error("setupDone must be true or false");
       patch.setupDone = value;
