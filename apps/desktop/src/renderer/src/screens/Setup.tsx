@@ -52,11 +52,12 @@ export function Setup({
   // as the app opens it.
   const page = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
-  const opened = useRef(false);
+  // The step the page last showed, so only a real change moves the focus, also when React runs the effect twice.
+  const shown = useRef(step);
   useEffect(() => {
     page.current?.scrollTo?.(0, 0);
-    if (opened.current) heading.current?.focus();
-    opened.current = step >= 0;
+    if (shown.current !== step) heading.current?.focus();
+    shown.current = step;
   }, [step]);
   const [name, setName] = useState(settings.name);
   const [work, setWork] = useState(settings.work);
