@@ -19,7 +19,7 @@
 
 ### en
 
-- **The welcome card after every update:** each new test build greets you once, so you know it arrived. It now says "test build", which no longer sounds like a trial.
+- **The welcome card after every update:** each new test version greets you once, so you know it arrived. It now says "test build", which no longer sounds like a trial.
 - **Problem reports carry what happened:** test builds keep an events log, with no task text and no file names, and Report a problem puts it in the form for you. The form's System field is filled in too.
 - **Jobs:** the columns read "Next run" and "Last run", with one line under their names.
 

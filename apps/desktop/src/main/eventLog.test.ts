@@ -42,6 +42,24 @@ describe("the events log of a test build", () => {
       expect(text).not.toContain(secret);
   });
 
+  it("names only known file types, so no part of a file's name gets in", async () => {
+    const log = new EventLog(file(), true, () => at);
+    log.task(
+      task({
+        status: "done",
+        files: [
+          { path: "/Users/tost/.ferraris", kind: "add", role: "made" },
+          { path: "C:\\Clienti\\.env", kind: "add", role: "made" },
+          { path: "/Users/tost/notes.Ferraris.md", kind: "add", role: "made" },
+          { path: "/Users/tost/Proposta.Ferraris", kind: "add", role: "made" },
+        ],
+      } as unknown as Partial<Task>),
+    );
+    const text = await log.tail(10_000);
+    expect(text).toContain("made=file:2,md:1,other:1");
+    expect(text).not.toMatch(/ferraris|env/i);
+  });
+
   it("writes a task again only when its state changes", async () => {
     const path = file();
     const log = new EventLog(path, true, () => at);
