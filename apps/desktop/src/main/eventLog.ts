@@ -30,6 +30,8 @@ export class EventLog {
   /** Each task's last state written, so a task's line is written when its state changes, not on every update. */
   private states = new Map<string, string>();
   private queue: Promise<void> = Promise.resolve();
+  /** About how big the file is, so it's trimmed during a long session too, not only at the next start. */
+  private bytes = 0;
 
   constructor(
     private file: string,
@@ -40,18 +42,21 @@ export class EventLog {
   /** Drops the lines older than a week, and the oldest past the size limit. */
   async prune(): Promise<void> {
     if (!this.on) return;
-    await this.enqueue(async () => {
-      const text = await readFile(this.file, "utf8").catch(() => "");
-      if (!text) return;
-      const since = new Date(this.now().getTime() - KEEP_DAYS * 86_400_000)
-        .toISOString()
-        .slice(0, 19)
-        .replace("T", " ");
-      let kept = text.split("\n").filter((l) => l && l.slice(0, 19) >= since);
-      while (kept.length && Buffer.byteLength(kept.join("\n")) > MAX_BYTES)
-        kept = kept.slice(Math.ceil(kept.length / 10));
-      await writeFile(this.file, kept.length ? `${kept.join("\n")}\n` : "", { mode: 0o600 });
-    });
+    await this.enqueue(() => this.trim());
+  }
+
+  /** Rewrites the file without the lines too old, then without the oldest while it's past the size limit. */
+  private async trim(): Promise<void> {
+    const text = await readFile(this.file, "utf8").catch(() => "");
+    this.bytes = Buffer.byteLength(text);
+    if (!text) return;
+    const since = new Date(this.now().getTime() - KEEP_DAYS * 86_400_000).toISOString().slice(0, 19).replace("T", " ");
+    let kept = text.split("\n").filter((l) => l && l.slice(0, 19) >= since);
+    while (kept.length && Buffer.byteLength(kept.join("\n")) > MAX_BYTES)
+      kept = kept.slice(Math.ceil(kept.length / 10));
+    const out = kept.length ? `${kept.join("\n")}\n` : "";
+    await writeFile(this.file, out, { mode: 0o600 });
+    this.bytes = Buffer.byteLength(out);
   }
 
   /** Something the app did, with plain fields: a version, a platform, an error's name. */
@@ -94,6 +99,8 @@ export class EventLog {
 
   /** The newest lines that fit in `max` characters, oldest first, for a problem report. */
   async tail(max: number): Promise<string> {
+    // A stable build reports nothing, even when an earlier test build left its file behind.
+    if (!this.on) return "";
     await this.queue;
     const lines = (await readFile(this.file, "utf8").catch(() => "")).split("\n").filter(Boolean);
     const out: string[] = [];
@@ -113,6 +120,8 @@ export class EventLog {
     this.enqueue(async () => {
       await mkdir(dirname(this.file), { recursive: true });
       await appendFile(this.file, text, { mode: 0o600 });
+      this.bytes += Buffer.byteLength(text);
+      if (this.bytes > MAX_BYTES) await this.trim();
     });
   }
 

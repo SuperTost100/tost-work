@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -74,6 +74,22 @@ describe("the events log of a test build", () => {
     writeFileSync(path, "2026-10-20 10:00:00 started\n2026-11-06 10:00:00 started\n");
     await new EventLog(path, true, () => at).prune();
     expect(readFileSync(path, "utf8")).toBe("2026-11-06 10:00:00 started\n");
+  });
+
+  it("stays under its size limit during a long session, not only at the next start", async () => {
+    const path = file();
+    const log = new EventLog(path, true, () => at);
+    for (let i = 0; i < 6000; i++)
+      log.app("started", { version: "0.0.28-dev", build: "c4d9a86", n: i, pad: "x".repeat(40) });
+    await log.tail(1);
+    expect(statSync(path).size).toBeLessThanOrEqual(512 * 1024);
+    expect((await log.tail(10_000)).endsWith("n=5999 pad=" + "x".repeat(40))).toBe(true);
+  });
+
+  it("reports nothing in a stable build, even from a file an earlier test build left", async () => {
+    const path = file();
+    writeFileSync(path, "2026-11-06 10:00:00 started version=0.0.28-dev\n");
+    expect(await new EventLog(path, false, () => at).tail(10_000)).toBe("");
   });
 
   it("writes nothing in a stable build", async () => {
