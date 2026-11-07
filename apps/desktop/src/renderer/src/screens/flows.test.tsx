@@ -154,6 +154,56 @@ describe("attaching files after the first message", () => {
     expect(container.querySelector(".artifact")).not.toBeNull();
   });
 
+  it("lets the user write the next message while it works, and send it once the turn ends", async () => {
+    const api = createMemoryApi();
+    // Hold back the follow-up's end, so the window sees it running.
+    const listen = api.tasks.onChange;
+    let holding = false;
+    const held: Array<() => void> = [];
+    api.tasks.onChange = (l) =>
+      listen((task) => {
+        if (holding && task.status !== "running") held.push(() => l(task));
+        else l(task);
+      });
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Write a proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: /We do/ }));
+    });
+    await screen.findByText("Check it against your brief");
+
+    holding = true;
+    const box = () => screen.getAllByRole("textbox").at(-1) as HTMLTextAreaElement;
+    const send = () => screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
+    fireEvent.change(box(), { target: { value: "Shorter" } });
+    await act(async () => {
+      fireEvent.click(send());
+    });
+    await screen.findByText("Done, I made the change.");
+    // Still working: the box takes the next message, and neither Send nor Enter sends it.
+    const followUp = vi.spyOn(api.tasks, "followUp");
+    expect(box().disabled).toBe(false);
+    expect(box().placeholder).toBe("Write your next message: you can send it when it stops");
+    fireEvent.change(box(), { target: { value: "Add the travel costs too" } });
+    expect(send().disabled).toBe(true);
+    fireEvent.keyDown(box(), { key: "Enter" });
+    expect(followUp).not.toHaveBeenCalled();
+
+    holding = false;
+    act(() => {
+      for (const deliver of held) deliver();
+    });
+    expect(box().value).toBe("Add the travel costs too");
+    expect(send().disabled).toBe(false);
+    await act(async () => {
+      fireEvent.click(send());
+    });
+    expect(followUp).toHaveBeenCalledWith(expect.any(String), "Add the travel costs too", []);
+  });
+
   it("sends a follow-up once when Send is pressed twice while it's on its way", async () => {
     const api = createMemoryApi();
     render(<App userName="Giulia" api={api} />);
