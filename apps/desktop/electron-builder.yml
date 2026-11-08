@@ -37,6 +37,9 @@ mac:
 linux:
   # Set here and not at the top level, where it would also rename the Mac bundle to tost-work.app.
   executableName: tost-work
+  # The .desktop file is named after package.json's desktopName, which Electron gives the window as its app id, so the
+  # dock shows the window under the app's own icon.
+  syncDesktopName: true
   category: Office
   target: [AppImage]
 win:

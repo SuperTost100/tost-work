@@ -32,7 +32,7 @@ ChatGPT and Claude can already do real work on documents, spreadsheets and prese
 
 Tost Work has no account and no server of its own. It runs the official Codex CLI and Claude Code on your computer, signed in to your own ChatGPT or Claude subscription, or with an OpenAI or Anthropic API key. Tasks count against your plan or your key. Tost Work is free.
 
-The app is in Italian and English, with light and dark themes. It's in alpha: Mac builds come first, and Windows and Linux follow before 0.1.0.
+The app is in Italian and English, with light and dark themes. It runs on Mac, Windows and Linux, and it's still in testing.
 
 ## What you can do
 
@@ -75,14 +75,18 @@ The app is in Italian and English, with light and dark themes. It's in alpha: Ma
 
 ## Install
 
-Download the file for your Mac from the [releases page](https://github.com/SuperTost100/tost-work/releases). Every build so far is a pre-release for testing.
+Download the file for your computer from the [releases page](https://github.com/SuperTost100/tost-work/releases). Every build so far is a pre-release for testing.
 
-| Mac | File |
+| Computer | File |
 | --- | --- |
-| Apple silicon (M1 and later) | `Tost.Work-<version>-arm64.dmg` |
-| Intel | `Tost.Work-<version>.dmg` |
+| Mac with Apple silicon (M1 and later) | `Tost.Work-<version>-arm64.dmg` |
+| Mac with Intel | `Tost.Work-<version>.dmg` |
+| Windows (64-bit Intel or AMD) | `Tost.Work.Setup.<version>.exe` |
+| Linux (64-bit Intel or AMD) | `Tost.Work-<version>.AppImage` |
 
-Open the `.dmg` and drag Tost Work to Applications. From 0.0.25-dev on, the app is signed with an Apple Developer ID and notarized by Apple, so it opens like any other app. Builds before that need one extra step on their first launch: open the app once, then go to System Settings > Privacy & Security and choose Open Anyway.
+- **Mac:** open the `.dmg` and drag Tost Work to Applications. From 0.0.25-dev on, the app is signed with an Apple Developer ID and notarized by Apple, so it opens like any other app. Builds before that need one extra step on their first launch: open the app once, then go to System Settings > Privacy & Security and choose Open Anyway.
+- **Windows:** run the installer. It isn't signed yet, so Windows SmartScreen warns about an unknown publisher: choose More info, then Run anyway.
+- **Linux:** make the file executable (`chmod +x Tost.Work-*.AppImage`) and open it. AppImages need FUSE 2, which Ubuntu 24.04 and later don't install by default: `sudo apt install libfuse2t64`.
 
 Tost Work doesn't update itself yet. Until 0.1.0, download each new build from the releases page.
 
@@ -109,7 +113,7 @@ Tost Work itself has no telemetry. The full list is in the [privacy notice](lega
 
 ## Build from source
 
-You need Node 24 and pnpm (the version is pinned in `package.json`). The Mac app is built on macOS; the app itself runs on macOS, Windows and Linux.
+You need Node 24 and pnpm (the version is pinned in `package.json`). Each platform's app is built on that platform: `.github/workflows/package.yml` builds all three.
 
 ```bash
 git clone https://github.com/SuperTost100/tost-work.git
