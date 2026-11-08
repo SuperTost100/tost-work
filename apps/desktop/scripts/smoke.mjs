@@ -80,7 +80,12 @@ try {
   );
   await page.waitForTimeout(800);
   await shot(page, "4-task");
-  if (state.status !== "done") throw new Error(`The task ended as "${state.status}"`);
+  if (state.status !== "done")
+    throw new Error(
+      state.status === "failed" || state.status === "stopped"
+        ? `The task ended as "${state.status}"`
+        : `The task didn't end in 60 s: it's still "${state.status}"`,
+    );
   const made = state.files.filter((f) => f.role === "made" && f.kind !== "delete");
   if (!made.length) throw new Error("The task made no files");
   for (const f of made) if (!existsSync(f.path)) throw new Error(`The task listed a file it didn't write: ${f.path}`);

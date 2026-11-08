@@ -154,9 +154,18 @@ jobs:
           resources/bin/officecli.exe create "$RUNNER_TEMP/check.docx"
           resources/bin/officecli.exe validate "$RUNNER_TEMP/check.docx"
           test -f resources/skills/word/SKILL.md
+      # The smoke test runs on the app the installer puts on disk, so a broken installer fails here too.
+      - name: Install the app
+        shell: pwsh
+        run: |
+          $setup = Get-Item "apps/desktop/release/Tost Work Setup *.exe"
+          Start-Process -FilePath $setup.FullName -ArgumentList "/S" -Wait
+          $app = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter "Tost Work.exe" | Select-Object -First 1
+          if (-not $app) { Write-Error "The installer put no Tost Work.exe in $env:LOCALAPPDATA\Programs"; exit 1 }
+          "APP_EXE=$($app.FullName)" >> $env:GITHUB_ENV
       - name: Open the app and run a task
         working-directory: apps/desktop
-        run: node scripts/smoke.mjs "release/win-unpacked/Tost Work.exe" "$RUNNER_TEMP/smoke"
+        run: node scripts/smoke.mjs "$APP_EXE" "$RUNNER_TEMP/smoke"
       - name: Keep the smoke test's screenshots
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -204,9 +213,12 @@ jobs:
           resources/bin/officecli create "$RUNNER_TEMP/check.docx"
           resources/bin/officecli validate "$RUNNER_TEMP/check.docx"
           test -f resources/skills/word/SKILL.md
+      # The smoke test runs the AppImage itself, as people download it. The runner has no FUSE 2, so it unpacks and runs.
       - name: Open the app and run a task
         working-directory: apps/desktop
-        run: xvfb-run -a node scripts/smoke.mjs release/linux-unpacked/tost-work "$RUNNER_TEMP/smoke"
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: xvfb-run -a node scripts/smoke.mjs release/*.AppImage "$RUNNER_TEMP/smoke"
       - name: Keep the smoke test's screenshots
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
