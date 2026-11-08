@@ -4,6 +4,10 @@
 # builds started by hand, and signs pull-request builds ad-hoc instead.
 appId: one.tost.work
 productName: Tost Work
+# The packaged package.json is named tost-work, because the Windows installer names the install folder after it, which
+# would be "@tost-workdesktop" from the workspace name. Electron names the data folder after productName, so it doesn't move.
+extraMetadata:
+  name: tost-work
 directories:
   output: release
 files:
