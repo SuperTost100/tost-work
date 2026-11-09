@@ -10,8 +10,7 @@
     virtualization off for all of AppData. HKCU\Environment is where the installers add themselves to the PATH.
   - The alias "tost-work.exe" starts the app inside its package from a command line, which CI's smoke test needs.
   - The startup task is how a packaged app starts at login; main/startupTask.ts turns it on and off with the setting.
-    It's off until then. uap10:Parameters asks Windows to pass the flag that opens the app without its window; on a
-    Windows that ignores it there, the app opens its window at login.
+    It's off until then.
 -->
 <Package
    xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"

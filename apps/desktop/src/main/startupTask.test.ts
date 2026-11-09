@@ -4,17 +4,17 @@ import { setOpenAtLogin } from "./loginItem";
 import { parseState, setStartupTask } from "./startupTask";
 
 describe("the Microsoft Store package's startup task", () => {
-  it("reads the state PowerShell prints, past any other output", () => {
-    expect(parseState("WARNING: something\r\nstate=Enabled\r\n")).toBe("Enabled");
+  it("reads the state the helper prints, past any other output", () => {
+    expect(parseState("note\r\nstate=Enabled\r\n")).toBe("Enabled");
     expect(parseState("state=DisabledByUser")).toBe("DisabledByUser");
     expect(parseState("state=Missing tasks=Other")).toBe("Missing");
-    expect(parseState("Exception calling GetAsync")).toBeNull();
+    expect(parseState("error=Element not found.")).toBeNull();
   });
 
   it("asks for the change and fails when Windows keeps the task as it was", async () => {
     const asked: string[] = [];
-    const answer = (state: string) => async (env: Record<string, string>) => {
-      asked.push(env.TOST_WORK_STARTUP as string);
+    const answer = (state: string) => async (change: string) => {
+      asked.push(change);
       return `state=${state}\n`;
     };
     await setStartupTask(true, answer("Enabled"));
