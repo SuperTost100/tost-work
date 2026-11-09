@@ -470,6 +470,7 @@ export class AgentEngine implements Engine, ToolHandler {
       model: task.model,
       effort: task.effort,
       access: "supervised",
+      sandbox,
       cwd: workdir,
       ...(task.sessionId ? { sessionId: task.sessionId } : {}),
       followUp: followUp !== null,

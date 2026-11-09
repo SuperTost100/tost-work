@@ -612,6 +612,7 @@ describe("AgentEngine", () => {
       model: "claude-sonnet-5-5",
       effort: "medium",
       access: "supervised",
+      sandbox: true,
       cwd: "/w",
       sessionId: "s0",
       followUp: true,
