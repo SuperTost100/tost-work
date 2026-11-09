@@ -95,7 +95,10 @@ try {
   for (const f of made) if (!existsSync(f.path)) throw new Error(`The task listed a file it didn't write: ${f.path}`);
   console.log(`Task ${state.status}, made ${made.length} files in ${readdirSync(folder).length} entries of its folder`);
 
-  // 4. The app's data is where other programs, such as the AI tools, can see it.
+  // 4. The app's data is where other programs, such as the AI tools, can see it. A Windows run with its own data folder
+  // is the Store package's, so it must really run inside the package, or the check above proves nothing.
+  if (ownData && process.platform === "win32" && !(await app.evaluate(() => process.windowsStore)))
+    throw new Error("The app didn't run inside its Microsoft Store package");
   if (!existsSync(join(data, "tost-work.db"))) throw new Error(`The app's database isn't in ${data}`);
 
   // 5. Nothing failed along the way: no error in the page, none in the events log a test build keeps.
