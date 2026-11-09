@@ -259,6 +259,53 @@ describe("TaskRunner when the sandbox can't start", () => {
     expect(after?.status).toBe("done");
     expect(after).not.toHaveProperty("sandboxNotReady");
   });
+
+  it("runs the task again with the prompt that didn't run, from the notice's Check and try again", async () => {
+    const store = new Store(":memory:");
+    const readiness = {
+      ready: false,
+      missing: ["socat" as const],
+      distro: { id: "ubuntu", like: ["debian"], name: "Ubuntu", version: "24.04" },
+      appArmorRestrictsUserns: null,
+    };
+    const prompts: (string | null)[] = [];
+    let fixed = false;
+    const engine: Engine = {
+      defaults: async () => ({ provider: "claude", model: "m", effort: "low" }),
+      choices: async () => ({ ai: "claude", provider: "claude", lists: [] }),
+      async *run({ followUp }) {
+        prompts.push(followUp);
+        if (!fixed) throw new SandboxNotReady("claude", readiness);
+        yield { type: "message", text: "Done" };
+      },
+      answer: () => false,
+      decide: () => false,
+    };
+    const runner = new TaskRunner(store, engine, () => {});
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
+    await runner.start(task.id);
+    expect(store.getTask(task.id)?.sandboxNotReady).toEqual(readiness);
+
+    // The first run failed before it reached the AI, so the brief runs: no follow-up prompt.
+    fixed = true;
+    runner.resume(task.id);
+    await waitFor(() => store.getTask(task.id)?.status === "done");
+    expect(prompts).toEqual([null, null]);
+
+    // A follow-up that failed on the sandbox runs again with the same instruction.
+    fixed = false;
+    runner.followUp(task.id, "Make it shorter");
+    await runner.start(task.id, "Make it shorter");
+    expect(store.getTask(task.id)).toMatchObject({ status: "failed", sandboxNotReady: readiness });
+    fixed = true;
+    runner.resume(task.id);
+    await waitFor(() => store.getTask(task.id)?.status === "done");
+    expect(prompts.slice(2)).toEqual(["Make it shorter", "Make it shorter"]);
+
+    // A task that failed for another reason can't be resumed this way.
+    store.saveTask({ ...(store.getTask(task.id) as Task), status: "failed", error: "Offline" });
+    expect(() => runner.resume(task.id)).toThrow(/Only a task stopped by closing/);
+  });
 });
 
 describe("decisionNote", () => {

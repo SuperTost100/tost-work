@@ -4,7 +4,8 @@ import type { QuestionAnswer } from "../../../shared/api";
 /** A question before something that can't be undone: what will happen, more detail if needed, and the button's word. */
 export interface Confirmation {
   message: string;
-  detail?: string;
+  /** More detail, one paragraph per string. */
+  detail?: string | string[];
   /** The word on the button that goes ahead, such as "Delete". */
   yes: string;
   /** The button is red when going ahead destroys or discards something. */

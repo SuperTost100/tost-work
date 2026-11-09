@@ -80,6 +80,15 @@ export const FILES_ONLY =
 export const taskTitle = (brief: string, files: string[]): string =>
   titleFrom(brief) || titleFrom(basename(files[0] ?? ""));
 
+/**
+ * The prompt of a run that never started, as its message left it: the user's last instruction when it was a follow-up,
+ * and null, which runs the brief, when it was the task's first run.
+ */
+function lastMessageToRun(task: Task): string | null {
+  const last = task.messages.at(-1);
+  return last?.from === "user" && last.followUp ? withFiles(last.text, last.attachments ?? []) : null;
+}
+
 export const RESUME_PROMPT =
   "Tost Work closed while you were working on this task, so your last turn was cut short. Check what you had already done in the folder, then carry on where you left off.";
 
@@ -396,15 +405,16 @@ export class TaskRunner {
 
   /**
    * Carries on with a task that stopped when Tost Work closed. With a conversation to go back to, the agent is told why
-   * it stopped; without one, the brief runs again from the start.
+   * it stopped; without one, the brief runs again from the start. A task that failed because its sandbox couldn't
+   * start never reached its AI, so it runs again with the prompt that didn't run.
    */
   resume(taskId: string): Task {
     const task = this.mustGet(taskId);
     if (this.running.has(taskId)) throw new UserError("error.stillWorking");
-    if (!task.interrupted) throw new UserError("error.onlyInterrupted");
+    if (!task.interrupted && !task.sandboxNotReady) throw new UserError("error.onlyInterrupted");
     // A run started now could write to a file the restore is about to put back.
     if (this.restoring.has(taskId)) throw new UserError("error.waitRestore");
-    this.launch(taskId, task.sessionId ? RESUME_PROMPT : null);
+    this.launch(taskId, task.interrupted ? (task.sessionId ? RESUME_PROMPT : null) : lastMessageToRun(task));
     return task;
   }
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { App } from "@/App";
+import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { errorText } from "@/lib/errorText";
 import { useLook } from "@/lib/useLook";
 import { LanguageContext } from "@/lib/useT";
@@ -32,7 +33,13 @@ export function Root({ api = window.tostWork }: { api?: TostWorkApi }) {
       </main>
     );
   else if (!settings) screen = <main className="main" />;
-  else if (!settings.setupDone) screen = <Setup api={api} settings={settings} onChange={setSettings} />;
+  else if (!settings.setupDone)
+    // Setup asks too, such as before Claude is connected on Windows, so it has the card the app has.
+    screen = (
+      <ConfirmProvider>
+        <Setup api={api} settings={settings} onChange={setSettings} />
+      </ConfirmProvider>
+    );
   else screen = <App api={api} userName={settings.name} settings={settings} onSettings={setSettings} />;
 
   return (

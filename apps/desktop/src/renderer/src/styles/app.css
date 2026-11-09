@@ -4356,6 +4356,9 @@ fieldset.fld > legend {
   :root:not([data-theme="light"]) .scrim {
     background: rgba(20, 18, 16, 0.7);
   }
+  :root:not([data-theme="light"]) .sbx-code {
+    background: var(--side);
+  }
 }
 
 /* The window has no title bar on Mac: the sidebar top and the page top bar drag the window. */
@@ -5090,6 +5093,152 @@ label.opt:hover:not(.on) {
   display: block;
   margin-top: 4px;
   color: var(--ink);
+}
+/* Windows: the note under Claude's row, spanning the row's two columns. */
+.unconfined {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: -2px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--t2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.unconfined-ic {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  color: var(--need);
+}
+/* The confirmation card's paragraphs. */
+.confirmmodal .cb .detail {
+  display: grid;
+  gap: 10px;
+}
+
+/* Linux: what the sandbox lacks, in setup (.sbx) and in a task that couldn't start (.sbx-fail). */
+.sbx {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: var(--panel);
+}
+.sbx-fail {
+  display: grid;
+  gap: 12px;
+}
+.sbx-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.sbx-ic {
+  width: 16px;
+  height: 16px;
+  color: var(--need);
+}
+.sbx.ok .sbx-ic {
+  color: var(--ink);
+}
+.sbx-p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--t2);
+}
+.sbx-fail .sbx-p {
+  font-size: inherit;
+  color: inherit;
+}
+.sbx-p.small {
+  font-size: 13px;
+  color: var(--t3);
+}
+.sbx-p.err {
+  color: var(--need);
+}
+.sbx-name {
+  font:
+    500 13px / 1 "IBM Plex Mono",
+    ui-monospace,
+    monospace;
+}
+.sbx-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sbx-tags .tag {
+  background: var(--canvas);
+}
+.sbx-step {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.sbx-step-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t2);
+}
+.sbx-raw {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--canvas);
+  color: var(--ink);
+  font:
+    500 12px / 1.45 "IBM Plex Mono",
+    ui-monospace,
+    monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sbx-code {
+  position: relative;
+  border-radius: 8px;
+  background: var(--canvas);
+  box-shadow: 0 0 0 1px var(--line);
+  padding: 10px 96px 10px 12px;
+  color: var(--ink);
+}
+:root[data-theme="dark"] .sbx-code {
+  background: var(--side);
+}
+.sbx-cmd {
+  margin: 0;
+  font:
+    500 12.5px / 1.5 "IBM Plex Mono",
+    ui-monospace,
+    monospace;
+  white-space: pre;
+  overflow-x: auto;
+  user-select: all;
+}
+.sbx-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.sbx-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sbx-status {
+  font-size: 13px;
+  color: var(--t3);
 }
 .opt .cmd {
   display: block;

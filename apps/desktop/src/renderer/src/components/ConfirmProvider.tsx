@@ -88,7 +88,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               <div className="cb">
                 <AlertDialog.Title render={<b />}>{shown.message}</AlertDialog.Title>
                 {shown.detail && (
-                  <AlertDialog.Description render={<p className="t2" />}>{shown.detail}</AlertDialog.Description>
+                  <AlertDialog.Description render={<div className="detail" />}>
+                    {[shown.detail].flat().map((paragraph) => (
+                      <p key={paragraph} className="t2">
+                        {paragraph}
+                      </p>
+                    ))}
+                  </AlertDialog.Description>
                 )}
               </div>
               <div className="mf">

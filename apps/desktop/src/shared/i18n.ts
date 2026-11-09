@@ -706,6 +706,40 @@ const en = {
   "sandbox.missing.bwrap": "bubblewrap isn't installed",
   "sandbox.missing.socat": "socat isn't installed",
   "sandbox.missing.userns": "the system doesn't let bubblewrap create user namespaces",
+  "unconfined.note":
+    "On Windows, Claude isn't limited to the task's folder yet. It edits files only there and asks before changing or deleting one, but the other commands it runs could read or write elsewhere on your PC. ChatGPT stays inside the folder.",
+  "unconfined.title": "Claude on Windows isn't limited to the task's folder",
+  "unconfined.p1":
+    "Anthropic hasn't turned on the protection that keeps Claude's commands inside the task's folder on Windows yet. For now those commands could also read or write elsewhere on your PC, which matters most if a document or a web page tries to trick the AI.",
+  "unconfined.p2":
+    "Your files stay protected: Claude edits them only in the task's folder, asks before it changes or deletes a file that already exists, and refuses commands that delete files. ChatGPT stays inside the folder on Windows too.",
+  "unconfined.go": "Continue",
+  "sandbox.title": "The AIs' sandbox isn't ready",
+  "sandbox.p":
+    "The AIs run their commands in a sandbox built on `bubblewrap`, which keeps them inside the task's folder. Tost Work can't install it from an AppImage: run these commands in a terminal.",
+  "sandbox.tag.bwrap": "bubblewrap: missing",
+  "sandbox.tag.socat": "socat: missing",
+  "sandbox.tag.apparmor": "AppArmor: blocks bwrap",
+  "sandbox.tag.userns": "user namespaces: blocked",
+  "sandbox.step.install": "Install the packages",
+  "sandbox.step.installSocat": "Install the packages (Claude Code also needs socat)",
+  "sandbox.step.installManual": "Install {packages} with your system's package manager",
+  "sandbox.step.apparmor": "AppArmor on {distro}: let bubblewrap create user namespaces",
+  "sandbox.step.apparmorPlain": "AppArmor: let bubblewrap create user namespaces",
+  "sandbox.step.userns":
+    "The system doesn't let bubblewrap create user namespaces, and AppArmor isn't the cause, so there's no command to run here.",
+  "sandbox.copy": "Copy",
+  "sandbox.copied": "Copied",
+  "sandbox.check": "Check again",
+  "sandbox.checking": "Checking…",
+  "sandbox.still": "Still not ready.",
+  "sandbox.later": "You can connect an AI now: tasks will start once the sandbox is ready.",
+  "sandbox.ok.title": "The sandbox is ready",
+  "sandbox.ok.p": "bubblewrap and socat are installed, and bubblewrap can start.",
+  "sandbox.task.head": "The task didn't start: the sandbox isn't ready",
+  "sandbox.task.p":
+    "{ai} runs its commands in a sandbox, which needs {needs}. On this computer, {missing}. Fix it in a terminal, then try again.",
+  "sandbox.task.retry": "Check and try again",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -1420,6 +1454,40 @@ const it: Record<MessageKey, string> = {
   "sandbox.missing.bwrap": "bubblewrap non è installato",
   "sandbox.missing.socat": "socat non è installato",
   "sandbox.missing.userns": "il sistema non permette a bubblewrap di creare user namespace",
+  "unconfined.note":
+    "Su Windows Claude non è ancora limitato alla cartella dell'attività. Modifica i file solo lì e prima di cambiarne o eliminarne uno chiede il permesso, ma gli altri comandi che lancia potrebbero leggere o scrivere altrove nel PC. ChatGPT resta dentro la cartella.",
+  "unconfined.title": "Claude su Windows non è limitato alla cartella dell'attività",
+  "unconfined.p1":
+    "Anthropic non ha ancora attivato su Windows la protezione che tiene i comandi di Claude dentro la cartella dell'attività. Per ora quei comandi potrebbero leggere o scrivere anche altrove nel PC, e questo conta soprattutto se un documento o una pagina web prova a ingannare l'AI.",
+  "unconfined.p2":
+    "Restano protetti i file: Claude li modifica solo nella cartella dell'attività, chiede il permesso prima di cambiare o eliminare un file che esiste già e rifiuta i comandi che eliminano file. ChatGPT, anche su Windows, resta dentro la cartella.",
+  "unconfined.go": "Continua",
+  "sandbox.title": "Il sandbox delle AI non è pronto",
+  "sandbox.p":
+    "Le AI lanciano i loro comandi in un sandbox basato su `bubblewrap`, che li tiene dentro la cartella dell'attività. Da un AppImage Tost Work non può installarlo: esegui questi comandi in un terminale.",
+  "sandbox.tag.bwrap": "bubblewrap: manca",
+  "sandbox.tag.socat": "socat: manca",
+  "sandbox.tag.apparmor": "AppArmor: blocca bwrap",
+  "sandbox.tag.userns": "user namespace: bloccati",
+  "sandbox.step.install": "Installa i pacchetti",
+  "sandbox.step.installSocat": "Installa i pacchetti (socat serve a Claude Code)",
+  "sandbox.step.installManual": "Installa {packages} con il gestore di pacchetti del tuo sistema",
+  "sandbox.step.apparmor": "AppArmor su {distro}: permetti a bubblewrap di creare user namespace",
+  "sandbox.step.apparmorPlain": "AppArmor: permetti a bubblewrap di creare user namespace",
+  "sandbox.step.userns":
+    "Il sistema non permette a bubblewrap di creare user namespace e la causa non è AppArmor, quindi qui non c'è un comando da eseguire.",
+  "sandbox.copy": "Copia",
+  "sandbox.copied": "Copiato",
+  "sandbox.check": "Controlla di nuovo",
+  "sandbox.checking": "Controllo…",
+  "sandbox.still": "Ancora non pronto.",
+  "sandbox.later": "Puoi collegare un'AI adesso: le attività partiranno quando il sandbox sarà pronto.",
+  "sandbox.ok.title": "Il sandbox è pronto",
+  "sandbox.ok.p": "bubblewrap e socat sono installati e bubblewrap riesce ad avviarsi.",
+  "sandbox.task.head": "L'attività non è partita: il sandbox non è pronto",
+  "sandbox.task.p":
+    "{ai} lancia i suoi comandi in un sandbox, che ha bisogno di {needs}. Su questo computer {missing}. Sistemalo in un terminale e riprova.",
+  "sandbox.task.retry": "Controlla e riprova",
 };
 
 export type Language = "en" | "it";
