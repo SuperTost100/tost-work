@@ -79,16 +79,16 @@
   <button data-where="header">B · in alto</button>
   <button data-where="report">C · solo in Segnala un problema</button>
   <span class="grow"></span>
-  <b>Invio</b>
-  <button data-send="mail" class="on">Email</button>
-  <button data-send="github">GitHub</button>
+  <b>AI dell'attività</b>
+  <button data-send="codex" class="on">Codex</button>
+  <button data-send="claude">Claude Code</button>
   <span class="grow"></span>
   <button data-theme="light" class="on">Chiaro</button>
   <button data-theme="dark">Scuro</button>
 </div>
 <div class="wrap">
   <h1>Segnalare un risultato dell'AI</h1>
-  <p class="lead">Il Microsoft Store chiede alle app che generano contenuti con l'AI un modo per segnalarli allo sviluppatore (regola 11.16). Qui il punto da cui si segnala e dove arriva la segnalazione. Clicca il pulsante sullo schermo per aprire la scheda.</p>
+  <p class="lead">Il Microsoft Store chiede alle app che generano contenuti con l'AI un modo per segnalarli (regola 11.16). Le risposte non le scrive Tost Work ma l'AI dell'attività, quindi la segnalazione va a chi la fa: OpenAI per Codex, Anthropic per Claude Code. Qui il punto da cui si segnala; in alto puoi cambiare l'AI dell'attività. Clicca il pulsante sullo schermo per aprire la scheda.</p>
   <p class="note" id="where-note"></p>
   <div class="scroll">
     <div class="screen">
@@ -109,7 +109,7 @@
             <button>Un problema dell'app</button>
             <button class="on">Un risultato dell'AI</button>
           </div>
-          <p>Se l'AI ha scritto qualcosa di offensivo, pericoloso o fuori luogo, dillo a Tost: legge ogni segnalazione.</p>
+          <p id="lead"></p>
           <div class="kinds">
             <button class="on">Offensivo</button>
             <button>Pericoloso o illegale</button>
@@ -119,7 +119,7 @@
           <textarea placeholder="Cosa è successo (facoltativo)"></textarea>
           <dl class="facts">
             <dt>Attività</dt><dd>Prepara il listino prezzi 2027</dd>
-            <dt>AI</dt><dd>Codex · GPT-6.1 Terra</dd>
+            <dt>AI</dt><dd id="ai"></dd>
             <dt>Versione</dt><dd>0.0.30 dev · build 94b42d9</dd>
           </dl>
           <p id="send-note"></p>
@@ -133,15 +133,15 @@
   </div>
 </div>
 <script>
-  const state = { where: "panel", send: "mail", theme: "light" };
+  const state = { where: "panel", send: "codex", theme: "light" };
   const notes = {
     panel: "<b>A.</b> Una riga discreta sotto il pannello dell'attività, a destra. Si vede in ogni attività senza disturbare.",
     header: "<b>B.</b> Una bandierina in alto, accanto allo stato. Più nascosta: il nome compare passandoci sopra.",
     report: "<b>C.</b> Nessun pulsante nell'attività: Segnala un problema, in Impostazioni e nel menu Aiuto, chiede prima se è un problema dell'app o un risultato dell'AI. Il minimo indispensabile, ma lo Store potrebbe volerlo più vicino al contenuto.",
   };
   const sends = {
-    mail: ["Scrivi l'email", "Si apre la tua app di posta con un'email per Tost già scritta: l'attività, l'AI e la versione. Il testo dell'attività no, a meno che tu non lo aggiunga. Resta tra te e Tost."],
-    github: ["Apri GitHub", "Si apre un modulo su GitHub già compilato. Serve un account GitHub, e quello che scrivi è pubblico: non metterci dati dei tuoi clienti."],
+    codex: ["Apri il modulo di OpenAI", "Codex", "GPT-6.1 Terra", "Si apre il modulo di OpenAI per segnalare contenuti. Copia lì la tua nota: Tost Work non invia niente da solo."],
+    claude: ["Scrivi l'email ad Anthropic", "Claude Code", "Claude Opus 5.5", "Si apre la tua app di posta con un'email ad Anthropic (usersafety@anthropic.com) già scritta: il tipo di problema, la tua nota, l'AI e il modello. Il testo dell'attività no, a meno che tu non lo aggiunga."],
   };
   const render = () => {
     document.body.dataset.theme = state.theme;
@@ -150,9 +150,12 @@
     for (const el of document.querySelectorAll("[data-for]")) el.hidden = el.dataset.for !== state.where;
     document.querySelector("[data-for-report]").hidden = state.where !== "report";
     document.getElementById("card-title").textContent = state.where === "report" ? "Segnala un problema" : "Segnala questo risultato";
-    const [label, note] = sends[state.send];
+    const [label, ai, model, note] = sends[state.send];
+    const maker = state.send === "codex" ? "OpenAI" : "Anthropic";
     document.getElementById("send").textContent = label;
     document.getElementById("send-note").textContent = note;
+    document.getElementById("ai").textContent = `${ai} · ${model}`;
+    document.getElementById("lead").textContent = `Le risposte le scrive ${ai}, l'AI di ${maker}: se ha scritto qualcosa di offensivo, pericoloso o fuori luogo, la segnalazione va a ${maker}, che può intervenire sul modello.`;
     for (const k of ["where", "send", "theme"])
       for (const b of document.querySelectorAll(`.bar [data-${k}]`)) b.classList.toggle("on", b.dataset[k] === state[k]);
     if (state.where === "report") document.getElementById("veil").classList.add("open");
