@@ -216,7 +216,9 @@ jobs:
         shell: pwsh
         run: |
           $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-          $winmd = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\UnionMetadata\*\Windows.winmd" | Sort-Object FullName | Select-Object -Last 1
+          # The newest SDK's full metadata; the Facade folder next to the versions holds a stub without the types.
+          $winmd = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\UnionMetadata\*\Windows.winmd" |
+            Where-Object { $_.Directory.Name -match '^\d' } | Sort-Object { [version]$_.Directory.Name } | Select-Object -Last 1
           $facades = Get-ChildItem "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.*\Facades" -Directory | Sort-Object FullName | Select-Object -Last 1
           $runtime = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\System.Runtime.WindowsRuntime.dll"
           # Full Windows paths: csc reads a forward slash as the start of an option.
