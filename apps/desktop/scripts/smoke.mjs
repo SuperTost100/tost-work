@@ -57,8 +57,10 @@ try {
   await page.locator(".composer textarea").first().waitFor({ timeout: 10_000 });
   await shot(page, "3-home");
 
-  // With SMOKE_LOGIN=1, starting at login goes on, and CI checks afterwards that the system recorded it.
+  // With SMOKE_LOGIN=1, starting at login goes on, and CI checks afterwards that the system recorded it. The debug
+  // logs go on first, so a change that fails leaves its error in logs/app.log.
   if (process.env.SMOKE_LOGIN === "1") {
+    await page.evaluate(() => window.tostWork.settings.update({ debug: true }));
     await page.evaluate(() => window.tostWork.settings.update({ openAtLogin: true }));
     await page.waitForTimeout(10_000);
   }

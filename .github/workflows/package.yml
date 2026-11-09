@@ -255,7 +255,8 @@ jobs:
           $key = "HKCU:\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\SystemAppData\$pfn"
           $state = (Get-ItemProperty -Path "$key\TostWorkStartup" -Name State -ErrorAction SilentlyContinue).State
           if ($state -ne 2) {
-            Get-ChildItem -Path $key -Recurse -ErrorAction SilentlyContinue | Format-List | Out-String | Write-Output
+            Get-ChildItem -Path $key -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }
+            Get-Content "$env:APPDATA\Tost Work\logs\app.log" -ErrorAction SilentlyContinue
             Write-Error "The startup task isn't on (State: $state)"; exit 1
           }
           "Startup task on"
