@@ -10,7 +10,11 @@ import { execFile } from "node:child_process";
 /** The task's id in the manifest. */
 export const STARTUP_TASK = "TostWorkStartup";
 
-/** Turns the task on ("on"), off ("off"), and prints its state: Enabled, Disabled, DisabledByUser, DisabledByPolicy… */
+/**
+ * Turns the task on ("on"), off ("off"), and prints its state: Enabled, Disabled, DisabledByUser, DisabledByPolicy…, or
+ * Missing with the package's task ids when the manifest's task isn't among them. It lists the package's tasks rather
+ * than asking for one by id, which answered "Element not found" from PowerShell inside the package.
+ */
 const SCRIPT = `
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
@@ -21,7 +25,9 @@ function Wait-Op($op, [Type]$type) {
   $t = $asTask.MakeGenericMethod($type).Invoke($null, @($op)); $t.Wait(-1) | Out-Null; $t.Result
 }
 $null = [Windows.ApplicationModel.StartupTask, Windows.ApplicationModel, ContentType = WindowsRuntime]
-$task = Wait-Op ([Windows.ApplicationModel.StartupTask]::GetAsync('${STARTUP_TASK}')) ([Windows.ApplicationModel.StartupTask])
+$all = Wait-Op ([Windows.ApplicationModel.StartupTask]::GetForCurrentPackageAsync()) ([System.Collections.Generic.IReadOnlyList[Windows.ApplicationModel.StartupTask]])
+$task = $all | Where-Object { $_.TaskId -eq '${STARTUP_TASK}' } | Select-Object -First 1
+if (-not $task) { Write-Output "state=Missing tasks=$(($all | ForEach-Object { $_.TaskId }) -join ',')"; exit }
 if ($env:TOST_WORK_STARTUP -eq 'on') { $null = Wait-Op ($task.RequestEnableAsync()) ([Windows.ApplicationModel.StartupTaskState]) }
 if ($env:TOST_WORK_STARTUP -eq 'off') { $task.Disable() }
 Write-Output "state=$($task.State)"
