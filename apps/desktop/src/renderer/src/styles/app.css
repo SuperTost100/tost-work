@@ -4808,21 +4808,27 @@ select.input {
   select.input::picker(select) {
     appearance: base-select;
   }
+  /* A long choice, such as a project's name, stays on one line and is cut off before the arrow. The select's own text
+     can't be styled, so the arrow sits on a block of the field's paper that covers the text's end. */
   select.input {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 11px;
+    display: block;
+    position: relative;
+    padding: 0 34px 0 11px;
+    line-height: 34px;
+    overflow: hidden;
+    white-space: nowrap;
     background-image: none;
     cursor: default;
   }
   select.input::picker-icon {
     content: "";
-    width: 16px;
-    height: 16px;
-    margin-left: auto;
-    background-color: var(--t3);
-    mask: url("../assets/icons/down.svg") center / contain no-repeat;
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: 34px;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23878070' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+      center / 16px no-repeat,
+      var(--paper);
     transition: rotate 150ms ease-out;
   }
   select.input:open::picker-icon {
@@ -4831,6 +4837,8 @@ select.input {
   select.input::picker(select) {
     box-sizing: border-box;
     min-width: anchor-size(width);
+    /* As wide as the select, so a long choice can't push the list past the window. */
+    max-width: max(anchor-size(width), 280px);
     margin: 4px 0;
     /* Below the select, and above it only when there's no room, rather than on the side with the most. */
     position-try-order: normal;
@@ -4844,14 +4852,15 @@ select.input {
       0 12px 32px rgba(27, 23, 18, 0.14);
   }
   select.input option {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    height: 32px;
-    padding: 0 10px;
+    display: block;
+    position: relative;
+    padding: 0 34px 0 10px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     border-radius: 8px;
     font:
-      400 14px "Schibsted Grotesk",
+      400 14px / 32px "Schibsted Grotesk",
       sans-serif;
     color: var(--ink);
     cursor: default;
@@ -4864,8 +4873,10 @@ select.input {
   }
   select.input option::checkmark {
     content: "";
-    order: 1;
-    margin-left: auto;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    margin-top: -7.5px;
     width: 15px;
     height: 15px;
     background-color: currentColor;
