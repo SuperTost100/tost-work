@@ -34,5 +34,7 @@ export async function setStartupTask(on: boolean, run: Run = runHelper): Promise
   const output = await run(on ? "on" : "off");
   const state = parseState(output);
   if (state === null) throw new Error(`The startup task's helper didn't report its state: ${output.trim()}`);
-  if (on ? state !== "Enabled" : state === "Enabled") throw new Error(`Windows kept the startup task ${output.trim()}`);
+  // Enabled and EnabledByPolicy both start the app; Missing means there was no task to change.
+  const enabled = state.startsWith("Enabled");
+  if (state === "Missing" || on !== enabled) throw new Error(`Windows kept the startup task ${output.trim()}`);
 }

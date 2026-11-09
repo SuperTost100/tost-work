@@ -23,5 +23,6 @@ describe("the Microsoft Store version", () => {
   it("refuses a version it can't number", () => {
     expect(() => storeVersion("0.1.100")).toThrow("under 100");
     expect(() => storeVersion("v0.1.0")).toThrow("Not a Tost Work version");
+    expect(() => storeVersion("65536.0.0")).toThrow("too large");
   });
 });

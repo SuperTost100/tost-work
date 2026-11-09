@@ -14,6 +14,8 @@ export function storeVersion(version) {
   const [major, minor, patch] = match.slice(1).map(Number);
   if (minor > 99 || patch > 99)
     throw new Error(`${version} doesn't fit the Store's numbering: minor and patch stay under 100`);
+  // Each part of an AppX version is at most 65535.
+  if (major > 65535) throw new Error(`${version} doesn't fit the Store's numbering: the major version is too large`);
   return `1.${major}.${minor * 100 + patch}`;
 }
 

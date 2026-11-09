@@ -23,6 +23,9 @@ describe("the Microsoft Store package's startup task", () => {
     await expect(setStartupTask(true, answer("DisabledByUser"))).rejects.toThrow("DisabledByUser");
     await expect(setStartupTask(false, answer("Enabled"))).rejects.toThrow("Enabled");
     await expect(setStartupTask(true, async () => "")).rejects.toThrow("didn't report");
+    await setStartupTask(true, answer("EnabledByPolicy"));
+    await expect(setStartupTask(false, answer("EnabledByPolicy"))).rejects.toThrow("EnabledByPolicy");
+    await expect(setStartupTask(false, answer("Missing tasks="))).rejects.toThrow("Missing");
   });
 
   it("takes over from Electron's login item inside the package", async () => {

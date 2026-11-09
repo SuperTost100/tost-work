@@ -20,6 +20,9 @@ on:
       - apps/desktop/scripts/smoke.mjs
       - apps/desktop/scripts/store-version.mjs
       - apps/desktop/build/**
+      # Starting at login inside the Store package, which only the Store job tests.
+      - apps/desktop/src/main/startupTask.ts
+      - apps/desktop/src/main/loginItem.ts
       # A lockfile or override change can break packaging, as a dependency fix for electron-builder's tools would.
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
