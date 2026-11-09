@@ -8,5 +8,9 @@ export default defineConfig({
   plugins: [react(), creditsPlugin()],
   define: buildInfo,
   resolve: { alias: { "@": resolve(import.meta.dirname, "src/renderer/src") } },
-  test: { environment: "jsdom", include: ["src/**/*.test.{ts,tsx}"], setupFiles: ["src/test-setup.ts"] },
+  test: {
+    environment: "jsdom",
+    include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.mjs"],
+    setupFiles: ["src/test-setup.ts"],
+  },
 });

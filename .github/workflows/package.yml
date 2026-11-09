@@ -4,7 +4,8 @@ name: Package
 # certificate or secret, so a broken build shows up before a release needs it. Started by hand (Actions > Package > Run
 # workflow), it signs with the Developer ID certificate and has Apple notarize the app: that's the build a release ships.
 # The Windows and Linux apps aren't signed yet (#148), and each one runs scripts/smoke.mjs, since no one on the team
-# opens them day to day. It publishes nothing: the installers are workflow artifacts.
+# opens them day to day. The Microsoft Store package is built unsigned for upload, since the Store signs it, and a
+# test-signed copy runs the smoke test inside its package. It publishes nothing: the installers are workflow artifacts.
 #
 # shortcut: the signing secrets are repository secrets, so a workflow changed on a branch could reach them. Only Tost and
 # his agents push here. Move them to a "release" environment limited to main once anyone else gets write access.
@@ -17,6 +18,11 @@ on:
       - .github/workflows/package.yml
       - apps/desktop/scripts/fetch-officecli.mjs
       - apps/desktop/scripts/smoke.mjs
+      - apps/desktop/scripts/store-version.mjs
+      - apps/desktop/build/**
+      # Starting at login inside the Store package, which only the Store job tests.
+      - apps/desktop/src/main/startupTask.ts
+      - apps/desktop/src/main/loginItem.ts
       # A lockfile or override change can break packaging, as a dependency fix for electron-builder's tools would.
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
@@ -182,6 +188,115 @@ jobs:
         with:
           name: ${{ steps.name.outputs.name }}
           path: apps/desktop/release/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  store:
+    name: Microsoft Store package
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @tost-work/desktop build
+      - run: node apps/desktop/scripts/fetch-officecli.mjs win-x64
+      # The helper that turns the package's startup task on and off (build/startup-task/StartupTask.cs). It goes in the
+      # package's resources/bin, since only a program inside the package has its identity.
+      - name: Compile the startup-task helper
+        shell: pwsh
+        run: |
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          # The newest SDK's full metadata; the Facade folder next to the versions holds a stub without the types.
+          $winmd = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\UnionMetadata\*\Windows.winmd" |
+            Where-Object { $_.Directory.Name -match '^\d' } | Sort-Object { [version]$_.Directory.Name } | Select-Object -Last 1
+          $facades = Get-ChildItem "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.*\Facades" -Directory | Sort-Object FullName | Select-Object -Last 1
+          $runtime = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\System.Runtime.WindowsRuntime.dll"
+          # Full Windows paths: csc reads a forward slash as the start of an option.
+          $source = (Resolve-Path "apps\desktop\build\startup-task\StartupTask.cs").Path
+          $out = Join-Path (Resolve-Path "apps\desktop\resources\bin\win-x64").Path "startup-task.exe"
+          & $csc /nologo /target:exe /platform:x64 /optimize "/out:$out" `
+            "/r:$($winmd.FullName)" "/r:$runtime" "/r:$($facades.FullName)\System.Runtime.dll" `
+            "/r:$($facades.FullName)\System.Threading.Tasks.dll" $source
+          if ($LASTEXITCODE -ne 0) { Write-Error "csc failed"; exit 1 }
+      # The Store rejects a version starting with 0, so the package carries the Store's number for this version. The app
+      # still shows its own: it's built into the code.
+      - name: Package for the Store, unsigned
+        run: |
+          version=$(node apps/desktop/scripts/store-version.mjs)
+          echo "STORE_VERSION=$version" >> "$GITHUB_ENV"
+          pnpm --filter @tost-work/desktop exec electron-builder --win appx --x64 --publish never -c.extraMetadata.version="$version"
+      # Windows installs only signed packages, so CI signs a copy with a throwaway certificate under the Store's publisher
+      # name, trusts it on this runner only, and installs that. The unsigned package is the one the Store gets.
+      - name: Install a test-signed copy
+        shell: pwsh
+        run: |
+          $appx = Get-Item "apps/desktop/release/*.appx"
+          $copy = Join-Path $env:RUNNER_TEMP "test-signed.appx"
+          Copy-Item $appx.FullName $copy
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=A368B52B-5248-4F8B-ADC9-335608EADB2C" `
+            -CertStoreLocation Cert:\CurrentUser\My -TextExtension @("2.5.29.19={text}")
+          $pfx = Join-Path $env:RUNNER_TEMP "test.pfx"
+          $password = ConvertTo-SecureString -String "throwaway" -Force -AsPlainText
+          Export-PfxCertificate -Cert $cert -FilePath $pfx -Password $password | Out-Null
+          Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\LocalMachine\TrustedPeople -Password $password | Out-Null
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1
+          & $signtool.FullName sign /fd SHA256 /f $pfx /p throwaway $copy
+          if ($LASTEXITCODE -ne 0) { Write-Error "signtool failed"; exit 1 }
+          Add-AppxPackage -Path $copy
+          $installed = Get-AppxPackage -Name Tost.TostWork
+          if (-not $installed) { Write-Error "The package didn't install"; exit 1 }
+          "Installed $($installed.PackageFullName)"
+          Remove-Item $pfx
+      # The alias starts the app inside its package. Its data must land in the real AppData folder, where the AI tools
+      # see it, and not in the package's private copy.
+      - name: Open the app in its package and run a task
+        working-directory: apps/desktop
+        env:
+          SMOKE_LOGIN: "1"
+        run: node scripts/smoke.mjs "$LOCALAPPDATA/Microsoft/WindowsApps/tost-work.exe" "$RUNNER_TEMP/smoke" "$APPDATA/Tost Work"
+      # The smoke test turned on starting at login. Inside a package that's the manifest's startup task, which Windows
+      # records per user under the package's SystemAppData key, with State 2 for enabled.
+      - name: Check that the startup task is on
+        shell: pwsh
+        run: |
+          $pfn = (Get-AppxPackage -Name Tost.TostWork).PackageFamilyName
+          $key = "HKCU:\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\SystemAppData\$pfn"
+          $state = (Get-ItemProperty -Path "$key\TostWorkStartup" -Name State -ErrorAction SilentlyContinue).State
+          if ($state -ne 2) {
+            Get-ChildItem -Path $key -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }
+            Get-Content "$env:APPDATA\Tost Work\logs\app.log" -ErrorAction SilentlyContinue
+            (Get-AppxPackageManifest -Package (Get-AppxPackage -Name Tost.TostWork)).Package.Applications.Application.Extensions.OuterXml
+            Write-Error "The startup task isn't on (State: $state)"; exit 1
+          }
+          "Startup task on"
+      - name: Keep the smoke test's screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: smoke-store-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/smoke
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Name the artifact
+        id: name
+        run: echo "name=tost-work-store-$(node -p "require('./apps/desktop/package.json').version")-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.name.outputs.name }}
+          path: apps/desktop/release/*.appx
           if-no-files-found: error
           retention-days: 14
 

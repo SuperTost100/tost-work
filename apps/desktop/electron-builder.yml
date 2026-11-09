@@ -48,3 +48,21 @@ linux:
   target: [AppImage]
 win:
   target: [nsis]
+# The Microsoft Store package. It's uploaded unsigned: the Store signs it with Microsoft's certificate, which is the
+# only free signing for Windows. The identity comes from Partner Center (Product identity). CI builds it with
+# `--win appx` and a Store version from scripts/store-version.mjs, since the Store rejects a version starting with 0.
+appx:
+  identityName: Tost.TostWork
+  publisher: CN=A368B52B-5248-4F8B-ADC9-335608EADB2C
+  publisherDisplayName: Tost
+  displayName: Tost Work
+  applicationId: TostWork
+  backgroundColor: "#1b1712"
+  languages: [it-IT, en-US]
+  # runFullTrust is always added. unvirtualizedResources lets the manifest keep the app's data and the AI tools'
+  # installs visible outside the package; the Store approves it at submission.
+  capabilities: [unvirtualizedResources]
+  customManifestPath: appx-manifest.xml
+  # Windows 10 version 2004 and later. Windows 10 ignores the per-folder exclusions and reads the older switches.
+  minVersion: 10.0.19041.0
+  maxVersionTested: 10.0.26100.0

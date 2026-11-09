@@ -44,6 +44,7 @@ import { pickAi } from "./pickAi";
 import { WindowQuestions } from "./questions";
 import { SkillFolder } from "./skills";
 import { SkillVersions } from "./skillVersions";
+import { setStartupTask } from "./startupTask";
 import { Store } from "./store/store";
 import { opensWindow, panelBounds, staysInMenuBar, trayMenu } from "./tray";
 import { buttonsPosition } from "./windowButtons";
@@ -362,6 +363,7 @@ app.whenReady().then(async () => {
     setLoginItemSettings: (s: { openAtLogin: boolean; args?: string[] }) => app.setLoginItemSettings(s),
     autostartDir: join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "autostart"),
     exec: process.env.APPIMAGE ?? process.execPath,
+    startupTask: process.windowsStore ? setStartupTask : undefined,
   };
   let atLogin = store.getSettings().openAtLogin;
   // One change at a time, so turning it on then off quickly can't end with the entry written after its removal.
