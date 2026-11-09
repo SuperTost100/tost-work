@@ -3,6 +3,7 @@ import type { Language, MessageKey } from "../shared/i18n";
 import { whenText } from "../shared/jobText";
 import { busyStatus, type Job, type Settings, type Task } from "../shared/model";
 import { upcoming } from "../shared/schedule";
+import { AT_LOGIN } from "./loginItem";
 
 /** Closing the window leaves Tost Work running in the menu bar, or the tray, unless the user turned that off. */
 export const staysInMenuBar = (settings: Pick<Settings, "stayInMenuBar">): boolean => settings.stayInMenuBar;
@@ -10,6 +11,20 @@ export const staysInMenuBar = (settings: Pick<Settings, "stayInMenuBar">): boole
 /** A start at login opens the window only when the user chose so; otherwise the menu-bar icon is all there is. */
 export const opensWindow = (atLogin: boolean, settings: Pick<Settings, "loginOpens">): boolean =>
   !atLogin || settings.loginOpens === "window";
+
+/** What a second launch of Tost Work sends the copy already running, before it quits. */
+export type SecondLaunch = { atLogin: boolean };
+
+/**
+ * Whether a second launch brings the running copy's window forward. It does when the user opened Tost Work again, also
+ * when it was waiting in the menu bar with no window, and not when the login started it: the copy that's running has
+ * already done what a start at login does. The flag is read from the data the second launch sent and, in case that
+ * didn't arrive, from its arguments.
+ */
+export function showsForSecondLaunch(data: unknown, argv: readonly string[]): boolean {
+  const sent = typeof data === "object" && data !== null && (data as Partial<SecondLaunch>).atLogin === true;
+  return !sent && !argv.includes(AT_LOGIN);
+}
 
 /** The gap between the icon and the panel. */
 const GAP = 6;

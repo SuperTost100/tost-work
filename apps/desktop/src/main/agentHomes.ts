@@ -15,8 +15,18 @@ import { join } from "node:path";
  *
  * Analytics stay off as Tost Work promises: app-server already keeps them off by default, and the setting says so
  * outright in case that default changes.
+ *
+ * On Windows, Codex needs to be told which sandbox to use. Without it, app-server turns a task's workspace-write
+ * sandbox into read-only (`effective_sandbox_mode` in Codex 0.167's config crate), and Codex can't create a file in
+ * the task's folder. MXC, Windows' own process isolation, is what Codex recommends, and it needs no administrator:
+ * with `prefer_mxc` Codex uses it where Windows has it (11 24H2 and later) and no managed Codex policy turns it off.
+ * Elsewhere, such as on Windows 10, Codex falls back to `unelevated`, a restricted copy of the user's own token, which
+ * needs no administrator either. Codex's third choice, `elevated`, asks for an administrator's approval to set up,
+ * which the people using Tost Work may not be able to give. Other systems don't get these keys: they mean nothing there.
  */
-export const CODEX_CONFIG = `# Written by Tost Work each time it starts. Changes here are replaced.
+export function codexConfig(platform: NodeJS.Platform = process.platform): string {
+  const windows = platform === "win32";
+  return `# Written by Tost Work each time it starts. Changes here are replaced.
 project_doc_max_bytes = 0
 
 [skills]
@@ -31,10 +41,11 @@ plugins = false
 remote_plugin = false
 tool_suggest = false
 skill_search = false
-
+${windows ? "prefer_mxc = true\n" : ""}
 [analytics]
 enabled = false
-`;
+${windows ? '\n[windows]\nsandbox = "unelevated"\n' : ""}`;
+}
 
 /**
  * Claude Code's settings in Tost Work's own Claude home: no bundled skills, no memory, nothing synced from the user's
@@ -71,12 +82,16 @@ export const CLAUDE_ENV = {
  * sign-in in its home, so the user signs in once more inside Tost Work. Set before any CLI starts: every one inherits
  * the environment, including sign-in and the model list.
  */
-export function giveAgentsOwnHomes(root: string, env: NodeJS.ProcessEnv = process.env): void {
+export function giveAgentsOwnHomes(
+  root: string,
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): void {
   const codex = join(root, "codex");
   const claude = join(root, "claude");
   mkdirSync(codex, { recursive: true, mode: 0o700 });
   mkdirSync(claude, { recursive: true, mode: 0o700 });
-  writeFileSync(join(codex, "config.toml"), CODEX_CONFIG);
+  writeFileSync(join(codex, "config.toml"), codexConfig(platform));
   writeFileSync(join(claude, "settings.json"), `${JSON.stringify(CLAUDE_SETTINGS, null, 2)}\n`);
   Object.assign(env, { CODEX_HOME: codex, CLAUDE_CONFIG_DIR: claude, ...CLAUDE_ENV });
 }

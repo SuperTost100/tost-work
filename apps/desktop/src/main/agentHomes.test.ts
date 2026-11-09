@@ -3,13 +3,13 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { giveAgentsOwnHomes } from "./agentHomes";
+import { codexConfig, giveAgentsOwnHomes } from "./agentHomes";
 
 describe("agent homes", () => {
   it("points both CLIs at Tost Work's homes, with outside instructions and skills off", async () => {
     const root = join(await mkdtemp(join(tmpdir(), "tw-agents-")), "agents");
     const env: NodeJS.ProcessEnv = { HOME: "/home/giulia" };
-    giveAgentsOwnHomes(root, env);
+    giveAgentsOwnHomes(root, env, "linux");
     expect(env).toMatchObject({
       HOME: "/home/giulia",
       CODEX_HOME: join(root, "codex"),
@@ -38,5 +38,19 @@ describe("agent homes", () => {
     giveAgentsOwnHomes(root, {});
     expect(await readFile(join(root, "codex", "config.toml"), "utf8")).toContain("project_doc_max_bytes = 0");
     expect(await readFile(join(root, "codex", "auth.json"), "utf8")).toBe("{}");
+  });
+
+  it("picks a Windows sandbox that needs no administrator, so Codex can write in the task's folder", () => {
+    const windows = codexConfig("win32");
+    // Without a Windows sandbox, Codex turns workspace-write into read-only. MXC where Windows has it, else unelevated.
+    expect(windows).toMatch(/\[features\]\n(?:[a-z_]+ = false\n)+prefer_mxc = true\n\n\[analytics\]/);
+    expect(windows).toMatch(/\n\[windows\]\nsandbox = "unelevated"\n$/);
+    // Each table once: TOML refuses a table defined twice, and Codex would then refuse the whole file.
+    for (const table of ["[features]", "[windows]"]) expect(windows.split(table)).toHaveLength(2);
+    for (const platform of ["darwin", "linux"] as const) {
+      const other = codexConfig(platform);
+      expect(other).not.toContain("prefer_mxc");
+      expect(other).not.toContain("[windows]");
+    }
   });
 });
