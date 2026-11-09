@@ -25,6 +25,13 @@ const handler: ToolHandler = {
   review: async (taskId, review) => {
     calls.push({ taskId, tool: "review", args: review });
   },
+  gate: async (taskId, step) => {
+    calls.push({ taskId, tool: "gate", args: step });
+    if ((step as { tool_name?: string }).tool_name === "boom") throw new Error("the policy broke");
+    return (step as { tool_name?: string }).tool_name === "Bash"
+      ? { decision: "allow" }
+      : { decision: "deny", reason: "not that" };
+  },
 };
 
 let server: ToolServer;
@@ -52,6 +59,18 @@ const raw = (url: string, headers: Record<string, string>) =>
     });
     req.on("error", reject);
     req.end("{}");
+  });
+
+/** A POST to the hook's address, with its status and body. */
+const post = (url: string, headers: Record<string, string>, body: string, method = "POST") =>
+  new Promise<{ status: number; body: string }>((resolve, reject) => {
+    const req = request(url, { method, headers: { "content-type": "application/json", ...headers } }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c: Buffer) => chunks.push(c));
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8") }));
+    });
+    req.on("error", reject);
+    req.end(body);
   });
 
 const textOf = (result: unknown) => (result as { content: { text: string }[] }).content[0]?.text;
@@ -179,6 +198,36 @@ describe("ToolServer", () => {
       req.end("{}");
     });
     expect(status).toBe(404);
+  });
+
+  it("passes Codex's hook to the gate of the task its token belongs to, and answers every step with a decision", async () => {
+    const one = server.open("task-1");
+    const two = server.open("task-2");
+    const hook = new URL("/hook", one.url).toString();
+    const step = (tool: string) => JSON.stringify({ tool_name: tool, tool_input: { command: "ls" } });
+    const ask = (token: string, body: string) => post(hook, { authorization: `Bearer ${token}` }, body);
+
+    expect(await ask(one.token, step("Bash"))).toEqual({ status: 200, body: '{"decision":"allow"}' });
+    expect(JSON.parse((await ask(two.token, step("apply_patch"))).body)).toEqual({
+      decision: "deny",
+      reason: "not that",
+    });
+    expect(calls.map((c) => [c.taskId, (c.args as { tool_name: string }).tool_name])).toEqual([
+      ["task-1", "Bash"],
+      ["task-2", "apply_patch"],
+    ]);
+    // A body that isn't JSON, or a policy that fails, is a refusal: the hook lets a step run only on an allow.
+    expect(JSON.parse((await ask(one.token, "not json")).body)).toMatchObject({ decision: "deny" });
+    expect(JSON.parse((await ask(one.token, step("boom"))).body)).toEqual({
+      decision: "deny",
+      reason: "Tost Work couldn't check this step: the policy broke",
+    });
+    // The token is checked as for the tools, and only a POST is a step.
+    expect((await post(hook, {}, step("Bash"))).status).toBe(401);
+    expect((await post(hook, { authorization: "Bearer nope" }, step("Bash"))).status).toBe(401);
+    expect((await post(hook, { authorization: `Bearer ${one.token}` }, "", "GET")).status).toBe(405);
+    server.close(one.token);
+    expect((await ask(one.token, step("Bash"))).status).toBe(401);
   });
 
   it("refuses to start twice", async () => {

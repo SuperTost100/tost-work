@@ -25,6 +25,7 @@ import { needsUnconfinedOk } from "../shared/sandbox";
 import { Accounts } from "./accounts";
 import { giveAgentsOwnHomes } from "./agentHomes";
 import { menuTemplate, nextTextSize, textMenuTemplate } from "./appMenu";
+import { type CodexHook, codexHookCheck } from "./codexHook";
 import { DebugLogs } from "./debugLog";
 import { documentTools } from "./documents";
 import { AgentEngine } from "./engine/agent";
@@ -254,9 +255,12 @@ app.whenReady().then(async () => {
   store.stopInterrupted(new Date().toISOString());
   // Before the window, so its background colour already follows the chosen theme.
   applyLook(null, store.getSettings());
-  // Codex and Claude Code read only what Tost Work gives them, not the user's own setup.
-  if (process.env.TOST_WORK_ENGINE !== "fake") giveAgentsOwnHomes(join(app.getPath("userData"), "agents"));
+  // Codex and Claude Code read only what Tost Work gives them, not the user's own setup. Codex's home also gets Tost
+  // Work's check before each step, which is checked in turn before each Codex task.
+  let codexHook: CodexHook | null = null;
+  if (process.env.TOST_WORK_ENGINE !== "fake") codexHook = giveAgentsOwnHomes(join(app.getPath("userData"), "agents"));
   const funnel = createFunnel();
+
   const language = () => store.getSettings().language ?? languageFrom(app.getLocale());
 
   // Tasks run on Codex or Claude Code. TOST_WORK_ENGINE=fake replays a script instead, for trying the interface without an account.
@@ -289,6 +293,7 @@ app.whenReady().then(async () => {
       courseKey: () => keys.get(),
       online: () => net.isOnline(),
       sandboxReady: (provider) => checkSandbox(provider, sandboxSystem),
+      codexHook: codexHookCheck(codexHook, () => funnel.providers.codex.detect()),
       skills: () => skills.list(),
       job: (id) => store.getJob(id),
       verbose: () => debugOn,

@@ -9,7 +9,7 @@ vi.mock("node:path", async () => {
 });
 
 const { inside } = await import("../files");
-const { asCodexRequest } = await import("./agent");
+const { asCodexRequest, outside } = await import("./agent");
 
 const WORK = "C:\\Users\\Giulia\\Documents\\Corso";
 const write = (file_path: string) => ({ id: "1", tool: "Write", input: { file_path, content: "x" } });
@@ -26,18 +26,20 @@ describe("the task's folder on Windows paths", () => {
     expect(inside(WORK, "\\\\server\\share\\note.txt")).toBe(false);
   });
 
-  it("lets Claude Code write inside the folder, however the path is written", async () => {
+  it("lets Claude Code and Codex write inside the folder, however the path is written", async () => {
     for (const path of [
       "note.txt",
       "sub\\note.txt",
       `${WORK}\\note.txt`,
       "c:\\USERS\\giulia\\documents\\corso\\note.txt",
       "C:/Users/Giulia/Documents/Corso/note.txt",
-    ])
+    ]) {
       expect(await asCodexRequest(write(path), WORK), path).toMatchObject({ tool: "file_change" });
+      expect(await outside(WORK, path), path).toBe(false);
+    }
   });
 
-  it("refuses a Claude Code write outside the folder", async () => {
+  it("refuses a write outside the folder, from either CLI", async () => {
     for (const path of [
       "..\\note.txt",
       "sub\\..\\..\\note.txt",
@@ -48,6 +50,6 @@ describe("the task's folder on Windows paths", () => {
       "\\\\server\\share\\note.txt",
       "C:\\Windows\\System32\\drivers\\etc\\hosts",
     ])
-      expect(await asCodexRequest(write(path), WORK), path).toBeNull();
+      expect(await outside(WORK, path), path).toBe(true);
   });
 });

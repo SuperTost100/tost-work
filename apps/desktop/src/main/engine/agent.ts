@@ -14,11 +14,13 @@ import {
   pickOn,
 } from "../../shared/modelChoice";
 import { type SandboxReadiness, sandboxFor } from "../../shared/sandbox";
+import { HOOK_TOKEN_ENV, HOOK_URL_ENV } from "../codexHook";
 import type { TaskLog } from "../debugLog";
 import { freeName, inside } from "../files";
-import type { ToolHandler } from "../mcp/server";
+import type { HookAnswer, ToolHandler } from "../mcp/server";
 import { SandboxNotReady, UserError } from "../userError";
 import { activityOf, noteText } from "./activity";
+import { gateRequest, hookCall, opensShell } from "./codexGate";
 import type { Engine, RunContext } from "./engine";
 import { instructionsFor } from "./instructions";
 import { OVERWRITE_NOTE, withFiles } from "./runner";
@@ -197,25 +199,38 @@ class Channel<T> implements AsyncIterable<T> {
 
 interface Live {
   channel: Channel<EngineEvent>;
+  /** Aborted by Stop, and by the engine when Codex takes a step its hook didn't allow. */
   signal: AbortSignal;
   workdir: string;
   /** Files this task made, which the agent may change again without asking. */
   made: Set<string>;
-  /** Approvals Codex itself is holding a file change for, by id. */
+  /** Approvals a step is waiting on, by id. */
   pending: Set<string>;
+  /** Codex's steps that its hook allowed, by call id: each command and file change it starts must be one. */
+  allowed: Set<string>;
+  log: TaskLog;
 }
 
-/** The paths and kinds of a Codex file change, from the item cli-funnel passes with the approval. */
-function changesOf(input: unknown): { path: string; kind: string }[] {
+/** The paths, kinds and new paths of a file change, from Codex's item or from the hook's patch. */
+function changesOf(input: unknown): { path: string; kind: string; movedTo?: string }[] {
   const changes = (input as { changes?: { changes?: unknown } } | undefined)?.changes;
   const list = Array.isArray(changes) ? changes : (changes as { changes?: unknown } | undefined)?.changes;
   if (!Array.isArray(list)) return [];
-  return list.flatMap((c: { path?: unknown; kind?: unknown }) => {
+  return list.flatMap((c: { path?: unknown; kind?: unknown; move_path?: unknown }) => {
     if (typeof c?.path !== "string") return [];
-    const kind = typeof c.kind === "string" ? c.kind : (c.kind as { type?: string } | undefined)?.type;
-    return [{ path: c.path, kind: kind ?? "update" }];
+    const detail = typeof c.kind === "object" ? (c.kind as { type?: string; move_path?: unknown } | null) : null;
+    const kind = typeof c.kind === "string" ? c.kind : detail?.type;
+    const movedTo = typeof c.move_path === "string" ? c.move_path : detail?.move_path;
+    return [{ path: c.path, kind: kind ?? "update", ...(typeof movedTo === "string" ? { movedTo } : {}) }];
   });
 }
+
+/** Whether a decision lets the step run. */
+const allows = (decision: ApprovalDecision) =>
+  (typeof decision === "string" ? decision : decision.decision) === "allow";
+
+/** The two kinds of Codex step that change the computer, which its hook must have allowed before they start. */
+const GATED = new Set(["command", "file_change"]);
 
 /**
  * Claude Code's tools that run a command: Bash, and on Windows PowerShell. Without Git for Windows Claude Code offers
@@ -248,24 +263,40 @@ async function realTarget(path: string): Promise<string> {
 }
 
 /**
- * A Claude Code approval request in the shape Codex sends, so one policy covers both: Bash and PowerShell become a
- * command, and a tool that writes a file becomes a file change, an add when the file isn't there yet. Null for a write outside the
- * folder, which Codex's sandbox would have stopped. Links are resolved first, because on a Mac a temporary folder
- * under /var is really under /private/var.
+ * Whether a path, taken from the task's folder, lands outside it. Links are resolved first, because on a Mac a
+ * temporary folder under /var is really under /private/var.
  */
-export async function asCodexRequest(request: ApprovalRequest, workdir: string): Promise<ApprovalRequest | null> {
+export async function outside(workdir: string, path: string): Promise<boolean> {
+  return !inside(await realTarget(workdir), await realTarget(resolve(workdir, path)));
+}
+
+/** Whether a file is there. */
+const exists = (path: string) =>
+  stat(path).then(
+    () => true,
+    () => false,
+  );
+
+/**
+ * A Claude Code approval request in the shape the policy takes, so one policy covers both CLIs: Bash and PowerShell
+ * become a command, keeping a request to run outside the sandbox, and a tool that writes a file becomes a file change,
+ * an add when the file isn't there yet.
+ */
+export async function asCodexRequest(request: ApprovalRequest, workdir: string): Promise<ApprovalRequest> {
   const input = (request.input ?? {}) as Record<string, unknown>;
-  if (CLAUDE_COMMANDS.has(request.tool)) return { ...request, tool: "command", input: { command: input.command } };
+  if (CLAUDE_COMMANDS.has(request.tool)) {
+    const unsandboxed = input.dangerouslyDisableSandbox === true ? { dangerouslyDisableSandbox: true } : {};
+    return { ...request, tool: "command", input: { command: input.command, ...unsandboxed } };
+  }
   const field = CLAUDE_WRITES[request.tool];
   const target = field ? input[field] : undefined;
   if (typeof target !== "string") return request;
   const path = resolve(workdir, target);
-  if (!inside(await realTarget(workdir), await realTarget(path))) return null;
-  const exists = await stat(path).then(
-    () => true,
-    () => false,
-  );
-  return { ...request, tool: "file_change", input: { changes: [{ path, kind: exists ? "update" : "add" }] } };
+  return {
+    ...request,
+    tool: "file_change",
+    input: { changes: [{ path, kind: (await exists(path)) ? "update" : "add" }] },
+  };
 }
 
 /**
@@ -279,9 +310,14 @@ export function isNetworkError(message: string): boolean {
 }
 
 /**
- * Runs tasks through cli-funnel on Codex (the ChatGPT sign-in) or Claude Code (the Claude sign-in), at `supervised`:
- * every file change comes here first, and Tost Work's tools carry questions, approvals, files and the review. Shell
- * commands run in each CLI's own sandbox, so they can write only inside the task's folder and temp folders.
+ * Runs tasks through cli-funnel on Codex (the ChatGPT sign-in) or Claude Code (the Claude sign-in), and Tost Work's
+ * tools carry questions, approvals, files and the review. Shell commands run in each CLI's own sandbox, so they can
+ * write only inside the task's folder and temp folders.
+ *
+ * Every step goes through one policy first. Claude Code runs at `supervised` and asks through its approvals. Codex
+ * runs at `full` with its sandbox on, which means no approvals, so every command it runs stays in the sandbox. Its
+ * steps reach the policy through its PreToolUse hook instead (codexHook.ts and `gate`), and every command and file
+ * change Codex starts must be one the hook allowed, or the task stops.
  */
 export class AgentEngine implements Engine, ToolHandler {
   private live = new Map<string, Live>();
@@ -304,6 +340,7 @@ export class AgentEngine implements Engine, ToolHandler {
   private verbose: () => boolean;
   private platform: string;
   private sandboxReady: (provider: AgentProvider) => Promise<SandboxReadiness>;
+  private codexHook: (workdir: string) => Promise<void>;
 
   constructor(
     private funnel: AgentFunnel,
@@ -332,6 +369,11 @@ export class AgentEngine implements Engine, ToolHandler {
       platform?: string;
       /** Whether the sandbox can start for an AI, checked before each run. Ready when not given. */
       sandboxReady?: (provider: AgentProvider) => Promise<SandboxReadiness>;
+      /**
+       * Makes sure Codex will run Tost Work's hook before each step of a task in the folder, and throws a UserError
+       * when it won't. Without it Codex tasks don't start.
+       */
+      codexHook?: (workdir: string) => Promise<void>;
     } = {},
   ) {
     this.documents = options.documents ?? null;
@@ -346,6 +388,11 @@ export class AgentEngine implements Engine, ToolHandler {
     this.taskLog = options.taskLog ?? (() => ({ write: () => {} }));
     this.platform = options.platform ?? process.platform;
     this.sandboxReady = options.sandboxReady ?? (async () => READY);
+    this.codexHook =
+      options.codexHook ??
+      (async () => {
+        throw new UserError("error.codexHookOff", { detail: "no check was given" });
+      });
   }
 
   /** Why the task can't reach its AI, in the user's language. */
@@ -421,20 +468,30 @@ export class AgentEngine implements Engine, ToolHandler {
     return { ai, provider, lists };
   }
 
-  async *run({ task, project, workdir, followUp, signal }: RunContext): AsyncIterable<EngineEvent> {
+  async *run({ task, project, workdir, followUp, signal: stopped }: RunContext): AsyncIterable<EngineEvent> {
     if (!this.tools) throw new Error("The tool server isn't attached");
+    const provider = task.provider ?? "codex";
+    const codex = provider === "codex";
     // Without a connection Codex retries for minutes before it gives up, so the task fails straight away instead.
-    if (!this.online()) throw new Error(this.offline(task.provider ?? "codex"));
+    if (!this.online()) throw new Error(this.offline(provider));
     // On Linux a sandbox that can't start would fail Claude Code with its own error, and leave Codex running with
     // every command failing. So the task fails here, saying what to install.
-    const sandbox = sandboxFor(task.provider ?? "codex", this.platform);
+    const sandbox = sandboxFor(provider, this.platform);
     if (sandbox) {
-      const readiness = await this.sandboxReady(task.provider ?? "codex");
+      const readiness = await this.sandboxReady(provider);
       if (!readiness.ready) {
         this.taskLog(task.id, []).write({ type: "sandbox.not-ready", ...readiness });
-        throw new SandboxNotReady(task.provider ?? "codex", readiness);
+        throw new SandboxNotReady(provider, readiness);
       }
     }
+    // Codex runs without approvals, so a task never starts unless its hook will check each step.
+    if (codex) await this.codexHook(workdir);
+    // Stop aborts the run, and so does the engine when Codex takes a step its hook never allowed.
+    const abort = new AbortController();
+    const onStop = () => abort.abort();
+    if (stopped.aborted) abort.abort();
+    else stopped.addEventListener("abort", onStop, { once: true });
+    const signal = abort.signal;
     const channel = new Channel<EngineEvent>();
     // Files the task created. A file with a kept copy existed before the task (it was overwritten with approval, or
     // restored since), so changing it again always asks.
@@ -444,8 +501,6 @@ export class AgentEngine implements Engine, ToolHandler {
     );
     for (const path of this.cleared.get(task.id) ?? []) made.add(path);
     this.cleared.delete(task.id);
-    const live: Live = { channel, signal, workdir, made, pending: new Set() };
-    this.live.set(task.id, live);
     const session = this.tools.open(task.id);
     const tools = this.tools;
 
@@ -453,8 +508,8 @@ export class AgentEngine implements Engine, ToolHandler {
     let apiKey: string | undefined;
     if (task.auth === "key") {
       const key = this.courseKey();
-      if (!key || KEY_PROVIDER[key.vendor] !== (task.provider ?? "codex")) {
-        this.live.delete(task.id);
+      if (!key || KEY_PROVIDER[key.vendor] !== provider) {
+        stopped.removeEventListener("abort", onStop);
         this.tools.close(session.token);
         throw new UserError("error.taskKeyGone");
       }
@@ -464,12 +519,15 @@ export class AgentEngine implements Engine, ToolHandler {
     // The log gets every event as cli-funnel sends it, after a line saying what the run was started with. The run's
     // tool server token and the course key are masked wherever they would appear.
     const log = this.taskLog(task.id, [session.token, apiKey]);
+    const live: Live = { channel, signal, workdir, made, pending: new Set(), allowed: new Set(), log };
+    this.live.set(task.id, live);
+    const access = codex ? "full" : "supervised";
     log.write({
       type: "run",
-      provider: task.provider ?? "codex",
+      provider,
       model: task.model,
       effort: task.effort,
-      access: "supervised",
+      access,
       sandbox,
       cwd: workdir,
       ...(task.sessionId ? { sessionId: task.sessionId } : {}),
@@ -480,18 +538,16 @@ export class AgentEngine implements Engine, ToolHandler {
     const skills = await this.skills().catch(() => []);
     // Claude Code can leave a command or a subagent running in the background and end its turn, saying it will look
     // later. Nothing would wake it to look, and the task would show as finished, so here it waits for each one.
-    const env =
-      task.provider === "claude"
-        ? { ...this.documents?.env, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1" }
-        : this.documents?.env;
+    // Codex's hook finds Tost Work through the run's address and token, which the commands Codex runs don't get.
+    const env = codex
+      ? {
+          ...this.documents?.env,
+          [HOOK_URL_ENV]: new URL("/hook", session.url).toString(),
+          [HOOK_TOKEN_ENV]: session.token,
+        }
+      : { ...this.documents?.env, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1" };
     const stream = this.funnel.stream({
-      selection: {
-        provider: task.provider ?? "codex",
-        model: task.model,
-        effort: task.effort,
-        cwd: workdir,
-        access: "supervised",
-      },
+      selection: { provider, model: task.model, effort: task.effort, cwd: workdir, access },
       // Files sent without a message come with a note that says so, in place of an empty prompt.
       prompt: followUp ?? (task.brief || withFiles("", task.attachments)),
       system: instructionsFor(
@@ -503,21 +559,21 @@ export class AgentEngine implements Engine, ToolHandler {
         skills,
         task.jobId ? (this.job(task.jobId) ?? null) : null,
       ),
-      ...(env ? { env } : {}),
+      env,
       ...(apiKey ? { apiKey } : {}),
       // Web search, without asking before each site. Codex searches OpenAI's web index: its live search needs a looser
       // access level than supervised. Claude Code has its own search tool, which the policy allows. Both pass on what
-      // their subagents write, for the activity, and the tool calls they make, for the debug view.
-      providerOptions:
-        (task.provider ?? "codex") === "codex"
-          ? { codex: { webSearch: "cached" as const, ...SUBAGENTS } }
-          : { claude: { ...SUBAGENTS, disallowedTools: UNUSED_CLAUDE_TOOLS } },
+      // their subagents write, for the activity, and the tool calls they make, for the debug view and the check that
+      // each Codex step was allowed.
+      providerOptions: codex
+        ? { codex: { webSearch: "cached" as const, ...SUBAGENTS } }
+        : { claude: { ...SUBAGENTS, disallowedTools: UNUSED_CLAUDE_TOOLS } },
       // While debug is on, every line the CLI prints, for the log. It costs nothing while off.
       verbose: this.verbose(),
-      // Claude Code's file tools are held to the folder by the approval policy, but a shell command could write
-      // anywhere: its sandbox stops that. Codex at supervised was sandboxed already. A sandbox that can't start fails
-      // the run rather than letting it go unconfined, except for Claude Code on Windows, which has none: there it
-      // runs without one, and setup warns the user (see claudeUnconfined).
+      // Shell commands run in each CLI's sandbox, so they can't write outside the folder. Codex at full stays in it
+      // with this, and with no approvals it never runs a command outside it. A sandbox that can't start fails the run
+      // rather than letting it go unconfined, except for Claude Code on Windows, which has none: there it runs
+      // without one, and setup warns the user (see claudeUnconfined).
       sandbox,
       sessionId: task.sessionId,
       signal,
@@ -530,27 +586,38 @@ export class AgentEngine implements Engine, ToolHandler {
           autoApprove: true,
         },
       },
-      onApproval: async (request) => {
-        if (task.provider !== "claude") return this.policy(task.id, request);
-        const translated = await asCodexRequest(request, workdir);
-        if (!translated) return { decision: "deny", message: "Work only inside the task's folder." };
-        return this.policy(task.id, translated);
-      },
+      // Claude Code's file tools are held to the folder here. Codex asks nothing at full: its hook calls `gate`.
+      ...(codex
+        ? {}
+        : {
+            onApproval: async (request: ApprovalRequest) =>
+              this.policy(task.id, await asCodexRequest(request, workdir)),
+          }),
     });
 
     // What the agent wrote since its last tool call. Words followed by a tool call were a note between steps, such as
     // "the table is nearly done", not the answer: they go into the activity, and only the last words are the answer.
     let said = "";
+    // Set when Codex started a step its hook never allowed: the hook isn't running, so the task stops.
+    let unchecked: string | null = null;
     const pump = (async () => {
       try {
         for await (const event of stream) {
           log.write(event);
+          if (codex && event.type === "tool.start" && GATED.has(event.name) && !live.allowed.has(event.id)) {
+            if (!unchecked) {
+              unchecked = event.id;
+              log.write({ type: "hook.missing", id: event.id, name: event.name });
+              abort.abort();
+            }
+            continue;
+          }
           if (event.type === "session") channel.push({ type: "session", sessionId: event.sessionId });
           else if (event.type === "text.delta") {
             said += event.text;
             channel.push({ type: "text", text: event.text });
           } else if (event.type === "plan") channel.push({ type: "plan", steps: event.steps });
-          // A subagent's own calls show in the debug view under the line that handed it off, from the log.
+          // A subagent's own calls show in the debug view under the line that hands it off, from the log.
           else if (event.type === "tool.start" && !event.parentId) {
             const note = noteText(said);
             said = "";
@@ -569,13 +636,15 @@ export class AgentEngine implements Engine, ToolHandler {
         }
         const result = await stream.result;
         log.write({ type: "run.end", finishReason: result.finishReason, deniedActions: result.deniedActions });
-        if (result.finishReason === "cancelled") channel.push({ type: "stopped" });
+        if (unchecked) channel.push({ type: "failed", error: translate(this.language(), "error.codexUnchecked") });
+        else if (result.finishReason === "cancelled") channel.push({ type: "stopped" });
         else {
           if (result.text.trim()) channel.push({ type: "message", text: result.text.trim() });
           channel.push({ type: "done" });
         }
       } catch (err) {
-        if (signal.aborted) channel.push({ type: "stopped" });
+        if (unchecked) channel.push({ type: "failed", error: translate(this.language(), "error.codexUnchecked") });
+        else if (signal.aborted) channel.push({ type: "stopped" });
         else {
           const message = err instanceof Error ? err.message : String(err);
           log.write({ type: "run.failed", message });
@@ -583,15 +652,16 @@ export class AgentEngine implements Engine, ToolHandler {
             type: "failed",
             // Only an error that is about the network gets the plain explanation; any other keeps the CLI's words,
             // even when the connection dropped meanwhile.
-            error: isNetworkError(message) ? this.offline(task.provider ?? "codex") : message,
+            error: isNetworkError(message) ? this.offline(provider) : message,
           });
         }
       } finally {
-        // A file change Codex still holds ends with the turn. Its card stays, and the decision starts the next run.
+        // A step still waiting on a card ends with the turn. Its card stays, and the decision starts the next run.
         for (const id of [...live.pending]) this.waiting.get(id)?.(null);
         // Stop takes the cards off the task, so no decision will come for them.
         if (signal.aborted)
           for (const [id, asked] of this.approvals) if (asked.taskId === task.id) this.approvals.delete(id);
+        stopped.removeEventListener("abort", onStop);
         tools.close(session.token);
         this.live.delete(task.id);
         channel.close();
@@ -663,6 +733,37 @@ export class AgentEngine implements Engine, ToolHandler {
     this.mustLive(taskId).channel.push({ type: "review", review });
   }
 
+  /**
+   * One step Codex is about to take, from its PreToolUse hook, decided by the same policy as Claude Code's approvals.
+   * A step the policy allows is recorded, so the run can tell it from a step the hook never saw.
+   */
+  async gate(taskId: string, body: unknown): Promise<HookAnswer> {
+    const live = this.live.get(taskId);
+    if (!live || live.signal.aborted) return { decision: "deny", reason: "This task isn't running any more." };
+    const call = hookCall(body);
+    if (!call) {
+      live.log.write({ type: "hook", decision: "deny", reason: "unreadable" });
+      return { decision: "deny", reason: "Tost Work couldn't read this step." };
+    }
+    const request = gateRequest(call);
+    let decision: ApprovalDecision = "allow";
+    if ("refuse" in request) decision = { decision: "deny", message: request.refuse };
+    else
+      for (const step of [request.command, request.change, request.other]) {
+        if (!step) continue;
+        decision = await this.policy(taskId, step);
+        if (!allows(decision)) break;
+      }
+    // Stop can come while a card is open: then nothing more runs, even a step the user has just allowed.
+    const allowed = allows(decision) && !live.signal.aborted && this.live.get(taskId) === live;
+    const reason =
+      typeof decision === "object" && decision.message ? decision.message : "Tost Work didn't allow this step.";
+    live.log.write({ type: "hook", id: call.id, tool: call.tool, decision: allowed ? "allow" : "deny" });
+    if (!allowed) return { decision: "deny", reason: live.signal.aborted ? "This task was stopped." : reason };
+    live.allowed.add(call.id);
+    return { decision: "allow" };
+  }
+
   /** The task's run, unless it ended or was stopped: after Stop nothing new goes on the task. */
   private mustLive(taskId: string): Live {
     const live = this.live.get(taskId);
@@ -671,9 +772,10 @@ export class AgentEngine implements Engine, ToolHandler {
   }
 
   /**
-   * What Codex may do without the user: new files, changes to files this task made, and commands other than
+   * What the agent may do without the user: new files, changes to files this task made, and commands other than
    * deletions. Changing a file that was already there, or deleting one, goes through the approval card, and Tost Work
-   * keeps the copy or moves the file to the Trash before Codex hears back.
+   * keeps the copy or moves the file to the Trash before the agent hears back. Nothing is written outside the task's
+   * folder, and commands stay in the sandbox.
    */
   private async policy(taskId: string, request: ApprovalRequest): Promise<ApprovalDecision> {
     const live = this.live.get(taskId);
@@ -683,22 +785,47 @@ export class AgentEngine implements Engine, ToolHandler {
     if (request.tool === "AskUserQuestion")
       return { decision: "deny", message: "Ask the user with the ask_user tool, then end your turn." };
     if (request.tool === "command") {
-      const command = String((request.input as { command?: unknown } | undefined)?.command ?? "");
+      const input = (request.input ?? {}) as { command?: unknown; dangerouslyDisableSandbox?: unknown };
+      const command = String(input.command ?? "");
+      // Claude Code asks this way to run a command outside its sandbox.
+      if (input.dangerouslyDisableSandbox === true)
+        return {
+          decision: "deny",
+          message: "Commands run only inside the sandbox. Run it again without dangerouslyDisableSandbox.",
+        };
       if (deletesFiles(command))
         return {
           decision: "deny",
           message:
             "Don't delete files with commands. Call request_approval with action delete, and Tost Work moves them to the Trash.",
         };
+      // What's typed into a shell that's already running isn't checked, so commands can't open one to type into.
+      if (opensShell(command))
+        return {
+          decision: "deny",
+          message:
+            "Don't start a shell or an interpreter to type commands into. Run the command, script or code directly, in this one call.",
+        };
       return "allow";
     }
     if (request.tool !== "file_change") return "allow";
 
     const changes = changesOf(request.input);
+    for (const c of changes)
+      for (const target of [c.path, c.movedTo])
+        if (target && (await outside(live.workdir, target)))
+          return { decision: "deny", message: "Work only inside the task's folder." };
     const deletes = changes.filter((c) => c.kind === "delete").map((c) => c.path);
-    const overwrites = changes
-      .filter((c) => c.kind !== "delete" && c.kind !== "add" && !live.made.has(c.path))
-      .map((c) => c.path);
+    // A file that's already there is overwritten by a change, by an add (a patch's Add File replaces it) and by a move
+    // onto it, unless the task made it.
+    const overwrites: string[] = [];
+    for (const c of changes) {
+      if (c.kind === "delete") continue;
+      const targets = [c.kind === "add" && !(await exists(c.path)) ? null : c.path];
+      if (c.movedTo && (await exists(c.movedTo))) targets.push(c.movedTo);
+      for (const target of targets)
+        if (target && !live.made.has(target) && !overwrites.includes(target)) overwrites.push(target);
+    }
     if (deletes.length) {
       const decided = await this.askApproval(taskId, "delete", deletes);
       return {
@@ -711,12 +838,14 @@ export class AgentEngine implements Engine, ToolHandler {
     }
     if (!overwrites.length) return "allow";
     const decided = (await this.askApproval(taskId, "overwrite", overwrites)) ?? "refuse";
-    return decided === "allow"
-      ? "allow"
-      : { decision: "deny", message: OVERWRITE_NOTE[decided](overwrites.join(", ")) };
+    if (decided !== "allow") return { decision: "deny", message: OVERWRITE_NOTE[decided](overwrites.join(", ")) };
+    // A copy is kept now, so a second try at the same change in this run doesn't ask again: Codex refuses a patch that
+    // deletes and adds one file, and the model then sends the same change as an update.
+    for (const path of overwrites) live.made.add(path);
+    return "allow";
   }
 
-  /** Shows an approval for a file change Codex is holding, and waits for the user or for the run to end. */
+  /** Shows the card for a step that waits on the user, and waits for the decision or for the run to end. */
   private askApproval(taskId: string, action: "overwrite" | "delete", paths: string[]): Promise<Decision | null> {
     const live = this.live.get(taskId);
     // After Stop nothing new goes on the task: an abort that already happened never fires its listener.

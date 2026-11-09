@@ -704,6 +704,10 @@ const en = {
   "error.noModels": "{ai} lists no models. Check that it's installed.",
   "error.sandboxNotReady":
     "{ai} can't work safely on this computer yet, because its sandbox can't start: {missing}. Fix that in a terminal, then send the task again.",
+  "error.codexHookOff":
+    "ChatGPT tasks can't start, because Tost Work couldn't turn on its check of each step in Codex ({detail}). Restart Tost Work and try again.",
+  "error.codexUnchecked":
+    "Tost Work stopped this task because ChatGPT took a step without Tost Work's check, which keeps a copy of a file before it's replaced and moves deleted files to the Trash. Restart Tost Work and send the task again.",
   "sandbox.missing.bwrap": "bubblewrap isn't installed",
   "sandbox.missing.socat": "socat isn't installed",
   "sandbox.missing.userns": "the system doesn't let bubblewrap create user namespaces",
@@ -1457,6 +1461,10 @@ const it: Record<MessageKey, string> = {
   "error.noModels": "{ai} non elenca nessun modello. Controlla che sia installato.",
   "error.sandboxNotReady":
     "{ai} non può ancora lavorare in sicurezza su questo computer, perché la sua sandbox non si avvia: {missing}. Sistemalo da un terminale e poi invia di nuovo l'attività.",
+  "error.codexHookOff":
+    "Le attività con ChatGPT non possono partire, perché Tost Work non è riuscito ad attivare in Codex il controllo di ogni passaggio ({detail}). Riavvia Tost Work e riprova.",
+  "error.codexUnchecked":
+    "Tost Work ha fermato l'attività perché ChatGPT ha fatto un passaggio senza il controllo di Tost Work, che conserva una copia dei file prima di sostituirli e sposta nel Cestino quelli da eliminare. Riavvia Tost Work e invia di nuovo l'attività.",
   "sandbox.missing.bwrap": "bubblewrap non è installato",
   "sandbox.missing.socat": "socat non è installato",
   "sandbox.missing.userns": "il sistema non permette a bubblewrap di creare user namespace",

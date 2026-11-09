@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { type CodexHook, HOOK_ENV_PATTERN, writeCodexHook } from "./codexHook";
 
 /**
  * Codex's settings in Tost Work's own Codex home: no AGENTS.md files from the folder or above it, and no skill catalog,
@@ -23,6 +24,10 @@ import { join } from "node:path";
  * Elsewhere, such as on Windows 10, Codex falls back to `unelevated`, a restricted copy of the user's own token, which
  * needs no administrator either. Codex's third choice, `elevated`, asks for an administrator's approval to set up,
  * which the people using Tost Work may not be able to give. Other systems don't get these keys: they mean nothing there.
+ *
+ * Hooks are on, which Codex already has by default, because Tost Work's check before each step is one (codexHook.ts).
+ * The run's address and token for that check reach Codex through its environment, and the commands Codex runs don't
+ * get them.
  */
 export function codexConfig(platform: NodeJS.Platform = process.platform): string {
   const windows = platform === "win32";
@@ -41,9 +46,13 @@ plugins = false
 remote_plugin = false
 tool_suggest = false
 skill_search = false
+hooks = true
 ${windows ? "prefer_mxc = true\n" : ""}
 [analytics]
 enabled = false
+
+[shell_environment_policy]
+exclude = ["${HOOK_ENV_PATTERN}"]
 ${windows ? '\n[windows]\nsandbox = "unelevated"\n' : ""}`;
 }
 
@@ -80,18 +89,23 @@ export const CLAUDE_ENV = {
  * Gives Codex and Claude Code their own homes under `root`, so a task sees only what Tost Work gives it: not the
  * user's own instructions, skills, hooks, plugins or MCP servers from ~/.codex and ~/.claude. Each CLI keeps its
  * sign-in in its home, so the user signs in once more inside Tost Work. Set before any CLI starts: every one inherits
- * the environment, including sign-in and the model list.
+ * the environment, including sign-in and the model list. Returns Tost Work's hook in Codex's home, for the check
+ * before each Codex task; `exe` runs its helper, the app's own executable.
  */
 export function giveAgentsOwnHomes(
   root: string,
   env: NodeJS.ProcessEnv = process.env,
   platform: NodeJS.Platform = process.platform,
-): void {
+  exe: string = process.execPath,
+): CodexHook {
   const codex = join(root, "codex");
   const claude = join(root, "claude");
   mkdirSync(codex, { recursive: true, mode: 0o700 });
   mkdirSync(claude, { recursive: true, mode: 0o700 });
-  writeFileSync(join(codex, "config.toml"), codexConfig(platform));
+  const config = codexConfig(platform);
+  writeFileSync(join(codex, "config.toml"), config);
+  const hook = writeCodexHook(codex, config, platform, exe);
   writeFileSync(join(claude, "settings.json"), `${JSON.stringify(CLAUDE_SETTINGS, null, 2)}\n`);
   Object.assign(env, { CODEX_HOME: codex, CLAUDE_CONFIG_DIR: claude, ...CLAUDE_ENV });
+  return hook;
 }

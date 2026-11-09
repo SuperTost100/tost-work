@@ -1,5 +1,6 @@
 /** @vitest-environment node */
 import { execFile } from "node:child_process";
+import { writeFileSync } from "node:fs";
 import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join, relative } from "node:path";
@@ -8,6 +9,8 @@ import { createFunnel } from "cli-funnel";
 import { afterAll, describe, it } from "vitest";
 import type { Language } from "../../shared/i18n";
 import { type AiId, questionItems, type Task } from "../../shared/model";
+import { codexConfig } from "../agentHomes";
+import { codexHookCheck, writeCodexHook } from "../codexHook";
 import { fileGuard } from "../guard";
 import { ToolServer } from "../mcp/server";
 import { Store } from "../store/store";
@@ -24,7 +27,8 @@ import { TaskRunner } from "./runner";
  * Each run writes what the agent said, asked and did to <folder>/<label>/<ai>/<brief>.json, with a copy of the
  * task's folder next to it. Nothing here passes or fails: a person reads the results. The CLIs run with whatever
  * homes the environment gives them; set CODEX_HOME and CLAUDE_CONFIG_DIR (or a wrapper in CLI_FUNNEL_CLAUDE_BIN)
- * so the tester's own instructions, skills and MCP servers stay out, as the app does.
+ * so the tester's own instructions, skills and MCP servers stay out, as the app does. Codex needs CODEX_HOME: its
+ * tasks run only with Tost Work's hook, which goes into that home together with the app's config.toml.
  */
 
 const label = process.env.TOST_WORK_EVAL ?? "";
@@ -185,6 +189,20 @@ async function filesIn(folder: string): Promise<string[]> {
 
 const funnel = createFunnel();
 afterAll(() => funnel.close());
+const codexHome = process.env.CODEX_HOME;
+const codexHook = codexHookCheck(
+  codexHome && label && out
+    ? writeCodexHook(codexHome, writeConfig(codexHome), process.platform, process.execPath)
+    : null,
+  () => funnel.providers.codex.detect(),
+);
+
+/** Writes the app's config.toml into a Codex home, as the app does at each start, and returns it. */
+function writeConfig(home: string): string {
+  const config = codexConfig();
+  writeFileSync(join(home, "config.toml"), config);
+  return config;
+}
 
 for (const ai of ais) {
   describe.runIf(label && out)(`instructions eval on ${ai}`, () => {
@@ -195,6 +213,7 @@ for (const ai of ais) {
         await b.setup?.(work);
         const before = await filesIn(work);
         const engine = new AgentEngine(funnel, () => b.language, {
+          codexHook,
           ai: async () => ai,
           documents,
           user: () => ({ name: "Giulia Rossi", work: "Consulente marketing per piccole aziende", notes: "" }),
