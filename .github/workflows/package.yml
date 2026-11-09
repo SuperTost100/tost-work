@@ -159,9 +159,10 @@ jobs:
         shell: pwsh
         run: |
           $setup = Get-Item "apps/desktop/release/Tost Work Setup *.exe"
-          Start-Process -FilePath $setup.FullName -ArgumentList "/S" -Wait
-          $app = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter "Tost Work.exe" | Select-Object -First 1
-          if (-not $app) { Write-Error "The installer put no Tost Work.exe in $env:LOCALAPPDATA\Programs"; exit 1 }
+          $install = Start-Process -FilePath $setup.FullName -ArgumentList "/S" -Wait -PassThru
+          if ($install.ExitCode -ne 0) { Write-Error "The installer exited with code $($install.ExitCode)"; exit 1 }
+          $app = Get-Item "$env:LOCALAPPDATA\Programs\tost-work\Tost Work.exe" -ErrorAction SilentlyContinue
+          if (-not $app) { Write-Error "The installer put no Tost Work.exe in $env:LOCALAPPDATA\Programs\tost-work"; exit 1 }
           "APP_EXE=$($app.FullName)" >> $env:GITHUB_ENV
       - name: Open the app and run a task
         working-directory: apps/desktop
