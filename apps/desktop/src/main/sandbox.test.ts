@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { claudeUnconfined, sandboxFor } from "../shared/sandbox";
+import { claudeUnconfined, needsUnconfinedOk, sandboxFor } from "../shared/sandbox";
 import { BWRAP_PROBE, checkSandbox, onPath, parseOsRelease, type SandboxSystem } from "./sandbox";
 
 const UBUNTU = `PRETTY_NAME="Ubuntu 24.04.5 LTS"
@@ -35,6 +35,15 @@ function system(
   };
   return { fake, runs };
 }
+
+describe("needsUnconfinedOk", () => {
+  it("holds back only a Claude run on Windows before the user said yes", () => {
+    expect(needsUnconfinedOk("claude", "win32", false)).toBe(true);
+    expect(needsUnconfinedOk("claude", "win32", true)).toBe(false);
+    expect(needsUnconfinedOk("codex", "win32", false)).toBe(false);
+    for (const platform of ["darwin", "linux"]) expect(needsUnconfinedOk("claude", platform, false)).toBe(false);
+  });
+});
 
 describe("claudeUnconfined", () => {
   it("is true only on Windows, and only Claude Code there goes without a sandbox", () => {

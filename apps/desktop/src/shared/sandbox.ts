@@ -7,6 +7,13 @@ import type { AgentProvider } from "./model";
  */
 export const claudeUnconfined = (platform: string): boolean => platform === "win32";
 
+/**
+ * Whether a run on `provider` has to wait for the user's OK: Claude runs unconfined here and the user hasn't yet
+ * pressed Continue on the notice that says so (`Settings.unconfinedAcknowledged`).
+ */
+export const needsUnconfinedOk = (provider: AgentProvider, platform: string, acknowledged: boolean): boolean =>
+  provider === "claude" && claudeUnconfined(platform) && !acknowledged;
+
 /** Whether a task on `provider` asks its CLI for a sandbox on `platform`. */
 export const sandboxFor = (provider: AgentProvider, platform: string): boolean =>
   !(provider === "claude" && claudeUnconfined(platform));

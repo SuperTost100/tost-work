@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ConfirmProvider } from "@/components/ConfirmProvider";
 import { createMemoryApi, type MemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
 import { Board } from "@/screens/Board";
@@ -538,20 +539,22 @@ describe("finished tasks older than a week", () => {
   it("wait behind Show older at the end of Done", async () => {
     const api = createMemoryApi(intermediate);
     render(
-      <Board
-        api={api}
-        tasks={[done("This week", 28), done("Two weeks ago", 15), done("Last month", 2)]}
-        projects={[]}
-        settings={{ ...DEFAULT_SETTINGS, ...intermediate }}
-        onSettings={() => {}}
-        allowNoProject
-        onOpenTask={() => {}}
-        onTaskChanged={() => {}}
-        onSavedForLater={() => {}}
-        onTaskMenu={() => {}}
-        onError={() => {}}
-        now={new Date(Date.UTC(2026, 9, 30, 12))}
-      />,
+      <ConfirmProvider>
+        <Board
+          api={api}
+          tasks={[done("This week", 28), done("Two weeks ago", 15), done("Last month", 2)]}
+          projects={[]}
+          settings={{ ...DEFAULT_SETTINGS, ...intermediate }}
+          onSettings={() => {}}
+          allowNoProject
+          onOpenTask={() => {}}
+          onTaskChanged={() => {}}
+          onSavedForLater={() => {}}
+          onTaskMenu={() => {}}
+          onError={() => {}}
+          now={new Date(Date.UTC(2026, 9, 30, 12))}
+        />
+      </ConfirmProvider>,
     );
     const doneGroup = await group("Done in the last 7 days");
     expect(within(doneGroup).getByRole("button", { name: "This week" })).toBeTruthy();
@@ -568,20 +571,22 @@ describe("finished tasks older than a week", () => {
   it("puts Hide older only in the column that had older tasks", async () => {
     const api = createMemoryApi(intermediate);
     render(
-      <Board
-        api={api}
-        tasks={[done("Last month", 2), { ...done("Saved", 29), status: "draft", reviewedAt: undefined }]}
-        projects={[]}
-        settings={{ ...DEFAULT_SETTINGS, ...intermediate, boardView: "columns" }}
-        onSettings={() => {}}
-        allowNoProject
-        onOpenTask={() => {}}
-        onTaskChanged={() => {}}
-        onSavedForLater={() => {}}
-        onTaskMenu={() => {}}
-        onError={() => {}}
-        now={new Date(Date.UTC(2026, 9, 30, 12))}
-      />,
+      <ConfirmProvider>
+        <Board
+          api={api}
+          tasks={[done("Last month", 2), { ...done("Saved", 29), status: "draft", reviewedAt: undefined }]}
+          projects={[]}
+          settings={{ ...DEFAULT_SETTINGS, ...intermediate, boardView: "columns" }}
+          onSettings={() => {}}
+          allowNoProject
+          onOpenTask={() => {}}
+          onTaskChanged={() => {}}
+          onSavedForLater={() => {}}
+          onTaskMenu={() => {}}
+          onError={() => {}}
+          now={new Date(Date.UTC(2026, 9, 30, 12))}
+        />
+      </ConfirmProvider>,
     );
     await click(await screen.findByRole("button", { name: "Show 1 older" }));
     expect(screen.getAllByRole("button", { name: "Hide older" })).toHaveLength(1);
@@ -620,19 +625,21 @@ describe("a running task's line", () => {
   ];
   const board = (boardView: "list" | "columns") =>
     render(
-      <Board
-        api={createMemoryApi(intermediate)}
-        tasks={tasks}
-        projects={[]}
-        settings={{ ...DEFAULT_SETTINGS, ...intermediate, boardView }}
-        onSettings={() => {}}
-        allowNoProject
-        onOpenTask={() => {}}
-        onTaskChanged={() => {}}
-        onSavedForLater={() => {}}
-        onTaskMenu={() => {}}
-        onError={() => {}}
-      />,
+      <ConfirmProvider>
+        <Board
+          api={createMemoryApi(intermediate)}
+          tasks={tasks}
+          projects={[]}
+          settings={{ ...DEFAULT_SETTINGS, ...intermediate, boardView }}
+          onSettings={() => {}}
+          allowNoProject
+          onOpenTask={() => {}}
+          onTaskChanged={() => {}}
+          onSavedForLater={() => {}}
+          onTaskMenu={() => {}}
+          onError={() => {}}
+        />
+      </ConfirmProvider>,
     );
 
   it("on a card, doesn't say again what its working tag says", async () => {

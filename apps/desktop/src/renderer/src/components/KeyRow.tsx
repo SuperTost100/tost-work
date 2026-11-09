@@ -35,7 +35,7 @@ export function KeyRow({
   connected.current = onConnected;
   const setup = variant === "setup";
   // An Anthropic key runs tasks on Claude Code, which has no sandbox on Windows: the same notice as Claude's own row.
-  const askUnconfined = useAskUnconfined(api.claudeUnconfined);
+  const askUnconfined = useAskUnconfined(api, api.claudeUnconfined);
   const unconfined = api.claudeUnconfined && info?.vendor === "anthropic";
 
   useEffect(() => {

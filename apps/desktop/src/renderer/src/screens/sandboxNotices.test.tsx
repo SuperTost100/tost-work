@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
+import { type ModelPick, SAMPLE_CHOICES } from "../../../shared/modelChoice";
 import type { SandboxReadiness } from "../../../shared/sandbox";
 
 // Find first, then act: waiting inside act holds back the updates the wait is for.
@@ -85,9 +86,12 @@ describe("Claude on Windows runs without a sandbox", () => {
     await connectStep(api);
     await click("Install Claude Code");
     await screen.findByRole("alertdialog");
+    expect((await api.settings.get()).unconfinedAcknowledged).toBe(false);
     await click("Continue");
     expect(await screen.findByRole("button", { name: "Sign in to Claude" })).toBeTruthy();
     expect(calls).toEqual(["install claude"]);
+    // Saved, so the first task on Claude doesn't ask again.
+    expect((await api.settings.get()).unconfinedAcknowledged).toBe(true);
     await click("Sign in to Claude");
     expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(calls).toEqual(["install claude", "signIn claude"]);
@@ -186,6 +190,112 @@ const missing = (over: Partial<SandboxReadiness> = {}): SandboxReadiness => ({
   ...over,
 });
 const ready: SandboxReadiness = { ready: true, missing: [], distro: null, appArmorRestrictsUserns: null };
+
+describe("a run on Claude on Windows before the user has said yes", () => {
+  const CLAUDE = { ai: "claude" as const, model: "claude-sonnet-5-5", effort: "high" };
+  /** Set up and connected, on Windows, without having pressed Continue on the card: a sign-in from before. */
+  const connected = (modelPick: ModelPick = CLAUDE) => {
+    const api = createMemoryApi({ name: "Giulia", setupDone: true, modelPick });
+    api.claudeUnconfined = true;
+    return api;
+  };
+  const startFromHome = async (brief: string) => {
+    await screen.findByRole("button", { name: "Start task" });
+    fireEvent.change(screen.getAllByRole("textbox")[0] as HTMLElement, { target: { value: brief } });
+    await click("Start task");
+  };
+
+  it("asks before a new task starts, starts nothing on Cancel, and asks only once after Continue", async () => {
+    const api = connected();
+    const start = vi.spyOn(api.tasks, "start");
+    render(<Root api={api} />);
+    await startFromHome("Prepare the 2027 price list");
+    const card = await screen.findByRole("alertdialog");
+    expect(within(card).getByText(TITLE)).toBeTruthy();
+    // The card's words are the ones setup shows.
+    expect(within(card).getByText(/When Claude edits files itself/)).toBeTruthy();
+    await click("Cancel");
+    expect(start).not.toHaveBeenCalled();
+    expect((screen.getAllByRole("textbox")[0] as HTMLTextAreaElement).value).toBe("Prepare the 2027 price list");
+    expect((await api.settings.get()).unconfinedAcknowledged).toBe(false);
+
+    await click("Start task");
+    await screen.findByRole("alertdialog");
+    await click("Continue");
+    expect(start).toHaveBeenCalledTimes(1);
+    expect((await api.settings.get()).unconfinedAcknowledged).toBe(true);
+  });
+
+  it("asks when the default AI behind a preset is Claude", async () => {
+    const api = connected({ preset: "balanced" });
+    api.models.choices = async () => ({ ...SAMPLE_CHOICES, ai: "claude", provider: "claude" });
+    render(<Root api={api} />);
+    await startFromHome("Prepare the 2027 price list");
+    expect(await screen.findByRole("alertdialog")).toBeTruthy();
+  });
+
+  it("never asks for a task on ChatGPT", async () => {
+    const api = connected({ preset: "balanced" });
+    const start = vi.spyOn(api.tasks, "start");
+    render(<Root api={api} />);
+    await startFromHome("Prepare the 2027 price list");
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("doesn't ask once the user said yes in setup", async () => {
+    const api = connected();
+    await api.settings.update({ unconfinedAcknowledged: true });
+    const start = vi.spyOn(api.tasks, "start");
+    render(<Root api={api} />);
+    await startFromHome("Prepare the 2027 price list");
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("asks before an answer, a follow-up and a resume on a Claude task", async () => {
+    const api = connected();
+    // Started before this version asked: the task is on Claude and waits for an answer.
+    const task = await api.tasks.start({ projectId: null, brief: "Write a proposal", attachments: [], pick: CLAUDE });
+    expect(task.provider).toBe("claude");
+    const answer = vi.spyOn(api.tasks, "answer");
+    await openTask(api, task.id);
+    await click(/We do/);
+    await screen.findByRole("alertdialog");
+    await click("Cancel");
+    expect(answer).not.toHaveBeenCalled();
+
+    // Each way a run continues goes through the same check; after Continue it stays quiet.
+    const followUp = vi.spyOn(api.tasks, "followUp");
+    const resume = vi.spyOn(api.tasks, "resume");
+    await click(/We do/);
+    await screen.findByRole("alertdialog");
+    await click("Continue");
+    expect(answer).toHaveBeenCalledTimes(1);
+    await screen.findByText("Check it against your brief");
+    fireEvent.change(screen.getAllByRole("textbox").at(-1) as HTMLElement, { target: { value: "Shorter" } });
+    await click("Send");
+    expect(followUp).toHaveBeenCalledTimes(1);
+    expect(resume).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("asks before running a Claude task again from the sandbox notice", async () => {
+    const api = connected();
+    const task = await api.tasks.start({ projectId: null, brief: "Write a proposal", attachments: [], pick: CLAUDE });
+    api.emit(task.id, { type: "failed", error: "x", sandboxNotReady: missing({ missing: ["socat"] }) });
+    api.sandbox.check = async () => ready;
+    const resume = vi.spyOn(api.tasks, "resume");
+    await openTask(api, task.id);
+    await click("Check and try again");
+    await screen.findByRole("alertdialog");
+    await click("Cancel");
+    expect(resume).not.toHaveBeenCalled();
+    await click("Check and try again");
+    await click("Continue");
+    expect(resume).toHaveBeenCalledWith(task.id);
+  });
+});
 
 describe("the Linux sandbox notice in setup", () => {
   it("shows nothing when the sandbox is ready from the start", async () => {
