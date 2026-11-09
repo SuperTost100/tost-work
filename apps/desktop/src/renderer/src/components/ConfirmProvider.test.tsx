@@ -6,7 +6,7 @@ import { LanguageContext } from "@/lib/useT";
 import { ConfirmProvider } from "./ConfirmProvider";
 
 /** A button that asks, and shows what the answer was. */
-function Asker({ danger = true, detail }: { danger?: boolean; detail?: string }) {
+function Asker({ danger = true, detail }: { danger?: boolean; detail?: string | string[] }) {
   const confirm = useConfirm();
   const [answers, setAnswers] = useState<boolean[]>([]);
   return (
@@ -58,6 +58,12 @@ describe("the confirmation card", () => {
         .getAllByRole("button")
         .map((b) => b.textContent),
     ).toEqual(["Cancel", "Delete"]);
+  });
+
+  it("shows a detail given as a list as one paragraph each", async () => {
+    const card = await open(<Asker detail={["It goes for good.", "Nothing is kept."]} />);
+    expect(within(card).getByText("It goes for good.").tagName).toBe("P");
+    expect(within(card).getByText("Nothing is kept.").tagName).toBe("P");
   });
 
   it("reads in the language of the app", async () => {

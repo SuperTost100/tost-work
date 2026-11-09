@@ -7,6 +7,7 @@ import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
 import { installLine } from "../../../shared/install";
 import { PROVIDER_OF, type Subscription } from "../../../shared/model";
+import { UnconfinedNote, useAskUnconfined } from "./Unconfined";
 
 /** The agent CLI behind each subscription. */
 const CLI: Record<Subscription, string> = { chatgpt: "Codex", claude: "Claude Code" };
@@ -62,6 +63,10 @@ export function AccountRow({
     onSignedOut: () => onSignedOut?.(ai),
   });
   const [code, setCode] = useState("");
+  // On Windows Claude runs without a sandbox, so the row says so and asks before Install and Sign in go ahead.
+  const unconfined = ai === "claude" && api.claudeUnconfined;
+  const askUnconfined = useAskUnconfined(unconfined);
+  const goAhead = (run: () => Promise<void>) => () => void askUnconfined().then((yes) => (yes ? run() : undefined));
   const setup = variant === "setup";
   const cli = CLI[ai];
   const name = t(`ai.${ai}.short` as MessageKey);
@@ -100,7 +105,7 @@ export function AccountRow({
             {t("ai.checkAgain")}
           </button>
         )}
-        <button type="button" className="btn" onClick={() => void install()}>
+        <button type="button" className="btn" onClick={goAhead(install)}>
           {t("ai.install", { cli })}
         </button>
       </span>
@@ -133,7 +138,7 @@ export function AccountRow({
     );
   } else if (account) {
     action = (
-      <button type="button" className="btn" aria-label={t("ai.signInTo", { name })} onClick={() => void signIn()}>
+      <button type="button" className="btn" aria-label={t("ai.signInTo", { name })} onClick={goAhead(signIn)}>
         {t("ai.signIn")}
       </button>
     );
@@ -171,6 +176,7 @@ export function AccountRow({
     <div className={setup ? (ok ? "opt on" : "opt") : "acct"}>
       {body}
       {action}
+      {unconfined && <UnconfinedNote />}
     </div>
   );
 }

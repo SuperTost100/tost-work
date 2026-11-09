@@ -216,7 +216,10 @@ export interface TostWorkApi {
     /** Asks for a folder, every time, and copies the files the task made into it. Null when the user cancels. */
     saveCopy(id: string): Promise<SaveResult | null>;
     stop(id: string): Promise<void>;
-    /** Carries on with a task that stopped when Tost Work closed, in the same conversation. */
+    /**
+     * Carries on with a task that stopped when Tost Work closed, in the same conversation. Also runs again a task
+     * that failed because its AI's sandbox couldn't start (`sandboxNotReady`), with the message that didn't run.
+     */
     resume(id: string): Promise<Task>;
     /** Shows the task's menu where the pointer is, and resolves with what the user picked, or null. */
     menu(id: string): Promise<TaskMenuAction | null>;

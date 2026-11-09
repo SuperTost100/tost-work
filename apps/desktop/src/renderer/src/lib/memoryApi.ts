@@ -573,8 +573,10 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       stop: async (id) => emit(id, { type: "stopped" }),
       resume: async (id) => {
         const t = tasks.get(id);
-        if (!t?.interrupted) throw new Error("Only a task stopped by closing Tost Work can be resumed");
-        return save({ ...t, status: "running", interrupted: undefined });
+        if (!t?.interrupted && !t?.sandboxNotReady)
+          throw new Error("Only a task stopped by closing Tost Work can be resumed");
+        const { sandboxNotReady: _fixed, ...rest } = t;
+        return save({ ...rest, status: "running", error: null, interrupted: undefined });
       },
       // Only what the real menu offers the task as it is now: a pick it wouldn't show comes back as nothing.
       menu: async (id) => {
