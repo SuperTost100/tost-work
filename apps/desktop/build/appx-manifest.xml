@@ -71,7 +71,7 @@
             <desktop:ExecutionAlias Alias="tost-work.exe" />
           </uap3:AppExecutionAlias>
         </uap3:Extension>
-        <desktop:Extension Category="windows.startupTask" Executable="${executable}" EntryPoint="Windows.FullTrustApplication" uap10:Parameters="--at-login">
+        <desktop:Extension Category="windows.startupTask" Executable="${executable}" EntryPoint="Windows.FullTrustApplication">
           <desktop:StartupTask TaskId="TostWorkStartup" Enabled="false" DisplayName="${displayName}" />
         </desktop:Extension>
       </Extensions>

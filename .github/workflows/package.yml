@@ -257,6 +257,7 @@ jobs:
           if ($state -ne 2) {
             Get-ChildItem -Path $key -Recurse -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }
             Get-Content "$env:APPDATA\Tost Work\logs\app.log" -ErrorAction SilentlyContinue
+            (Get-AppxPackageManifest -Package (Get-AppxPackage -Name Tost.TostWork)).Package.Applications.Application.Extensions.OuterXml
             Write-Error "The startup task isn't on (State: $state)"; exit 1
           }
           "Startup task on"

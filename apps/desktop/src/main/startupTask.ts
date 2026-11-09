@@ -25,6 +25,7 @@ function Wait-Op($op, [Type]$type) {
   $t = $asTask.MakeGenericMethod($type).Invoke($null, @($op)); $t.Wait(-1) | Out-Null; $t.Result
 }
 $null = [Windows.ApplicationModel.StartupTask, Windows.ApplicationModel, ContentType = WindowsRuntime]
+try { Write-Output "package=$([Windows.ApplicationModel.Package]::Current.Id.FullName)" } catch { Write-Output "package=none" }
 $all = Wait-Op ([Windows.ApplicationModel.StartupTask]::GetForCurrentPackageAsync()) ([System.Collections.Generic.IReadOnlyList[Windows.ApplicationModel.StartupTask]])
 $task = $all | Where-Object { $_.TaskId -eq '${STARTUP_TASK}' } | Select-Object -First 1
 if (-not $task) { Write-Output "state=Missing tasks=$(($all | ForEach-Object { $_.TaskId }) -join ',')"; exit }
