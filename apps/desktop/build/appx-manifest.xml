@@ -9,16 +9,20 @@
     a terminal too. Windows 11 reads the folder list; Windows 10 ignores it and reads the older switches, which turn
     virtualization off for all of AppData. HKCU\Environment is where the installers add themselves to the PATH.
   - The alias "tost-work.exe" starts the app inside its package from a command line, which CI's smoke test needs.
+  - The startup task is how a packaged app starts at login; main/startupTask.ts turns it on and off with the setting.
+    It's off until then. uap10:Parameters asks Windows to pass the flag that opens the app without its window; on a
+    Windows that ignores it there, the app opens its window at login.
 -->
 <Package
    xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
    xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
    xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+   xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
    xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
    xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
    xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
    xmlns:virtualization="http://schemas.microsoft.com/appx/manifest/virtualization/windows10"
-   IgnorableNamespaces="uap3 desktop6 rescap virtualization">
+   IgnorableNamespaces="uap3 uap10 desktop6 rescap virtualization">
   <Identity Name="${identityName}"
     ProcessorArchitecture="${arch}"
     Publisher="${publisher}"
@@ -67,6 +71,9 @@
             <desktop:ExecutionAlias Alias="tost-work.exe" />
           </uap3:AppExecutionAlias>
         </uap3:Extension>
+        <desktop:Extension Category="windows.startupTask" Executable="${executable}" EntryPoint="Windows.FullTrustApplication" uap10:Parameters="--at-login">
+          <desktop:StartupTask TaskId="TostWorkStartup" Enabled="false" DisplayName="${displayName}" />
+        </desktop:Extension>
       </Extensions>
     </Application>
   </Applications>

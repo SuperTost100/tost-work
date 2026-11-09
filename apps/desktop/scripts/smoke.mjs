@@ -57,6 +57,12 @@ try {
   await page.locator(".composer textarea").first().waitFor({ timeout: 10_000 });
   await shot(page, "3-home");
 
+  // With SMOKE_LOGIN=1, starting at login goes on, and CI checks afterwards that the system recorded it.
+  if (process.env.SMOKE_LOGIN === "1") {
+    await page.evaluate(() => window.tostWork.settings.update({ openAtLogin: true }));
+    await page.waitForTimeout(10_000);
+  }
+
   // 3. A task in a project folder, answered and approved until it ends.
   const project = await page.evaluate(
     (f) => window.tostWork.projects.create({ name: "Smoke", description: "", folder: f }),

@@ -10,6 +10,8 @@ export interface LoginDeps {
   autostartDir: string;
   /** The program to start: the AppImage when there is one, since the path inside it changes on each run. */
   exec: string;
+  /** Set in the Microsoft Store package, where Electron's switch does nothing: turns the package's startup task on. */
+  startupTask?: (on: boolean) => Promise<void>;
 }
 
 /** The flag a start at login carries, so Tost Work can start without opening its window. */
@@ -19,6 +21,10 @@ const DESKTOP_FILE = "tost-work.desktop";
 
 /** Starts Tost Work when the user logs in, or stops doing so. */
 export async function setOpenAtLogin(on: boolean, deps: LoginDeps): Promise<void> {
+  if (deps.startupTask) {
+    await deps.startupTask(on);
+    return;
+  }
   if (deps.platform !== "linux") {
     deps.setLoginItemSettings({ openAtLogin: on, args: [AT_LOGIN] });
     return;
