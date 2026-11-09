@@ -1,9 +1,9 @@
 /** @vitest-environment node */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { translate } from "../shared/i18n";
 import type { Job, Task } from "../shared/model";
 import { AT_LOGIN } from "./loginItem";
-import { opensWindow, panelBounds, showsForSecondLaunch, staysInMenuBar, trayMenu } from "./tray";
+import { onSecondLaunch, opensWindow, panelBounds, showsForSecondLaunch, staysInMenuBar, trayMenu } from "./tray";
 
 const job = (title: string, time: string, on = true) =>
   ({ title, on, skip: null, schedule: { repeat: "daily", time } }) as unknown as Job;
@@ -39,6 +39,19 @@ describe("showsForSecondLaunch", () => {
     expect(showsForSecondLaunch({ atLogin: true }, [exe])).toBe(false);
     // Windows can reorder the arguments and add Chromium's own; the flag still counts.
     expect(showsForSecondLaunch(undefined, [exe, "--allow-file-access-from-files", AT_LOGIN])).toBe(false);
+  });
+});
+
+describe("onSecondLaunch", () => {
+  const exe = "C:\\Users\\giulia\\AppData\\Local\\Programs\\tost-work\\Tost Work.exe";
+  const cwd = "C:\\Users\\giulia";
+
+  it("reads the data from the event's fourth argument, after the working directory", () => {
+    const show = vi.fn();
+    onSecondLaunch(show)({}, [exe], cwd, { atLogin: true });
+    expect(show).not.toHaveBeenCalled();
+    onSecondLaunch(show)({}, [exe], cwd, { atLogin: false });
+    expect(show).toHaveBeenCalledTimes(1);
   });
 });
 

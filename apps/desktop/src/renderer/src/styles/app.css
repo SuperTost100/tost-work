@@ -4882,6 +4882,17 @@ select.input {
     background-color: currentColor;
     mask: url("../assets/icons/check.svg") center / contain no-repeat;
   }
+  /* In forced colours the list's shadow and the chosen row's tint are gone, and the check takes the list's own
+     colour. The list gets a real border, and the check the text colour. */
+  @media (forced-colors: active) {
+    select.input::picker(select) {
+      border: 1px solid CanvasText;
+    }
+    select.input option::checkmark {
+      forced-color-adjust: none;
+      background-color: CanvasText;
+    }
+  }
 }
 fieldset.fld {
   margin: 0;

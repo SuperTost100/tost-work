@@ -26,6 +26,16 @@ export function showsForSecondLaunch(data: unknown, argv: readonly string[]): bo
   return !sent && !argv.includes(AT_LOGIN);
 }
 
+/**
+ * The listener for Electron's second-instance event. Electron passes the second launch's working directory third and
+ * the data it sent fourth, and reading the third as the data ignored the login flag.
+ */
+export const onSecondLaunch =
+  (show: () => void) =>
+  (_event: unknown, argv: string[], _workingDirectory: string, data: unknown): void => {
+    if (showsForSecondLaunch(data, argv)) show();
+  };
+
 /** The gap between the icon and the panel. */
 const GAP = 6;
 

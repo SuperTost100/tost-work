@@ -46,7 +46,7 @@ import { SkillFolder } from "./skills";
 import { SkillVersions } from "./skillVersions";
 import { setStartupTask } from "./startupTask";
 import { Store } from "./store/store";
-import { opensWindow, panelBounds, type SecondLaunch, showsForSecondLaunch, staysInMenuBar, trayMenu } from "./tray";
+import { onSecondLaunch, opensWindow, panelBounds, type SecondLaunch, staysInMenuBar, trayMenu } from "./tray";
 import { buttonsPosition } from "./windowButtons";
 
 const isMac = process.platform === "darwin";
@@ -61,11 +61,13 @@ if (!firstCopy) app.exit(0);
 // Set once the app is ready. A second launch before then is remembered, and the window shows once the app can show it.
 let showForSecondLaunch: (() => void) | null = null;
 let secondLaunchWaiting = false;
-app.on("second-instance", (_e, argv, data) => {
-  if (!showsForSecondLaunch(data, argv)) return;
-  if (showForSecondLaunch) showForSecondLaunch();
-  else secondLaunchWaiting = true;
-});
+app.on(
+  "second-instance",
+  onSecondLaunch(() => {
+    if (showForSecondLaunch) showForSecondLaunch();
+    else secondLaunchWaiting = true;
+  }),
+);
 
 let mainWindow: BrowserWindow | null = null;
 // The menu-bar panel, once the icon has been clicked. Hidden rather than closed between clicks.
