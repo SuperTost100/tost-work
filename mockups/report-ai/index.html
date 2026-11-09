@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tost Work · segnalare un risultato dell'AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap">
+<style>
+  /* The app's own tokens (apps/desktop/src/renderer/src/styles/app.css). */
+  :root {
+    --canvas: #faf8f4; --side: #f3f0ea; --panel: #efebe3; --paper: #ffffff; --line: #e6e1d8;
+    --hover: rgba(27, 23, 18, 0.045); --ink: #1b1712; --t2: #57504a; --t3: #6b6255;
+    --btn: #1b1712; --on-btn: #faf8f4; --fact: #efe9e0;
+    --card-shadow: 0 0 0 1px var(--line), 0 24px 70px rgba(27, 23, 18, 0.16);
+    --veil: rgba(250, 248, 244, 0.7);
+  }
+  body[data-theme="dark"] {
+    --canvas: #22201d; --side: #1b1917; --panel: #2c2925; --paper: #2a2723; --line: #36322d;
+    --hover: rgba(255, 250, 240, 0.06); --ink: #eeeae3; --t2: #b7afa4; --t3: #9d958a;
+    --btn: #eeeae3; --on-btn: #1b1712; --fact: #34302b;
+    --card-shadow: 0 0 0 1px var(--line), 0 24px 70px rgba(0, 0, 0, 0.5);
+    --veil: rgba(20, 18, 16, 0.7);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--side); color: var(--ink); font: 400 14px/1.5 "Schibsted Grotesk", system-ui, sans-serif; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .bar { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 24px; background: var(--paper); border-bottom: 1px solid var(--line); font-size: 13px; color: var(--t2); }
+  .bar b { color: var(--ink); font-weight: 600; margin-right: 4px; }
+  .bar .grow { flex: 1; }
+  .bar button { height: 28px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: none; }
+  .bar button.on { background: var(--ink); color: var(--canvas); border-color: var(--ink); }
+  .wrap { max-width: 1328px; margin: 0 auto; padding: 28px 24px 80px; }
+  h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
+  .lead { color: var(--t2); font-size: 15px; max-width: 860px; margin: 8px 0 22px; }
+  .note { color: var(--t2); font-size: 14px; max-width: 860px; margin: 0 0 18px; }
+  .note b { color: var(--ink); }
+
+  /* The screen: a real screenshot of the app, with the new parts drawn on top at the same scale. */
+  .screen { position: relative; width: 1280px; height: 820px; border-radius: 10px; overflow: hidden; box-shadow: 0 0 0 1px var(--line), 0 10px 40px rgba(0,0,0,.12); }
+  .screen > img { display: block; width: 1280px; height: 820px; }
+  .scroll { overflow-x: auto; padding-bottom: 8px; }
+
+  .flagbtn { position: absolute; top: 8px; right: 98px; width: 30px; height: 30px; border-radius: 8px; border: 0; background: none; color: var(--t2); display: grid; place-items: center; }
+  .flagbtn:hover { background: var(--hover); color: var(--ink); }
+  .flagbtn .tip { position: absolute; top: 36px; right: -8px; white-space: nowrap; background: var(--ink); color: var(--canvas); font-size: 12px; padding: 4px 8px; border-radius: 6px; opacity: 0; pointer-events: none; transition: opacity .12s; }
+  .flagbtn:hover .tip { opacity: 1; }
+  .panelrow { position: absolute; left: 989px; top: 452px; width: 277px; display: flex; align-items: center; gap: 10px; padding: 9px 16px; border-radius: 10px; border: 0; background: none; color: var(--t2); font-size: 14px; text-align: left; }
+  .panelrow:hover { background: var(--hover); color: var(--ink); }
+
+  .veil { position: absolute; inset: 0; background: var(--veil); backdrop-filter: blur(3px); display: none; }
+  .veil.open { display: block; }
+  .card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 568px; background: var(--canvas); border-radius: 16px; box-shadow: var(--card-shadow); padding: 22px 22px 20px; }
+  .card h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+  .card .x { position: absolute; top: 18px; right: 18px; width: 30px; height: 30px; border: 0; background: none; border-radius: 8px; color: var(--t2); display: grid; place-items: center; }
+  .card p { margin: 10px 0 0; color: var(--t2); font-size: 15px; line-height: 1.55; }
+  .kinds { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .kinds button { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); font-size: 14px; }
+  .kinds button.on { background: var(--ink); color: var(--canvas); border-color: var(--ink); }
+  textarea { width: 100%; margin-top: 12px; min-height: 76px; resize: none; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font: inherit; font-size: 15px; padding: 10px 12px; }
+  textarea::placeholder { color: var(--t3); }
+  .facts { margin-top: 12px; background: var(--fact); border-radius: 10px; padding: 10px 14px; display: grid; grid-template-columns: auto 1fr; gap: 2px 16px; font-size: 14px; }
+  .facts dt { color: var(--t3); } .facts dd { margin: 0; }
+  .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  .btn { height: 34px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; }
+  .btn.dark { background: var(--btn); color: var(--on-btn); border-color: var(--btn); }
+  .seg { display: flex; gap: 6px; margin-top: 14px; }
+  .seg button { flex: 1; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); font-size: 14px; }
+  .seg button.on { background: var(--ink); color: var(--canvas); border-color: var(--ink); }
+  [hidden] { display: none !important; }
+  @media (max-width: 700px) { .wrap { padding: 20px 16px 60px; } }
+</style>
+</head>
+<body>
+<div class="bar">
+  <b>Dove</b>
+  <button data-where="panel" class="on">A · nel pannello</button>
+  <button data-where="header">B · in alto</button>
+  <button data-where="report">C · solo in Segnala un problema</button>
+  <span class="grow"></span>
+  <b>Invio</b>
+  <button data-send="mail" class="on">Email</button>
+  <button data-send="github">GitHub</button>
+  <span class="grow"></span>
+  <button data-theme="light" class="on">Chiaro</button>
+  <button data-theme="dark">Scuro</button>
+</div>
+<div class="wrap">
+  <h1>Segnalare un risultato dell'AI</h1>
+  <p class="lead">Il Microsoft Store chiede alle app che generano contenuti con l'AI un modo per segnalarli allo sviluppatore (regola 11.16). Qui il punto da cui si segnala e dove arriva la segnalazione. Clicca il pulsante sullo schermo per aprire la scheda.</p>
+  <p class="note" id="where-note"></p>
+  <div class="scroll">
+    <div class="screen">
+      <img id="shot" src="task-light.png" alt="La schermata di un'attività finita">
+      <button class="panelrow" data-open data-for="panel">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4h11l-1.5 4L16 12H5"/></svg>
+        Segnala questo risultato
+      </button>
+      <button class="flagbtn" data-open data-for="header" aria-label="Segnala questo risultato">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4h11l-1.5 4L16 12H5"/></svg>
+        <span class="tip">Segnala questo risultato</span>
+      </button>
+      <div class="veil" id="veil">
+        <div class="card" role="dialog" aria-label="Segnala questo risultato">
+          <h2 id="card-title">Segnala questo risultato</h2>
+          <button class="x" data-close aria-label="Chiudi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+          <div class="seg" data-for-report hidden>
+            <button>Un problema dell'app</button>
+            <button class="on">Un risultato dell'AI</button>
+          </div>
+          <p>Se l'AI ha scritto qualcosa di offensivo, pericoloso o fuori luogo, dillo a Tost: legge ogni segnalazione.</p>
+          <div class="kinds">
+            <button class="on">Offensivo</button>
+            <button>Pericoloso o illegale</button>
+            <button>Sessuale o violento</button>
+            <button>Altro</button>
+          </div>
+          <textarea placeholder="Cosa è successo (facoltativo)"></textarea>
+          <dl class="facts">
+            <dt>Attività</dt><dd>Prepara il listino prezzi 2027</dd>
+            <dt>AI</dt><dd>Codex · GPT-6.1 Terra</dd>
+            <dt>Versione</dt><dd>0.0.30 dev · build 94b42d9</dd>
+          </dl>
+          <p id="send-note"></p>
+          <div class="acts">
+            <button class="btn" data-close>Annulla</button>
+            <button class="btn dark" id="send"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  const state = { where: "panel", send: "mail", theme: "light" };
+  const notes = {
+    panel: "<b>A.</b> Una riga discreta sotto il pannello dell'attività, a destra. Si vede in ogni attività senza disturbare.",
+    header: "<b>B.</b> Una bandierina in alto, accanto allo stato. Più nascosta: il nome compare passandoci sopra.",
+    report: "<b>C.</b> Nessun pulsante nell'attività: Segnala un problema, in Impostazioni e nel menu Aiuto, chiede prima se è un problema dell'app o un risultato dell'AI. Il minimo indispensabile, ma lo Store potrebbe volerlo più vicino al contenuto.",
+  };
+  const sends = {
+    mail: ["Scrivi l'email", "Si apre la tua app di posta con un'email per Tost già scritta: l'attività, l'AI e la versione. Il testo dell'attività no, a meno che tu non lo aggiunga. Resta tra te e Tost."],
+    github: ["Apri GitHub", "Si apre un modulo su GitHub già compilato. Serve un account GitHub, e quello che scrivi è pubblico: non metterci dati dei tuoi clienti."],
+  };
+  const render = () => {
+    document.body.dataset.theme = state.theme;
+    document.getElementById("shot").src = `task-${state.theme}.png`;
+    document.getElementById("where-note").innerHTML = notes[state.where];
+    for (const el of document.querySelectorAll("[data-for]")) el.hidden = el.dataset.for !== state.where;
+    document.querySelector("[data-for-report]").hidden = state.where !== "report";
+    document.getElementById("card-title").textContent = state.where === "report" ? "Segnala un problema" : "Segnala questo risultato";
+    const [label, note] = sends[state.send];
+    document.getElementById("send").textContent = label;
+    document.getElementById("send-note").textContent = note;
+    for (const k of ["where", "send", "theme"])
+      for (const b of document.querySelectorAll(`.bar [data-${k}]`)) b.classList.toggle("on", b.dataset[k] === state[k]);
+    if (state.where === "report") document.getElementById("veil").classList.add("open");
+  };
+  for (const k of ["where", "send", "theme"])
+    for (const b of document.querySelectorAll(`.bar [data-${k}]`))
+      b.addEventListener("click", () => { state[k] = b.dataset[k]; document.getElementById("veil").classList.remove("open"); render(); });
+  for (const b of document.querySelectorAll("[data-open]")) b.addEventListener("click", () => document.getElementById("veil").classList.add("open"));
+  for (const b of document.querySelectorAll("[data-close]")) b.addEventListener("click", () => document.getElementById("veil").classList.remove("open"));
+  for (const group of document.querySelectorAll(".kinds, .seg"))
+    for (const b of group.querySelectorAll("button")) b.addEventListener("click", () => { for (const o of group.querySelectorAll("button")) o.classList.toggle("on", o === b); });
+  render();
+</script>
+</body>
+</html>
