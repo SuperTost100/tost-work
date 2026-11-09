@@ -7,6 +7,7 @@ describe("the Microsoft Store package's startup task", () => {
   it("reads the state PowerShell prints, past any other output", () => {
     expect(parseState("WARNING: something\r\nstate=Enabled\r\n")).toBe("Enabled");
     expect(parseState("state=DisabledByUser")).toBe("DisabledByUser");
+    expect(parseState("state=Missing tasks=Other")).toBe("Missing");
     expect(parseState("Exception calling GetAsync")).toBeNull();
   });
 

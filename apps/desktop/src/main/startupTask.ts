@@ -35,7 +35,7 @@ Write-Output "state=$($task.State)"
 
 /** The task's state from the script's output, or null when the output has none, as when PowerShell failed. */
 export function parseState(output: string): string | null {
-  return /^state=(\w+)\s*$/m.exec(output)?.[1] ?? null;
+  return /^state=(\w+)/m.exec(output)?.[1] ?? null;
 }
 
 type Run = (env: Record<string, string>) => Promise<string>;
@@ -55,7 +55,8 @@ const runPowerShell: Run = (env) =>
  * Task Manager or Settings (DisabledByUser), which only they can undo there, or a policy did.
  */
 export async function setStartupTask(on: boolean, run: Run = runPowerShell): Promise<void> {
-  const state = parseState(await run({ TOST_WORK_STARTUP: on ? "on" : "off" }));
-  if (state === null) throw new Error("PowerShell didn't report the startup task's state");
-  if (on ? state !== "Enabled" : state === "Enabled") throw new Error(`Windows kept the startup task ${state}`);
+  const output = await run({ TOST_WORK_STARTUP: on ? "on" : "off" });
+  const state = parseState(output);
+  if (state === null) throw new Error(`PowerShell didn't report the startup task's state: ${output.trim()}`);
+  if (on ? state !== "Enabled" : state === "Enabled") throw new Error(`Windows kept the startup task ${output.trim()}`);
 }
