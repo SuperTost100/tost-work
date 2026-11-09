@@ -313,6 +313,7 @@ describe("the Linux sandbox notice in setup", () => {
     api.sandbox.check = vi.fn(async () => results.shift() ?? ready);
     await connectStep(api);
     expect(await screen.findByText("The AIs' sandbox isn't ready")).toBeTruthy();
+    expect(screen.getByText(/run these commands in a terminal/)).toBeTruthy();
     expect(screen.getByText("bubblewrap: missing")).toBeTruthy();
     expect(screen.getByText("socat: missing")).toBeTruthy();
     expect(screen.getByText("AppArmor: blocks bwrap")).toBeTruthy();
@@ -337,7 +338,9 @@ describe("the Linux sandbox notice in setup", () => {
     expect(screen.queryByText("Still not ready.")).toBeNull();
     await click("Check again");
     expect(await screen.findByText("Still not ready.")).toBeTruthy();
-    // No package manager known: the packages are named, with no command.
+    // No package manager known: the packages are named, with no command, and the intro asks for none.
+    expect(screen.queryByText(/run these commands/)).toBeNull();
+    expect(screen.getByText(/so it has to be done on the system, as described below/)).toBeTruthy();
     expect(screen.getByText("Install socat with your system's package manager")).toBeTruthy();
     expect(document.querySelector(".sbx-cmd")).toBeNull();
   });
@@ -353,10 +356,28 @@ describe("the Linux sandbox notice in setup", () => {
       configurable: true,
     });
     await connectStep(api);
+    const block = (await screen.findByRole("button", { name: "Copy: sudo dnf install socat" })).parentElement;
+    const status = within(block as HTMLElement).getByRole("status");
+    expect(status.textContent).toBe("");
     await click("Copy: sudo dnf install socat");
     expect(written).toEqual(["sudo dnf install socat"]);
     expect(await screen.findByRole("button", { name: /Copy: sudo dnf install socat/ })).toBeTruthy();
-    expect(screen.getByText("Copied")).toBeTruthy();
+    // The button's name stays the same, so a screen reader hears the result from the status beside it.
+    expect(status.textContent).toBe("Copied");
+  });
+
+  it("says so when copying a command fails", async () => {
+    const api = createMemoryApi({ name: "Giulia" });
+    api.sandbox.check = vi.fn(async () => missing({ missing: ["socat"] }));
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: async () => Promise.reject(new Error("denied")) },
+      configurable: true,
+    });
+    await connectStep(api);
+    await click("Copy: sudo apt install socat");
+    const block = screen.getByRole("button", { name: "Copy: sudo apt install socat" }).parentElement;
+    expect(within(block as HTMLElement).getByRole("status").textContent).toMatch(/./);
+    expect(within(block as HTMLElement).getByRole("status").textContent).not.toBe("Copied");
   });
 });
 
@@ -436,6 +457,26 @@ describe("the sandbox notice in a failed task", () => {
       screen.getByText(/doesn't let bubblewrap create user namespaces, and AppArmor isn't the cause/),
     ).toBeTruthy();
     expect(screen.getByText("bwrap: No permissions to create new namespace")).toBeTruthy();
+  });
+
+  it("shows the notice, not the plain sentence, when resuming a task Tost Work closed on hits the sandbox", async () => {
+    const api = createMemoryApi({ name: "Giulia", setupDone: true });
+    const task = await api.tasks.start({ projectId: null, brief: "Prepare the 2027 price list", attachments: [] });
+    api.emit(task.id, { type: "stopped" });
+    // As the runner saves it: still stopped and resumable, with what the sandbox lacks.
+    Object.assign((await api.tasks.get(task.id)) as object, {
+      interrupted: true,
+      error: "ChatGPT can't work safely on this computer yet",
+      sandboxNotReady: missing({ missing: ["bwrap"] }),
+    });
+    api.sandbox.check = async () => ready;
+    const resume = vi.spyOn(api.tasks, "resume");
+    await openTask(api, task.id);
+    expect(await screen.findByText("The task didn't start: the sandbox isn't ready")).toBeTruthy();
+    expect(screen.getByText("sudo apt install bubblewrap")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Resume" })).toBeNull();
+    await click("Check and try again");
+    expect(resume).toHaveBeenCalledWith(task.id);
   });
 
   it("keeps the plain sentence for a task that failed for another reason", async () => {

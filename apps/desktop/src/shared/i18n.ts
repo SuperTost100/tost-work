@@ -720,6 +720,8 @@ const en = {
   "sandbox.title": "The AIs' sandbox isn't ready",
   "sandbox.p":
     "The AIs run their commands in a sandbox built on `bubblewrap`, which keeps them inside the task's folder. Tost Work can't install it from an AppImage: run these commands in a terminal.",
+  "sandbox.pManual":
+    "The AIs run their commands in a sandbox built on `bubblewrap`, which keeps them inside the task's folder. Tost Work can't set it up from an AppImage, so it has to be done on the system, as described below.",
   "sandbox.tag.bwrap": "bubblewrap: missing",
   "sandbox.tag.socat": "socat: missing",
   "sandbox.tag.apparmor": "AppArmor: blocks bwrap",
@@ -1471,6 +1473,8 @@ const it: Record<MessageKey, string> = {
   "sandbox.title": "Il sandbox delle AI non è pronto",
   "sandbox.p":
     "Le AI lanciano i loro comandi in un sandbox basato su `bubblewrap`, che li tiene dentro la cartella dell'attività. Da un AppImage Tost Work non può installarlo: esegui questi comandi in un terminale.",
+  "sandbox.pManual":
+    "Le AI lanciano i loro comandi in un sandbox basato su `bubblewrap`, che li tiene dentro la cartella dell'attività. Da un AppImage Tost Work non può configurarlo, quindi va sistemato nel sistema come descritto qui sotto.",
   "sandbox.tag.bwrap": "bubblewrap: manca",
   "sandbox.tag.socat": "socat: manca",
   "sandbox.tag.apparmor": "AppArmor: blocca bwrap",
