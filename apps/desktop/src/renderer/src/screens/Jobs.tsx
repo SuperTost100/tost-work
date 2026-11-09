@@ -2,6 +2,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import { Switch } from "@/components/Switch";
 import { TaskTag } from "@/components/TaskTag";
+import { useClaudeGate } from "@/components/Unconfined";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { useConfirm } from "@/lib/useConfirm";
@@ -10,6 +11,7 @@ import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
 import { JOB_GROUPS, type JobGroup, jobGroup, scheduleText, WEEK, weekday, whenText } from "../../../shared/jobText";
 import type { Job, JobDraft, Project, Task } from "../../../shared/model";
+import { DEFAULT_PICK } from "../../../shared/modelChoice";
 import { JOB_REPEATS, type JobRepeat, upcoming } from "../../../shared/schedule";
 
 /** How often the list works out its groups and next runs again, so "today" doesn't stay today past midnight. */
@@ -278,6 +280,7 @@ function JobBuilder({
 }) {
   const t = useT();
   const confirm = useConfirm();
+  const claudeGate = useClaudeGate(api);
   const lang = useContext(LanguageContext);
   const [step, setStep] = useState<Step>(0);
   const [draft, setDraft] = useState<JobDraft>(
@@ -368,7 +371,9 @@ function JobBuilder({
     const made = await save();
     if (!made) return;
     try {
-      setStarted(await api.jobs.runNow(made.id));
+      // A job runs on the default choice, so the notice asks when that's Claude on Windows.
+      const started = await claudeGate({ pick: DEFAULT_PICK }, () => api.jobs.runNow(made.id));
+      if (started !== null) setStarted(started);
     } catch (err) {
       setError(errorText(err));
     }

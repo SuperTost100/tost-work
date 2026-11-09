@@ -46,7 +46,7 @@ import {
 import type { Installer } from "./installer";
 import { type Jobs, jobDraft } from "./jobs";
 import type { KeyStore } from "./keys";
-import { checkSandbox } from "./sandbox";
+import { checkSandbox, type SandboxSystem } from "./sandbox";
 import type { GuideText, SkillFolder } from "./skills";
 import type { Store } from "./store/store";
 import { UserError, userMessage } from "./userError";
@@ -72,6 +72,8 @@ export function registerIpc(
   ask: (question: Omit<WindowQuestion, "id">) => Promise<QuestionAnswer>,
   /** The events log of a test build, which a problem report carries. */
   events: EventLog,
+  /** The computer as the CLIs see it, for the sandbox check. */
+  sandboxSystem: SandboxSystem,
 ): void {
   // A handler that fails goes to the app's debug log too, and on to the window as before.
   const handle = (channel: string, listener: Parameters<typeof ipcMain.handle>[1]) =>
@@ -127,7 +129,7 @@ export function registerIpc(
   handle(IPC.sandboxCheck, (_e, provider: unknown) => {
     if (provider !== null && provider !== "codex" && provider !== "claude")
       throw new Error("provider must be codex, claude or null");
-    return checkSandbox(provider);
+    return checkSandbox(provider, sandboxSystem);
   });
   handle(IPC.keyInfo, () => keys.info());
   handle(IPC.keySave, (_e, key: unknown) => keys.save(text(key, "key", 400).trim()));

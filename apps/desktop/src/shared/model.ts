@@ -203,6 +203,11 @@ export interface Task {
    * window can show how to fix it. `error` has the plain sentence. A new run clears it.
    */
   sandboxNotReady?: SandboxReadiness;
+  /**
+   * What the run the sandbox stopped was started with (`followUp` null for the brief), so Resume replays exactly that:
+   * an answer, a decision or a follow-up. Set and cleared with `sandboxNotReady`; missing on tasks saved before.
+   */
+  sandboxRun?: { followUp: string | null };
   createdAt: string;
   updatedAt: string;
 }
@@ -282,6 +287,11 @@ export interface Settings {
    */
   debug: boolean;
   setupDone: boolean;
+  /**
+   * The user pressed Continue on the notice that Claude on Windows isn't limited to the task's folder. Until then no
+   * task runs on Claude there: the window shows the notice first, and a job's run is refused.
+   */
+  unconfinedAcknowledged: boolean;
   /** The pre-release version whose welcome card the user closed, so the card comes back with the next update. */
   welcomed: string | null;
 }
@@ -380,6 +390,7 @@ export const DEFAULT_SETTINGS: Settings = {
   boardGroup: "status",
   debug: false,
   setupDone: false,
+  unconfinedAcknowledged: false,
   welcomed: null,
 };
 

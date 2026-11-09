@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process";
 import { constants } from "node:fs";
-import { access, readFile, stat } from "node:fs/promises";
-import { delimiter, join } from "node:path";
+import { access, readFile, realpath, stat } from "node:fs/promises";
+import { homedir } from "node:os";
+import { delimiter, dirname, join } from "node:path";
 import type { AgentProvider } from "../shared/model";
 import { type Distro, SANDBOX_NEEDS, type SandboxMissing, type SandboxReadiness } from "../shared/sandbox";
 
@@ -30,12 +31,74 @@ const APPARMOR_USERNS = "/proc/sys/kernel/apparmor_restrict_unprivileged_userns"
 /** What the check reads from the system, so tests can stand in for it. */
 export interface SandboxSystem {
   platform: string;
-  /** The program's path on the PATH the CLIs inherit, or null. */
+  /** The program's path on the PATH the CLIs get, or null. */
   which(name: string): Promise<string | null>;
   /** Runs a program and says whether it exited with 0, with what it printed. */
   run(file: string, args: string[], timeoutMs: number): Promise<{ ok: boolean; output: string }>;
   /** A text file's content, or null when it can't be read. */
   read(path: string): Promise<string | null>;
+  /** The copy of bubblewrap Codex brings, which it uses when the system has none, or null. */
+  codexBwrap(): Promise<string | null>;
+}
+
+/** The folders cli-funnel adds to its search path after the app's PATH. */
+const FUNNEL_DIRS = (home: string) => [
+  join(home, ".local", "bin"),
+  join(home, ".bun", "bin"),
+  join(home, ".cursor", "bin"),
+  join(home, ".npm-global", "bin"),
+  "/opt/homebrew/bin",
+  "/usr/local/bin",
+];
+
+/**
+ * The PATH a CLI that cli-funnel starts gets, mirroring `childEnv` and `searchPath` in cli-funnel 0.7.0's
+ * src/util/process.ts, which it doesn't export. The PATH in the env the app passes wins: with OfficeCLI that's its
+ * folder before the app's own PATH (documents.ts). Without one, cli-funnel uses the app's PATH followed by the folders
+ * installers use. It also finds programs with this search path, Codex among them.
+ *
+ * shortcut: leaves out the login shell's PATH, which cli-funnel's search path also adds; only a checkout without
+ * OfficeCLI, or a Codex reached only through the shell profile, depends on it. Add it if such a setup is reported.
+ */
+export function cliPath(envPath: string | undefined, appPath = process.env.PATH ?? "", home = homedir()): string {
+  if (envPath !== undefined) return envPath;
+  return [...new Set([...appPath.split(delimiter).filter(Boolean), ...FUNNEL_DIRS(home)])].join(delimiter);
+}
+
+/** The Linux target npm's Codex package is built for, as its launcher (bin/codex.js) names it. */
+const CODEX_TRIPLE: Record<string, string> = {
+  x64: "x86_64-unknown-linux-musl",
+  arm64: "aarch64-unknown-linux-musl",
+};
+
+/** Whether `path` is a file that can run. */
+const runnable = (path: string) =>
+  access(path, constants.X_OK)
+    .then(() => stat(path))
+    .then(
+      (info) => info.isFile(),
+      () => false,
+    );
+
+/**
+ * The copy of bubblewrap that comes with Codex, from the path cli-funnel starts Codex by. The standalone installer and
+ * the binary in npm's platform package both keep it at codex-resources/bwrap beside the folder of the codex binary.
+ * npm's launcher, bin/codex.js, runs the binary from the platform package installed under it.
+ */
+export async function bundledBwrap(codex: string | null, arch = process.arch): Promise<string | null> {
+  if (!codex) return null;
+  const real = await realpath(codex).catch(() => null);
+  if (!real) return null;
+  const top = dirname(dirname(real));
+  const triple = CODEX_TRIPLE[arch];
+  const candidates = [join(top, "codex-resources", "bwrap")];
+  if (real.endsWith(".js") && triple)
+    candidates.push(
+      join(top, "node_modules", "@openai", `codex-linux-${arch}`, "vendor", triple, "codex-resources", "bwrap"),
+      join(top, "vendor", triple, "codex-resources", "bwrap"),
+    );
+  for (const candidate of candidates) if (await runnable(candidate)) return candidate;
+  return null;
 }
 
 /** A program on `path` (the PATH variable): the first folder that has it as an executable file. */
@@ -43,23 +106,22 @@ export async function onPath(name: string, path = process.env.PATH ?? ""): Promi
   for (const dir of path.split(delimiter)) {
     if (!dir) continue;
     const file = join(dir, name);
-    const usable = await access(file, constants.X_OK)
-      .then(() => stat(file))
-      .then(
-        (info) => info.isFile(),
-        () => false,
-      );
-    if (usable) return file;
+    if (await runnable(file)) return file;
   }
   return null;
 }
 
-export const realSystem: SandboxSystem = {
+/**
+ * This computer, as the CLIs see it: programs are looked for, and bubblewrap runs, on the PATH they get (see
+ * `cliPath`). `envPath` is the PATH in the env the engine passes them, if it passes one.
+ */
+export const systemFor = (envPath: string | undefined): SandboxSystem => ({
   platform: process.platform,
-  which: (name) => onPath(name),
+  which: (name) => onPath(name, cliPath(envPath)),
   run: (file, args, timeoutMs) =>
     new Promise((resolve) => {
-      execFile(file, args, { timeout: timeoutMs, killSignal: "SIGKILL" }, (err, stdout, stderr) => {
+      const env = { ...process.env, PATH: cliPath(envPath) };
+      execFile(file, args, { env, timeout: timeoutMs, killSignal: "SIGKILL" }, (err, stdout, stderr) => {
         const output = `${stderr}${stdout}`.trim().slice(-2000);
         if (!err) resolve({ ok: true, output });
         else if (err.killed)
@@ -68,7 +130,9 @@ export const realSystem: SandboxSystem = {
       });
     }),
   read: (path) => readFile(path, "utf8").catch(() => null),
-};
+  // Where cli-funnel would start Codex from: its override, or the search path (cliPath without the app's env).
+  codexBwrap: async () => bundledBwrap(process.env.CLI_FUNNEL_CODEX_BIN || (await onPath("codex", cliPath(undefined)))),
+});
 
 /** The distribution in an os-release file, or null when it names none. */
 export function parseOsRelease(text: string): Distro | null {
@@ -95,20 +159,23 @@ export function parseOsRelease(text: string): Distro | null {
  * Only Linux is checked: the Mac's sandbox is part of the system, and on Windows Codex brings its own and Claude Code
  * runs without one. The result isn't kept, so a fix made in a terminal counts at the next check.
  */
-export async function checkSandbox(
-  provider: AgentProvider | null,
-  system: SandboxSystem = realSystem,
-): Promise<SandboxReadiness> {
+export async function checkSandbox(provider: AgentProvider | null, system: SandboxSystem): Promise<SandboxReadiness> {
   if (system.platform !== "linux") return { ready: true, missing: [], distro: null, appArmorRestrictsUserns: null };
   const needs = (what: SandboxMissing) => provider === null || SANDBOX_NEEDS[what].includes(provider);
   const missing: SandboxMissing[] = [];
   let detail: string | undefined;
 
+  // Without the system's bubblewrap, Codex runs the copy it brings; Claude Code has none, so it needs the system's.
   const bwrap = await system.which("bwrap");
-  if (!bwrap) missing.push("bwrap");
+  const bundled = !bwrap && provider === "codex" ? await system.codexBwrap() : null;
+  const tried = bwrap ?? bundled;
+  if (!tried) missing.push("bwrap");
   else {
-    const probe = await system.run(bwrap, BWRAP_PROBE, PROBE_TIMEOUT_MS);
+    const probe = await system.run(tried, BWRAP_PROBE, PROBE_TIMEOUT_MS);
     if (!probe.ok) {
+      // Codex's copy blocked too: on Ubuntu 24.04 and later AppArmor's profile covers only /usr/bin/bwrap, so the
+      // system's package goes first, then the profile.
+      if (bundled) missing.push("bwrap");
       missing.push("userns");
       detail = probe.output;
     }

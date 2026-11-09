@@ -4,6 +4,7 @@ import { type DragEvent, type MouseEvent, type ReactNode, useContext, useEffect,
 import { approvalTitle } from "@/components/Approval";
 import { FileLine, fileName, Thumb } from "@/components/FileLine";
 import { TaskTag } from "@/components/TaskTag";
+import { type RunOn, useClaudeGate } from "@/components/Unconfined";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { LanguageContext, useT } from "@/lib/useT";
@@ -137,17 +138,27 @@ export function Board({
 
   const save = (patch: Partial<Pick<Settings, "boardView" | "boardGroup">>) =>
     void api.settings.update(patch).then(onSettings, onError);
-  const act = (work: Promise<Task>, then?: (task: Task) => void) =>
+  // Null when the notice below was cancelled and nothing changed.
+  const act = (work: Promise<Task | null>, then?: (task: Task) => void) =>
     void work.then((task) => {
+      if (!task) return;
       onTaskChanged(task);
       then?.(task);
     }, onError);
+  // A run on Claude on Windows waits for the user's OK to the notice; Cancel leaves the task as it was.
+  const claudeGate = useClaudeGate(api);
+  const run = (on: RunOn, work: () => Promise<Task>, then?: (task: Task) => void) => act(claudeGate(on, work), then);
   const actions: RowActions = {
     // Starting it from a button goes to the task, to watch it work. A drag keeps the user on the board.
-    start: (id, go = true) => act(api.tasks.startSaved(id), (task) => go && onOpenTask(task.id)),
-    decide: (id, decision) => act(api.tasks.decide(id, decision)),
+    start: (id, go = true) =>
+      run(
+        {},
+        () => api.tasks.startSaved(id),
+        (task) => go && onOpenTask(task.id),
+      ),
+    decide: (id, decision) => run({ taskId: id }, () => api.tasks.decide(id, decision)),
     review: (id) => act(api.tasks.markReviewed(id)),
-    answer: (id, answer) => act(api.tasks.answer(id, [answer])),
+    answer: (id, answer) => run({ taskId: id }, () => api.tasks.answer(id, [answer])),
   };
   const select = (id: string) => setSelected((current) => (current === id ? null : id));
   const menu = (id: string, inPanel = false) => onTaskMenu(id, () => setRenaming({ id, inPanel }));

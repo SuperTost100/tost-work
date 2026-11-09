@@ -36,7 +36,7 @@ function CommandBlock({ command }: { command: string }) {
     const timer = setTimeout(() => setState("ready"), COPIED_FOR);
     return () => clearTimeout(timer);
   }, [state]);
-  const label = t(state === "copied" ? "sandbox.copied" : state === "failed" ? "message.copyFailed" : "sandbox.copy");
+  const done = state === "copied" ? t("sandbox.copied") : state === "failed" ? t("message.copyFailed") : null;
   return (
     <div className="sbx-code">
       <pre className="sbx-cmd">{command}</pre>
@@ -52,8 +52,12 @@ function CommandBlock({ command }: { command: string }) {
         }
       >
         <Icon name={state === "copied" ? "check" : state === "failed" ? "alert" : "copy-2"} />
-        {label}
+        {done ?? t("sandbox.copy")}
       </button>
+      {/* The button's name stays "Copy: …", so the result reaches a screen reader from here. */}
+      <span className="sr-only" role="status">
+        {done ?? ""}
+      </span>
     </div>
   );
 }
@@ -188,7 +192,11 @@ export function SetupSandboxNotice({ api }: { api: TostWorkApi }) {
         <Icon name="alert" className="sbx-ic" />
         {t("sandbox.title")}
       </b>
-      <p className="sbx-p">{withCode(t("sandbox.p"))}</p>
+      <p className="sbx-p">
+        {withCode(
+          t(sandboxSteps(readiness).some((s) => "command" in s && s.command) ? "sandbox.p" : "sandbox.pManual"),
+        )}
+      </p>
       <Tags readiness={readiness} />
       <Steps readiness={readiness} />
       <CheckButton label={t("sandbox.check")} checking={checking} still={still} onCheck={check} />

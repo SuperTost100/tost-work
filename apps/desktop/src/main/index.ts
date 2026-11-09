@@ -21,6 +21,7 @@ import { languageFrom, translate } from "../shared/i18n";
 import type { AgentProvider, AiId } from "../shared/model";
 import { PROVIDER_OF } from "../shared/model";
 import { choiceOf } from "../shared/modelChoice";
+import { needsUnconfinedOk } from "../shared/sandbox";
 import { Accounts } from "./accounts";
 import { giveAgentsOwnHomes } from "./agentHomes";
 import { menuTemplate, nextTextSize, textMenuTemplate } from "./appMenu";
@@ -42,12 +43,13 @@ import { ToolServer } from "./mcp/server";
 import { confirmsNotifications, Notifier } from "./notify";
 import { pickAi } from "./pickAi";
 import { WindowQuestions } from "./questions";
-import { checkSandbox } from "./sandbox";
+import { checkSandbox, systemFor } from "./sandbox";
 import { SkillFolder } from "./skills";
 import { SkillVersions } from "./skillVersions";
 import { setStartupTask } from "./startupTask";
 import { Store } from "./store/store";
 import { onSecondLaunch, opensWindow, panelBounds, type SecondLaunch, staysInMenuBar, trayMenu } from "./tray";
+import { UserError } from "./userError";
 import { buttonsPosition } from "./windowButtons";
 
 const isMac = process.platform === "darwin";
@@ -209,6 +211,8 @@ app.whenReady().then(async () => {
   // Where people can see, back up and copy their skills, as the course teaches.
   // The Word, Excel, PowerPoint and PDF guides show among them as built in; earlier versions stay in the app's data.
   const documents = documentTools();
+  // The sandbox check looks for bubblewrap and socat on the PATH the CLIs get, which OfficeCLI's env sets.
+  const sandboxSystem = systemFor(documents?.env.PATH);
   const skills = new SkillFolder(
     join(app.getPath("documents"), "Tost Work", "Skills"),
     (path) => shell.trashItem(path),
@@ -284,7 +288,7 @@ app.whenReady().then(async () => {
       },
       courseKey: () => keys.get(),
       online: () => net.isOnline(),
-      sandboxReady: (provider) => checkSandbox(provider),
+      sandboxReady: (provider) => checkSandbox(provider, sandboxSystem),
       skills: () => skills.list(),
       job: (id) => store.getJob(id),
       verbose: () => debugOn,
@@ -402,6 +406,12 @@ app.whenReady().then(async () => {
   // Off as well as on, so a removal that failed last time is tried again.
   applyLogin(atLogin);
 
+  // Claude on Windows runs without a sandbox, and no run starts on it before the user has read the notice that says so
+  // and pressed Continue. The window shows the notice before it starts a run; this refuses one that comes another way.
+  const refuseUnconfined = (provider: AgentProvider) => {
+    if (needsUnconfinedOk(provider, process.platform, store.getSettings().unconfinedAcknowledged))
+      throw new UserError("error.unconfinedNotOk");
+  };
   // shortcut: kept copies are never cleaned up; add a size limit or an age limit before the public beta.
   const guard = fileGuard(join(app.getPath("userData"), "kept"), (path) => shell.trashItem(path));
   const runner = new TaskRunner(
@@ -421,6 +431,7 @@ app.whenReady().then(async () => {
     },
     appLog,
     language,
+    (task) => refuseUnconfined(task.provider ?? "codex"),
   );
   // Set once the tray exists below; jobs and tasks changing before that have nothing to update.
   let trayChanged = () => {};
@@ -433,6 +444,9 @@ app.whenReady().then(async () => {
       const project = store.getProject(job.projectId);
       if (!project) throw new Error(translate(language(), "jobs.projectGone"));
       const { provider, auth, model, effort } = await runner.defaults();
+      // Nobody may be watching a job, so it doesn't run on an unconfined Claude before the user has said yes to the
+      // notice in the window: its run fails with the reason, and the next one runs once they have.
+      refuseUnconfined(provider);
       // The project may have been removed while the account was being read.
       if (!store.getProject(job.projectId)) throw new Error(translate(language(), "jobs.projectGone"));
       const day = new Intl.DateTimeFormat(language(), { day: "numeric", month: "short" }).format(at);
@@ -633,6 +647,7 @@ app.whenReady().then(async () => {
     debugLogs,
     askInWindow,
     events,
+    sandboxSystem,
   );
   // Quitting stops the tasks still working, so it asks first, in the window's card. They show as interrupted, with
   // Resume, next time. Quit again while the card is open only brings the window forward.

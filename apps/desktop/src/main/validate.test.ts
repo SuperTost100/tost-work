@@ -166,6 +166,11 @@ describe("oneLine", () => {
 });
 
 describe("settingsPatch", () => {
+  it("takes the OK to Claude running unconfined only as true or false", () => {
+    expect(settingsPatch({ unconfinedAcknowledged: true })).toEqual({ unconfinedAcknowledged: true });
+    expect(() => settingsPatch({ unconfinedAcknowledged: "yes" })).toThrow(/unconfinedAcknowledged/);
+  });
+
   it("keeps known settings and trims the name", () => {
     expect(settingsPatch({ name: " Giulia ", level: "expert", language: null, setupDone: true })).toEqual({
       name: "Giulia",

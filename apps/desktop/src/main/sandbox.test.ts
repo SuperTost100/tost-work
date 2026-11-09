@@ -1,10 +1,19 @@
 /** @vitest-environment node */
-import { chmod, mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { claudeUnconfined, sandboxFor } from "../shared/sandbox";
-import { BWRAP_PROBE, checkSandbox, onPath, parseOsRelease, type SandboxSystem } from "./sandbox";
+import { claudeUnconfined, needsUnconfinedOk, sandboxFor } from "../shared/sandbox";
+import { APPARMOR_COMMAND, sandboxSteps } from "../shared/sandboxSteps";
+import {
+  BWRAP_PROBE,
+  bundledBwrap,
+  checkSandbox,
+  cliPath,
+  onPath,
+  parseOsRelease,
+  type SandboxSystem,
+} from "./sandbox";
 
 const UBUNTU = `PRETTY_NAME="Ubuntu 24.04.5 LTS"
 NAME="Ubuntu"
@@ -16,7 +25,13 @@ ID_LIKE=debian
 
 /** A Linux system with the programs given on the PATH, where bubblewrap's run gives `probe`. */
 function system(
-  over: { programs?: string[]; probe?: { ok: boolean; output: string }; files?: Record<string, string> } = {},
+  over: {
+    programs?: string[];
+    probe?: { ok: boolean; output: string };
+    files?: Record<string, string>;
+    /** Codex's own copy of bubblewrap, and what running it gives. */
+    bundled?: { path: string; probe: { ok: boolean; output: string } };
+  } = {},
 ) {
   const runs: { file: string; args: string[] }[] = [];
   const programs = over.programs ?? ["bwrap", "socat"];
@@ -29,12 +44,23 @@ function system(
     which: async (name) => (programs.includes(name) ? `/usr/bin/${name}` : null),
     run: async (file, args) => {
       runs.push({ file, args });
+      if (file === over.bundled?.path) return over.bundled.probe;
       return over.probe ?? { ok: true, output: "" };
     },
     read: async (path) => files[path] ?? null,
+    codexBwrap: async () => over.bundled?.path ?? null,
   };
   return { fake, runs };
 }
+
+describe("needsUnconfinedOk", () => {
+  it("holds back only a Claude run on Windows before the user said yes", () => {
+    expect(needsUnconfinedOk("claude", "win32", false)).toBe(true);
+    expect(needsUnconfinedOk("claude", "win32", true)).toBe(false);
+    expect(needsUnconfinedOk("codex", "win32", false)).toBe(false);
+    for (const platform of ["darwin", "linux"]) expect(needsUnconfinedOk("claude", platform, false)).toBe(false);
+  });
+});
 
 describe("claudeUnconfined", () => {
   it("is true only on Windows, and only Claude Code there goes without a sandbox", () => {
@@ -114,6 +140,35 @@ describe("checkSandbox", () => {
     expect(runs).toEqual([]);
   });
 
+  it("lets Codex use its own bubblewrap when the system has none and it starts", async () => {
+    const bundled = { path: "/opt/codex/codex-resources/bwrap", probe: { ok: true, output: "" } };
+    const { fake, runs } = system({ programs: ["socat"], bundled });
+    expect(await checkSandbox("codex", fake)).toMatchObject({ ready: true, missing: [] });
+    expect(runs).toEqual([{ file: bundled.path, args: BWRAP_PROBE }]);
+    // Claude Code has no copy of its own, and setup asks for both AIs.
+    expect(await checkSandbox("claude", fake)).toMatchObject({ ready: false, missing: ["bwrap"] });
+    expect(await checkSandbox(null, fake)).toMatchObject({ ready: false, missing: ["bwrap"] });
+    expect(runs).toHaveLength(1);
+  });
+
+  it("asks for the system's bubblewrap and its AppArmor profile when Codex's own copy is blocked", async () => {
+    const output = "bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted";
+    const bundled = { path: "/opt/codex/codex-resources/bwrap", probe: { ok: false, output } };
+    const { fake } = system({ programs: [], bundled });
+    const readiness = await checkSandbox("codex", fake);
+    expect(readiness).toMatchObject({
+      ready: false,
+      missing: ["bwrap", "userns"],
+      appArmorRestrictsUserns: true,
+      detail: output,
+    });
+    // Ubuntu's profile covers only /usr/bin/bwrap, so the steps install it and then add the profile.
+    expect(sandboxSteps(readiness)).toEqual([
+      { kind: "install", packages: ["bubblewrap"], command: "sudo apt install bubblewrap" },
+      { kind: "apparmor", command: APPARMOR_COMMAND, distro: "Ubuntu 24.04" },
+    ]);
+  });
+
   it("reports bubblewrap blocked from user namespaces, with what it said", async () => {
     const { fake } = system({
       probe: { ok: false, output: "bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted" },
@@ -158,5 +213,53 @@ describe("onPath", () => {
     expect(await onPath("socat", [a, b, c].join(delimiter))).toBe(join(c, "socat"));
     expect(await onPath("bwrap", [a, b, c].join(delimiter))).toBeNull();
     expect(await onPath("socat", "")).toBeNull();
+  });
+});
+
+describe("cliPath", () => {
+  it("is the PATH the app passes the CLI, when it passes one", () => {
+    expect(cliPath("/app/bin:/usr/bin:/bin", "/usr/bin:/bin", "/home/giulia")).toBe("/app/bin:/usr/bin:/bin");
+  });
+
+  it("is cli-funnel's search path otherwise: the app's PATH, then the folders installers use", () => {
+    const path = cliPath(undefined, "/usr/bin:/bin:/usr/local/bin", "/home/giulia").split(delimiter);
+    expect(path.slice(0, 4)).toEqual(["/usr/bin", "/bin", "/usr/local/bin", "/home/giulia/.local/bin"]);
+    // Each folder once.
+    expect(path.filter((d) => d === "/usr/local/bin")).toHaveLength(1);
+  });
+});
+
+describe("bundledBwrap", () => {
+  const executable = async (path: string) => {
+    await mkdir(join(path, ".."), { recursive: true });
+    await writeFile(path, "#!/bin/sh\n");
+    await chmod(path, 0o755);
+  };
+
+  it("finds the copy beside a standalone Codex, through the link the installer makes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "tw-codex-"));
+    const release = join(root, "releases", "0.167.0-x86_64-unknown-linux-musl");
+    await executable(join(release, "bin", "codex"));
+    await executable(join(release, "codex-resources", "bwrap"));
+    await mkdir(join(root, "bin"));
+    await symlink(join(release, "bin", "codex"), join(root, "bin", "codex"));
+    expect(await bundledBwrap(join(root, "bin", "codex"))).toBe(join(release, "codex-resources", "bwrap"));
+  });
+
+  it("finds the copy in npm's platform package, behind the launcher", async () => {
+    const root = await mkdtemp(join(tmpdir(), "tw-codex-npm-"));
+    const pkg = join(root, "lib", "node_modules", "@openai", "codex");
+    await executable(join(pkg, "bin", "codex.js"));
+    const triple = `${process.arch === "arm64" ? "aarch64" : "x86_64"}-unknown-linux-musl`;
+    const vendor = join(pkg, "node_modules", "@openai", `codex-linux-${process.arch}`, "vendor", triple);
+    await executable(join(vendor, "codex-resources", "bwrap"));
+    expect(await bundledBwrap(join(pkg, "bin", "codex.js"))).toBe(join(vendor, "codex-resources", "bwrap"));
+  });
+
+  it("is null without Codex, or when its copy isn't there", async () => {
+    const root = await mkdtemp(join(tmpdir(), "tw-codex-none-"));
+    await executable(join(root, "bin", "codex"));
+    expect(await bundledBwrap(join(root, "bin", "codex"))).toBeNull();
+    expect(await bundledBwrap(null)).toBeNull();
   });
 });

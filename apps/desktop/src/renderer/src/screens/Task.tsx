@@ -1251,7 +1251,16 @@ export function Task({
                   <Artifact api={api} task={task} files={made} picked={picked} onPick={setPicked} onError={onError} />
                 )}
                 {task.status === "stopped" &&
-                  (task.interrupted ? (
+                  (task.interrupted && task.sandboxNotReady ? (
+                    // A resume that failed on the sandbox shows what to install, and runs it again once it's fixed.
+                    <TaskSandboxNotice
+                      api={api}
+                      provider={task.provider ?? "codex"}
+                      readiness={task.sandboxNotReady}
+                      onReady={onResume}
+                      onError={onError}
+                    />
+                  ) : task.interrupted ? (
                     <div className="agent row">
                       {/* Only the note is grey: Resume is a normal button. */}
                       <span className="grow t3">

@@ -65,7 +65,7 @@ export function AccountRow({
   const [code, setCode] = useState("");
   // On Windows Claude runs without a sandbox, so the row says so and asks before Install and Sign in go ahead.
   const unconfined = ai === "claude" && api.claudeUnconfined;
-  const askUnconfined = useAskUnconfined(unconfined);
+  const askUnconfined = useAskUnconfined(api, unconfined);
   const goAhead = (run: () => Promise<void>) => () => void askUnconfined().then((yes) => (yes ? run() : undefined));
   const setup = variant === "setup";
   const cli = CLI[ai];

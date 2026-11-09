@@ -708,16 +708,20 @@ const en = {
   "sandbox.missing.socat": "socat isn't installed",
   "sandbox.missing.userns": "the system doesn't let bubblewrap create user namespaces",
   "unconfined.note":
-    "On Windows, Claude isn't limited to the task's folder yet. It edits files only there and asks before changing or deleting one, but the other commands it runs could read or write elsewhere on your PC. ChatGPT stays inside the folder.",
+    "On Windows, Claude isn't limited to the task's folder yet. When it edits files itself it works only there and asks before changing or deleting one, but the other commands it runs could change files without asking, or read and write elsewhere on your PC. ChatGPT stays inside the folder.",
   "unconfined.title": "Claude on Windows isn't limited to the task's folder",
   "unconfined.p1":
     "Anthropic hasn't turned on the protection that keeps Claude's commands inside the task's folder on Windows yet. For now those commands could also read or write elsewhere on your PC, which matters most if a document or a web page tries to trick the AI.",
   "unconfined.p2":
-    "Your files stay protected: Claude edits them only in the task's folder, asks before it changes or deletes a file that already exists, and refuses commands that delete files. ChatGPT stays inside the folder on Windows too.",
+    "When Claude edits files itself, it works only in the task's folder and asks before it changes or deletes a file that already exists. Commands that delete files are refused, but other commands aren't checked this way and could change a file without asking. ChatGPT stays inside the folder on Windows too.",
   "unconfined.go": "Continue",
+  "error.unconfinedNotOk":
+    "Claude didn't start, because on Windows it isn't limited to the task's folder and you haven't accepted the notice that says so. Start a task on Claude in Tost Work to read it.",
   "sandbox.title": "The AIs' sandbox isn't ready",
   "sandbox.p":
     "The AIs run their commands in a sandbox built on `bubblewrap`, which keeps them inside the task's folder. Tost Work can't install it from an AppImage: run these commands in a terminal.",
+  "sandbox.pManual":
+    "The AIs run their commands in a sandbox built on `bubblewrap`, which keeps them inside the task's folder. Tost Work can't set it up from an AppImage, so it has to be done on the system, as described below.",
   "sandbox.tag.bwrap": "bubblewrap: missing",
   "sandbox.tag.socat": "socat: missing",
   "sandbox.tag.apparmor": "AppArmor: blocks bwrap",
@@ -1457,16 +1461,20 @@ const it: Record<MessageKey, string> = {
   "sandbox.missing.socat": "socat non è installato",
   "sandbox.missing.userns": "il sistema non permette a bubblewrap di creare user namespace",
   "unconfined.note":
-    "Su Windows Claude non è ancora limitato alla cartella dell'attività. Modifica i file solo lì e prima di cambiarne o eliminarne uno chiede il permesso, ma gli altri comandi che lancia potrebbero leggere o scrivere altrove nel PC. ChatGPT resta dentro la cartella.",
+    "Su Windows Claude non è ancora limitato alla cartella dell'attività. Quando modifica i file direttamente lavora solo lì e prima di cambiarne o eliminarne uno chiede il permesso, ma gli altri comandi che lancia potrebbero cambiare file senza chiedere, o leggere e scrivere altrove nel PC. ChatGPT resta dentro la cartella.",
   "unconfined.title": "Claude su Windows non è limitato alla cartella dell'attività",
   "unconfined.p1":
     "Anthropic non ha ancora attivato su Windows la protezione che tiene i comandi di Claude dentro la cartella dell'attività. Per ora quei comandi potrebbero leggere o scrivere anche altrove nel PC, e questo conta soprattutto se un documento o una pagina web prova a ingannare l'AI.",
   "unconfined.p2":
-    "Restano protetti i file: Claude li modifica solo nella cartella dell'attività, chiede il permesso prima di cambiare o eliminare un file che esiste già e rifiuta i comandi che eliminano file. ChatGPT, anche su Windows, resta dentro la cartella.",
+    "Quando modifica i file direttamente, Claude lavora solo nella cartella dell'attività e chiede il permesso prima di cambiare o eliminare un file che esiste già. I comandi che eliminano file vengono rifiutati, mentre gli altri comandi non hanno questo controllo e potrebbero cambiare un file senza chiedere. ChatGPT, anche su Windows, resta dentro la cartella.",
   "unconfined.go": "Continua",
+  "error.unconfinedNotOk":
+    "Claude non è partito, perché su Windows non è limitato alla cartella dell'attività e non hai ancora accettato l'avviso che lo spiega. Avvia un'attività con Claude in Tost Work per leggerlo.",
   "sandbox.title": "Il sandbox delle AI non è pronto",
   "sandbox.p":
     "Le AI lanciano i loro comandi in un sandbox basato su `bubblewrap`, che li tiene dentro la cartella dell'attività. Da un AppImage Tost Work non può installarlo: esegui questi comandi in un terminale.",
+  "sandbox.pManual":
+    "Le AI lanciano i loro comandi in un sandbox basato su `bubblewrap`, che li tiene dentro la cartella dell'attività. Da un AppImage Tost Work non può configurarlo, quindi va sistemato nel sistema come descritto qui sotto.",
   "sandbox.tag.bwrap": "bubblewrap: manca",
   "sandbox.tag.socat": "socat: manca",
   "sandbox.tag.apparmor": "AppArmor: blocca bwrap",

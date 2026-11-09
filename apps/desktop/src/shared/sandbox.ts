@@ -7,14 +7,22 @@ import type { AgentProvider } from "./model";
  */
 export const claudeUnconfined = (platform: string): boolean => platform === "win32";
 
+/**
+ * Whether a run on `provider` has to wait for the user's OK: Claude runs unconfined here and the user hasn't yet
+ * pressed Continue on the notice that says so (`Settings.unconfinedAcknowledged`).
+ */
+export const needsUnconfinedOk = (provider: AgentProvider, platform: string, acknowledged: boolean): boolean =>
+  provider === "claude" && claudeUnconfined(platform) && !acknowledged;
+
 /** Whether a task on `provider` asks its CLI for a sandbox on `platform`. */
 export const sandboxFor = (provider: AgentProvider, platform: string): boolean =>
   !(provider === "claude" && claudeUnconfined(platform));
 
 /**
  * What a Linux sandbox lacks:
- * - `bwrap`: bubblewrap isn't on the PATH. Both CLIs use it (Codex falls back to a copy it bundles, but on Ubuntu that
- *   copy is blocked the same way, so the fix is the same).
+ * - `bwrap`: bubblewrap isn't on the PATH the CLIs get. Claude Code needs the system's. Codex falls back to a copy it
+ *   brings, so for Codex it's missing only when that copy is missing too or can't start: on Ubuntu 24.04 and later
+ *   AppArmor's profile covers only /usr/bin/bwrap, so then `userns` comes with it.
  * - `socat`: not on the PATH. Only Claude Code needs it, for its network proxy.
  * - `userns`: bubblewrap is there but can't create a user namespace. On Ubuntu 24.04 and later that's AppArmor's
  *   restriction, which an AppArmor profile for bwrap lifts.
