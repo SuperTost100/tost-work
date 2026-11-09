@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Icon } from "@/lib/Icon";
+import { Spinner } from "@/lib/Spinner";
 import { useT } from "@/lib/useT";
 import type { MessageKey } from "../../../shared/i18n";
 import { type Task, toReview } from "../../../shared/model";
@@ -69,13 +70,7 @@ export function TaskStatusIcon({ task }: { task: Task }) {
     task.status === "needs-you"
       ? ["need", <Icon key="i" name="hand" />]
       : task.status === "running"
-        ? [
-            "run",
-            <svg key="i" viewBox="0 0 16 16" aria-hidden="true">
-              <circle cx="8" cy="8" r="6" opacity="0.25" />
-              <path d="M8 2a6 6 0 0 1 6 6" />
-            </svg>,
-          ]
+        ? ["run", <Spinner key="i" />]
         : task.status === "draft"
           ? [
               "later",

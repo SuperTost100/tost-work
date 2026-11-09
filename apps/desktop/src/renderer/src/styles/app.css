@@ -533,7 +533,14 @@ h3 {
   width: 24px;
   height: 24px;
 }
-.st.run svg {
+.spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
   animation: spin 1.6s linear infinite;
 }
 .st.seen {
@@ -562,7 +569,7 @@ h3 {
   color: var(--danger);
 }
 @media (prefers-reduced-motion: reduce) {
-  .st.run svg {
+  .spinner {
     animation: none;
   }
 }
@@ -4371,9 +4378,8 @@ fieldset.fld > legend {
 :focus-visible {
   outline: none;
 }
-:root[data-keys] :focus-visible,
-input:not([type="radio"], [type="checkbox"]):focus-visible,
-select:focus-visible {
+:root[data-keys] :focus-visible:not(.input),
+input:not([type="radio"], [type="checkbox"], .input):focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
@@ -4382,7 +4388,7 @@ select:focus-visible {
   outline: none;
 }
 /* A text box shows its focus on its own frame, so the keyboard ring above stays off it. */
-:root[data-keys] textarea:focus-visible {
+:root[data-keys] textarea:not(.input):focus-visible {
   outline: none;
 }
 :root[data-keys] .composer:has(textarea:focus-visible) {
@@ -4438,6 +4444,10 @@ button.item {
 .btn:disabled {
   opacity: 0.4;
   cursor: default;
+}
+/* A button waiting for its work to end is dimmed less, so its spinner and label stay readable. */
+.btn.busy:disabled {
+  opacity: 0.75;
 }
 .composer textarea:disabled {
   cursor: default;
@@ -4773,9 +4783,14 @@ button.item {
     400 15px "Schibsted Grotesk",
     sans-serif;
 }
+/* One ring, for the mouse and the keyboard alike: the field's own border turns ink and a second ink line sits against
+   it, as a chosen card's does. A ring set off from the border, as the keyboard ring elsewhere is, drew two outlines. */
 .input:focus {
-  outline: none;
   border-color: var(--ink);
+}
+.input:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 0;
 }
 /* The system's arrow sits against the edge and differs per platform, so a select draws its own, inset like the text. */
 select.input {
@@ -4785,6 +4800,77 @@ select.input {
   background-repeat: no-repeat;
   background-position: right 11px center;
   background-size: 16px;
+}
+/* Where Chromium can customise a select (Electron 45 can), its list is drawn here, as the app's own menu: the same
+   paper, radius, shadow, row height and hover as .menu, and the select keeps its keyboard and screen-reader behaviour. */
+@supports (appearance: base-select) {
+  select.input,
+  select.input::picker(select) {
+    appearance: base-select;
+  }
+  select.input {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 11px;
+    background-image: none;
+    cursor: default;
+  }
+  select.input::picker-icon {
+    content: "";
+    width: 16px;
+    height: 16px;
+    margin-left: auto;
+    background-color: var(--t3);
+    mask: url("../assets/icons/down.svg") center / contain no-repeat;
+    transition: rotate 150ms ease-out;
+  }
+  select.input:open::picker-icon {
+    rotate: 180deg;
+  }
+  select.input::picker(select) {
+    box-sizing: border-box;
+    min-width: anchor-size(width);
+    margin: 4px 0;
+    /* Below the select, and above it only when there's no room, rather than on the side with the most. */
+    position-try-order: normal;
+    padding: 5px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 12px 32px rgba(27, 23, 18, 0.14);
+  }
+  select.input option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 8px;
+    font:
+      400 14px "Schibsted Grotesk",
+      sans-serif;
+    color: var(--ink);
+    cursor: default;
+  }
+  select.input option:is(:hover, :focus) {
+    background: var(--hover);
+  }
+  select.input option:checked {
+    background: var(--sel);
+  }
+  select.input option::checkmark {
+    content: "";
+    order: 1;
+    margin-left: auto;
+    width: 15px;
+    height: 15px;
+    background-color: currentColor;
+    mask: url("../assets/icons/check.svg") center / contain no-repeat;
+  }
 }
 fieldset.fld {
   margin: 0;
@@ -5107,12 +5193,13 @@ label.opt:hover:not(.on) {
 [data-full-screen] .lights-space {
   display: none;
 }
-/* In full screen there are no window buttons, so the sidebar button moves up into the logo's row. */
-[data-full-screen] .side .chrome {
+/* With no window buttons, in full screen and on Windows and Linux (whose title bar is the system's, above the page),
+   the sidebar button moves up into the logo's row instead of leaving an empty band over it. */
+:is([data-full-screen], :where(.app):not(.mac)) .side .chrome {
   position: relative;
   height: 0;
 }
-[data-full-screen] .side .chrome .iconbtn {
+:is([data-full-screen], :where(.app):not(.mac)) .side .chrome .iconbtn {
   position: absolute;
   top: 14px;
   right: 4px;
@@ -5121,7 +5208,7 @@ label.opt:hover:not(.on) {
   padding: 0;
   gap: 8px;
 }
-[data-full-screen] .side .brand {
+:is([data-full-screen], :where(.app):not(.mac)) .side .brand {
   padding-top: 16px;
 }
 .rail-chrome {
@@ -5131,7 +5218,7 @@ label.opt:hover:not(.on) {
   -webkit-app-region: drag;
 }
 /* The rail's logo stays level with the sidebar's. */
-[data-full-screen] .rail-chrome {
+:is([data-full-screen], :where(.app):not(.mac)) .rail-chrome {
   height: 10px;
 }
 /* A round of answered questions: one grey line like the steps, which opens onto each question and its answer. */
