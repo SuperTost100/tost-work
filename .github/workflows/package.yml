@@ -219,9 +219,12 @@ jobs:
           $winmd = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\UnionMetadata\*\Windows.winmd" | Sort-Object FullName | Select-Object -Last 1
           $facades = Get-ChildItem "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.*\Facades" -Directory | Sort-Object FullName | Select-Object -Last 1
           $runtime = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\System.Runtime.WindowsRuntime.dll"
-          & $csc /nologo /target:exe /platform:x64 /optimize "/out:apps/desktop/resources/bin/win-x64/startup-task.exe" `
+          # Full Windows paths: csc reads a forward slash as the start of an option.
+          $source = (Resolve-Path "apps\desktop\build\startup-task\StartupTask.cs").Path
+          $out = Join-Path (Resolve-Path "apps\desktop\resources\bin\win-x64").Path "startup-task.exe"
+          & $csc /nologo /target:exe /platform:x64 /optimize "/out:$out" `
             "/r:$($winmd.FullName)" "/r:$runtime" "/r:$($facades.FullName)\System.Runtime.dll" `
-            "/r:$($facades.FullName)\System.Threading.Tasks.dll" apps/desktop/build/startup-task/StartupTask.cs
+            "/r:$($facades.FullName)\System.Threading.Tasks.dll" $source
           if ($LASTEXITCODE -ne 0) { Write-Error "csc failed"; exit 1 }
       # The Store rejects a version starting with 0, so the package carries the Store's number for this version. The app
       # still shows its own: it's built into the code.
