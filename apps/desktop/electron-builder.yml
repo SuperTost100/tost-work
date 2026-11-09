@@ -4,6 +4,10 @@
 # builds started by hand, and signs pull-request builds ad-hoc instead.
 appId: one.tost.work
 productName: Tost Work
+# The packaged package.json is named tost-work, because the Windows installer names the install folder after it, which
+# would be "@tost-workdesktop" from the workspace name. Electron names the data folder after productName, so it doesn't move.
+extraMetadata:
+  name: tost-work
 directories:
   output: release
 files:
@@ -37,6 +41,9 @@ mac:
 linux:
   # Set here and not at the top level, where it would also rename the Mac bundle to tost-work.app.
   executableName: tost-work
+  # The .desktop file is named after package.json's desktopName, which Electron gives the window as its app id, so the
+  # dock shows the window under the app's own icon.
+  syncDesktopName: true
   category: Office
   target: [AppImage]
 win:
