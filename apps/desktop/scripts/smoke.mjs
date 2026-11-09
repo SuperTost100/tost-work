@@ -64,7 +64,8 @@ try {
     project.id,
   );
   let state;
-  for (let i = 0; i < 150; i++) {
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
     state = await page.evaluate((id) => window.tostWork.tasks.get(id), task.id);
     if (["done", "failed", "stopped"].includes(state.status)) break;
     if (state.question) await page.evaluate((id) => window.tostWork.tasks.answer(id, ["The client pays it"]), task.id);
