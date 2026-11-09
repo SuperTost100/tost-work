@@ -20,8 +20,9 @@ export const sandboxFor = (provider: AgentProvider, platform: string): boolean =
 
 /**
  * What a Linux sandbox lacks:
- * - `bwrap`: bubblewrap isn't on the PATH. Both CLIs use it (Codex falls back to a copy it bundles, but on Ubuntu that
- *   copy is blocked the same way, so the fix is the same).
+ * - `bwrap`: bubblewrap isn't on the PATH the CLIs get. Claude Code needs the system's. Codex falls back to a copy it
+ *   brings, so for Codex it's missing only when that copy is missing too or can't start: on Ubuntu 24.04 and later
+ *   AppArmor's profile covers only /usr/bin/bwrap, so then `userns` comes with it.
  * - `socat`: not on the PATH. Only Claude Code needs it, for its network proxy.
  * - `userns`: bubblewrap is there but can't create a user namespace. On Ubuntu 24.04 and later that's AppArmor's
  *   restriction, which an AppArmor profile for bwrap lifts.

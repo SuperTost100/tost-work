@@ -71,6 +71,7 @@ describe("errors from the IPC handlers", () => {
       debug as never,
       async () => "no",
       {} as never,
+      {} as never,
     );
     const followUp = handlers.get(IPC.tasksFollowUp);
     if (!followUp) throw new Error("the follow-up handler isn't registered");

@@ -43,7 +43,7 @@ import { ToolServer } from "./mcp/server";
 import { confirmsNotifications, Notifier } from "./notify";
 import { pickAi } from "./pickAi";
 import { WindowQuestions } from "./questions";
-import { checkSandbox } from "./sandbox";
+import { checkSandbox, systemFor } from "./sandbox";
 import { SkillFolder } from "./skills";
 import { SkillVersions } from "./skillVersions";
 import { setStartupTask } from "./startupTask";
@@ -211,6 +211,8 @@ app.whenReady().then(async () => {
   // Where people can see, back up and copy their skills, as the course teaches.
   // The Word, Excel, PowerPoint and PDF guides show among them as built in; earlier versions stay in the app's data.
   const documents = documentTools();
+  // The sandbox check looks for bubblewrap and socat on the PATH the CLIs get, which OfficeCLI's env sets.
+  const sandboxSystem = systemFor(documents?.env.PATH);
   const skills = new SkillFolder(
     join(app.getPath("documents"), "Tost Work", "Skills"),
     (path) => shell.trashItem(path),
@@ -286,7 +288,7 @@ app.whenReady().then(async () => {
       },
       courseKey: () => keys.get(),
       online: () => net.isOnline(),
-      sandboxReady: (provider) => checkSandbox(provider),
+      sandboxReady: (provider) => checkSandbox(provider, sandboxSystem),
       skills: () => skills.list(),
       job: (id) => store.getJob(id),
       verbose: () => debugOn,
@@ -645,6 +647,7 @@ app.whenReady().then(async () => {
     debugLogs,
     askInWindow,
     events,
+    sandboxSystem,
   );
   // Quitting stops the tasks still working, so it asks first, in the window's card. They show as interrupted, with
   // Resume, next time. Quit again while the card is open only brings the window forward.
