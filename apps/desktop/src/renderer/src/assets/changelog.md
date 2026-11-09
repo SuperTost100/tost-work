@@ -15,6 +15,16 @@
   wait here until the release bumps the version.
 -->
 
+## 0.0.30-dev
+
+### en
+
+- **Windows and Linux:** Tost Work now comes as a Windows installer and a Linux AppImage too, next to the Mac app. Neither is signed yet, so Windows asks for one extra click the first time: More info, then Run anyway.
+
+### it
+
+- **Windows e Linux:** Tost Work ora c'è anche come programma di installazione per Windows e come AppImage per Linux, oltre all'app per Mac. Nessuno dei due è ancora firmato, quindi la prima volta Windows chiede un clic in più: Ulteriori informazioni, poi Esegui comunque.
+
 ## 0.0.29-dev
 
 ### en
