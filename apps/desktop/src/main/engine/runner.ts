@@ -8,7 +8,7 @@ import { type Choice, choiceOf, type ModelChoices, type ModelPick } from "../../
 import { applyEvent, resume } from "../../shared/reduce";
 import type { Guard } from "../guard";
 import type { Store } from "../store/store";
-import { UserError, userMessage } from "../userError";
+import { SandboxNotReady, UserError, userMessage } from "../userError";
 import type { Engine } from "./engine";
 
 export interface NewTask {
@@ -186,7 +186,9 @@ export class TaskRunner {
     try {
       // An interrupted task stays resumable until its run really starts: a resume that fails at once, for example
       // offline, leaves Resume on the task to try again.
-      task = this.save({ ...task, status: "running", error: null, updatedAt: this.now() });
+      // A sandbox that couldn't start last time may have been fixed since: this run checks again.
+      const { sandboxNotReady: _fixed, ...rest } = task;
+      task = this.save({ ...rest, status: "running", error: null, updatedAt: this.now() });
       this.log("info", `Task ${taskId} started ${followUp === null ? "its first run" : "a run that follows up"}`, {
         provider: task.provider,
         model: task.model,
@@ -228,10 +230,12 @@ export class TaskRunner {
           : latest;
     } catch (err) {
       const message = userMessage(err, this.language());
+      // What the sandbox lacks goes on the task with the sentence, for the window's notice.
+      const sandbox = err instanceof SandboxNotReady ? { sandboxNotReady: err.readiness } : {};
       const current = this.mustGet(taskId);
       task = current.interrupted
-        ? this.save({ ...current, status: "stopped", error: message, updatedAt: this.now() })
-        : this.save(applyEvent(current, { type: "failed", error: message }, this.now()));
+        ? this.save({ ...current, status: "stopped", error: message, ...sandbox, updatedAt: this.now() })
+        : this.save(applyEvent(current, { type: "failed", error: message, ...sandbox }, this.now()));
     } finally {
       this.running.delete(taskId);
       this.drafts.delete(taskId);

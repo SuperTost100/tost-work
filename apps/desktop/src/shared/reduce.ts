@@ -66,7 +66,14 @@ export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
         steps: task.steps.map((s) => ({ ...s, status: "done" })),
       };
     case "failed":
-      return { ...next, status: "failed", error: event.error, question: null, approval: null };
+      return {
+        ...next,
+        status: "failed",
+        error: event.error,
+        question: null,
+        approval: null,
+        ...(event.sandboxNotReady ? { sandboxNotReady: event.sandboxNotReady } : {}),
+      };
     case "stopped":
       return { ...next, status: "stopped", question: null, approval: null };
   }

@@ -5,7 +5,9 @@ import { join } from "node:path";
 import type { FunnelEvent, RunRequest } from "cli-funnel";
 import { describe, expect, it } from "vitest";
 import type { Decision, EngineEvent, Task } from "../../shared/model";
-import { AgentEngine, type AgentFunnel, deletesFiles, isNetworkError } from "./agent";
+import type { SandboxReadiness } from "../../shared/sandbox";
+import { SandboxNotReady } from "../userError";
+import { AgentEngine, type AgentFunnel, asCodexRequest, deletesFiles, isNetworkError } from "./agent";
 
 type Emit = (event: FunnelEvent) => void;
 type Script = (input: RunRequest, emit: Emit) => Promise<{ text: string; finishReason?: string }>;
@@ -853,6 +855,56 @@ describe("deletesFiles", () => {
       expect(deletesFiles(command), command).toBe(true);
   });
 
+  it("finds Windows commands that delete, from Claude Code's PowerShell tool and from Codex", () => {
+    // Codex on Windows wraps each command like this.
+    const codex = (inner: string) =>
+      String.raw`"C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -Command '${inner}'`;
+    const encoded = (text: string) => Buffer.from(text, "utf16le").toString("base64");
+    for (const command of [
+      "Remove-Item C:\\Users\\me\\proj\\old.docx",
+      "remove-item -Recurse -Force drafts",
+      "Get-ChildItem *.tmp | Remove-Item",
+      "ri old.docx",
+      "Get-ChildItem *.tmp | ri",
+      "rm old.docx",
+      "del old.docx",
+      "Del .\\old.docx",
+      "erase old.docx",
+      "rd /s /q drafts",
+      "rmdir drafts",
+      "cd out; RI old.docx",
+      "[System.IO.File]::Delete('C:\\Users\\me\\proj\\old.docx')",
+      "[IO.Directory]::Delete('drafts', $true)",
+      "(Get-Item old.docx).Delete()",
+      'cmd /c "del old.docx"',
+      '"C:\\Windows\\system32\\cmd.exe" /c "rd /s /q drafts"',
+      codex("del old.docx"),
+      codex("rm old.docx"),
+      codex("ri old.docx"),
+      codex("Remove-Item old.docx"),
+      'powershell -ExecutionPolicy Bypass -Command "del old.docx"',
+      `powershell -NoProfile -EncodedCommand ${encoded("ri old.docx")}`,
+      `pwsh.exe -enc ${encoded("del old.docx")}`,
+    ])
+      expect(deletesFiles(command), command).toBe(true);
+  });
+
+  it("leaves alone Windows commands that only read or write text", () => {
+    const codex = (inner: string) =>
+      String.raw`"C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -Command '${inner}'`;
+    const encoded = (text: string) => Buffer.from(text, "utf16le").toString("base64");
+    for (const command of [
+      codex("Get-ChildItem ."),
+      codex('Set-Content -Path note.txt -Value "Scaletta del corso"'),
+      "Get-Content programma.md",
+      "Write-Output 'Obiettivi del corso'",
+      'Set-Content note.txt "rd round"',
+      "Get-ChildItem -Recurse | Select-Object Name",
+      `powershell -NoProfile -EncodedCommand ${encoded("Get-ChildItem .")}`,
+    ])
+      expect(deletesFiles(command), command).toBe(false);
+  });
+
   it("leaves alone words inside the text a command writes", () => {
     for (const command of [
       "python3 - <<'PY'\nparas = ['Scaletta del corso', 'rd round']\ndel paras[0]\nPY",
@@ -865,5 +917,106 @@ describe("deletesFiles", () => {
       "cat <<'EOF' > plan.md\n$(rm old.docx)\nEOF",
     ])
       expect(deletesFiles(command), command).toBe(false);
+  });
+});
+
+const READY: SandboxReadiness = { ready: true, missing: [], distro: null, appArmorRestrictsUserns: null };
+
+describe("the sandbox", () => {
+  /** A run on `platform`, with the sandbox check given, returning what reached cli-funnel and the error, if any. */
+  async function runOn(
+    platform: string,
+    provider: "codex" | "claude",
+    ready: (provider: "codex" | "claude") => Promise<SandboxReadiness> = async () => READY,
+  ) {
+    const { funnel, inputs } = fakeFunnel(async () => ({ text: "ok" }));
+    const checked: string[] = [];
+    const engine = new AgentEngine(funnel, () => "it", {
+      platform,
+      sandboxReady: (p) => {
+        checked.push(p);
+        return ready(p);
+      },
+    });
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const signal = new AbortController().signal;
+    let error: unknown = null;
+    try {
+      for await (const _ of engine.run({
+        task: task({ provider }),
+        project: null,
+        workdir: "/w",
+        followUp: null,
+        signal,
+      }));
+    } catch (err) {
+      error = err;
+    }
+    return { input: inputs[0], checked, error };
+  }
+
+  it("asks every CLI for a sandbox, except Claude Code on Windows, which has none", async () => {
+    for (const [platform, provider, sandbox] of [
+      ["darwin", "codex", true],
+      ["darwin", "claude", true],
+      ["linux", "codex", true],
+      ["linux", "claude", true],
+      ["win32", "codex", true],
+      ["win32", "claude", false],
+    ] as const) {
+      const { input, error } = await runOn(platform, provider);
+      expect(error, `${platform} ${provider}`).toBeNull();
+      expect(input?.sandbox, `${platform} ${provider}`).toBe(sandbox);
+    }
+  });
+
+  it("fails a task at once, saying what's missing, when its sandbox can't start", async () => {
+    const missing: SandboxReadiness = {
+      ready: false,
+      missing: ["socat"],
+      distro: { id: "ubuntu", like: ["debian"], name: "Ubuntu", version: "24.04" },
+      appArmorRestrictsUserns: true,
+    };
+    const { input, checked, error } = await runOn("linux", "claude", async () => missing);
+    expect(input).toBeUndefined();
+    expect(checked).toEqual(["claude"]);
+    expect(error).toBeInstanceOf(SandboxNotReady);
+    expect((error as SandboxNotReady).readiness).toEqual(missing);
+    expect((error as SandboxNotReady).provider).toBe("claude");
+    expect((error as SandboxNotReady).say("it")).toMatch(/Claude non può ancora lavorare.*socat non è installato/);
+
+    // Claude Code on Windows runs without a sandbox, so there's nothing to check.
+    const windows = await runOn("win32", "claude", async () => missing);
+    expect(windows.checked).toEqual([]);
+    expect(windows.error).toBeNull();
+  });
+
+  it("puts Claude Code's PowerShell commands through the same policy as Bash", async () => {
+    expect(await asCodexRequest({ id: "1", tool: "PowerShell", input: { command: "ri old.docx" } }, "/w")).toEqual({
+      id: "1",
+      tool: "command",
+      input: { command: "ri old.docx" },
+    });
+    const decisions: unknown[] = [];
+    const { funnel } = fakeFunnel(async (input) => {
+      for (const command of ["Remove-Item old.docx", "del old.docx", "Get-ChildItem ."])
+        decisions.push(await input.onApproval?.({ id: command, tool: "PowerShell", input: { command } }));
+      return { text: "" };
+    });
+    const engine = new AgentEngine(funnel, () => "it", { platform: "win32" });
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const signal = new AbortController().signal;
+    for await (const _ of engine.run({
+      task: task({ provider: "claude" }),
+      project: null,
+      workdir: "/w",
+      followUp: null,
+      signal,
+    }));
+    expect(decisions).toEqual([
+      expect.objectContaining({ decision: "deny", message: expect.stringMatching(/Don't delete files/) }),
+      expect.objectContaining({ decision: "deny", message: expect.stringMatching(/Don't delete files/) }),
+      "allow",
+    ]);
   });
 });

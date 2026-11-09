@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 import { describe, expect, it, vi } from "vitest";
 import { IPC } from "../shared/api";
-import { UserError, userMessage } from "./userError";
+import { SandboxNotReady, UserError, userMessage } from "./userError";
 
 const handlers = new Map<string, (...args: unknown[]) => unknown>();
 vi.mock("electron", () => ({
@@ -28,6 +28,22 @@ describe("UserError", () => {
     const err = new UserError("error.notAFile", { name: "notes" });
     expect(err.message).toBe("notes isn't a file");
     expect(userMessage(err, "it")).toBe("notes non è un file");
+  });
+
+  it("lists what a sandbox lacks in the language asked for", () => {
+    const err = new SandboxNotReady("codex", {
+      ready: false,
+      missing: ["bwrap", "userns"],
+      distro: null,
+      appArmorRestrictsUserns: null,
+    });
+    expect(err).toBeInstanceOf(UserError);
+    expect(err.message).toBe(
+      "ChatGPT can't work safely on this computer yet, because its sandbox can't start: bubblewrap isn't installed, the system doesn't let bubblewrap create user namespaces. Fix that in a terminal, then send the task again.",
+    );
+    expect(userMessage(err, "it")).toMatch(
+      /^ChatGPT non può ancora .*: bubblewrap non è installato, il sistema non permette a bubblewrap di creare user namespace\./,
+    );
   });
 
   it("leaves any other error as it is", () => {

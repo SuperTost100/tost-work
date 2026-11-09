@@ -42,6 +42,7 @@ import { ToolServer } from "./mcp/server";
 import { confirmsNotifications, Notifier } from "./notify";
 import { pickAi } from "./pickAi";
 import { WindowQuestions } from "./questions";
+import { checkSandbox } from "./sandbox";
 import { SkillFolder } from "./skills";
 import { SkillVersions } from "./skillVersions";
 import { setStartupTask } from "./startupTask";
@@ -263,6 +264,7 @@ app.whenReady().then(async () => {
       },
       courseKey: () => keys.get(),
       online: () => net.isOnline(),
+      sandboxReady: (provider) => checkSandbox(provider),
       skills: () => skills.list(),
       job: (id) => store.getJob(id),
       verbose: () => debugOn,
