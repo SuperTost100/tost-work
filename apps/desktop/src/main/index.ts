@@ -46,10 +46,26 @@ import { SkillFolder } from "./skills";
 import { SkillVersions } from "./skillVersions";
 import { setStartupTask } from "./startupTask";
 import { Store } from "./store/store";
-import { opensWindow, panelBounds, staysInMenuBar, trayMenu } from "./tray";
+import { opensWindow, panelBounds, type SecondLaunch, showsForSecondLaunch, staysInMenuBar, trayMenu } from "./tray";
 import { buttonsPosition } from "./windowButtons";
 
 const isMac = process.platform === "darwin";
+
+// One copy of Tost Work at a time, since two would write to the same database. A second launch quits here, before
+// anything opens the database, and tells the running copy, which brings its window forward unless the login started
+// the second one. Electron ties the lock to the data folder, so a test run with its own --user-data-dir still starts
+// next to an installed copy.
+const launch: SecondLaunch = { atLogin: process.argv.includes(AT_LOGIN) };
+const firstCopy = app.requestSingleInstanceLock(launch);
+if (!firstCopy) app.exit(0);
+// Set once the app is ready. A second launch before then is remembered, and the window shows once the app can show it.
+let showForSecondLaunch: (() => void) | null = null;
+let secondLaunchWaiting = false;
+app.on("second-instance", (_e, argv, data) => {
+  if (!showsForSecondLaunch(data, argv)) return;
+  if (showForSecondLaunch) showForSecondLaunch();
+  else secondLaunchWaiting = true;
+});
 
 let mainWindow: BrowserWindow | null = null;
 // The menu-bar panel, once the icon has been clicked. Hidden rather than closed between clicks.
@@ -177,6 +193,8 @@ function createWindow(store: Store): BrowserWindow {
 }
 
 app.whenReady().then(async () => {
+  // This copy is quitting because another one runs.
+  if (!firstCopy) return;
   // Codex's Windows installer puts it where cli-funnel doesn't look, so it's pointed there before anything runs.
   findInstalledCodex();
   const store = new Store(join(app.getPath("userData"), "tost-work.db"));
@@ -655,6 +673,8 @@ app.whenReady().then(async () => {
   const startedAtLogin = process.argv.includes(AT_LOGIN) || (isMac && app.getLoginItemSettings().wasOpenedAtLogin);
   if (opensWindow(startedAtLogin, store.getSettings())) mainWindow = createWindow(store);
   else if (isMac) void app.dock?.hide();
+  showForSecondLaunch = () => showWindow();
+  if (secondLaunchWaiting) showWindow();
   // Closing the window leaves Tost Work in the menu bar (the tray elsewhere), and a Mac drops its Dock icon until the
   // window comes back. Without that, Windows and Linux quit, and a Mac keeps the app in the Dock, as Mac apps do.
   mainClosed = () => {
