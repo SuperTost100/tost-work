@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { EngineEvent, Task } from "../../shared/model";
 import { Store } from "../store/store";
-import { UserError } from "../userError";
+import { SandboxNotReady, UserError } from "../userError";
 import type { Engine, RunContext } from "./engine";
 import { FakeEngine, PROPOSAL_SCRIPT } from "./fake";
 import { decisionNote, FILES_ONLY, RESUME_PROMPT, TaskRunner, taskTitle, titleFrom, withFiles } from "./runner";
@@ -212,6 +212,52 @@ describe("TaskRunner when a run fails with a message for the user", () => {
       status: "failed",
       error: "Questa attività usava la chiave del corso, che non c'è più. Incollala di nuovo in Impostazioni.",
     });
+  });
+});
+
+describe("TaskRunner when the sandbox can't start", () => {
+  it("saves what's missing with the sentence, and clears it when the next run starts", async () => {
+    const store = new Store(":memory:");
+    const readiness = {
+      ready: false,
+      missing: ["socat" as const],
+      distro: { id: "ubuntu", like: ["debian"], name: "Ubuntu", version: "24.04" },
+      appArmorRestrictsUserns: true,
+    };
+    let fixed = false;
+    const engine: Engine = {
+      defaults: async () => ({ provider: "claude", model: "m", effort: "low" }),
+      choices: async () => ({ ai: "claude", provider: "claude", lists: [] }),
+      async *run() {
+        if (!fixed) throw new SandboxNotReady("claude", readiness);
+        yield { type: "message", text: "Done" };
+      },
+      answer: () => false,
+      decide: () => false,
+    };
+    const runner = new TaskRunner(
+      store,
+      engine,
+      () => {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      () => "it",
+    );
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
+    await runner.start(task.id);
+    expect(store.getTask(task.id)).toMatchObject({
+      status: "failed",
+      error: expect.stringMatching(/Claude non può ancora lavorare in sicurezza.*socat non è installato/),
+      sandboxNotReady: readiness,
+    });
+
+    fixed = true;
+    await runner.start(task.id, "Try again");
+    const after = store.getTask(task.id);
+    expect(after?.status).toBe("done");
+    expect(after).not.toHaveProperty("sandboxNotReady");
   });
 });
 

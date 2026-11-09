@@ -264,6 +264,10 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   };
   const api: MemoryApi = {
     platform: "linux",
+    claudeUnconfined: false,
+    sandbox: {
+      check: async () => ({ ready: true, missing: [], distro: null, appArmorRestrictsUserns: null }),
+    },
     pickInMenu: (action) => {
       menuPick = action;
     },

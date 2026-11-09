@@ -13,10 +13,11 @@ import {
   type ModelPick,
   pickOn,
 } from "../../shared/modelChoice";
+import { type SandboxReadiness, sandboxFor } from "../../shared/sandbox";
 import type { TaskLog } from "../debugLog";
 import { freeName, inside } from "../files";
 import type { ToolHandler } from "../mcp/server";
-import { UserError } from "../userError";
+import { SandboxNotReady, UserError } from "../userError";
 import { activityOf, noteText } from "./activity";
 import type { Engine, RunContext } from "./engine";
 import { instructionsFor } from "./instructions";
@@ -64,24 +65,40 @@ export const UNUSED_CLAUDE_TOOLS = [
   "Workflow",
 ];
 
+/** A sandbox with nothing missing, for an engine that isn't told how to check. */
+const READY: SandboxReadiness = { ready: true, missing: [], distro: null, appArmorRestrictsUserns: null };
+
 const END_TURN =
   "It's in front of the user now. End your turn here: don't do anything else and don't repeat it. Their reply arrives as your next message.";
 
 /**
  * Shell words that delete. Any standalone one counts, whatever comes before it (sudo, env, options, then, xargs), so
- * the check runs only on what the shell runs: shellText takes out the text a command writes.
+ * the check runs only on what the shell runs: shellText takes out the text a command writes. The Windows ones are
+ * cmd's del, erase, rd and rmdir, and PowerShell's aliases for Remove-Item: rm, ri, del, erase, rd and rmdir.
  */
-const SHELL_DELETES = /(^|[\s;&|(`{!])(rm|rmdir|del|erase|rd|unlink|shred|trash)(\s|$)|(^|\s)find\s[^\n]*\s-delete\b/im;
-/** Deletions in code a command runs, such as a Python, Node or PowerShell script. Looked for in the whole command. */
+const SHELL_DELETES =
+  /(^|[\s;&|(`{!])(rm|rmdir|del|erase|rd|ri|unlink|shred|trash)(\s|$)|(^|\s)find\s[^\n]*\s-delete\b/im;
+/**
+ * Deletions in code a command runs, such as a Python, Node or PowerShell script. Looked for in the whole command.
+ * PowerShell's also include .NET's [IO.File]::Delete(…) and (Get-Item x).Delete().
+ */
 const CODE_DELETES =
-  /os\.(remove|unlink|rmdir)\(|shutil\.rmtree\(|\.(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync)\(|Remove-Item/i;
+  /os\.(remove|unlink|rmdir)\(|shutil\.rmtree\(|\.(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync)\(|Remove-Item|::Delete\(|\.Delete\(\)/i;
 /** A shell where a command starts, by name or path: bash and /bin/sh, but not a file named cleanup.sh. */
 const SHELL = String.raw`(^|[\s;&|(])(\S*\/)?((ba|z|da|k)?sh|fish)`;
-/** A shell's flag for running the string that follows: that string is a command, not text. */
+/** A PowerShell option, with its value when it has one, such as -NoProfile or -ExecutionPolicy Bypass. */
+const PS_OPTION = String.raw`-\w+(\s+[^-\s'"]\S*)?\s+`;
+/**
+ * A shell's flag for running the string that follows: that string is a command, not text. On Windows the program's
+ * path may be quoted, as in Codex's `"C:\…\powershell.exe" -NoProfile -Command '…'`.
+ */
 const PAYLOAD = new RegExp(
-  String.raw`${SHELL}\s+(-\w+\s+)*-c\s*$|\bcmd(\.exe)?\s+\/[ck]\s*$|\b(powershell|pwsh)(\.exe)?\s+(-\w+\s+)*-c(ommand)?\s*$`,
+  String.raw`${SHELL}\s+(-\w+\s+)*-c\s*$|\bcmd(\.exe)?["']?\s+\/[ck]\s*$|\b(powershell|pwsh)(\.exe)?["']?\s+(${PS_OPTION})*-c(ommand)?\s*$`,
   "i",
 );
+/** PowerShell's -EncodedCommand (or -enc, -e), whose base64 hides the command it runs. */
+const ENCODED =
+  /\b(?:powershell|pwsh)(?:\.exe)?["']?(?:[ \t]+\S+)*?[ \t]+-e(?:c|nc|ncodedcommand)?[ \t]+['"]?([A-Za-z0-9+/=]+)/gi;
 /** A line that hands a heredoc to a shell, whose body is then commands. */
 const SHELL_READS = new RegExp(String.raw`${SHELL}(\s|<|$)`);
 const HEREDOC = /<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2[ \t]*(?=\n|$)/g;
@@ -120,7 +137,11 @@ function shellText(command: string): string {
  * shortcut: a script that deletes in another way still deletes; snapshot the folder before each run to close the gap.
  */
 export function deletesFiles(command: string): boolean {
-  return CODE_DELETES.test(command) || SHELL_DELETES.test(shellText(command));
+  if (CODE_DELETES.test(command) || SHELL_DELETES.test(shellText(command))) return true;
+  // PowerShell reads -EncodedCommand as base64 of UTF-16LE text.
+  return [...command.matchAll(ENCODED)].some((m) =>
+    deletesFiles(Buffer.from(m[1] ?? "", "base64").toString("utf16le")),
+  );
 }
 
 /** OfficeCLI and the document skills, which the agent uses for Word, Excel, PowerPoint and PDF files. */
@@ -196,6 +217,12 @@ function changesOf(input: unknown): { path: string; kind: string }[] {
   });
 }
 
+/**
+ * Claude Code's tools that run a command: Bash, and on Windows PowerShell. Without Git for Windows Claude Code offers
+ * only PowerShell there; with it, both.
+ */
+const CLAUDE_COMMANDS = new Set(["Bash", "PowerShell"]);
+
 /** Claude Code's tools that write one file, and the input field with its path. */
 const CLAUDE_WRITES: Record<string, string> = {
   Write: "file_path",
@@ -221,14 +248,14 @@ async function realTarget(path: string): Promise<string> {
 }
 
 /**
- * A Claude Code approval request in the shape Codex sends, so one policy covers both: Bash becomes a command, and a
- * tool that writes a file becomes a file change, an add when the file isn't there yet. Null for a write outside the
+ * A Claude Code approval request in the shape Codex sends, so one policy covers both: Bash and PowerShell become a
+ * command, and a tool that writes a file becomes a file change, an add when the file isn't there yet. Null for a write outside the
  * folder, which Codex's sandbox would have stopped. Links are resolved first, because on a Mac a temporary folder
  * under /var is really under /private/var.
  */
 export async function asCodexRequest(request: ApprovalRequest, workdir: string): Promise<ApprovalRequest | null> {
   const input = (request.input ?? {}) as Record<string, unknown>;
-  if (request.tool === "Bash") return { ...request, tool: "command", input: { command: input.command } };
+  if (CLAUDE_COMMANDS.has(request.tool)) return { ...request, tool: "command", input: { command: input.command } };
   const field = CLAUDE_WRITES[request.tool];
   const target = field ? input[field] : undefined;
   if (typeof target !== "string") return request;
@@ -275,6 +302,8 @@ export class AgentEngine implements Engine, ToolHandler {
   private job: (id: string) => Pick<Job, "title" | "output"> | undefined;
   private taskLog: (taskId: string, secrets: (string | undefined)[]) => TaskLog;
   private verbose: () => boolean;
+  private platform: string;
+  private sandboxReady: (provider: AgentProvider) => Promise<SandboxReadiness>;
 
   constructor(
     private funnel: AgentFunnel,
@@ -299,6 +328,10 @@ export class AgentEngine implements Engine, ToolHandler {
       verbose?: () => boolean;
       /** The task's debug log, which writes only while debug is on. `secrets` are masked in every line. */
       taskLog?: (taskId: string, secrets: (string | undefined)[]) => TaskLog;
+      /** The system the CLIs run on, which decides whether Claude Code gets a sandbox. */
+      platform?: string;
+      /** Whether the sandbox can start for an AI, checked before each run. Ready when not given. */
+      sandboxReady?: (provider: AgentProvider) => Promise<SandboxReadiness>;
     } = {},
   ) {
     this.documents = options.documents ?? null;
@@ -311,6 +344,8 @@ export class AgentEngine implements Engine, ToolHandler {
     this.job = options.job ?? (() => undefined);
     this.verbose = options.verbose ?? (() => false);
     this.taskLog = options.taskLog ?? (() => ({ write: () => {} }));
+    this.platform = options.platform ?? process.platform;
+    this.sandboxReady = options.sandboxReady ?? (async () => READY);
   }
 
   /** Why the task can't reach its AI, in the user's language. */
@@ -390,6 +425,16 @@ export class AgentEngine implements Engine, ToolHandler {
     if (!this.tools) throw new Error("The tool server isn't attached");
     // Without a connection Codex retries for minutes before it gives up, so the task fails straight away instead.
     if (!this.online()) throw new Error(this.offline(task.provider ?? "codex"));
+    // On Linux a sandbox that can't start would fail Claude Code with its own error, and leave Codex running with
+    // every command failing. So the task fails here, saying what to install.
+    const sandbox = sandboxFor(task.provider ?? "codex", this.platform);
+    if (sandbox) {
+      const readiness = await this.sandboxReady(task.provider ?? "codex");
+      if (!readiness.ready) {
+        this.taskLog(task.id, []).write({ type: "sandbox.not-ready", ...readiness });
+        throw new SandboxNotReady(task.provider ?? "codex", readiness);
+      }
+    }
     const channel = new Channel<EngineEvent>();
     // Files the task created. A file with a kept copy existed before the task (it was overwritten with approval, or
     // restored since), so changing it again always asks.
@@ -425,6 +470,7 @@ export class AgentEngine implements Engine, ToolHandler {
       model: task.model,
       effort: task.effort,
       access: "supervised",
+      sandbox,
       cwd: workdir,
       ...(task.sessionId ? { sessionId: task.sessionId } : {}),
       followUp: followUp !== null,
@@ -470,8 +516,9 @@ export class AgentEngine implements Engine, ToolHandler {
       verbose: this.verbose(),
       // Claude Code's file tools are held to the folder by the approval policy, but a shell command could write
       // anywhere: its sandbox stops that. Codex at supervised was sandboxed already. A sandbox that can't start fails
-      // the run rather than letting it go unconfined.
-      sandbox: true,
+      // the run rather than letting it go unconfined, except for Claude Code on Windows, which has none: there it
+      // runs without one, and setup warns the user (see claudeUnconfined).
+      sandbox,
       sessionId: task.sessionId,
       signal,
       planTool: true,

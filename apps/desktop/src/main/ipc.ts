@@ -46,6 +46,7 @@ import {
 import type { Installer } from "./installer";
 import { type Jobs, jobDraft } from "./jobs";
 import type { KeyStore } from "./keys";
+import { checkSandbox } from "./sandbox";
 import type { GuideText, SkillFolder } from "./skills";
 import type { Store } from "./store/store";
 import { UserError, userMessage } from "./userError";
@@ -122,6 +123,11 @@ export function registerIpc(
   handle(IPC.accountInstall, (_e, provider: unknown) => {
     account(provider);
     return installer.install(provider as AgentProvider);
+  });
+  handle(IPC.sandboxCheck, (_e, provider: unknown) => {
+    if (provider !== null && provider !== "codex" && provider !== "claude")
+      throw new Error("provider must be codex, claude or null");
+    return checkSandbox(provider);
   });
   handle(IPC.keyInfo, () => keys.info());
   handle(IPC.keySave, (_e, key: unknown) => keys.save(text(key, "key", 400).trim()));

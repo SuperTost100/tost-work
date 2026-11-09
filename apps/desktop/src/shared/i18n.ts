@@ -702,6 +702,11 @@ const en = {
   "error.tooManyFiles": "Too many files called {name} in that folder",
   "error.notAFile": "{name} isn't a file",
   "error.noModels": "{ai} lists no models. Check that it's installed.",
+  "error.sandboxNotReady":
+    "{ai} can't work safely on this computer yet, because its sandbox can't start: {missing}. Fix that in a terminal, then send the task again.",
+  "sandbox.missing.bwrap": "bubblewrap isn't installed",
+  "sandbox.missing.socat": "socat isn't installed",
+  "sandbox.missing.userns": "the system doesn't let bubblewrap create user namespaces",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -1412,6 +1417,11 @@ const it: Record<MessageKey, string> = {
   "error.tooManyFiles": "In quella cartella ci sono troppi file chiamati {name}",
   "error.notAFile": "{name} non è un file",
   "error.noModels": "{ai} non elenca nessun modello. Controlla che sia installato.",
+  "error.sandboxNotReady":
+    "{ai} non può ancora lavorare in sicurezza su questo computer, perché la sua sandbox non si avvia: {missing}. Sistemalo da un terminale e poi invia di nuovo l'attività.",
+  "sandbox.missing.bwrap": "bubblewrap non è installato",
+  "sandbox.missing.socat": "socat non è installato",
+  "sandbox.missing.userns": "il sistema non permette a bubblewrap di creare user namespace",
 };
 
 export type Language = "en" | "it";

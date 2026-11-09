@@ -1,6 +1,7 @@
 /** The data Tost Work keeps about projects and tasks. Shared by the main process and the interface. */
 
 import type { Choice, ModelPick } from "./modelChoice";
+import type { SandboxReadiness } from "./sandbox";
 import type { JobSchedule } from "./schedule";
 
 export interface Project {
@@ -197,6 +198,11 @@ export interface Task {
    */
   reviewedAt?: string;
   error: string | null;
+  /**
+   * Set when the last run couldn't start because its AI's sandbox can't on this Linux system: what's missing, so the
+   * window can show how to fix it. `error` has the plain sentence. A new run clears it.
+   */
+  sandboxNotReady?: SandboxReadiness;
   createdAt: string;
   updatedAt: string;
 }
@@ -217,7 +223,7 @@ export type EngineEvent =
   | { type: "approval"; approval: Approval }
   | { type: "review"; review: Review }
   | { type: "done" }
-  | { type: "failed"; error: string }
+  | { type: "failed"; error: string; sandboxNotReady?: SandboxReadiness }
   | { type: "stopped" };
 
 /** A finished task the user hasn't marked as reviewed yet. */
