@@ -65,14 +65,64 @@ describe("the three choices", () => {
     expect(resolvePreset("balanced", "codex", [terra])?.effort).toBe("high");
   });
 
-  it("falls back to the AI's own default model when a mapped model isn't offered", () => {
-    const only = [model("gpt-6-sol", ["low", "medium"], "medium")];
+  it("falls back to the AI's own default model, at the choice's level, when nothing nearer is offered", () => {
+    const only = [model("gpt-6-sol", ["low", "medium", "high"], "low")];
     const found = resolvePreset("fast", "codex", only);
     expect([found?.model.id, found?.effort]).toEqual(["gpt-6-sol", "medium"]);
     // Claude's default is Sonnet by name, not the largest model first in the list.
     const noHaiku = claude.filter((m) => m.id !== "claude-haiku-5-5");
     const fast = resolvePreset("fast", "claude", noHaiku);
     expect(fast?.model.id).toBe("claude-sonnet-5-5");
+  });
+
+  it("gives each choice a different model or level on a ChatGPT Go plan, which lacks GPT-6.1 Terra and Sol", () => {
+    // What Codex 0.167.0's model/list gave a Go account on 2026-11-10, in its order.
+    const go = [
+      { ...model("gpt-6-luna", ALL, "medium"), name: "GPT-6-Luna" },
+      { ...model("gpt-5.6-terra", [...ALL, "ultra"], "medium"), name: "GPT-5.6-Terra" },
+      { ...model("gpt-5.6-luna", ALL, "medium"), name: "GPT-5.6-Luna" },
+    ];
+    const run = (preset: "fast" | "balanced" | "thorough") => {
+      const found = resolvePreset(preset, "codex", go);
+      return `${found?.model.id} ${found?.effort}`;
+    };
+    expect(run("fast")).toBe("gpt-6-luna medium");
+    // GPT-6.1 Terra's place goes to the newest Terra on offer.
+    expect(run("balanced")).toBe("gpt-5.6-terra medium");
+    // No Sol at all: the balanced choice's model, at the thorough choice's own level.
+    expect(run("thorough")).toBe("gpt-5.6-terra high");
+  });
+
+  it("takes the newest model of the family, newer than the one named too", () => {
+    const named = (id: string, name: string) => ({ ...model(id), name });
+    const list = [
+      named("gpt-6-luna", "GPT-6-Luna"),
+      named("gpt-5.6-sol", "GPT-5.6-Sol"),
+      named("gpt-6-sol", "GPT-6-Sol"),
+      named("gpt-6.2-terra", "GPT-6.2 Terra"),
+    ];
+    expect(resolvePreset("thorough", "codex", list)?.model.id).toBe("gpt-6-sol");
+    expect(resolvePreset("balanced", "codex", list)?.model.id).toBe("gpt-6.2-terra");
+  });
+
+  it("finds the family of a model listed without a name, by its id", () => {
+    // model() names each one by its id, as the app does when the list carries no names.
+    const go = [model("gpt-6-luna"), model("gpt-5.6-terra"), model("gpt-5.6-luna")];
+    expect(resolvePreset("balanced", "codex", go)?.model.id).toBe("gpt-5.6-terra");
+  });
+
+  it("takes another Opus before Sonnet when the named Opus isn't offered", () => {
+    const list = [model("claude-opus-5-6"), model("claude-sonnet-5-5"), model("claude-haiku-5-5")];
+    const found = resolvePreset("thorough", "claude", list);
+    expect([found?.model.id, found?.effort]).toEqual(["claude-opus-5-6", "high"]);
+  });
+
+  it("keeps the thorough choice apart from the balanced one on a newer Sonnet alone", () => {
+    const list = [model("claude-sonnet-5-6"), model("claude-haiku-5-5")];
+    const balanced = resolvePreset("balanced", "claude", list);
+    const thorough = resolvePreset("thorough", "claude", list);
+    expect([balanced?.model.id, balanced?.effort]).toEqual(["claude-sonnet-5-6", "high"]);
+    expect([thorough?.model.id, thorough?.effort]).toEqual(["claude-sonnet-5-6", "xhigh"]);
   });
 
   it("gives nothing when the AI lists no models", () => {

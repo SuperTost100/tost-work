@@ -4,7 +4,7 @@
   "desktopName": "tost-work.desktop",
   "description": "Everyday work with AI: projects, skills and scheduled jobs, on your own ChatGPT or Claude subscription.",
   "author": "Tommaso Barbera",
-  "version": "0.0.31-dev",
+  "version": "0.0.32-dev",
   "private": true,
   "type": "module",
   "main": "out/main/index.js",
@@ -28,7 +28,7 @@
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@vitejs/plugin-react": "6.2.1",
+    "@vitejs/plugin-react": "6.3.0",
     "docx-preview": "0.4.1",
     "dompurify": "3.4.17",
     "electron": "45.2.3",
@@ -41,7 +41,7 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "typescript": "7.0.2",
-    "vite": "8.3.6",
+    "vite": "8.3.7",
     "vitest": "5.1.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }

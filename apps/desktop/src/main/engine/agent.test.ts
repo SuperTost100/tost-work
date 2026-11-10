@@ -273,7 +273,7 @@ describe("AgentEngine", () => {
       return { text: "" };
     });
     replies.push("allow", "refuse", "discard");
-    await run(task({ files: [{ path: "/w/made.docx", kind: "add", role: "made" }] }));
+    await run(task({ own: ["/w/made.docx"] }));
     expect(decisions[0]).toEqual({ decision: "allow" });
     expect(decisions[1]).toEqual({ decision: "allow" });
     expect(decisions[2]).toEqual({ decision: "allow" });
@@ -645,6 +645,8 @@ describe("AgentEngine", () => {
     }
     expect(written.map((w) => w.line.type)).toEqual([
       "run",
+      // The folder isn't there, so the listing that tells the task's own files from the rest can't be made.
+      "listing.failed",
       "reasoning.delta",
       "tool.start",
       "tool.end",
@@ -1634,7 +1636,7 @@ describe("Commands that replace a file", () => {
         await run("touch note.txt");
         await run("sort -o sorted.txt note.txt");
       },
-      { files: [{ path: at("made.txt"), kind: "add", role: "made" }] },
+      { own: [at("made.txt")] },
     );
     expect(asked).toEqual([]);
     expect(answers).toEqual(Array(7).fill(allowed));

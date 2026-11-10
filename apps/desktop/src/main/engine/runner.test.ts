@@ -1197,3 +1197,48 @@ describe("editing a task saved for later", () => {
     expect(() => runner.updateDraft(saved.id, { ...edit, brief: "Something else" })).toThrow(/already started/);
   });
 });
+
+describe("TaskRunner when the user decides while the run is still ending", () => {
+  it("keeps the words written before the decision as a note, so the next run's answer is the turn's answer", async () => {
+    const store = new Store(":memory:");
+    const prompts: (string | null)[] = [];
+    let decided = () => {};
+    const decision = new Promise<void>((resolve) => (decided = resolve));
+    const engine: Engine = {
+      defaults: async () => ({ provider: "codex", model: "m", effort: "low" }),
+      choices: async () => ({ ai: "chatgpt", provider: "codex", lists: [] }),
+      async *run({ followUp }) {
+        prompts.push(followUp);
+        if (followUp === "Now Friday's date") {
+          // As in Tost's log: the agent asks, and its last words land after he has chosen.
+          yield { type: "approval", approval: { id: "a1", action: "overwrite", paths: ["/w/Quote.docx"] } };
+          await decision;
+          yield { type: "message", text: "I need your approval to change the file again, as the Word guide says." };
+        } else yield { type: "message", text: "I saved Friday's version as a new file, Quote 13.docx." };
+        yield { type: "done" };
+      },
+      answer: () => false,
+      decide: () => false,
+    };
+    const runner = new TaskRunner(store, engine, () => {});
+    const task = runner.create({ projectId: null, brief: "Change the date", workdir: "/w" });
+    store.saveTask({ ...task, status: "done" });
+    runner.followUp(task.id, "Now Friday's date");
+    const first = runner.start(task.id, "Now Friday's date");
+    await waitFor(() => store.getTask(task.id)?.approval != null);
+    await runner.decide(task.id, "refuse");
+    decided();
+    await first;
+    await waitFor(() => prompts.length === 2 && store.getTask(task.id)?.status === "done");
+    const final = store.getTask(task.id) as Task;
+    expect(prompts[1]).toMatch(/Save your version under a new name/);
+    expect(final.messages.map((m) => [m.from, m.text])).toEqual([
+      ["user", "Change the date"],
+      ["user", "Now Friday's date"],
+      ["agent", "I saved Friday's version as a new file, Quote 13.docx."],
+    ]);
+    expect(final.activity?.map((a) => [a.kind, a.target])).toEqual([
+      ["note", "I need your approval to change the file again, as the Word guide says."],
+    ]);
+  });
+});

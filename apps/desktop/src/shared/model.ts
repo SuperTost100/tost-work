@@ -76,6 +76,12 @@ export interface Approval {
 export type Decision = "allow" | "refuse" | "discard";
 export const DECISIONS: readonly Decision[] = ["allow", "refuse", "discard"];
 
+/** A file's modification time and size, as `stat` reports them. */
+export interface FileStamp {
+  mtimeMs: number;
+  size: number;
+}
+
 /** A copy Tost Work kept before a file was replaced, so the user can put it back. */
 export interface KeptCopy {
   /** The file in the task's folder. */
@@ -182,6 +188,17 @@ export interface Task {
   review: Review | null;
   /** Missing on tasks saved before copies were kept. */
   kept?: KeptCopy[];
+  /**
+   * The files Tost Work saw this task make, which weren't in its folder before. The agent may change them without
+   * asking, and they stay listed as made. Missing on tasks saved before it was kept: their files ask first.
+   */
+  own?: string[];
+  /**
+   * What each file in `own` looked like when the last run ended. The next run compares the file with it: a file that
+   * differs was saved by the user in between, and is no longer the task's own. Missing on tasks saved before it was
+   * kept.
+   */
+  ownSeen?: Record<string, FileStamp>;
   /** Stopped because Tost Work closed while the task was working, not by the user. Resume carries on. */
   interrupted?: boolean;
   /** The skills the agent read, by folder name, in any run. Built-in guides count too. */
@@ -222,6 +239,8 @@ export type EngineEvent =
   /** Words of the agent's answer as it writes them, shown live and never saved: the whole answer comes as a message. */
   | { type: "text"; text: string }
   | { type: "file"; change: FileChange }
+  /** Every file Tost Work knows the task made, with how each looked, as a run starts and ends: they replace the task's `own`. */
+  | { type: "own"; paths: string[]; seen: Record<string, FileStamp> }
   | { type: "question"; question: Question }
   /** The agent stopped waiting for this question or approval, so it comes off the task. */
   | { type: "withdrawn"; id: string }
