@@ -490,12 +490,17 @@ export class TaskRunner {
     try {
       const kept: KeptCopy[] = [];
       const trashed: string[] = [];
-      // Files in the Trash are gone from the task too, whatever the engine reports next, and even after a Stop.
+      // Files in the Trash are gone from the task too, whatever the engine reports next, and even after a Stop. A file
+      // with a kept copy is listed as changed straight away, so its earlier version can be restored even when the
+      // agent never reports the file, or reports it as new.
       const record = (t: Task) => {
         let next = t;
         for (const path of trashed)
           next = applyEvent(next, { type: "file", change: { path, kind: "delete", role: "made" } }, this.now());
-        return { ...next, kept: [...(next.kept ?? []), ...kept] };
+        next = { ...next, kept: [...(next.kept ?? []), ...kept] };
+        for (const { path } of kept)
+          next = applyEvent(next, { type: "file", change: { path, kind: "update", role: "made" } }, this.now());
+        return next;
       };
       if (allow) {
         try {

@@ -33,6 +33,20 @@ describe("applyEvent file", () => {
       { path: "/w/a.docx", kind: "add", role: "made" },
     ]);
   });
+
+  it("keeps a file with a kept copy listed as changed, whatever the agent reports, until it's deleted", () => {
+    const kept = [{ path: "/w/note.txt", copy: "/k/1", at: "t", reason: "overwrite" as const }];
+    const base = { status: "running", files: [], kept } as unknown as Task;
+    const file = (kind: "add" | "update" | "delete") =>
+      ({ type: "file", change: { path: "/w/note.txt", kind, role: "made" } }) as const;
+    const changed = [{ path: "/w/note.txt", kind: "update", role: "made" }];
+    let task = applyEvent(base, file("add"), "t");
+    expect(task.files).toEqual(changed);
+    task = applyEvent(task, file("update"), "t");
+    expect(task.files).toEqual(changed);
+    task = applyEvent(task, file("delete"), "t");
+    expect(task.files).toEqual([{ path: "/w/note.txt", kind: "delete", role: "made" }]);
+  });
 });
 
 describe("applyEvent activity", () => {

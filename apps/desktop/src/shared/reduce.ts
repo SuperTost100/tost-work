@@ -39,11 +39,15 @@ export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
       return task;
     case "file": {
       // A later change to the same path replaces the earlier one, so each file is listed once. A file the task made
-      // and then edited still counts as made.
-      const others = task.files.filter((f) => f.path !== event.change.path);
-      const before = task.files.find((f) => f.path === event.change.path);
-      const made = before?.kind === "add" && before.role === "made" && event.change.kind === "update";
-      return { ...next, files: [...others, made ? { ...event.change, kind: "add" as const } : event.change] };
+      // and then edited still counts as made. A file Tost Work kept a copy of was there before the task, so it stays
+      // listed as changed, with its earlier version, whatever the agent reports.
+      const { change } = event;
+      const others = task.files.filter((f) => f.path !== change.path);
+      if (change.kind !== "delete" && task.kept?.some((k) => k.path === change.path))
+        return { ...next, files: [...others, { path: change.path, kind: "update", role: "made" }] };
+      const before = task.files.find((f) => f.path === change.path);
+      const made = before?.kind === "add" && before.role === "made" && change.kind === "update";
+      return { ...next, files: [...others, made ? { ...change, kind: "add" as const } : change] };
     }
     case "question":
       return { ...next, status: "needs-you", question: event.question };
