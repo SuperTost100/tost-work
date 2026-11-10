@@ -707,6 +707,68 @@ describe("AgentEngine", () => {
       },
     ]);
   });
+
+  it("doesn't start Claude Code in a folder whose own Claude Code settings would change the checks", async () => {
+    const workdir = await realpath(await mkdtemp(join(tmpdir(), "tw-claude-")));
+    await mkdir(join(workdir, ".claude"));
+    await writeFile(join(workdir, ".claude", "settings.local.json"), "{}");
+    const { funnel, inputs } = fakeFunnel(async () => ({ text: "" }));
+    const engine = new AgentEngine(funnel, () => "it");
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const run = async (t: Task) => {
+      for await (const _ of engine.run({
+        task: t,
+        project: null,
+        workdir,
+        followUp: null,
+        signal: AbortSignal.abort(),
+      }));
+    };
+    await expect(run(task({ provider: "claude", model: "claude-sonnet-5-5", workdir }))).rejects.toMatchObject({
+      key: "error.claudeFolderSettings",
+      vars: { path: join(workdir, ".claude", "settings.local.json") },
+    });
+    expect(inputs).toHaveLength(0);
+    // Codex doesn't read them, and its own .codex settings have their check (codexHook.ts).
+    const codex = new AgentEngine(fakeFunnel(async () => ({ text: "" })).funnel, () => "it", PASSES);
+    codex.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    for await (const _ of codex.run({
+      task: task({ workdir }),
+      project: null,
+      workdir,
+      followUp: null,
+      signal: AbortSignal.abort(),
+    }));
+  });
+
+  it("keeps the AI's own settings in the task's folder as they are, however a tool names them", async () => {
+    const workdir = await realpath(await mkdtemp(join(tmpdir(), "tw-claude-")));
+    await mkdir(join(workdir, ".claude"));
+    await symlink(join(workdir, ".claude"), join(workdir, "config"));
+    const decisions: unknown[] = [];
+    const { funnel } = fakeFunnel(async (input) => {
+      const ask = (tool: string, toolInput: unknown) => input.onApproval?.({ id: tool, tool, input: toolInput });
+      decisions.push(await ask("Write", { file_path: ".claude/settings.json", content: "{}" }));
+      decisions.push(await ask("Edit", { file_path: join(workdir, ".mcp.json"), old_string: "a", new_string: "b" }));
+      decisions.push(await ask("Write", { file_path: "notes/.Claude/agents/helper.md", content: "x" }));
+      decisions.push(await ask("Write", { file_path: ".codex/config.toml", content: "x" }));
+      decisions.push(await ask("Write", { file_path: "config/settings.local.json", content: "{}" }));
+      decisions.push(await ask("Write", { file_path: "claude-notes.md", content: "x" }));
+      return { text: "" };
+    });
+    const engine = new AgentEngine(funnel, () => "it");
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const t = task({ provider: "claude", model: "claude-sonnet-5-5", workdir });
+    for await (const _ of engine.run({
+      task: t,
+      project: null,
+      workdir,
+      followUp: null,
+      signal: new AbortController().signal,
+    }));
+    const refused = expect.objectContaining({ decision: "deny", message: expect.stringMatching(/AI's own settings/) });
+    expect(decisions).toEqual([refused, refused, refused, refused, refused, "allow"]);
+  });
 });
 
 describe("AgentEngine with the document tools", () => {
@@ -1325,6 +1387,24 @@ describe("Codex's hook", () => {
       { decision: "allow" },
     ]);
     expect(seen.some((e) => e.type === "approval")).toBe(false);
+  });
+
+  it("refuses a patch to the AI's own settings in the task's folder", async () => {
+    const answers: unknown[] = [];
+    const { go } = await inFolder(async (engine, work) => {
+      const gate = (tool: string, input: unknown) => engine.gate("t1", step(tool, input, work));
+      answers.push(await gate("apply_patch", { command: patch("*** Add File: .claude/settings.local.json", "+{}") }));
+      answers.push(await gate("apply_patch", { command: patch("*** Add File: .codex/config.toml", "+x") }));
+      answers.push(
+        await gate("apply_patch", {
+          command: patch("*** Update File: servers.json", "*** Move to: .mcp.json", "@@", "+x"),
+        }),
+      );
+      answers.push(await gate("apply_patch", { command: patch("*** Add File: notes.md", "+x") }));
+    });
+    await go();
+    const refused = { decision: "deny", reason: expect.stringMatching(/AI's own settings/) };
+    expect(answers).toEqual([refused, refused, refused, { decision: "allow" }]);
   });
 
   it("refuses shells to type into and steps it can't read, and lets through the ones that change nothing", async () => {

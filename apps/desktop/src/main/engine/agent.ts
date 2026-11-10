@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { lstat, realpath, stat } from "node:fs/promises";
-import { basename, dirname, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
 import { translate } from "../../shared/i18n";
 import type { AgentProvider, AiId, Decision, EngineEvent, Job, KeyVendor, Review, Skill } from "../../shared/model";
@@ -14,6 +14,7 @@ import {
   pickOn,
 } from "../../shared/modelChoice";
 import { type SandboxReadiness, sandboxFor } from "../../shared/sandbox";
+import { checkClaudeFolder } from "../claudeFolder";
 import { HOOK_TOKEN_ENV, HOOK_URL_ENV } from "../codexHook";
 import type { TaskLog } from "../debugLog";
 import { freeName, inside } from "../files";
@@ -504,6 +505,26 @@ export async function outside(workdir: string, path: string): Promise<boolean> {
   return !folder || !target || !inside(folder, target);
 }
 
+/** Folders that hold an AI's own settings: Claude Code's and Codex's. */
+const SETTINGS_FOLDERS = new Set([".claude", ".codex"]);
+
+/**
+ * Whether a path in the task's folder is one of the AI's own settings: anything in a .claude or .codex folder, or a
+ * .mcp.json file. Claude Code reads them from the folder in the next run, and some at once, so a task could otherwise
+ * plant settings that skip Tost Work's checks (claudeFolder.ts). The path is read as given and with its links
+ * resolved, and without regard to case, as Windows and macOS name files.
+ */
+export async function agentSettings(workdir: string, path: string): Promise<boolean> {
+  const target = resolve(workdir, path);
+  const folder = await realTarget(workdir);
+  const real = await realTarget(target);
+  const names = [relative(resolve(workdir), target), folder && real ? relative(folder, real) : ""];
+  return names.some((name) => {
+    const parts = name.toLowerCase().split(/[\\/]/);
+    return parts.some((part) => SETTINGS_FOLDERS.has(part)) || parts.at(-1) === ".mcp.json";
+  });
+}
+
 /** Whether a file is there. */
 const exists = (path: string) =>
   stat(path).then(
@@ -575,6 +596,7 @@ export class AgentEngine implements Engine, ToolHandler {
   private platform: string;
   private sandboxReady: (provider: AgentProvider) => Promise<SandboxReadiness>;
   private codexHook: (workdir: string) => Promise<void>;
+  private claudeFolder: (workdir: string) => Promise<void>;
 
   constructor(
     private funnel: AgentFunnel,
@@ -608,6 +630,11 @@ export class AgentEngine implements Engine, ToolHandler {
        * when it won't. Without it Codex tasks don't start.
        */
       codexHook?: (workdir: string) => Promise<void>;
+      /**
+       * Throws a UserError when the task's folder brings Claude Code settings that would change Tost Work's checks,
+       * checked before each Claude run. checkClaudeFolder when not given.
+       */
+      claudeFolder?: (workdir: string) => Promise<void>;
     } = {},
   ) {
     this.documents = options.documents ?? null;
@@ -627,6 +654,7 @@ export class AgentEngine implements Engine, ToolHandler {
       (async () => {
         throw new UserError("error.codexHookOff", { detail: "no check was given" });
       });
+    this.claudeFolder = options.claudeFolder ?? ((workdir) => checkClaudeFolder(workdir));
   }
 
   /** Why the task can't reach its AI, in the user's language. */
@@ -720,6 +748,9 @@ export class AgentEngine implements Engine, ToolHandler {
     }
     // Codex runs without approvals, so a task never starts unless its hook will check each step.
     if (codex) await this.codexHook(workdir);
+    // Claude Code reads a folder's own settings in every run, follow-ups included, and some of them would let its steps
+    // skip the policy or run commands outside the sandbox.
+    else await this.claudeFolder(workdir);
     // Stop aborts the run, and so does the engine when Codex takes a step its hook never allowed.
     const abort = new AbortController();
     const onStop = () => abort.abort();
@@ -1049,6 +1080,14 @@ export class AgentEngine implements Engine, ToolHandler {
       for (const target of [c.path, c.movedTo])
         if (target && (await outside(live.workdir, target)))
           return { decision: "deny", message: "Work only inside the task's folder." };
+    for (const c of changes)
+      for (const target of [c.path, c.movedTo])
+        if (target && (await agentSettings(live.workdir, target)))
+          return {
+            decision: "deny",
+            message:
+              "Leave .claude and .codex folders and .mcp.json files as they are: they hold the AI's own settings, which Tost Work doesn't let a task change.",
+          };
     const deletes = changes.filter((c) => c.kind === "delete").map((c) => c.path);
     // A file that's already there is overwritten by a change, by an add (a patch's Add File replaces it) and by a move
     // onto it, unless the task made it.
