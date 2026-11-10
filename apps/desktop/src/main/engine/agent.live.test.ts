@@ -3,7 +3,7 @@ import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFunnel } from "cli-funnel";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, onTestFinished } from "vitest";
 import { type AiId, questionItems, SUBSCRIPTIONS, type Task } from "../../shared/model";
 import { giveAgentsOwnHomes } from "../agentHomes";
 import { codexHookCheck } from "../codexHook";
@@ -423,6 +423,9 @@ describe.runIf(runs("chatgpt") && homes)("Codex's steps through Tost Work's hook
   ) {
     const work = await mkdtemp(join(homedir(), ".tw-live-hook-"));
     const kept = await mkdtemp(join(tmpdir(), "tw-live-hook-kept-"));
+    onTestFinished(async () => {
+      for (const folder of [work, kept]) await rm(folder, { recursive: true, force: true });
+    });
     const trashed: string[] = [];
     const lines: Record<string, unknown>[] = [];
     const engine = new AgentEngine(plain, () => "en", {
