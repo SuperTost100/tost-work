@@ -75,8 +75,8 @@ process.stdin.on("end", () => {
 
 /** A word for sh, bash and zsh in single quotes. */
 const shQuote = (text: string) => `'${text.replaceAll("'", `'\\''`)}'`;
-/** A word for PowerShell in single quotes. */
-const psQuote = (text: string) => `'${text.replaceAll("'", "''")}'`;
+/** A word for PowerShell in single quotes, which end at ' and at the curly quotes ‘ ’ ‚ ‛ too: each is doubled. */
+const psQuote = (text: string) => `'${text.replace(/['‘’‚‛]/g, "$&$&")}'`;
 
 /**
  * The hook's command. Codex runs it with the user's shell, and lets a step run when its hook fails, so any ending other

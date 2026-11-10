@@ -44,6 +44,13 @@ describe("the hook's command", () => {
     expect(command).toMatch(/exit 2$/);
   });
 
+  it("doubles every quote PowerShell ends a single-quoted string at, such as the curly one in D’Angelo", () => {
+    const command = hookCommand("win32", "C:\\Users\\D’Angelo‘‚‛\\Tost Work.exe", "C:\\Users\\D’Angelo\\h.cjs");
+    expect(command).toContain(
+      "& 'C:\\Users\\D’’Angelo‘‘‚‚‛‛\\Tost Work.exe' 'C:\\Users\\D’’Angelo\\h.cjs' | Out-Null;",
+    );
+  });
+
   it("sends the step from PowerShell itself inside the Microsoft Store package, with no program path", () => {
     const command = hookCommand(
       "win32",
