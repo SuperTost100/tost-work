@@ -15,6 +15,22 @@
   wait here until the release bumps the version.
 -->
 
+## 0.0.32-dev
+
+### en
+
+- **A file the task made is the task's own:** changing it again no longer asks, and it stays listed as made. Tost Work now sees for itself which files appeared during a task, whatever the AI used to make them.
+- **A file you edited is yours again:** if you change a file the task made, in Word for example, the next change by the task asks first and keeps a copy of your version.
+- **The right answer after a card:** when you answered a card quickly, a sentence the AI wrote just before could stay on screen as the task's answer. Now the answer is what the task did after your choice.
+- **Fast, Balanced and Thorough on a plan without their model:** when your ChatGPT plan doesn't have the model one of them uses, it runs the closest one at its own level of thinking. Before, all three ran the same model.
+
+### it
+
+- **Un file creato dall'attività è dell'attività:** modificarlo di nuovo non chiede più il permesso e il file resta tra quelli creati. Ora Tost Work vede da sé quali file sono comparsi durante un'attività, qualunque strumento l'AI abbia usato per crearli.
+- **Un file che hai modificato torna tuo:** se cambi un file creato dall'attività, per esempio in Word, la modifica successiva dell'attività chiede prima il permesso e tiene una copia della tua versione.
+- **La risposta giusta dopo una richiesta:** se rispondevi in fretta a una richiesta, una frase scritta dall'AI un attimo prima poteva restare sullo schermo come risposta dell'attività. Ora la risposta è ciò che l'attività ha fatto dopo la tua scelta.
+- **Veloce, Equilibrato e Approfondito su un piano senza il loro modello:** quando il tuo piano ChatGPT non ha il modello che uno dei tre usa, quello sceglie il più vicino e mantiene il suo livello di ragionamento. Prima tutti e tre usavano lo stesso modello.
+
 ## 0.0.31-dev
 
 ### en
