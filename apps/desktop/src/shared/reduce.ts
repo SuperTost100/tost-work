@@ -46,12 +46,29 @@ export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
       const others = task.files.filter((f) => f.path !== change.path);
       if (change.kind !== "delete" && task.kept?.some((k) => k.path === change.path))
         return { ...next, files: [...others, { path: change.path, kind: "update", role: "made" }] };
+      // A file that was the user's when it changed is listed as changed, even when an earlier run made it, and as one
+      // with no earlier version.
+      if (event.unkept)
+        return {
+          ...next,
+          files: [...others, { ...change, kind: change.kind === "delete" ? "delete" : "update" }],
+          unkept: [...new Set([...(task.unkept ?? []), change.path])],
+        };
       const before = task.files.find((f) => f.path === change.path);
       const made =
         change.kind === "update" &&
         ((before?.kind === "add" && before.role === "made") ||
           (change.role === "made" && task.own?.includes(change.path)));
       return { ...next, files: [...others, made ? { ...change, kind: "add" as const } : change] };
+    }
+    case "kept": {
+      const { path } = event.copy;
+      const others = task.files.filter((f) => f.path !== path);
+      return {
+        ...next,
+        kept: [...(task.kept ?? []), event.copy],
+        files: [...others, { path, kind: event.kind, role: "made" }],
+      };
     }
     case "own": {
       // A file the task made that the agent reported as changed is listed as made from now on.

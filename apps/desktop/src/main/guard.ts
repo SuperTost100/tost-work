@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { access, copyFile, mkdir } from "node:fs/promises";
+import { access, copyFile, mkdir, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type { KeptCopy, Task } from "../shared/model";
-import { taskFile, writablePath } from "./files";
+import { inside, taskFile, writablePath } from "./files";
 import { UserError } from "./userError";
 
 /** What Tost Work does to files on the user's behalf, so the rules hold whatever the agent does. */
@@ -17,7 +17,11 @@ export interface Guard {
 }
 
 /** The guard on disk: copies go to `keptDir/<task id>/`, deletions through the system Trash. */
-export function fileGuard(keptDir: string, trashItem: (path: string) => Promise<void>, now = () => new Date()): Guard {
+export function fileGuard(
+  keptDir: string,
+  trashItem: (path: string) => Promise<void>,
+  now = () => new Date(),
+): Guard & { drop(kept: KeptCopy): Promise<void> } {
   return {
     async keep(task, path, reason) {
       const real = await taskFile(task, path);
@@ -51,6 +55,11 @@ export function fileGuard(keptDir: string, trashItem: (path: string) => Promise<
     async restore(task, kept) {
       // The file may be gone, removed by the user after the edit; restoring puts it back.
       await copyFile(kept.copy, await writablePath(task, kept.path));
+    },
+    /** Removes a copy that turned out not to be needed. Only a copy in the kept folder is ever removed. */
+    async drop(kept) {
+      if (!inside(keptDir, kept.copy)) throw new Error(`${kept.copy} isn't a kept copy`);
+      await rm(kept.copy, { force: true });
     },
   };
 }

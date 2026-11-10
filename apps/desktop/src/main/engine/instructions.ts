@@ -11,6 +11,7 @@ export const PARTS = [
   "In a project",
   "In a quick edit",
   "Rules",
+  "Files the user changed",
   "Office files",
   "Office files on Windows",
   "The user's skills",
@@ -59,7 +60,8 @@ const PART = readParts(source);
  * The block every agent session starts with. It says who the agent works for, where it may work, the rules and the
  * Tost Work tools. The rules are enforced by Tost Work too; the text only explains them. The words are in
  * resources/instructions.md; this picks the parts that apply and fills them in. `platform` picks the words that
- * differ by system: where deleted files go, and on Windows how to pass text to officecli in PowerShell.
+ * differ by system: where deleted files go, and on Windows how to pass text to officecli in PowerShell. `saved` are
+ * files the task made that the user has saved since its last run: they're the user's again, so changing one asks.
  */
 export function instructionsFor(
   task: Task,
@@ -69,7 +71,8 @@ export function instructionsFor(
   user: { name: string; work: string; notes: string } = { name: "", work: "", notes: "" },
   skills: Pick<Skill, "title" | "description" | "folder">[] = [],
   job: Pick<Job, "title" | "output"> | null = null,
-  platform: NodeJS.Platform = process.platform,
+  platform: string = process.platform,
+  saved: string[] = [],
 ): string {
   const parts = [
     fill(PART["Every task"], { language: LANGUAGE_NAMES[language] }),
@@ -78,6 +81,8 @@ export function instructionsFor(
       : fill(PART["In a quick edit"], { folder: task.workdir }),
     fill(PART.Rules, { trash: trashName(platform) }),
   ];
+  if (saved.length)
+    parts.push(fill(PART["Files the user changed"], { files: saved.map((path) => `- ${path}`).join("\n") }));
   if (documents) {
     const guide = (kind: string) => join(documents.skills, kind, "SKILL.md");
     parts.push(

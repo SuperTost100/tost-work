@@ -128,6 +128,11 @@ describe.runIf(posix)("the hook, run as Codex runs it", () => {
       child.stdout.on("data", (d) => (stdout += d));
       child.stderr.on("data", (d) => (stderr += d));
       child.on("error", reject);
+      // A hook that can't start exits before it reads the step, and the write then fails with EPIPE. That's the case
+      // some of these tests are about, so only another error on the pipe fails the run.
+      child.stdin.on("error", (err: NodeJS.ErrnoException) => {
+        if (err.code !== "EPIPE") reject(err);
+      });
       child.on("close", (code) => resolve({ code, stdout, stderr }));
       child.stdin.end(JSON.stringify({ tool_name: "Bash", tool_input: { command: stepCommand }, tool_use_id: "c1" }));
     });
