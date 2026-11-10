@@ -4,7 +4,14 @@ import { basename } from "node:path";
 import { type Language, trashName } from "../../shared/i18n";
 import type { AgentProvider, Approval, Decision, EngineEvent, KeptCopy, Project, Task } from "../../shared/model";
 import { answersText, BRIEF_MAX, questionItems } from "../../shared/model";
-import { type Choice, choiceOf, type ModelChoices, type ModelPick } from "../../shared/modelChoice";
+import {
+  type Choice,
+  choiceOf,
+  DEFAULT_PICK,
+  type ModelChoices,
+  type ModelPick,
+  PRESET_MODELS,
+} from "../../shared/modelChoice";
 import { applyEvent, resume } from "../../shared/reduce";
 import type { Guard } from "../guard";
 import type { Store } from "../store/store";
@@ -158,8 +165,9 @@ export class TaskRunner {
       provider: input.provider ?? "codex",
       ...(input.auth === "key" ? { auth: "key" as const } : {}),
       ...(input.jobId ? { jobId: input.jobId } : {}),
-      model: input.model ?? "gpt-5.5",
-      effort: input.effort ?? "medium",
+      // A task saved for later gets its model when it starts (startSaved). Until then it names the middle choice's.
+      model: input.model ?? PRESET_MODELS[DEFAULT_PICK.preset].codex.model,
+      effort: input.effort ?? PRESET_MODELS[DEFAULT_PICK.preset].codex.effort,
       ...(input.choice ? { choice: input.choice } : {}),
       status: "draft",
       steps: [],
