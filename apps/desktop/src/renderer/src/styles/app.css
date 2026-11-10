@@ -279,8 +279,9 @@ h3 {
 .search input::placeholder {
   color: var(--t3);
 }
-/* The box shows the focus, as other fields do, rather than a ring round the text inside it. */
-.search input:focus-visible {
+/* The box shows the focus, as other fields do, rather than a ring round the text inside it. :root outranks the
+   keyboard ring every other text field gets, which comes later in this file and otherwise drew a second outline. */
+:root .search input:focus-visible {
   outline: none;
 }
 /* :root outranks the dark theme's own border. */
@@ -4346,6 +4347,9 @@ fieldset.fld > legend {
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .search {
     background: var(--panel);
+  }
+  /* Not while it's focused: the ink border is then the only sign of the focus. */
+  :root:not([data-theme="light"]) .search:not(:focus-within) {
     border-color: transparent;
   }
   :root:not([data-theme="light"]) .sprig {
