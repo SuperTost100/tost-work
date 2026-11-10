@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { realpathSync, renameSync, writeFileSync } from "node:fs";
+import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { UserError } from "./userError";
@@ -12,9 +13,14 @@ import { UserError } from "./userError";
  * Codex runs a hook only once the user trusted it, by its hash in config.toml. Tost Work writes the hook at each start
  * and asks Codex itself, through `hooks/list`, for the hash and whether the hook is trusted, so a Codex that hashes
  * differently is asked too, and one that won't run the hook makes Codex tasks fail instead of running unchecked.
+ *
+ * The commands Codex runs don't get the hook's address and token in their environment, and Tost Work's server refuses
+ * any request without a session's token. Whether a command can connect to 127.0.0.1 at all depends on the sandbox:
+ * Codex's Linux sandbox blocks it (checked with Codex 0.166), and so does MXC on Windows, but Windows' `unelevated`
+ * sandbox, used where MXC isn't available, only sets proxy variables and blocks no network. macOS wasn't checked.
  */
 
-/** The run's address and token, which reach the hook through Codex's environment. Commands don't get them. */
+/** The run's address and token, which reach the hook through Codex's environment but not commands'. */
 export const HOOK_URL_ENV = "TOST_WORK_HOOK_URL";
 export const HOOK_TOKEN_ENV = "TOST_WORK_HOOK_TOKEN";
 /** What config.toml keeps out of the environment of the commands Codex runs. */
@@ -75,8 +81,8 @@ process.stdin.on("end", () => {
 
 /** A word for sh, bash and zsh in single quotes. */
 const shQuote = (text: string) => `'${text.replaceAll("'", `'\\''`)}'`;
-/** A word for PowerShell in single quotes. */
-const psQuote = (text: string) => `'${text.replaceAll("'", "''")}'`;
+/** A word for PowerShell in single quotes, which end at ' and at the curly quotes ‘ ’ ‚ ‛ too: each is doubled. */
+const psQuote = (text: string) => `'${text.replace(/['‘’‚‛]/g, "$&$&")}'`;
 
 /**
  * The hook's command. Codex runs it with the user's shell, and lets a step run when its hook fails, so any ending other
@@ -116,12 +122,129 @@ export function hooksJson(command: string): string {
   return `${JSON.stringify({ hooks: { PreToolUse: [{ hooks: [hook] }] } }, null, 2)}\n`;
 }
 
-/** A TOML basic string. JSON's escapes are TOML's, for the characters a path or a hash can hold. */
-const tomlString = (text: string) => JSON.stringify(text);
+/**
+ * A TOML basic string. JSON's escapes are TOML's, for the characters a path or a hash can hold, except DEL, which
+ * TOML wants escaped too. A lone UTF-16 surrogate has no TOML form: such a path is refused before it gets here.
+ */
+const tomlString = (text: string) => JSON.stringify(text).replaceAll("\u007f", "\\u007f");
 
 /** config.toml's lines that trust one hook, by its key and Codex's hash of it. */
 export function trustLines(key: string, hash: string): string {
   return `\n[hooks.state.${tomlString(key)}]\ntrusted_hash = ${tomlString(hash)}\n`;
+}
+
+/** config.toml's lines that keep Codex from trusting a folder, and so from loading its .codex settings. */
+export function untrustedLines(folder: string): string {
+  return `\n[projects.${tomlString(folder)}]\ntrust_level = "untrusted"\n`;
+}
+
+/**
+ * The names Codex looks a task's folder up by in config.toml (`normalized_project_trust_keys` in Codex's config
+ * loader): the folder with links resolved, as Rust's canonicalize gives it, then as Codex was given it. That covers
+ * /var as /private/var on macOS; on Windows Codex compares the names without regard to letter case, and the resolved
+ * one has no \\?\ in front, as Node's realpath gives it too.
+ */
+export function folderKeys(folder: string): string[] {
+  const given = resolve(folder);
+  let real = given;
+  try {
+    real = realpathSync.native(given);
+  } catch (err) {
+    // A folder that isn't there yet has no links to resolve: Codex then uses the name as given.
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+  }
+  return real === given ? [given] : [real, given];
+}
+
+/** Renames a file over another; Windows refuses for a moment while another program, such as an antivirus, has it open. */
+async function replace(from: string, to: string): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await rename(from, to);
+    } catch (err) {
+      const busy = ["EPERM", "EACCES", "EBUSY"].includes((err as NodeJS.ErrnoException).code ?? "");
+      if (process.platform !== "win32" || !busy || attempt === 5) throw err;
+      await new Promise((r) => setTimeout(r, 50 * attempt));
+    }
+  }
+}
+
+let written = 0;
+
+/** Writes a file whole: into a new file beside it, then renamed over it, so no reader finds it half-written. */
+export async function writeWhole(path: string, text: string): Promise<void> {
+  const temporary = `${path}.${process.pid}.${++written}.tmp`;
+  try {
+    await writeFile(temporary, text);
+    await replace(temporary, path);
+  } finally {
+    await rm(temporary, { force: true });
+  }
+}
+
+/**
+ * config.toml in Tost Work's Codex home, which Tost Work owns: it's written whole from what Tost Work keeps here, so
+ * what anything else wrote into it is replaced, as at each start. What it holds: Tost Work's settings (codexConfig),
+ * the hook's trust, and an untrusted entry for each folder a Codex task has run in since the app started, which
+ * Codex needs for as long as that task's Codex may read config.toml again. They're only dropped when the app starts,
+ * so the file grows by a few lines for each folder used in one session.
+ *
+ * Each change and its write wait for the one before, all in the main process, so two tasks starting together never
+ * write over each other's lines.
+ */
+export class CodexConfigFile {
+  private trusted: { key: string; hash: string } | null = null;
+  private folders = new Set<string>();
+  private queue: Promise<unknown> = Promise.resolve();
+
+  constructor(
+    readonly path: string,
+    readonly base: string,
+    private write: (path: string, text: string) => Promise<void> = writeWhole,
+  ) {}
+
+  text(): string {
+    let text = this.base;
+    if (this.trusted) text += trustLines(this.trusted.key, this.trusted.hash);
+    for (const folder of this.folders) text += untrustedLines(folder);
+    return text;
+  }
+
+  /** At start, before any Codex runs: Tost Work's settings alone. */
+  writeNow(): void {
+    const temporary = `${this.path}.${process.pid}.start.tmp`;
+    writeFileSync(temporary, this.text());
+    renameSync(temporary, this.path);
+  }
+
+  /** Keeps Codex from trusting these folders, in every task from now until the app quits. */
+  untrust(folders: string[]): Promise<void> {
+    return this.change(() => {
+      for (const folder of folders) this.folders.add(folder);
+    });
+  }
+
+  /** Trusts the hook with Codex's hash of it. */
+  trust(key: string, hash: string): Promise<void> {
+    return this.change(() => {
+      this.trusted = { key, hash };
+    });
+  }
+
+  private change(apply: () => void): Promise<void> {
+    const step = this.queue.then(async () => {
+      apply();
+      const text = this.text();
+      // An unchanged file isn't written again.
+      if ((await readText(this.path)) !== text) await this.write(this.path, text);
+    });
+    // The caller of this change gets its error; the next change runs either way.
+    this.queue = step.then(
+      () => undefined,
+      () => undefined,
+    );
+    return step;
+  }
 }
 
 /** The hook as Tost Work wrote it this time, for the check. */
@@ -130,13 +253,13 @@ export interface CodexHook {
   /** hooks.json's path. */
   file: string;
   command: string;
-  /** config.toml as Tost Work writes it, before the hook's trust is added. */
-  config: string;
+  config: CodexConfigFile;
 }
 
 /**
- * Writes the hook into Codex's home: hooks.json and the helper. Both are rewritten at each start, because the app's
- * executable can move: an AppImage mounts itself somewhere new each time.
+ * Writes the hook into Codex's home: hooks.json and the helper, and config.toml with Tost Work's settings `config`.
+ * All three are rewritten at each start, because the app's executable can move: an AppImage mounts itself somewhere
+ * new each time.
  */
 export function writeCodexHook(
   home: string,
@@ -145,12 +268,14 @@ export function writeCodexHook(
   exe: string,
   store = false,
 ): CodexHook {
+  const file = new CodexConfigFile(join(home, "config.toml"), config);
+  file.writeNow();
   const helper = join(home, HELPER);
   writeFileSync(helper, HELPER_SOURCE);
   const command = hookCommand(platform, exe, helper, store);
-  const file = join(home, "hooks.json");
-  writeFileSync(file, hooksJson(command));
-  return { home, file, command, config };
+  const hooks = join(home, "hooks.json");
+  writeFileSync(hooks, hooksJson(command));
+  return { home, file: hooks, command, config: file };
 }
 
 /** One hook as `hooks/list` reports it. */
@@ -208,16 +333,44 @@ export function findHook(
   return { hook: found };
 }
 
-/** What the check needs from Codex: its hooks as seen from a folder, through `hooks/list`. */
+/** One of the settings files Codex reads for a folder, as `config/read` reports it. */
+export interface ConfigLayer {
+  name: { type: string; dotCodexFolder?: string };
+  disabledReason?: string;
+}
+
+/** What `config/read` answered for one folder: the settings files, and the folders' trust Codex read. */
+export interface ConfigReading {
+  layers: ConfigLayer[];
+  projects: Record<string, { trust_level?: string }>;
+}
+
+/** What the check needs from Codex: its hooks (`hooks/list`) and settings files (`config/read`) as seen from a folder. */
 export interface HookLister {
   list(cwd: string): Promise<HookListing>;
+  read(cwd: string): Promise<ConfigReading>;
   close(): void;
 }
 
 /**
- * Makes sure Codex will run the hook before each step of a task in `cwd`: trusted, as written. A hook Codex hasn't
- * trusted yet is trusted with the hash Codex gives for it, then listed again. Throws a UserError when Codex won't run
- * it, so the task fails instead of running unchecked.
+ * Why Codex would use a folder's own settings for a task there, or null. A .codex folder in the task's folder (or a
+ * repository it's in) holds settings Codex loads once it trusts the folder, and they can turn hooks off or let
+ * commands write outside it. Codex trusts such a folder itself when a task starts, unless config.toml already says,
+ * so the folder must be listed as untrusted, and no settings file of a folder may be in use.
+ */
+export function folderSettingsProblem(reading: ConfigReading, keys: string[]): string | null {
+  const used = reading.layers.find((l) => l.name.type === "project" && !l.disabledReason);
+  if (used) return `Codex loads the settings in ${used.name.dotCodexFolder ?? "the task's folder"}`;
+  if (!keys.some((k) => reading.projects[k]?.trust_level === "untrusted"))
+    return "Codex doesn't list the task's folder as untrusted";
+  return null;
+}
+
+/**
+ * Makes sure Codex will run the hook before each step of a task in `cwd`: trusted, as written, and with none of the
+ * folder's own settings in use (folderSettingsProblem). The folder is listed as untrusted first, then a hook Codex
+ * hasn't trusted yet is trusted with the hash Codex gives for it, and both are checked through Codex itself. Throws a
+ * UserError when Codex won't run the hook, so the task fails instead of running unchecked.
  */
 export async function checkCodexHook(
   hook: CodexHook,
@@ -227,16 +380,19 @@ export async function checkCodexHook(
 ): Promise<void> {
   let lister: HookLister | null = null;
   try {
+    const keys = folderKeys(cwd);
+    if (keys.some((k) => /\p{Cs}/u.test(k))) throw new Error("the folder's name can't be written in config.toml");
+    await hook.config.untrust(keys);
     lister = await open();
     let found = findHook(await lister.list(cwd), hook, platform);
     if ("hook" in found && found.hook.trustStatus !== "trusted") {
-      const config = hook.config + trustLines(found.hook.key, found.hook.currentHash);
-      // Unchanged files aren't written, so a Codex reading config.toml for another task never finds it half-written.
-      if (readText(join(hook.home, "config.toml")) !== config) writeFileSync(join(hook.home, "config.toml"), config);
+      await hook.config.trust(found.hook.key, found.hook.currentHash);
       found = findHook(await lister.list(cwd), hook, platform);
     }
     if ("problem" in found) throw new Error(found.problem);
     if (found.hook.trustStatus !== "trusted") throw new Error(`Codex says the hook is ${found.hook.trustStatus}`);
+    const problem = folderSettingsProblem(await lister.read(cwd), keys);
+    if (problem) throw new Error(problem);
   } catch (err) {
     throw new UserError("error.codexHookOff", { detail: err instanceof Error ? err.message : String(err) });
   } finally {
@@ -260,9 +416,9 @@ export function codexHookCheck(
   };
 }
 
-function readText(path: string): string | null {
+async function readText(path: string): Promise<string | null> {
   try {
-    return readFileSync(path, "utf8");
+    return await readFile(path, "utf8");
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw err;
@@ -347,6 +503,13 @@ export function appServerLister(codex: string, env: NodeJS.ProcessEnv = process.
           };
           const data = answer?.data ?? [];
           return { hooks: data.flatMap((d) => d.hooks ?? []), errors: data.flatMap((d) => d.errors ?? []) };
+        },
+        async read(cwd: string): Promise<ConfigReading> {
+          const answer = (await request("config/read", { cwd, includeLayers: true })) as {
+            layers?: ConfigLayer[] | null;
+            config?: { projects?: ConfigReading["projects"] | null };
+          };
+          return { layers: answer?.layers ?? [], projects: answer?.config?.projects ?? {} };
         },
         close,
       };

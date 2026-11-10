@@ -1038,7 +1038,7 @@ export class AgentEngine implements Engine, ToolHandler {
         return {
           decision: "deny",
           message:
-            "Don't start a shell or an interpreter to type commands into. Run the command, script or code directly, in this one call.",
+            "This command leaves a shell or an interpreter waiting for typed input, which Tost Work can't check. Run a script by its path (python3 convert.py, bash build.sh), or pass the code with -c (python3 -c '…', bash -c '…'), in this one call.",
         };
       return "allow";
     }

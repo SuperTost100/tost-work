@@ -25,14 +25,23 @@ import { type CodexHook, HOOK_ENV_PATTERN, writeCodexHook } from "./codexHook";
  * needs no administrator either. Codex's third choice, `elevated`, asks for an administrator's approval to set up,
  * which the people using Tost Work may not be able to give. Other systems don't get these keys: they mean nothing there.
  *
+ * Codex reads a folder's own settings from a .codex folder in it once it trusts the folder, and the folders up to
+ * the repository it's in too; those settings could turn hooks off or let commands write outside the folder. Codex
+ * trusts a folder by itself when a task starts there, so Tost Work lists each task's folder as untrusted before the
+ * task (codexHook.ts). `project_root_markers = []` also keeps Codex to the task's own folder, so a .codex folder
+ * higher up isn't read whatever its trust.
+ *
  * Hooks are on, which Codex already has by default, because Tost Work's check before each step is one (codexHook.ts).
- * The run's address and token for that check reach Codex through its environment, and the commands Codex runs don't
- * get them.
+ * The run's address and token for that check reach Codex through its environment, and config.toml keeps them out of
+ * the environment of the commands Codex runs. That doesn't keep commands away from Tost Work's server on 127.0.0.1:
+ * on Windows without MXC the `unelevated` sandbox blocks no network, so the server's token check is what refuses them
+ * there.
  */
 export function codexConfig(platform: NodeJS.Platform = process.platform): string {
   const windows = platform === "win32";
   return `# Written by Tost Work each time it starts. Changes here are replaced.
 project_doc_max_bytes = 0
+project_root_markers = []
 
 [skills]
 include_instructions = false
@@ -103,9 +112,7 @@ export function giveAgentsOwnHomes(
   const claude = join(root, "claude");
   mkdirSync(codex, { recursive: true, mode: 0o700 });
   mkdirSync(claude, { recursive: true, mode: 0o700 });
-  const config = codexConfig(platform);
-  writeFileSync(join(codex, "config.toml"), config);
-  const hook = writeCodexHook(codex, config, platform, exe, store);
+  const hook = writeCodexHook(codex, codexConfig(platform), platform, exe, store);
   writeFileSync(join(claude, "settings.json"), `${JSON.stringify(CLAUDE_SETTINGS, null, 2)}\n`);
   Object.assign(env, { CODEX_HOME: codex, CLAUDE_CONFIG_DIR: claude, ...CLAUDE_ENV });
   return hook;
