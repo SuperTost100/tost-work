@@ -1,14 +1,17 @@
 /** @vitest-environment node */
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { codexConfig } from "./agentHomes";
 import {
   appServerLister,
+  CodexConfigFile,
   type CodexHook,
+  type ConfigReading,
   checkCodexHook,
+  folderKeys,
   HOOK_TIMEOUT_S,
   type HookLister,
   type HookListing,
@@ -16,6 +19,7 @@ import {
   hooksJson,
   type ListedHook,
   trustLines,
+  untrustedLines,
   writeCodexHook,
 } from "./codexHook";
 import { type HookAnswer, ToolServer } from "./mcp/server";
@@ -168,13 +172,33 @@ const listed = (hook: CodexHook, over: Partial<ListedHook> = {}): ListedHook => 
   ...over,
 });
 
-/** A Codex that lists what `answer` says, given config.toml as it is on disk each time. */
-function fakeCodex(answer: (config: string) => HookListing) {
-  const log = { lists: 0, closed: 0 };
+/** The folders config.toml lists as untrusted, read back as Codex would. */
+const untrustedIn = (config: string): ConfigReading["projects"] =>
+  Object.fromEntries(
+    [...config.matchAll(/^\[projects\.("(?:[^"\\]|\\.)*")\]\ntrust_level = "untrusted"$/gm)].map((m) => [
+      JSON.parse(m[1] as string),
+      { trust_level: "untrusted" },
+    ]),
+  );
+
+/**
+ * A Codex that lists what `answer` says, given config.toml as it is on disk each time, and reads the folders'
+ * settings as `read` says, by default none in use and the folders config.toml lists as untrusted.
+ */
+function fakeCodex(
+  answer: (config: string) => HookListing,
+  read: (config: string) => ConfigReading = (config) => ({ layers: [], projects: untrustedIn(config) }),
+) {
+  const log = { lists: 0, reads: 0, closed: 0 };
+  const config = () => readFile(join(home, "config.toml"), "utf8");
   const open = async (): Promise<HookLister> => ({
     list: async () => {
       log.lists++;
-      return answer(await readFile(join(home, "config.toml"), "utf8"));
+      return answer(await config());
+    },
+    read: async () => {
+      log.reads++;
+      return read(await config());
     },
     close: () => {
       log.closed++;
@@ -207,17 +231,17 @@ describe("checking that Codex will run the hook", () => {
     codex.at(hook.home);
     await checkCodexHook(hook, "/w", codex.open, "linux");
     expect(await readFile(join(hook.home, "config.toml"), "utf8")).toBe(
-      hook.config + trustLines(`${hook.file}:pre_tool_use:0:0`, "sha256:abc"),
+      hook.config.base + trustLines(`${hook.file}:pre_tool_use:0:0`, "sha256:abc") + untrustedLines("/w"),
     );
-    expect(codex.log).toEqual({ lists: 2, closed: 1 });
+    expect(codex.log).toEqual({ lists: 2, reads: 1, closed: 1 });
     // Trusted already, it only looks.
     await checkCodexHook(hook, "/w", codex.open, "linux");
-    expect(codex.log).toEqual({ lists: 3, closed: 2 });
+    expect(codex.log).toEqual({ lists: 3, reads: 2, closed: 2 });
   });
 
   it("trusts a hook again when Codex hashes it differently, as after an update", async () => {
     const hook = await written();
-    await writeFile(join(hook.home, "config.toml"), hook.config + trustLines(`${hook.file}:pre_tool_use:0:0`, "old"));
+    await hook.config.trust(`${hook.file}:pre_tool_use:0:0`, "old");
     const codex = fakeCodex((config) => ({
       hooks: [listed(hook, { currentHash: "new", trustStatus: config.includes('"new"') ? "trusted" : "modified" })],
       errors: [],
@@ -256,14 +280,142 @@ describe("checking that Codex will run the hook", () => {
     ).rejects.toMatchObject({ key: "error.codexHookOff", vars: { detail: "spawn codex ENOENT" } });
     const unknown = async (): Promise<HookLister> => ({
       list: () => Promise.reject(new Error("Unknown method hooks/list")),
+      read: () => Promise.reject(new Error("Unknown method config/read")),
       close: () => {},
     });
     await expect(checkCodexHook(hook, "/w", unknown, "linux")).rejects.toMatchObject({ key: "error.codexHookOff" });
+  });
+
+  it("lists the task's folder as untrusted first, and refuses when Codex would still use the folder's settings", async () => {
+    const hook = await written();
+    const trusted = () => ({ hooks: [listed(hook)], errors: [] });
+    const cases: [string, (config: string) => ConfigReading][] = [
+      [
+        "a .codex folder in use",
+        (config) => ({
+          layers: [{ name: { type: "project", dotCodexFolder: "/w/.codex" } }],
+          projects: untrustedIn(config),
+        }),
+      ],
+      ["the folder not listed as untrusted", () => ({ layers: [], projects: {} })],
+      ["the folder trusted", () => ({ layers: [], projects: { "/w": { trust_level: "trusted" } } })],
+    ];
+    for (const [name, read] of cases) {
+      const codex = fakeCodex(trusted, read);
+      codex.at(hook.home);
+      await expect(checkCodexHook(hook, "/w", codex.open, "linux"), name).rejects.toMatchObject({
+        key: "error.codexHookOff",
+      });
+    }
+    // A folder's settings that Codex lists but won't use are fine.
+    const off = fakeCodex(trusted, (config) => ({
+      layers: [{ name: { type: "project", dotCodexFolder: "/w/.codex" }, disabledReason: "untrusted" }],
+      projects: untrustedIn(config),
+    }));
+    off.at(hook.home);
+    await checkCodexHook(hook, "/w", off.open, "linux");
+  });
+});
+
+describe("config.toml in Tost Work's Codex home", () => {
+  it("names a folder as Codex looks it up: with links resolved first, then as given", async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "tw-folder-keys-")));
+    try {
+      await mkdir(join(root, "real"));
+      await symlink(join(root, "real"), join(root, "link"));
+      expect(folderKeys(join(root, "link"))).toEqual([join(root, "real"), join(root, "link")]);
+      expect(folderKeys(join(root, "real", "..", "real"))).toEqual([join(root, "real")]);
+      expect(folderKeys(join(root, "missing"))).toEqual([join(root, "missing")]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("writes each change after the one before, keeping every task's folder and the hook's trust", async () => {
+    const home = await mkdtemp(join(tmpdir(), "tw-config-"));
+    const path = join(home, "config.toml");
+    const writes: string[] = [];
+    let writing = false;
+    const slow = async (p: string, text: string) => {
+      expect(writing).toBe(false);
+      writing = true;
+      await new Promise((r) => setTimeout(r, 5));
+      await writeFile(p, text);
+      writes.push(text);
+      writing = false;
+    };
+    const file = new CodexConfigFile(path, "base\n", slow);
+    file.writeNow();
+    await Promise.all([file.untrust(["/a"]), file.trust("k", "h"), file.untrust(["/b", "/a"]), file.untrust(["/c"])]);
+    const want = `base\n${trustLines("k", "h")}${untrustedLines("/a")}${untrustedLines("/b")}${untrustedLines("/c")}`;
+    expect(await readFile(path, "utf8")).toBe(want);
+    expect(writes).toHaveLength(4);
+    // Nothing new to write: the file stays as it is.
+    await file.untrust(["/b"]);
+    expect(writes).toHaveLength(4);
+    // The next start writes the settings alone.
+    new CodexConfigFile(path, "base\n").writeNow();
+    expect(await readFile(path, "utf8")).toBe("base\n");
+    await rm(home, { recursive: true, force: true });
+  });
+
+  it("writes into a new file and renames it over config.toml, leaving no temporary file", async () => {
+    const home = await mkdtemp(join(tmpdir(), "tw-config-"));
+    const file = new CodexConfigFile(join(home, "config.toml"), "base\n");
+    file.writeNow();
+    await file.untrust(['C:\\Users\\D’Angelo\\"Lavoro"\u007f']);
+    const text = await readFile(join(home, "config.toml"), "utf8");
+    expect(text).toContain('[projects."C:\\\\Users\\\\D’Angelo\\\\\\"Lavoro\\"\\u007f"]');
+    expect(untrustedIn(text)).toEqual({ 'C:\\Users\\D’Angelo\\"Lavoro"\u007f': { trust_level: "untrusted" } });
+    expect(await readdir(home)).toEqual(["config.toml"]);
+    await rm(home, { recursive: true, force: true });
   });
 });
 
 /** The installed Codex, when this computer has one: the check needs no sign-in. Set TOST_WORK_LIVE to run it. */
 const codexBin = posix ? spawnSync("sh", ["-c", "command -v codex"]).stdout.toString().trim() : "";
+
+/** A `codex app-server` on a home, for requests the check itself doesn't make. */
+function appServer(env: NodeJS.ProcessEnv) {
+  const child = spawn(codexBin, ["app-server"], { env });
+  child.stderr.resume();
+  let next = 1;
+  const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+  let buffer = "";
+  child.stdout.on("data", (chunk: Buffer) => {
+    buffer += chunk.toString("utf8");
+    for (let at = buffer.indexOf("\n"); at >= 0; at = buffer.indexOf("\n")) {
+      const line = buffer.slice(0, at);
+      buffer = buffer.slice(at + 1);
+      if (!line.startsWith("{")) continue;
+      const message = JSON.parse(line) as { id?: number; method?: string; result?: unknown; error?: unknown };
+      const p = typeof message.id === "number" && !message.method ? pending.get(message.id) : undefined;
+      if (message.error) p?.reject(new Error(JSON.stringify(message.error)));
+      else p?.resolve(message.result);
+    }
+  });
+  const request = (method: string, params: unknown) =>
+    new Promise<unknown>((resolve, reject) => {
+      const id = next++;
+      pending.set(id, { resolve, reject });
+      child.stdin.write(`${JSON.stringify({ method, id, params })}\n`);
+    });
+  return {
+    async start() {
+      await request("initialize", { clientInfo: { name: "test", title: null, version: "0" }, capabilities: {} });
+      child.stdin.write(`${JSON.stringify({ method: "initialized" })}\n`);
+    },
+    request,
+    /** Ends it, and waits until it has, since Codex writes into its home until it exits. */
+    close: () =>
+      new Promise<void>((resolve) => {
+        if (child.exitCode !== null || child.signalCode !== null) return resolve();
+        child.once("exit", () => resolve());
+        child.stdin.end();
+        child.kill();
+      }),
+  };
+}
 
 describe.runIf(process.env.TOST_WORK_LIVE && codexBin)("the check against the installed Codex", () => {
   it("trusts the hook, and refuses once hooks.json changes behind its back", { timeout: 60_000 }, async () => {
@@ -283,5 +435,55 @@ describe.runIf(process.env.TOST_WORK_LIVE && codexBin)("the check against the in
     // Someone else's hook in its place is no longer the one Tost Work trusted.
     await writeFile(hook.file, hooksJson("echo allowed"));
     await expect(checkCodexHook(hook, root, open, "linux")).rejects.toMatchObject({ key: "error.codexHookOff" });
+  });
+
+  it("keeps the hook and the sandbox when the task's folder, or a repository above it, brings its own .codex settings", {
+    timeout: 120_000,
+  }, async () => {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "tw-codex-folder-")));
+    const server = { close: async () => {} };
+    try {
+      const { giveAgentsOwnHomes } = await import("./agentHomes");
+      const env: NodeJS.ProcessEnv = { ...process.env };
+      const hook = giveAgentsOwnHomes(join(root, "agents"), env, "linux", process.execPath);
+      const outside = join(root, "outside");
+      await mkdir(outside);
+      // Settings a zip or a shared folder could bring: hooks off, and commands allowed to write outside.
+      const settings = `[features]\nhooks = false\n\n[sandbox_workspace_write]\nwritable_roots = [${JSON.stringify(outside)}]\n`;
+      const own = join(root, "task");
+      await mkdir(join(own, ".codex"), { recursive: true });
+      await writeFile(join(own, ".codex", "config.toml"), settings);
+      const repo = join(root, "repo");
+      await mkdir(join(repo, ".codex"), { recursive: true });
+      await writeFile(join(repo, ".codex", "config.toml"), settings);
+      expect(spawnSync("git", ["init", "-q"], { cwd: repo }).status).toBe(0);
+      const inRepo = join(repo, "sub");
+      await mkdir(inRepo);
+      const codex = appServer(env);
+      server.close = codex.close;
+      await codex.start();
+      for (const folder of [own, inRepo]) {
+        await checkCodexHook(hook, folder, () => appServerLister(codexBin, env), "linux");
+        // What the task's own Codex then does: start the thread, which may trust the folder, and list its hooks.
+        const started = (await codex.request("thread/start", {
+          cwd: folder,
+          approvalPolicy: "never",
+          sandbox: "workspace-write",
+          ephemeral: true,
+        })) as { thread: { id: string }; sandbox: { writableRoots?: string[] } };
+        expect(started.sandbox.writableRoots ?? [], folder).not.toContain(outside);
+        const hooks = (await codex.request("hooks/list", { threadId: started.thread.id })) as {
+          data: { hooks: ListedHook[] }[];
+        };
+        expect(
+          hooks.data.flatMap((d) => d.hooks).map((h) => [h.sourcePath, h.trustStatus]),
+          folder,
+        ).toEqual([[hook.file, "trusted"]]);
+      }
+      expect(await readFile(join(hook.home, "config.toml"), "utf8")).not.toMatch(/trust_level = "trusted"/);
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

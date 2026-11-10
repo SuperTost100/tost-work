@@ -21,6 +21,8 @@ describe("agent homes", () => {
     });
     const codex = await readFile(join(root, "codex", "config.toml"), "utf8");
     expect(codex).toContain("project_doc_max_bytes = 0");
+    // A .codex folder above the task's folder is never read.
+    expect(codex).toContain("\nproject_root_markers = []\n");
     expect(codex).toMatch(/\[skills\]\ninclude_instructions = false/);
     expect(codex).toMatch(/\[skills\.bundled\]\nenabled = false/);
     // ChatGPT's apps and plugins stay out: a task doesn't use them, and they'd reach the user's connected accounts.
@@ -37,7 +39,8 @@ describe("agent homes", () => {
     const root = join(await mkdtemp(join(tmpdir(), "tw-agents-")), "agents");
     const hook = giveAgentsOwnHomes(root, {}, "linux", "/tmp/.mount_tostAb12/tost-work");
     const home = join(root, "codex");
-    expect(hook).toMatchObject({ home, file: join(home, "hooks.json"), config: codexConfig("linux") });
+    expect(hook).toMatchObject({ home, file: join(home, "hooks.json") });
+    expect(hook.config.base).toBe(codexConfig("linux"));
     const json = JSON.parse(await readFile(hook.file, "utf8"));
     expect(json.hooks.PreToolUse[0].hooks[0]).toMatchObject({ type: "command", command: hook.command });
     expect(hook.command).toContain(`'/tmp/.mount_tostAb12/tost-work' '${join(home, "tost-work-hook.cjs")}'`);
@@ -55,7 +58,7 @@ describe("agent homes", () => {
     await writeFile(join(root, "codex", "config.toml"), "project_doc_max_bytes = 32768\n");
     await writeFile(join(root, "codex", "auth.json"), "{}");
     giveAgentsOwnHomes(root, {});
-    expect(await readFile(join(root, "codex", "config.toml"), "utf8")).toContain("project_doc_max_bytes = 0");
+    expect(await readFile(join(root, "codex", "config.toml"), "utf8")).toBe(codexConfig());
     expect(await readFile(join(root, "codex", "auth.json"), "utf8")).toBe("{}");
   });
 
