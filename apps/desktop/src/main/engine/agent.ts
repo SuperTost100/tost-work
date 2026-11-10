@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { lstat, realpath, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
-import { translate } from "../../shared/i18n";
+import { translate, trashName } from "../../shared/i18n";
 import type { AgentProvider, AiId, Decision, EngineEvent, Job, KeyVendor, Review, Skill } from "../../shared/model";
 import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
 import {
@@ -878,8 +878,7 @@ export class AgentEngine implements Engine, ToolHandler {
       if (deletesFiles(command))
         return {
           decision: "deny",
-          message:
-            "Don't delete files with commands. Call request_approval with action delete, and Tost Work moves them to the Trash.",
+          message: `Don't delete files with commands. Call request_approval with action delete, and Tost Work moves them to the ${trashName(process.platform)}.`,
         };
       // What's typed into a shell that's already running isn't checked, so commands can't open one to type into.
       if (opensShell(command))
@@ -922,7 +921,7 @@ export class AgentEngine implements Engine, ToolHandler {
         decision: "deny",
         message:
           decided === "allow"
-            ? "The user allowed it, and Tost Work moved the files to the Trash. Don't delete them again."
+            ? `The user allowed it, and Tost Work moved the files to the ${trashName(process.platform)}. Don't delete them again.`
             : "The user wants to keep these files. Leave them as they are.",
       };
     }
