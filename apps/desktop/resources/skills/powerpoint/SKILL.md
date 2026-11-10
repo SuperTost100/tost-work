@@ -32,7 +32,7 @@ A deck is read from across a room or skimmed in a meeting. Make it with the `off
 
 ## Editing a presentation that already exists
 
-- Ask with `request_approval` before changing a file that was there before the task.
+- Ask with `request_approval` before changing a file that was there before the task. A file this task made needs no approval: change it directly.
 - Keep the user's theme, layouts and slide order unless they asked to change them. Replace text in place with `set … --find … --replace …`.
 - Don't duplicate or clone slides that contain charts, groups or video: the current OfficeCLI can produce a file PowerPoint wants to repair. Build a new slide instead.
 

@@ -41,7 +41,7 @@ A workbook is something the user will keep working in, so totals must be formula
 
 ## Editing a workbook that already exists
 
-- Ask with `request_approval` before changing a file that was there before the task.
+- Ask with `request_approval` before changing a file that was there before the task. A file this task made needs no approval: change it directly.
 - Change only the cells the user asked about. Keep their formatting, formulas and other sheets.
 - Read before writing: `officecli get <file> /Sheet1/A1:F20` shows values and formulas.
 

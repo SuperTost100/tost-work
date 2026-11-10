@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { lstat, realpath, stat } from "node:fs/promises";
+import { lstat, opendir, realpath, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
 import { translate, trashName } from "../../shared/i18n";
@@ -86,6 +86,55 @@ const READY: SandboxReadiness = { ready: true, missing: [], distro: null, appArm
 
 const END_TURN =
   "It's in front of the user now. End your turn here: don't do anything else and don't repeat it. Their reply arrives as your next message.";
+
+/** What request_approval tells the agent: the card asks, so the agent's last words don't need to. */
+const APPROVAL_END = `${END_TURN} The card already asks for their decision, so don't write that you need their approval.`;
+
+/** What request_approval says about files the agent may change without asking. */
+const noApprovalNeeded = (paths: string[]) =>
+  `No approval is needed for ${paths.join(", ")}: this task made ${paths.length === 1 ? "it" : "them"}, or the user already let you replace ${paths.length === 1 ? "it" : "them"} in this turn. Go ahead without asking. Ask only before replacing a file that was in the folder before the task began.`;
+
+/**
+ * The most entries a folder listing reads. A bigger folder gets no listing, and then every file in it counts as there
+ * before the task, as it did before listings.
+ */
+const LISTING_MAX = 200_000;
+/**
+ * The most files a task keeps as its own. Past that, the rest ask before they're changed in a later run.
+ * shortcut: a task that unpacks thousands of files asks again for most of them; raise it if a real task does that.
+ */
+const OWN_MAX = 2_000;
+
+/**
+ * How a path is looked up in a listing: one form for the spellings a Mac or Windows disk takes as the same name,
+ * whatever their case or Unicode form. A Linux disk tells those apart, and then two names count as one, so a new
+ * file whose name differs only in case from an older one is taken as the older one and asks first.
+ */
+const pathKey = (path: string) => path.normalize("NFC").toLowerCase();
+
+/**
+ * Every file and folder in `folder` and its subfolders, by the `pathKey` of its real path, each with the path as the
+ * task names it. Null when part of the folder can't be read, or it holds more than LISTING_MAX entries: then nothing
+ * counts as made by the task from the listing.
+ */
+async function listFolder(folder: string, log: TaskLog): Promise<Map<string, string> | null> {
+  try {
+    const real = await realpath(folder);
+    const entries = new Map<string, string>();
+    for await (const entry of await opendir(real, { recursive: true })) {
+      const name = relative(real, join(entry.parentPath, entry.name));
+      entries.set(pathKey(join(real, name)), join(folder, name));
+      if (entries.size > LISTING_MAX) {
+        log.write({ type: "listing.skipped", reason: "too many files", max: LISTING_MAX });
+        return null;
+      }
+    }
+    return entries;
+  } catch (err) {
+    log.write({ type: "listing.failed", message: err instanceof Error ? err.message : String(err) });
+    return null;
+  }
+}
 
 /**
  * Programs and PowerShell commands that delete: rm, unlink, shred and trash; cmd's del, erase, rd and rmdir; and
@@ -235,8 +284,15 @@ interface Live {
   /** Aborted by Stop, and by the engine when Codex takes a step its hook didn't allow. */
   signal: AbortSignal;
   workdir: string;
-  /** Files this task made, which the agent may change again without asking. */
+  /**
+   * Files the agent may change again without asking: the ones this task made, and the ones the user let it replace in
+   * this run, whose copy is kept.
+   */
   made: Set<string>;
+  /** Files Tost Work knows this task made, in this run or an earlier one. They're saved on the task when the run ends. */
+  own: Set<string>;
+  /** The folder as it was when the run started, from `listFolder`. A file that isn't in it was made by this run. */
+  before: Map<string, string> | null;
   /** Approvals a step is waiting on, by id. */
   pending: Set<string>;
   /** Codex's steps that its hook allowed, by call id: each command and file change it starts must be one. */
@@ -569,12 +625,12 @@ export class AgentEngine implements Engine, ToolHandler {
     else stopped.addEventListener("abort", onStop, { once: true });
     const signal = abort.signal;
     const channel = new Channel<EngineEvent>();
-    // Files the task created. A file with a kept copy existed before the task (it was overwritten with approval, or
-    // restored since), so changing it again always asks.
+    // Files the task created, as Tost Work saw them made, never as the agent reports them: a file the agent calls new
+    // may have been in the folder before. A file with a kept copy existed before the task (it was overwritten with
+    // approval, or restored since), so changing it again always asks.
     const kept = new Set((task.kept ?? []).map((k) => k.path));
-    const made = new Set(
-      task.files.filter((f) => f.role === "made" && f.kind !== "delete" && !kept.has(f.path)).map((f) => f.path),
-    );
+    const own = new Set((task.own ?? []).filter((path) => !kept.has(path)));
+    const made = new Set(own);
     for (const path of this.cleared.get(task.id) ?? []) made.add(path);
     this.cleared.delete(task.id);
     const session = this.tools.open(task.id);
@@ -595,8 +651,6 @@ export class AgentEngine implements Engine, ToolHandler {
     // The log gets every event as cli-funnel sends it, after a line saying what the run was started with. The run's
     // tool server token and the course key are masked wherever they would appear.
     const log = this.taskLog(task.id, [session.token, apiKey]);
-    const live: Live = { channel, signal, workdir, made, pending: new Set(), allowed: new Set(), log };
-    this.live.set(task.id, live);
     const access = codex ? "full" : "supervised";
     log.write({
       type: "run",
@@ -609,6 +663,11 @@ export class AgentEngine implements Engine, ToolHandler {
       ...(task.sessionId ? { sessionId: task.sessionId } : {}),
       followUp: followUp !== null,
     });
+    // The folder as it is before the CLI starts, so no file the run makes is in it. On an SSD a folder of 25,000 files
+    // takes about 50 ms to list; a network folder takes longer, and the run starts that much later.
+    const before = await listFolder(workdir, log);
+    const live: Live = { channel, signal, workdir, made, own, before, pending: new Set(), allowed: new Set(), log };
+    this.live.set(task.id, live);
 
     // A skills folder that can't be read leaves the task without skills rather than failing it.
     const skills = await this.skills().catch(() => []);
@@ -687,6 +746,12 @@ export class AgentEngine implements Engine, ToolHandler {
     let said = "";
     // Set when Codex started a step its hook never allowed: the hook isn't running, so the task stops.
     let unchecked: string | null = null;
+    // The files the task owns go on the task before the run ends, however it ends, and only when they changed.
+    const recordOwn = async () => {
+      const paths = await this.ownAtEnd(live);
+      const had = new Set(task.own ?? []);
+      if (paths.length !== had.size || paths.some((path) => !had.has(path))) channel.push({ type: "own", paths });
+    };
     const pump = (async () => {
       try {
         for await (const event of stream) {
@@ -716,13 +781,16 @@ export class AgentEngine implements Engine, ToolHandler {
             if (note) channel.push({ type: "activity", kind: "note", target: note });
           } else if (event.type === "file.change" && event.status === "done") {
             const path = event.movedTo ?? event.path;
-            if (event.kind === "delete") made.delete(path);
-            else made.add(path);
+            if (event.kind === "delete") {
+              made.delete(path);
+              live.own.delete(path);
+            } else made.add(path);
             channel.push({ type: "file", change: { path, kind: event.kind, role: "made" } });
           }
         }
         const result = await stream.result;
         log.write({ type: "run.end", finishReason: result.finishReason, deniedActions: result.deniedActions });
+        await recordOwn();
         if (unchecked) channel.push({ type: "failed", error: translate(this.language(), "error.codexUnchecked") });
         else if (result.finishReason === "cancelled") channel.push({ type: "stopped" });
         else {
@@ -730,6 +798,7 @@ export class AgentEngine implements Engine, ToolHandler {
           channel.push({ type: "done" });
         }
       } catch (err) {
+        await recordOwn();
         if (unchecked) channel.push({ type: "failed", error: translate(this.language(), "error.codexUnchecked") });
         else if (signal.aborted) channel.push({ type: "stopped" });
         else {
@@ -791,12 +860,20 @@ export class AgentEngine implements Engine, ToolHandler {
     return END_TURN;
   }
 
+  /**
+   * The agent's own request before it replaces or deletes files. A file this task made, or one the user already let it
+   * replace in this run, needs no card: the agent hears so at once, and only the other files go on the card.
+   */
   async approve(taskId: string, action: "overwrite" | "delete", paths: string[]): Promise<string> {
     const live = this.mustLive(taskId);
+    const free: string[] = [];
+    if (action === "overwrite") for (const path of paths) if (await this.mayChange(live, path)) free.push(path);
+    const asked = paths.filter((path) => !free.includes(path));
+    if (!asked.length) return noApprovalNeeded(free);
     const id = randomUUID();
-    this.approvals.set(id, { taskId, action, paths });
-    live.channel.push({ type: "approval", approval: { id, action, paths } });
-    return END_TURN;
+    this.approvals.set(id, { taskId, action, paths: asked });
+    live.channel.push({ type: "approval", approval: { id, action, paths: asked } });
+    return free.length ? `${APPROVAL_END} ${noApprovalNeeded(free)}` : APPROVAL_END;
   }
 
   /**
@@ -825,6 +902,7 @@ export class AgentEngine implements Engine, ToolHandler {
     const target = await freeName(dirname(source), `${basename(source, extname(source))}.pdf`);
     await this.documents.makePdf(source, target);
     live.made.add(target);
+    live.own.add(target);
     live.channel.push({ type: "file", change: { path: target, kind: "add", role: "made" } });
     return `Made ${target}. Tell the user where it is.`;
   }
@@ -932,7 +1010,7 @@ export class AgentEngine implements Engine, ToolHandler {
       const targets = [c.kind === "add" && !(await exists(c.path)) ? null : c.path];
       if (c.movedTo && (await exists(c.movedTo))) targets.push(c.movedTo);
       for (const target of targets)
-        if (target && !live.made.has(target) && !overwrites.includes(target)) overwrites.push(target);
+        if (target && !overwrites.includes(target) && !(await this.mayChange(live, target))) overwrites.push(target);
     }
     if (deletes.length) {
       const decided = await this.askApproval(taskId, "delete", deletes);
@@ -971,12 +1049,50 @@ export class AgentEngine implements Engine, ToolHandler {
         throw err;
       });
       if (!entry) added.push(path);
-      else if (entry.isFile() && !live.made.has(path)) overwrites.push(path);
+      else if (entry.isFile() && !(await this.mayChange(live, path))) overwrites.push(path);
     }
     const decision = await this.overwrite(taskId, live, overwrites);
     if (!allows(decision)) return decision;
     for (const path of added) live.made.add(path);
     return decision;
+  }
+
+  /**
+   * Whether the agent may change a file without asking: one it may already change (`made`), or one that's there now
+   * but wasn't when the run started, such as a file a script made, which no reader of commands can tell. Without a
+   * listing, no file counts as new. Each file found this way is the task's own from then on, saved on the task when the
+   * run ends.
+   */
+  private async mayChange(live: Live, path: string): Promise<boolean> {
+    if (live.made.has(path)) return true;
+    const { before } = live;
+    if (!before || !(await exists(path))) return false;
+    const real = await realTarget(path);
+    if (!real) return false;
+    if (before.has(pathKey(path)) || before.has(pathKey(real))) return false;
+    live.made.add(path);
+    live.own.add(path);
+    return true;
+  }
+
+  /**
+   * The files the task owns once the run ends: those it owned before, those found while it ran, and every other file
+   * that's in the folder now and wasn't when the run started, less any that are gone. Without both listings only the
+   * first two count.
+   */
+  private async ownAtEnd(live: Live): Promise<string[]> {
+    const { before } = live;
+    const after = before && (await listFolder(live.workdir, live.log));
+    const found = new Set(live.own);
+    if (before && after) for (const [key, path] of after) if (!before.has(key)) found.add(path);
+    const own: string[] = [];
+    for (const path of found) {
+      if (own.length >= OWN_MAX) break;
+      // A file that's gone, or that can't be read now, is left out: changing it later asks first.
+      const entry = await stat(path).catch(() => null);
+      if (entry?.isFile()) own.push(path);
+    }
+    return own;
   }
 
   /** Asks before files that were already there are replaced, unless there are none. */

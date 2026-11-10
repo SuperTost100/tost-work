@@ -182,6 +182,11 @@ export interface Task {
   review: Review | null;
   /** Missing on tasks saved before copies were kept. */
   kept?: KeptCopy[];
+  /**
+   * The files Tost Work saw this task make, which weren't in its folder before. The agent may change them without
+   * asking, and they stay listed as made. Missing on tasks saved before it was kept: their files ask first.
+   */
+  own?: string[];
   /** Stopped because Tost Work closed while the task was working, not by the user. Resume carries on. */
   interrupted?: boolean;
   /** The skills the agent read, by folder name, in any run. Built-in guides count too. */
@@ -222,6 +227,8 @@ export type EngineEvent =
   /** Words of the agent's answer as it writes them, shown live and never saved: the whole answer comes as a message. */
   | { type: "text"; text: string }
   | { type: "file"; change: FileChange }
+  /** Every file Tost Work knows the task made, as a run ends: they replace the task's `own`. */
+  | { type: "own"; paths: string[] }
   | { type: "question"; question: Question }
   /** The agent stopped waiting for this question or approval, so it comes off the task. */
   | { type: "withdrawn"; id: string }
