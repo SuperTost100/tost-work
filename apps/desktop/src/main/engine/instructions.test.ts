@@ -78,6 +78,8 @@ describe("instructionsFor", () => {
     expect(windows).toContain('ConvertTo-Json -Depth 5 -InputObject @(@{ command = "add"');
     // The here-string's end has to start its line, or PowerShell never finds it.
     expect(windows).toMatch(/^'@$/m);
+    // officecli turns \n into a new line in a --prop value, but not in batch, where it shows on the slide.
+    expect(windows).toContain("Through `batch` it doesn't");
     expect(windows).toContain("Tost Work moves them to the Recycle Bin");
     for (const platform of ["darwin", "linux"] as const) {
       expect(on(platform)).not.toContain("PowerShell");
