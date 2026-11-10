@@ -673,6 +673,43 @@ describe("turning an overwrite down", () => {
   });
 });
 
+describe("the preview of a task's files", () => {
+  it("never asks to read a file the task deleted", async () => {
+    const api = createMemoryApi();
+    const read = vi.spyOn(api.files, "read");
+    const project = await api.projects.create({ name: "Courses", folder: "/home/giulia/Courses" });
+    const task = await api.tasks.start({ projectId: project.id, brief: "Delete two.txt", attachments: [] });
+    // The task's only file is the one it deleted, as after an allowed deletion: the main process refuses to read it.
+    act(() =>
+      api.emit(task.id, {
+        type: "file",
+        change: { path: "/home/giulia/Courses/two.txt", kind: "delete", role: "made" },
+      }),
+    );
+    render(<App userName="Giulia" api={api} />);
+    const [open] = await screen.findAllByText("Delete two.txt");
+    await act(async () => {
+      fireEvent.click(open as HTMLElement);
+    });
+    const panel = document.querySelector("aside.rp") as HTMLElement;
+    expect(within(panel).getByText("two.txt")).toBeTruthy();
+    // A file made after it is previewed, and the deleted one still isn't read.
+    act(() =>
+      api.emit(task.id, { type: "file", change: { path: "/home/giulia/Courses/one.txt", kind: "add", role: "made" } }),
+    );
+    await waitFor(() => expect(read).toHaveBeenCalledWith(task.id, "/home/giulia/Courses/one.txt"));
+    act(() =>
+      api.emit(task.id, {
+        type: "file",
+        change: { path: "/home/giulia/Courses/old.txt", kind: "delete", role: "made" },
+      }),
+    );
+    await act(async () => {});
+    expect(read.mock.calls.map(([, path]) => path)).not.toContain("/home/giulia/Courses/two.txt");
+    expect(read.mock.calls.map(([, path]) => path)).not.toContain("/home/giulia/Courses/old.txt");
+  });
+});
+
 describe("the side panel's files", () => {
   it("shows the first five of a long list and the rest on request", async () => {
     const api = createMemoryApi();
