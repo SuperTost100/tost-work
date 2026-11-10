@@ -35,7 +35,7 @@ export interface PatchChange {
 }
 
 /** The path functions for a folder's own system, so Windows paths resolve as Windows paths on any computer. */
-const pathsFor = (folder: string) => (/^[A-Za-z]:[\\/]|^\\\\/.test(folder) ? win32 : posix);
+export const pathsFor = (folder: string) => (/^[A-Za-z]:[\\/]|^\\\\/.test(folder) ? win32 : posix);
 
 const BEGIN = "*** Begin Patch";
 const END = "*** End Patch";
@@ -326,7 +326,8 @@ export function gateRequest(call: HookCall): GateRequest {
     const changes = commandPatch(input.command, call.cwd);
     if (changes === null) return { refuse: UNREADABLE_PATCH };
     return {
-      command: { id: call.id, tool: "command", input: { command: input.command } },
+      // The command's folder goes with it, for the files its relative paths write.
+      command: { id: call.id, tool: "command", input: { command: input.command, cwd: call.cwd } },
       ...(changes.length ? { change: asChange(call.id, changes) } : {}),
     };
   }

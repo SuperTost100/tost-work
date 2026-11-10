@@ -22,6 +22,19 @@ import type { HookAnswer, ToolHandler } from "../mcp/server";
 import { SandboxNotReady, UserError } from "../userError";
 import { activityOf, noteText } from "./activity";
 import { gateRequest, hookCall, opensShell } from "./codexGate";
+import {
+  commandWrites,
+  heredocs,
+  MAX_DEPTH,
+  namesOf,
+  parse,
+  payloadOf,
+  RUNS_NEXT,
+  SHELLS,
+  UNWRAPS,
+  type Word,
+  writtenPaths,
+} from "./commands";
 import type { Engine, RunContext } from "./engine";
 import { instructionsFor } from "./instructions";
 import { OVERWRITE_NOTE, withFiles } from "./runner";
@@ -80,18 +93,6 @@ const END_TURN =
  */
 const DELETES = new Set(["rm", "rmdir", "del", "erase", "rd", "ri", "unlink", "shred", "trash", "remove-item"]);
 /**
- * Words that run a program named later in the command, such as sudo, xargs and find's -exec, and the shell's keywords
- * before a command. Every word after one of them is read as a program's name too.
- */
-const RUNS_NEXT = new Set([
-  ...["sudo", "doas", "env", "command", "builtin", "exec", "nohup", "nice", "ionice", "time", "timeout", "stdbuf"],
-  ...["xargs", "busybox", "toybox", "-exec", "-execdir", "-ok", "-okdir", ".", "call", "start"],
-  ...["if", "then", "else", "elif", "do", "while", "until", "!"],
-]);
-const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "mksh", "ash", "fish", "csh", "tcsh"]);
-/** Programs whose payload runs as commands, which the check reads as a script of its own. */
-const UNWRAPS = new Set([...SHELLS, "cmd", "powershell", "pwsh", "eval", "iex", "invoke-expression"]);
-/**
  * Deletions in code a command runs, such as a Python, Node or PowerShell script. They're looked for in the command's
  * unquoted text and in quoted code handed to an interpreter, never in quoted text a command only writes. PowerShell's
  * include .NET's [IO.File]::Delete(…) and (Get-Item x).Delete(…). A lowercase .delete( counts only before nothing or a
@@ -103,203 +104,13 @@ const CODE_DELETES = [
 ];
 /** An interpreter's flag for running the quoted text after it as code: python -c, node -e, perl -pe, php -r. */
 const CODE_FLAG = /^(-[a-z]{0,2}[ce]|-p|-r|--eval|--print|--command|-command)$/i;
-/** Nested shells and payloads deeper than this aren't read: the command is taken as deleting. */
-const MAX_DEPTH = 10;
-/** A shell where a command starts, by name or path: bash and /bin/sh, but not a file named cleanup.sh. */
-const SHELL = String.raw`(^|[\s;&|(])(\S*\/)?((ba|z|da|k)?sh|fish)`;
-/** A line that hands a heredoc to a shell, whose body is then commands. */
-const SHELL_READS = new RegExp(String.raw`${SHELL}(\s|<|$)`);
-const HEREDOC = /<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2[ \t]*(?=\n|$)/g;
-const SUBSTITUTION = /\$\(([^()]*)\)|`([^`]*)`/g;
-
-/** The text before `offset` on its line. */
-const lineBefore = (text: string, offset: number) => text.slice(text.lastIndexOf("\n", offset - 1) + 1, offset);
 
 const codeDeletes = (text: string) => CODE_DELETES.some((pattern) => pattern.test(text));
 
-/** Whether `option` is `full` or a prefix of it at least `min` characters long, as PowerShell reads its options. */
-const prefixOf = (full: string, option: string, min = 2) => option.length >= min && full.startsWith(option);
-
-/**
- * A script with its heredocs' bodies taken out, and the bodies, whose code is still checked. A body a shell reads
- * stays in as commands. Any other body is text, except for the $(…) and `…` in one whose delimiter isn't quoted,
- * which the shell runs.
- */
-function heredocs(script: string): { text: string; bodies: string[] } {
-  const bodies: string[] = [];
-  const text = script.replace(HEREDOC, (body: string, quote: string, _tag: string, offset: number) => {
-    bodies.push(body);
-    if (SHELL_READS.test(lineBefore(script, offset))) return body;
-    if (quote) return "";
-    return [...body.matchAll(SUBSTITUTION)].map((m) => `\n${m[1] ?? m[2] ?? ""}\n`).join("");
-  });
-  return { text, bodies };
-}
-
-/** One word of a command as the shell passes it on: quotes removed and adjacent pieces joined. */
-interface Word {
-  text: string;
-  /** Whether any of it stood outside quotes. */
-  bare: boolean;
-  /** Where its quoted pieces sit in the script, so the code check can leave out quoted text. */
-  quotes: [number, number][];
-  /** Whether it follows <<<, so it's the program's input: a script, when the program is a shell. */
-  fed: boolean;
-}
-
-/** The index of the parenthesis that closes the one at `open`, skipping quoted text, or the script's end. */
-function closing(script: string, open: number): number {
-  let depth = 0;
-  for (let i = open; i < script.length; i++) {
-    const c = script[i];
-    if (c === "'" || c === '"') {
-      const end = script.indexOf(c, i + 1);
-      if (end < 0) return script.length;
-      i = end;
-    } else if (c === "(") depth++;
-    else if (c === ")" && --depth === 0) return i;
-  }
-  return script.length;
-}
-
-/**
- * A script split into commands of words, as POSIX shells, cmd and PowerShell would split it closely enough for the
- * delete check: commands end at a newline, ;, &, |, a parenthesis or a brace, which also skips PowerShell's call
- * operator. It also returns the $(…) and `…` substitutions, which run even inside double quotes. A backtick with no
- * partner is PowerShell's escape. A backslash escapes only what a POSIX shell would treat specially, because in
- * Windows paths it separates folders.
- */
-function parse(script: string): { commands: Word[][]; substitutions: string[] } {
-  const commands: Word[][] = [];
-  const substitutions: string[] = [];
-  let words: Word[] = [];
-  let word: Word | null = null;
-  let feed = false;
-  const piece = (): Word => {
-    word ??= { text: "", bare: false, quotes: [], fed: feed };
-    feed = false;
-    return word;
-  };
-  const bare = (text: string) => {
-    const w = piece();
-    w.text += text;
-    w.bare = true;
-  };
-  const endWord = () => {
-    if (word) words.push(word);
-    word = null;
-  };
-  const endCommand = () => {
-    endWord();
-    if (words.length) commands.push(words);
-    words = [];
-  };
-  let i = 0;
-  while (i < script.length) {
-    const c = script[i] as string;
-    const next = script[i + 1] ?? "";
-    if (c === "'") {
-      const end = script.indexOf("'", i + 1);
-      const close = end < 0 ? script.length : end;
-      const w = piece();
-      w.text += script.slice(i + 1, close);
-      w.quotes.push([i, close + 1]);
-      i = close + 1;
-    } else if (c === '"') {
-      let j = i + 1;
-      let text = "";
-      while (j < script.length && script[j] !== '"') {
-        const after = script[j + 1] ?? "";
-        // A POSIX shell's \" \\ \$ \`, and PowerShell's `".
-        if ((script[j] === "\\" && after && '"\\$`'.includes(after)) || (script[j] === "`" && after === '"')) {
-          text += after;
-          j += 2;
-        } else text += script[j++];
-      }
-      const w = piece();
-      w.text += text;
-      w.quotes.push([i, j + 1]);
-      for (const m of script.slice(i + 1, j).matchAll(SUBSTITUTION)) substitutions.push(m[1] ?? m[2] ?? "");
-      i = j + 1;
-    } else if (c === "$" && next === "(") {
-      const end = closing(script, i + 1);
-      substitutions.push(script.slice(i + 2, end));
-      bare(script.slice(i, end + 1));
-      i = end + 1;
-    } else if (c === "`") {
-      const end = script.indexOf("`", i + 1);
-      if (end < 0) {
-        bare(next);
-        i += 2;
-      } else {
-        substitutions.push(script.slice(i + 1, end));
-        bare(script.slice(i, end + 1));
-        i = end + 1;
-      }
-    } else if (c === "\\" && next === "\n") i += 2;
-    else if (c === "\\" && next && /[\s"'`$;&|<>(){}\\]/.test(next)) {
-      bare(next);
-      i += 2;
-    } else if (c === "\n") {
-      endCommand();
-      i++;
-    } else if (/\s/.test(c)) {
-      endWord();
-      i++;
-    } else if (c === "<" || c === ">" || (c === "&" && next === ">")) {
-      // A redirection, such as > out.txt, 2>&1 or &> log.txt: its target is a word of the command.
-      endWord();
-      const start = i;
-      while (i < script.length && /[<>&|]/.test(script[i] as string)) i++;
-      feed = script.slice(start, i) === "<<<";
-      if (script[i - 1] === "&") while (/[\d-]/.test(script[i] ?? "")) i++;
-    } else if (";&|(){}".includes(c)) {
-      endCommand();
-      i++;
-    } else {
-      bare(c);
-      i++;
-    }
-  }
-  endCommand();
-  return { commands, substitutions };
-}
-
-/**
- * The names a word may run as a program, in lowercase: the word, its last part without folders and .exe, and, in a
- * program's place, the part before a slash, because cmd reads del/q as del /q.
- */
-function namesOf(word: string, program: boolean): string[] {
-  const lower = word.toLowerCase();
-  const base = (lower.split(/[\\/]/).pop() ?? "").replace(/\.exe$/, "");
-  return program ? [lower, base, lower.split("/")[0] ?? ""] : [lower, base];
-}
-
 /** Whether a program, given the words after it, runs a deletion: a nested shell's payload, find's -delete, git clean. */
 function nestedDeletes(name: string, rest: string[], depth: number): boolean {
-  if (SHELLS.has(name)) {
-    const flag = rest.findIndex((t) => /^-[a-z]*c[a-z]*$/i.test(t));
-    return flag >= 0 && deletes(rest[flag + 1] ?? "", depth + 1);
-  }
-  if (name === "cmd") {
-    // cmd's switches, such as /d /s /q, may come before /c or /k, and ^ is its escape.
-    const at = rest.findIndex((t) => /^\/[ck]/i.test(t));
-    if (at < 0) return false;
-    const payload = [rest[at]?.slice(2) ?? "", ...rest.slice(at + 1)].join(" ");
-    return deletes(payload.replace(/\^([\s\S])/g, "$1"), depth + 1);
-  }
-  if (name === "powershell" || name === "pwsh") {
-    for (const [at, option] of rest.map((t) => t.toLowerCase()).entries()) {
-      // PowerShell reads -EncodedCommand (any prefix from -e, or -ec) as base64 of UTF-16LE text.
-      if (prefixOf("-encodedcommand", option) || option === "-ec")
-        return deletes(Buffer.from(rest[at + 1] ?? "", "base64").toString("utf16le"), depth + 1);
-      if (prefixOf("-command", option)) return deletes(rest.slice(at + 1).join(" "), depth + 1);
-      if (prefixOf("-file", option)) return false;
-    }
-    // With neither, Windows PowerShell runs the words after its options as a command.
-    return deletes(rest.filter((t) => !t.startsWith("-")).join(" "), depth + 1);
-  }
-  if (name === "eval" || name === "iex" || name === "invoke-expression") return deletes(rest.join(" "), depth + 1);
+  const payload = payloadOf(name, rest);
+  if (payload !== null) return deletes(payload, depth + 1);
   if (name === "find") return rest.some((t) => t.toLowerCase() === "-delete");
   if (name === "git") {
     for (let at = 0; at < rest.length; at++) {
@@ -430,6 +241,11 @@ interface Live {
   pending: Set<string>;
   /** Codex's steps that its hook allowed, by call id: each command and file change it starts must be one. */
   allowed: Set<string>;
+  /**
+   * The folder Claude Code's next command runs in. Its shell keeps the folder a cd moved to, inside the task's folder,
+   * and its requests don't say which it is. Codex's hook names the folder of each command.
+   */
+  shell: string;
   log: TaskLog;
 }
 
@@ -784,7 +600,7 @@ export class AgentEngine implements Engine, ToolHandler {
     // The log gets every event as cli-funnel sends it, after a line saying what the run was started with. The run's
     // tool server token and the course key are masked wherever they would appear.
     const log = this.taskLog(task.id, [session.token, apiKey]);
-    const live: Live = { channel, signal, workdir, made, pending: new Set(), allowed: new Set(), log };
+    const live: Live = { channel, signal, workdir, made, pending: new Set(), allowed: new Set(), shell: workdir, log };
     this.live.set(task.id, live);
     const access = codex ? "full" : "supervised";
     log.write({
@@ -1037,8 +853,9 @@ export class AgentEngine implements Engine, ToolHandler {
   }
 
   /**
-   * What the agent may do without the user: new files, changes to files this task made, and commands other than
-   * deletions. Changing a file that was already there, or deleting one, goes through the approval card, and Tost Work
+   * What the agent may do without the user: new files, changes to files this task made, and commands that neither
+   * delete nor replace a file that was already there. Changing such a file, with a tool or a command, or deleting one,
+   * goes through the approval card, and Tost Work
    * keeps the copy or moves the file to the Trash before the agent hears back. Nothing is written outside the task's
    * folder, and commands stay in the sandbox.
    */
@@ -1050,7 +867,7 @@ export class AgentEngine implements Engine, ToolHandler {
     if (request.tool === "AskUserQuestion")
       return { decision: "deny", message: "Ask the user with the ask_user tool, then end your turn." };
     if (request.tool === "command") {
-      const input = (request.input ?? {}) as { command?: unknown; dangerouslyDisableSandbox?: unknown };
+      const input = (request.input ?? {}) as { command?: unknown; cwd?: unknown; dangerouslyDisableSandbox?: unknown };
       const command = String(input.command ?? "");
       // Claude Code asks this way to run a command outside its sandbox.
       if (input.dangerouslyDisableSandbox === true)
@@ -1071,7 +888,7 @@ export class AgentEngine implements Engine, ToolHandler {
           message:
             "This command leaves a shell or an interpreter waiting for typed input, which Tost Work can't check. Run a script by its path (python3 convert.py, bash build.sh), or pass the code with -c (python3 -c '…', bash -c '…'), in this one call.",
         };
-      return "allow";
+      return this.commandOverwrites(taskId, live, command, typeof input.cwd === "string" ? input.cwd : null);
     }
     if (request.tool !== "file_change") return "allow";
 
@@ -1109,6 +926,46 @@ export class AgentEngine implements Engine, ToolHandler {
             : "The user wants to keep these files. Leave them as they are.",
       };
     }
+    return this.overwrite(taskId, live, overwrites);
+  }
+
+  /**
+   * A command that writes files goes through the same card as a file change when it would replace a file that was
+   * already in the task's folder. It runs only once the user allows it, after the copy is kept. The files it writes
+   * that weren't there yet count as made by the task. Files outside the folder are left to the sandbox. `cwd` is the
+   * folder Codex's hook names; for Claude Code it's the folder its shell is in.
+   */
+  private async commandOverwrites(
+    taskId: string,
+    live: Live,
+    command: string,
+    cwd: string | null,
+  ): Promise<ApprovalDecision> {
+    const from = cwd ?? live.shell;
+    const writes = commandWrites(command, from);
+    const overwrites: string[] = [];
+    const added: string[] = [];
+    for (const path of await writtenPaths(writes.targets, from)) {
+      if (await outside(live.workdir, path)) continue;
+      const entry = await stat(path).catch((err: NodeJS.ErrnoException) => {
+        if (err.code === "ENOENT" || err.code === "ENOTDIR") return null;
+        throw err;
+      });
+      if (!entry) added.push(path);
+      else if (entry.isFile() && !live.made.has(path)) overwrites.push(path);
+    }
+    const decision = await this.overwrite(taskId, live, overwrites);
+    if (!allows(decision)) return decision;
+    for (const path of added) live.made.add(path);
+    // Claude Code's shell stays in the folder a cd moved it to, and goes back to the task's folder when it leaves it.
+    if (cwd === null)
+      live.shell =
+        writes.cwd && (writes.cwd === live.workdir || inside(live.workdir, writes.cwd)) ? writes.cwd : live.workdir;
+    return decision;
+  }
+
+  /** Asks before files that were already there are replaced, unless there are none. */
+  private async overwrite(taskId: string, live: Live, overwrites: string[]): Promise<ApprovalDecision> {
     if (!overwrites.length) return "allow";
     const decided = (await this.askApproval(taskId, "overwrite", overwrites)) ?? "refuse";
     if (decided !== "allow") return { decision: "deny", message: OVERWRITE_NOTE[decided](overwrites.join(", ")) };
