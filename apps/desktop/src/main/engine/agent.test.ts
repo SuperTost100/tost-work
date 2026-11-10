@@ -1301,7 +1301,9 @@ describe("Codex's hook", () => {
       answers.push(await gate("apply_patch", { command: patch(`*** Add File: ${join(elsewhere, "x.txt")}`, "+x") }));
       answers.push(await gate("apply_patch", { command: patch("*** Add File: ../x.txt", "+x") }));
       answers.push(
-        await gate("apply_patch", { command: patch("*** Update File: a.md", `*** Move to: ${elsewhere}/a.md`) }),
+        await gate("apply_patch", {
+          command: patch("*** Update File: a.md", `*** Move to: ${elsewhere}/a.md`, "@@", "+x"),
+        }),
       );
       answers.push(
         await gate("Bash", { command: `cd .. && apply_patch <<'EOF'\n${patch("*** Add File: x.txt", "+x")}\nEOF` }),
@@ -1339,8 +1341,8 @@ describe("Codex's hook", () => {
     });
     await go();
     expect(answers).toEqual([
-      { decision: "deny", reason: expect.stringMatching(/Don't start a shell/) },
-      { decision: "deny", reason: expect.stringMatching(/Don't start a shell/) },
+      { decision: "deny", reason: expect.stringMatching(/waiting for typed input.*by its path/) },
+      { decision: "deny", reason: expect.stringMatching(/waiting for typed input.*by its path/) },
       { decision: "allow" },
       { decision: "deny", reason: expect.stringMatching(/couldn't read this patch/) },
       { decision: "allow" },

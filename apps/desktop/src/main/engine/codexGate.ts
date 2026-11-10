@@ -337,8 +337,22 @@ export function gateRequest(call: HookCall): GateRequest {
 const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "fish", "csh", "tcsh"]);
 const POWERSHELLS = new Set(["pwsh", "powershell"]);
 const SCRIPTING = /^(python[\d.]*|py|ipython\d*|node|nodejs|deno|perl|ruby|irb|php|lua|tclsh)$/i;
-/** Words that run the program after them, with the options they take. */
-const PREFIXES = new Set(["sudo", "env", "exec", "command", "nohup", "time", "nice", "builtin", "stdbuf", "doas"]);
+/** Words that run the program after them, and the options among theirs whose value is the next word. */
+const PREFIXES: Record<string, RegExp | null> = {
+  sudo: /^-[ugCh]$/,
+  doas: /^-[uC]$/,
+  env: /^-[CuS]$/,
+  nice: /^-n$/,
+  stdbuf: /^-[ioe]$/,
+  timeout: /^-[sk]$/,
+  exec: null,
+  command: null,
+  builtin: null,
+  nohup: null,
+  time: null,
+  setsid: null,
+  busybox: null,
+};
 
 /** The words of one simple command, with quoted strings as one placeholder word each. */
 function wordsOf(segment: string): string[] {
@@ -355,38 +369,54 @@ function programOf(segment: string): { name: string; args: string[]; redirected:
     const first = words[0];
     if (!first) return null;
     const bare = first.replace(/^.*[\\/]/, "").replace(/\.exe$/i, "");
-    if (!PREFIXES.has(bare.toLowerCase())) return { name: bare, args: words.slice(1), redirected };
+    const prefix = bare.toLowerCase();
+    if (!Object.hasOwn(PREFIXES, prefix)) return { name: bare, args: words.slice(1), redirected };
+    const takesValue = PREFIXES[prefix];
     words = words.slice(1);
     while (words[0]?.startsWith("-")) {
       const option = words[0];
       words = words.slice(1);
-      // sudo -u bob, env -C dir, nice -n 5: the option's value is the next word.
-      if (/^-[uCgnS]$/.test(option) && words[0]) words = words.slice(1);
+      // sudo -u bob, env -C dir, nice -n 5, timeout -s KILL: the option's value is the next word.
+      if (takesValue?.test(option) && words[0]) words = words.slice(1);
     }
+    // timeout 600 bash: the time comes before the program.
+    if (prefix === "timeout") words = words.slice(1);
   }
 }
 
-/** Whether a shell, PowerShell or cmd with these arguments is left reading commands from its input. */
+/**
+ * Whether a shell, PowerShell or cmd with these arguments is left reading commands from its input. A version or help
+ * option prints and ends, and only cmd takes options that start with /: elsewhere that's a path, such as a script's.
+ */
 function readsCommands(name: string, args: string[]): boolean {
   const lower = name.toLowerCase();
-  const flags = args.filter((a) => a.startsWith("-") || a.startsWith("/"));
-  const operands = args.filter((a) => !a.startsWith("-") && !a.startsWith("/"));
+  const isFlag = (a: string) => a.startsWith("-") || (lower === "cmd" && a.startsWith("/"));
+  const flags = args.filter(isFlag);
+  const operands = args.filter((a) => !isFlag(a));
   if (SHELLS.has(lower)) {
+    if (flags.some((f) => /^--(version|help)$/.test(f))) return false;
     if (flags.some((f) => /^-[a-z]*s[a-z]*$/i.test(f) && !f.startsWith("--"))) return true;
     if (flags.some((f) => /^-[a-z]*c[a-z]*$/i.test(f) && !f.startsWith("--"))) return false;
     return operands.length === 0;
   }
   if (POWERSHELLS.has(lower)) {
+    // Only pwsh reads -v as its version: Windows PowerShell's -Version starts the version it names.
+    if (flags.some((f) => /^(-\?|-h|-help|--help)$/i.test(f) || (lower === "pwsh" && /^-(v|version)$/i.test(f))))
+      return false;
     if (flags.some((f) => /^-noexit$/i.test(f))) return true;
     const runs = args.findIndex((a) => /^-(c|command|f|file|e|ec|encodedcommand)$/i.test(a));
     if (runs >= 0) return args[runs + 1] === "-" || args[runs + 1] === undefined;
     return operands.length === 0;
   }
   if (lower === "cmd") {
+    if (args.includes("/?")) return false;
     if (args.some((a) => /^\/k$/i.test(a))) return true;
     return !args.some((a) => /^\/c$/i.test(a));
   }
   if (SCRIPTING.test(name)) {
+    // -v is Python's verbose mode, and the version elsewhere.
+    const python = /^(python|py|ipython)/i.test(name);
+    if (flags.some((f) => /^(--version|--help|-V|-h)$/.test(f) || (f === "-v" && !python))) return false;
     if (flags.some((f) => /^(-i|--interactive)$/.test(f))) return true;
     if (args.includes("-")) return true;
     // A script, a module or code to run: -c, -m, -e, -p, --eval, --print, -r (php).
@@ -413,8 +443,10 @@ const SUBSTITUTED = /\$\(([^()]*)\)|`([^`]*)`/g;
 /**
  * Whether a command leaves a shell or an interpreter waiting for commands on its input, such as a bare `bash`,
  * `python` or `cmd`. Codex's hook doesn't see what's typed into a running command afterwards (`write_stdin`), so text
- * typed there would skip the delete check. A program whose input is piped or redirected doesn't count: it reads that,
- * not what's typed.
+ * typed there would skip the delete check. A program whose input is redirected doesn't count: it reads that, not
+ * what's typed, and nor does one reading a pipe from echo, printf or cat of a file.
+ * shortcut: a word list can't catch every way to start one, such as `xargs -I{} sh -c '{}'`, `script -q /dev/null`
+ * or `python3 -c 'import code; code.interact()'`; a hook on `write_stdin`, if Codex adds one, would close the gap.
  */
 export function opensShell(command: string): boolean {
   const inner = [...command.matchAll(SUBSTITUTED)].map((m) => m[1] ?? m[2] ?? "");
@@ -427,10 +459,21 @@ export function opensShell(command: string): boolean {
     .replace(/\d*[<>]&\d*-?/g, " ")
     .replace(/&>>?/g, " > ");
   for (const statement of flat.split(/;|&&|\|\||&|\n/)) {
-    // Only the first program of a pipeline reads what's typed: the rest read the pipe.
-    const first = statement.split("|")[0] ?? "";
+    const [first = "", ...piped] = statement.split("|");
     const program = programOf(first);
     if (program && !program.redirected && readsCommands(program.name, program.args)) return true;
+    // A later program reads the pipe, which carries what's typed into the first one unless that one only writes
+    // text it was given: echo, printf, or cat of a file or a heredoc.
+    const fixed =
+      program &&
+      (program.redirected ||
+        /^(echo|printf)$/i.test(program.name) ||
+        (program.name === "cat" && program.args.some((a) => !a.startsWith("-"))));
+    if (!fixed)
+      for (const segment of piped) {
+        const reader = programOf(segment);
+        if (reader && readsCommands(reader.name, reader.args)) return true;
+      }
   }
   return false;
 }

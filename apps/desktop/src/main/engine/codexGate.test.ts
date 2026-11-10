@@ -299,6 +299,18 @@ describe("opensShell", () => {
       "& 'C:\\Python312\\python.exe'",
       "echo $(bash)",
       "bash 2>&1",
+      // A shell that reads what's typed through a pipe, or behind a program that runs the one after it.
+      "cat | sh",
+      "cat | python3",
+      "timeout 600 bash",
+      "timeout -s KILL 10m sh",
+      "setsid bash",
+      "nohup bash",
+      "env -i bash",
+      "busybox sh",
+      // -v is verbose for Python and bash, not a version.
+      "python3 -v",
+      "bash -v",
     ])
       expect(opensShell(command), command).toBe(true);
   });
@@ -325,6 +337,21 @@ describe("opensShell", () => {
       "ls -la && cat notes.txt",
       "echo bash",
       "grep -r python .",
+      // Scripts by absolute path, which Codex usually runs, and a version or help that prints and ends.
+      "python3 /work/task/convert.py",
+      "bash /Users/mario/build.sh",
+      "/usr/bin/python3 /tmp/x.py",
+      "python3 --version",
+      "python3 -V",
+      "node -v && npm -v",
+      "bash --version",
+      "php -v",
+      "perl -v",
+      "pwsh -Version",
+      "cmd /?",
+      "cat build.sh | bash",
+      "printf 'ls\\n' | sh",
+      "timeout 600 bash make.sh",
     ])
       expect(opensShell(command), command).toBe(false);
   });
