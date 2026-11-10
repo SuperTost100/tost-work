@@ -34,8 +34,23 @@ describe("the hook's command", () => {
     expect(command).toMatch(/exit 2$/);
   });
 
-  it("sends the step from PowerShell itself on Windows, with no program path and no double quotes", () => {
-    const command = hookCommand("win32", "C:\\Users\\Giulia\\AppData\\Local\\Programs\\tost-work\\Tost Work.exe", "x");
+  it("runs the helper from PowerShell on Windows, waiting for it, with each path quoted for PowerShell", () => {
+    const exe = "C:\\Users\\Giulia D'Amico\\AppData\\Local\\Programs\\tost-work\\Tost Work.exe";
+    const command = hookCommand("win32", exe, "C:\\Users\\Giulia D'Amico\\AppData\\Roaming\\Tost Work\\h.cjs");
+    expect(command).toContain(
+      "$env:ELECTRON_RUN_AS_NODE='1';& 'C:\\Users\\Giulia D''Amico\\AppData\\Local\\Programs\\tost-work\\Tost Work.exe' 'C:\\Users\\Giulia D''Amico\\AppData\\Roaming\\Tost Work\\h.cjs' | Out-Null;",
+    );
+    expect(command).not.toContain('"');
+    expect(command).toMatch(/exit 2$/);
+  });
+
+  it("sends the step from PowerShell itself inside the Microsoft Store package, with no program path", () => {
+    const command = hookCommand(
+      "win32",
+      "C:\\Program Files\\WindowsApps\\Tost.TostWork_1\\app\\Tost Work.exe",
+      "x",
+      true,
+    );
     expect(command).not.toContain('"');
     expect(command).not.toContain("Tost Work.exe");
     expect(command).toContain("$env:TOST_WORK_HOOK_URL");

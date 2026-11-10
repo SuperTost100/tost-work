@@ -90,13 +90,14 @@ export const CLAUDE_ENV = {
  * user's own instructions, skills, hooks, plugins or MCP servers from ~/.codex and ~/.claude. Each CLI keeps its
  * sign-in in its home, so the user signs in once more inside Tost Work. Set before any CLI starts: every one inherits
  * the environment, including sign-in and the model list. Returns Tost Work's hook in Codex's home, for the check
- * before each Codex task; `exe` runs its helper, the app's own executable.
+ * before each Codex task; `exe` runs its helper, the app's own executable, except in the Microsoft Store package.
  */
 export function giveAgentsOwnHomes(
   root: string,
   env: NodeJS.ProcessEnv = process.env,
   platform: NodeJS.Platform = process.platform,
   exe: string = process.execPath,
+  store: boolean = process.windowsStore === true,
 ): CodexHook {
   const codex = join(root, "codex");
   const claude = join(root, "claude");
@@ -104,7 +105,7 @@ export function giveAgentsOwnHomes(
   mkdirSync(claude, { recursive: true, mode: 0o700 });
   const config = codexConfig(platform);
   writeFileSync(join(codex, "config.toml"), config);
-  const hook = writeCodexHook(codex, config, platform, exe);
+  const hook = writeCodexHook(codex, config, platform, exe, store);
   writeFileSync(join(claude, "settings.json"), `${JSON.stringify(CLAUDE_SETTINGS, null, 2)}\n`);
   Object.assign(env, { CODEX_HOME: codex, CLAUDE_CONFIG_DIR: claude, ...CLAUDE_ENV });
   return hook;

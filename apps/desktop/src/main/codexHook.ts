@@ -32,8 +32,8 @@ const HELPER = "tost-work-hook.cjs";
 const REFUSED = 10;
 
 /**
- * The helper the hook runs on macOS and Linux, through the app's own executable as Node. It sends the step to Tost
- * Work and exits 0 to allow it, or writes the reason to stderr and exits 10 to refuse it.
+ * The helper the hook runs through the app's own executable as Node. It sends the step to Tost Work and exits 0 to
+ * allow it, or writes the reason to stderr and exits 10 to refuse it.
  */
 export const HELPER_SOURCE = `"use strict";
 // Written by Tost Work each time it starts. Codex runs it before each step of a Tost Work task (see hooks.json).
@@ -75,21 +75,29 @@ process.stdin.on("end", () => {
 
 /** A word for sh, bash and zsh in single quotes. */
 const shQuote = (text: string) => `'${text.replaceAll("'", `'\\''`)}'`;
+/** A word for PowerShell in single quotes. */
+const psQuote = (text: string) => `'${text.replaceAll("'", "''")}'`;
 
 /**
- * The hook's command. On macOS and Linux Codex runs it with the user's shell (`zsh -c` or `bash -c`): it runs the
- * helper and turns its refusal into Codex's (exit 2 with the reason on stderr). Any other ending, such as a helper
- * that can't start, refuses the step too, because Codex lets a step run when its hook fails.
+ * The hook's command. Codex runs it with the user's shell, and lets a step run when its hook fails, so any ending other
+ * than the helper's allow or refusal refuses the step too, such as a helper that can't start.
  *
- * On Windows Codex runs it with `powershell -NoProfile -Command`. PowerShell sends the step itself, so no program path
- * needs quoting and nothing has to run from the Microsoft Store package's protected folder. Any error refuses the
- * step. If Codex finds no PowerShell it uses cmd, which can't read the line: the hook fails, Codex takes the step, and
- * the engine's check of each started step (AgentEngine) stops the task.
+ * On macOS and Linux the shell is `zsh -c` or `bash -c`: the line runs the helper and turns its refusal into Codex's
+ * (exit 2 with the reason on stderr).
+ *
+ * On Windows it's `powershell -NoProfile -Command`, and the line does the same. `| Out-Null` makes PowerShell wait for
+ * the app's executable, which Windows starts as a windowed program. Inside the Microsoft Store package (`store`) the
+ * executable sits in a protected folder that a program outside the package may not be able to run, so PowerShell
+ * sends the step itself there, which takes longer: measured on the Windows test desktop, about 1.5 s a step against
+ * 1.1 s, of which about 1 s is PowerShell starting. If Codex finds no PowerShell it uses cmd, which can't read either
+ * line: the hook fails, Codex takes the step, and the engine's check of each started step (AgentEngine) stops the task.
  */
-export function hookCommand(platform: NodeJS.Platform, exe: string, helper: string): string {
+export function hookCommand(platform: NodeJS.Platform, exe: string, helper: string, store = false): string {
   if (platform !== "win32")
     return `set +e; ELECTRON_RUN_AS_NODE=1 ${shQuote(exe)} ${shQuote(helper)}; s=$?; [ "$s" = 0 ] && exit 0; [ "$s" = ${REFUSED} ] || echo 'Tost Work could not check this step.' >&2; exit 2`;
   // No double quotes: Codex passes the line as one argument, and PowerShell's own parsing of quotes would change it.
+  if (!store)
+    return `$env:ELECTRON_RUN_AS_NODE='1';& ${psQuote(exe)} ${psQuote(helper)} | Out-Null;$s=$LASTEXITCODE;if($s -eq 0){exit 0};if($s -ne ${REFUSED}){[Console]::Error.WriteLine('Tost Work could not check this step.')};exit 2`;
   return [
     "$ErrorActionPreference='Stop'",
     "$a=$null",
@@ -127,13 +135,19 @@ export interface CodexHook {
 }
 
 /**
- * Writes the hook into Codex's home: hooks.json and, outside Windows, the helper. Both are rewritten at each start,
- * because the app's executable can move: an AppImage mounts itself somewhere new each time.
+ * Writes the hook into Codex's home: hooks.json and the helper. Both are rewritten at each start, because the app's
+ * executable can move: an AppImage mounts itself somewhere new each time.
  */
-export function writeCodexHook(home: string, config: string, platform: NodeJS.Platform, exe: string): CodexHook {
+export function writeCodexHook(
+  home: string,
+  config: string,
+  platform: NodeJS.Platform,
+  exe: string,
+  store = false,
+): CodexHook {
   const helper = join(home, HELPER);
-  if (platform !== "win32") writeFileSync(helper, HELPER_SOURCE);
-  const command = hookCommand(platform, exe, helper);
+  writeFileSync(helper, HELPER_SOURCE);
+  const command = hookCommand(platform, exe, helper, store);
   const file = join(home, "hooks.json");
   writeFileSync(file, hooksJson(command));
   return { home, file, command, config };
