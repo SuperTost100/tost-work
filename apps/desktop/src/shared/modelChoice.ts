@@ -109,8 +109,13 @@ export function providerDefault(provider: AgentProvider, models: ModelOption[]):
 
 /**
  * The model and level behind a choice on one AI, from the models it offers. A level the model doesn't offer becomes
- * the nearest one it does. A model that isn't offered, such as Opus on a plan without it, becomes Sonnet at
- * "xhigh" for Claude's thorough choice, and otherwise the AI's default. Null when the AI lists no models.
+ * the nearest one it does. A model that isn't offered, as on a ChatGPT Go plan without GPT-6.1 Terra and Sol, is
+ * replaced so that each choice still runs at its own level and shows what it runs:
+ * - Claude's thorough choice without Opus runs on Sonnet at "xhigh" (Opus uses a Pro plan's limits quickly);
+ * - otherwise the newest offered model of the same family, such as GPT-5.6 Terra for GPT-6.1 Terra;
+ * - otherwise the model the next quicker choice runs on, at this choice's level;
+ * - and for the quickest choice, the AI's default model at its level.
+ * Null when the AI lists no models.
  */
 export function resolvePreset(preset: Preset, provider: AgentProvider, models: ModelOption[]): Resolved | null {
   const want = PRESET_MODELS[preset][provider];
@@ -118,7 +123,15 @@ export function resolvePreset(preset: Preset, provider: AgentProvider, models: M
   if (model) return withEffort(model, want.effort);
   const sonnet = preset === "thorough" && provider === "claude" && models.find((m) => m.id === CLAUDE_MODEL);
   if (sonnet) return withEffort(sonnet, "xhigh");
-  return providerDefault(provider, models);
+  const family = familyOf({ id: want.model, name: nameFromId(want.model) }).family;
+  const sameFamily = models
+    .map((m) => ({ m, ...familyOf(m) }))
+    .filter((x) => x.family === family)
+    .sort((a, b) => compareVersions(b.version, a.version))[0];
+  if (sameFamily) return withEffort(sameFamily.m, want.effort);
+  const quicker = PRESETS[PRESETS.indexOf(preset) - 1];
+  const below = quicker ? resolvePreset(quicker, provider, models) : providerDefault(provider, models);
+  return below && withEffort(below.model, want.effort);
 }
 
 /** A pick worked out against the models on offer: the AI, agent, model and level a task would run on. */
