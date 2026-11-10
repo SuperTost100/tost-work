@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FIRST_TASK, LINES } from "./homeLines";
-import { greeting, guideText, homeLine, languageFrom, translate } from "./i18n";
+import { greeting, guideText, homeLine, languageFrom, translate, trashName } from "./i18n";
 
 describe("i18n", () => {
   it("picks Italian for any Italian locale", () => {
@@ -20,6 +20,30 @@ describe("i18n", () => {
   it("fills placeholders and keeps unknown ones visible", () => {
     expect(translate("en", "task.questionOf", { n: "1", total: "3" })).toBe("Question 1 of 3");
     expect(translate("it", "task.questionOf", { n: "2" })).toBe("Domanda 2 di {total}");
+  });
+
+  describe("the Trash", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("is the Recycle Bin on Windows and the Trash elsewhere, in English", () => {
+      expect(trashName("win32")).toBe("Recycle Bin");
+      expect(trashName("darwin")).toBe("Trash");
+      expect(trashName("linux")).toBe("Trash");
+    });
+
+    it("follows the system the window runs on, and stays Cestino in Italian", () => {
+      vi.stubGlobal("tostWork", { platform: "win32" });
+      expect(translate("en", "approval.trash")).toBe("Move to Recycle Bin");
+      expect(translate("en", "skills.removeDetail")).toBe("Its folder goes to the Recycle Bin.");
+      expect(translate("it", "approval.trash")).toBe("Sposta nel Cestino");
+      vi.stubGlobal("tostWork", { platform: "darwin" });
+      expect(translate("en", "approval.trash")).toBe("Move to Trash");
+    });
+
+    it("follows Node's platform in the main process", () => {
+      vi.stubGlobal("tostWork", undefined);
+      expect(translate("en", "approval.trash")).toBe(`Move to ${trashName(process.platform)}`);
+    });
   });
 
   it("names the built-in guides in Italian, and leaves English and unknown guides to their own files", () => {

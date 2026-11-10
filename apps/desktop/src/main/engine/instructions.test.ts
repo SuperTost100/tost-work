@@ -63,6 +63,32 @@ describe("instructionsFor", () => {
     expect(instructionsFor(task, project, "it")).not.toContain("officecli");
   });
 
+  it("asks to read every Office file back, and teaches PowerShell's way to pass text only on Windows", () => {
+    const docs = { skills: "/app/skills" };
+    const user = { name: "", work: "", notes: "" };
+    const on = (platform: NodeJS.Platform, documents: { skills: string } | null = docs) =>
+      instructionsFor(task, project, "it", documents, user, [], null, platform);
+    for (const platform of ["darwin", "linux", "win32"] as const) {
+      expect(on(platform)).toContain("read it back with `officecli view <file> outline`");
+      expect(on(platform)).toContain("a document with 0 paragraphs");
+    }
+    const windows = on("win32");
+    expect(windows).toContain("Your commands run in Windows PowerShell");
+    expect(windows).toContain("$OutputEncoding = [System.Text.UTF8Encoding]::new($false)");
+    expect(windows).toContain('ConvertTo-Json -Depth 5 -InputObject @(@{ command = "add"');
+    // The here-string's end has to start its line, or PowerShell never finds it.
+    expect(windows).toMatch(/^'@$/m);
+    // officecli turns \n into a new line in a slide's text, but not in a title or in batch, where it shows on the slide.
+    expect(windows).toContain("A title keeps \\n as two characters, and so does `batch`");
+    expect(windows).toContain("Tost Work moves them to the Recycle Bin");
+    for (const platform of ["darwin", "linux"] as const) {
+      expect(on(platform)).not.toContain("PowerShell");
+      expect(on(platform)).toContain("Tost Work moves them to the Trash");
+    }
+    // Without OfficeCLI there's nothing to pass text to.
+    expect(on("win32", null)).not.toContain("PowerShell");
+  });
+
   it("passes on the user's profile, leaving out empty parts", () => {
     const text = instructionsFor(task, project, "it", null, {
       name: "Giulia Rossi",

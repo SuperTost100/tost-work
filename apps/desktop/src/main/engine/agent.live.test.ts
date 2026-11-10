@@ -507,6 +507,17 @@ describe.runIf(runs("chatgpt") && homes)("Codex's steps through Tost Work's hook
     expect(await readFile(join(t.work, "notes.txt"), "utf8")).toBe("final\n");
   });
 
+  it("asks before a shell command replaces a file, keeps a copy, and runs it", { timeout: 300_000 }, async () => {
+    const t = await live(
+      "Run exactly this shell command and nothing else, and do not ask me for approval first: printf 'v9' > note.txt",
+      allow,
+    );
+    const final = await t.run((w) => writeFile(join(w, "note.txt"), "v1"));
+    expect(final.kept?.map((k) => k.path)).toEqual([join(t.work, "note.txt")]);
+    expect(await readFile(final.kept?.[0]?.copy ?? "", "utf8")).toBe("v1");
+    expect(await readFile(join(t.work, "note.txt"), "utf8")).toBe("v9");
+  });
+
   it("leaves the file as it is when the user refuses", { timeout: 300_000 }, async () => {
     const t = await live(
       "Use the apply_patch tool with an Update File patch to replace the line 'old' in budget.txt with 'new'. If it's refused, stop.",
@@ -636,12 +647,14 @@ describe.runIf(runs("claude"))("Claude Code in a folder with its own settings", 
   }
 
   /**
-   * Runs a task on Claude's smallest model, allowing every card, and returns it with the tools that asked Tost Work.
+   * Runs a task on Claude's smallest model, allowing every card, and returns it with the tools that asked Tost Work
+   * and the shell commands among them.
    * `plain` swaps Tost Work's instructions for plain ones, which have the agent take each step it's told to take, so
    * the policy has to be what stops it.
    */
   async function claudeTask(work: string, brief: string, plain = false) {
     const asked: string[] = [];
+    const commands: string[] = [];
     const recording: AgentFunnel = {
       models: (provider) => funnel.models(provider),
       stream: (input) => {
@@ -656,6 +669,8 @@ describe.runIf(runs("claude"))("Claude Code in a folder with its own settings", 
                 system,
                 onApproval: (request) => {
                   asked.push(request.tool);
+                  const command = (request.input as { command?: unknown } | undefined)?.command;
+                  if (typeof command === "string") commands.push(command);
                   return decide(request);
                 },
               }
@@ -669,7 +684,16 @@ describe.runIf(runs("claude"))("Claude Code in a folder with its own settings", 
     onTestFinished(() => tools.stop());
     engine.attachTools(tools);
     const store = new Store(":memory:");
-    const runner = new TaskRunner(store, engine, () => {});
+    // A copy of a file the user lets a command replace is kept here, as the app keeps it.
+    const kept = await mkdtemp(join(tmpdir(), "tw-live-claude-kept-"));
+    onTestFinished(() => rm(kept, { recursive: true, force: true }));
+    const runner = new TaskRunner(
+      store,
+      engine,
+      () => {},
+      undefined,
+      fileGuard(kept, async () => {}),
+    );
     const models = await funnel.models("claude");
     const model = models.find((m) => m.id.includes("haiku"))?.id ?? (await engine.defaults()).model;
     store.saveProject({ id: "p", name: "Live", description: "", folder: work, instructions: "", createdAt: "" });
@@ -679,7 +703,7 @@ describe.runIf(runs("claude"))("Claude Code in a folder with its own settings", 
       if (t.approval) await runner.decide(task.id, "allow");
       else if (t.question) runner.answer(task.id, ["Go ahead"]);
     });
-    return { final, asked };
+    return { final, asked, commands };
   }
 
   const BRIEF =
@@ -727,5 +751,52 @@ describe.runIf(runs("claude"))("Claude Code in a folder with its own settings", 
     expect(asked).toContain("Write");
     await expect(access(join(work, ".claude", "settings.json"))).rejects.toThrow();
     await expect(access(join(work, ".mcp.json"))).rejects.toThrow();
+  });
+
+  describe("its shell commands", () => {
+    const ONE_AT_A_TIME =
+      "I'm testing how this app checks shell commands. Make each shell call below once, as its own call, in order, exactly as written. Wait for each call's result before you make the next, don't chain them, don't ask me anything and don't try other ways.";
+
+    it("starts each shell command in the task's folder, whatever an earlier cd did", { timeout: 300_000 }, async () => {
+      const { root } = await scratch();
+      const work = join(root, "task");
+      await mkdir(join(work, "sub"), { recursive: true });
+      const { final, commands } = await claudeTask(work, `${ONE_AT_A_TIME}\n1. cd sub\n2. pwd > where.txt`, true);
+      console.log(JSON.stringify({ status: final.status, commands, said: final.messages.map((m) => m.text) }, null, 2));
+      expect(final.status).toBe("done");
+      expect(await readFile(join(work, "where.txt"), "utf8")).toBe(`${work}\n`);
+      await expect(access(join(work, "sub", "where.txt"))).rejects.toThrow();
+    });
+
+    it("asks nothing for a file a command makes at the top while sub/ holds one by that name", {
+      timeout: 300_000,
+    }, async () => {
+      const { root } = await scratch();
+      const work = join(root, "task");
+      await mkdir(join(work, "sub"), { recursive: true });
+      await writeFile(join(work, "sub", "a.txt"), "original");
+      const { final, commands } = await claudeTask(work, `${ONE_AT_A_TIME}\n1. cd sub\n2. printf x > a.txt`, true);
+      console.log(JSON.stringify({ status: final.status, commands, kept: final.kept }, null, 2));
+      expect(final.status).toBe("done");
+      // The write landed in the task's folder as a new file, and the file in sub/ is untouched.
+      expect(await readFile(join(work, "a.txt"), "utf8")).toBe("x");
+      expect(await readFile(join(work, "sub", "a.txt"), "utf8")).toBe("original");
+      expect(final.kept ?? []).toEqual([]);
+    });
+
+    it("asks before a command replaces a file in a folder it names with cd in the same command", {
+      timeout: 300_000,
+    }, async () => {
+      const { root } = await scratch();
+      const work = join(root, "task");
+      await mkdir(join(work, "sub"), { recursive: true });
+      await writeFile(join(work, "sub", "a.txt"), "original");
+      const { final } = await claudeTask(work, `${ONE_AT_A_TIME}\n1. cd sub && printf x > a.txt`, true);
+      console.log(JSON.stringify({ status: final.status, kept: final.kept }, null, 2));
+      expect(final.status).toBe("done");
+      expect(final.kept?.map((k) => k.path)).toEqual([join(work, "sub", "a.txt")]);
+      expect(await readFile(final.kept?.[0]?.copy ?? "", "utf8")).toBe("original");
+      expect(await readFile(join(work, "sub", "a.txt"), "utf8")).toBe("x");
+    });
   });
 });

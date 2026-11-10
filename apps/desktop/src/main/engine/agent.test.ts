@@ -686,6 +686,8 @@ describe("AgentEngine", () => {
     expect(off?.some((t) => t.startsWith("mcp__"))).toBe(false);
     // It waits for each command and subagent instead of leaving one in the background and finishing the task.
     expect(inputs[0]?.env).toMatchObject({ CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1" });
+    // Each of its commands starts in the task's folder, which is where the policy resolves a relative path.
+    expect(inputs[0]?.env).toMatchObject({ CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR: "1" });
     expect(decisions).toEqual([
       "allow",
       { decision: "deny", message: "Work only inside the task's folder." },
@@ -1496,5 +1498,192 @@ describe("Codex's hook", () => {
     }))
       seen.push(e);
     expect(seen.at(-1)).toEqual({ type: "done" });
+  });
+});
+
+describe("Commands that replace a file", () => {
+  type Run = (command: string, cwd?: string) => Promise<unknown>;
+
+  /**
+   * A task in a real folder that holds note.txt, on Codex through its hook or on Claude Code through its approvals.
+   * Each run plays `steps`, and the user answers each card with the next of `decisions`.
+   */
+  async function folder(provider: "codex" | "claude" = "codex") {
+    const work = await realpath(await mkdtemp(join(tmpdir(), "tw-cmd-")));
+    await writeFile(join(work, "note.txt"), "v1");
+    const holder: { engine?: AgentEngine; steps: (run: Run) => Promise<unknown> } = { steps: async () => {} };
+    const answers: unknown[] = [];
+    const { funnel } = fakeFunnel(async (input) => {
+      const run: Run = async (command, cwd = work) => {
+        const answer =
+          provider === "codex"
+            ? await holder.engine?.gate("t1", step("Bash", { command }, cwd))
+            : await input.onApproval?.({ id: command, tool: "Bash", input: { command } });
+        answers.push(answer);
+        return answer;
+      };
+      await holder.steps(run);
+      return { text: "" };
+    });
+    const engine = new AgentEngine(funnel, () => "en", PASSES);
+    holder.engine = engine;
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const decisions: Decision[] = [];
+    const asked: string[][] = [];
+    const go = async (
+      steps: (run: Run) => Promise<unknown>,
+      over: Partial<Task> = {},
+      followUp: string | null = null,
+    ) => {
+      holder.steps = steps;
+      answers.length = 0;
+      const signal = new AbortController().signal;
+      for await (const e of engine.run({
+        task: task({ workdir: work, provider, ...over }),
+        project: null,
+        workdir: work,
+        followUp,
+        signal,
+      }))
+        if (e.type === "approval") {
+          asked.push(e.approval.paths);
+          engine.decide("t1", e.approval.id, decisions.shift() ?? "refuse");
+        }
+      return [...answers];
+    };
+    return { work, engine, decisions, asked, go, at: (name: string) => join(work, name) };
+  }
+
+  const allowed = { decision: "allow" };
+
+  it("asks before a command replaces a file, and lets it run only when the user allows it", async () => {
+    const { decisions, asked, go, at, work } = await folder();
+    for (const name of ["a.txt", "b.txt"]) await writeFile(join(work, name), "x");
+    decisions.push("allow", "refuse", "discard");
+    const answers = await go(async (run) => {
+      // The tester's command, as Codex's hook hands it over on Linux.
+      await run(`/bin/bash -lc "printf 'v9' > note.txt"`);
+      await run("printf x > a.txt");
+      await run("echo x >> b.txt");
+      // Allowed once, with its copy kept, the file doesn't ask again in this run.
+      await run("printf v10 > note.txt");
+    });
+    expect(asked).toEqual([[at("note.txt")], [at("a.txt")], [at("b.txt")]]);
+    expect(answers).toEqual([
+      allowed,
+      { decision: "deny", reason: expect.stringMatching(/Save your version under a new name/) },
+      { decision: "deny", reason: expect.stringMatching(/Don't save it/) },
+      allowed,
+    ]);
+  });
+
+  it("doesn't ask for a new file, a file the task made, a file outside the folder or one a command only reads", async () => {
+    const { asked, go, at, work } = await folder();
+    await writeFile(join(work, "made.txt"), "a");
+    const elsewhere = await realpath(await mkdtemp(join(tmpdir(), "tw-cmd-out-")));
+    await writeFile(join(elsewhere, "out.txt"), "x");
+    const answers = await go(
+      async (run) => {
+        await run("printf x > new.txt");
+        // Made by this run's last command, so changing it again doesn't ask.
+        await run("printf y >> new.txt");
+        await run("sed -i 's/a/b/' made.txt");
+        await run(`printf x > '${join(elsewhere, "out.txt")}'`);
+        await run("cat note.txt > /dev/null 2>&1");
+        await run("touch note.txt");
+        await run("sort -o sorted.txt note.txt");
+      },
+      { files: [{ path: at("made.txt"), kind: "add", role: "made" }] },
+    );
+    expect(asked).toEqual([]);
+    expect(answers).toEqual(Array(7).fill(allowed));
+  });
+
+  it("asks once for all the files one command replaces", async () => {
+    const { decisions, asked, go, at, work } = await folder();
+    await mkdir(join(work, "docs"));
+    for (const name of ["one.txt", "two.txt", "docs/one.txt"]) await writeFile(join(work, name), "x");
+    decisions.push("allow", "allow");
+    const answers = await go(async (run) => {
+      await run("tee one.txt two.txt three.txt < note.txt");
+      // A copy into a folder replaces the file of the same name there.
+      await run("cp one.txt docs/");
+    });
+    expect(asked).toEqual([[at("one.txt"), at("two.txt")], [at("docs/one.txt")]]);
+    expect(answers).toEqual([allowed, allowed]);
+  });
+
+  it("asks before OfficeCLI changes a document once per run, and never for reading one", async () => {
+    const { decisions, asked, go, at, work } = await folder();
+    await writeFile(join(work, "Contratto.docx"), "x");
+    decisions.push("allow");
+    const answers = await go(async (run) => {
+      await run('officecli view "Contratto.docx" outline');
+      await run('officecli set "Contratto.docx" / --find "Alberto Pedrini" --replace "Alberto Pedroni"');
+      await run('officecli add "Contratto.docx" /body --type paragraph --prop text="Ciao"');
+      await run("officecli validate Contratto.docx");
+    });
+    expect(asked).toEqual([[at("Contratto.docx")]]);
+    expect(answers).toEqual(Array(4).fill(allowed));
+  });
+
+  it("doesn't ask a second time after the user allowed the AI's own request, and asks again in a later run", async () => {
+    const { engine, decisions, asked, go, at } = await folder();
+    // The AI asks first, as its instructions say, and ends its turn. The user allows it.
+    decisions.push("allow");
+    await go(() => engine.approve("t1", "overwrite", [at("note.txt")]));
+    const card = asked.length;
+    expect(card).toBe(1);
+    // The next run makes the change without another card.
+    expect(await go(async (run) => run("printf v2 > note.txt"), {}, "Go ahead")).toEqual([allowed]);
+    expect(asked).toHaveLength(card);
+    // A later message is a new run: the file now has a kept copy, so a command that changes it asks again, and the
+    // copy kept then holds v2.
+    decisions.push("allow");
+    const kept = [{ path: at("note.txt"), copy: "/k/1", at: "", reason: "overwrite" as const }];
+    const files = [{ path: at("note.txt"), kind: "update" as const, role: "made" as const }];
+    expect(await go(async (run) => run("printf v3 > note.txt"), { kept, files }, "Change it to v3")).toEqual([allowed]);
+    expect(asked.slice(card)).toEqual([[at("note.txt")]]);
+  });
+
+  it("asks again in a follow-up after the card allowed a command's overwrite", async () => {
+    const { decisions, asked, go, at } = await folder();
+    decisions.push("allow", "allow");
+    await go(async (run) => run("printf v2 > note.txt"));
+    const kept = [{ path: at("note.txt"), copy: "/k/1", at: "", reason: "overwrite" as const }];
+    const files = [{ path: at("note.txt"), kind: "update" as const, role: "made" as const }];
+    await go(async (run) => run("printf v3 > note.txt"), { kept, files }, "Change it to v3");
+    expect(asked).toEqual([[at("note.txt")], [at("note.txt")]]);
+  });
+
+  it("takes relative paths from the folder Codex's hook names, and from a cd in the command", async () => {
+    const { decisions, asked, go, at, work } = await folder();
+    await mkdir(join(work, "sub"));
+    await writeFile(join(work, "sub", "a.txt"), "x");
+    await writeFile(join(work, "sub", "b.txt"), "x");
+    decisions.push("allow", "allow");
+    await go(async (run) => {
+      await run("printf x > a.txt", join(work, "sub"));
+      await run(`/bin/bash -lc "cd sub && printf x > b.txt"`);
+    });
+    expect(asked).toEqual([[at("sub/a.txt")], [at("sub/b.txt")]]);
+  });
+
+  it("resolves Claude Code's relative paths against the task's folder, plus the cd inside the same command", async () => {
+    const { decisions, asked, go, at, work } = await folder("claude");
+    await mkdir(join(work, "sub"));
+    await writeFile(join(work, "sub", "a.txt"), "x");
+    decisions.push("allow", "allow");
+    const answers = await go(async (run) => {
+      await run("printf 'v9' > note.txt");
+      // Each of its commands starts in the task's folder (CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR), so an earlier cd
+      // doesn't move where the next one writes: this makes a.txt at the top, and sub/a.txt stays as it is.
+      await run("cd sub");
+      await run("printf x > a.txt");
+      // A cd inside the command does move it.
+      await run("cd sub && printf x > a.txt");
+    });
+    expect(asked).toEqual([[at("note.txt")], [at("sub/a.txt")]]);
+    expect(answers).toEqual(Array(4).fill("allow"));
   });
 });

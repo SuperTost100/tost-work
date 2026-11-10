@@ -454,6 +454,11 @@ describe("decisionNote", () => {
     expect(decisionNote(overwrite, "refuse")).toMatch(/new name/);
     expect(decisionNote(overwrite, "discard")).toMatch(/Don't save it/);
   });
+  it("names the place deleted files went as the system does", () => {
+    const remove = { ...overwrite, action: "delete" as const };
+    expect(decisionNote(remove, "allow", "darwin")).toContain("moved them to the Trash.");
+    expect(decisionNote(remove, "allow", "win32")).toContain("moved them to the Recycle Bin.");
+  });
   it("keeps the files when a deletion is refused", () => {
     expect(decisionNote({ ...overwrite, action: "delete" }, "refuse")).toMatch(/keep \/w\/a.docx/);
   });
