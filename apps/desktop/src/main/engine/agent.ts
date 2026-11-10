@@ -241,11 +241,6 @@ interface Live {
   pending: Set<string>;
   /** Codex's steps that its hook allowed, by call id: each command and file change it starts must be one. */
   allowed: Set<string>;
-  /**
-   * The folder Claude Code's next command runs in. Its shell keeps the folder a cd moved to, inside the task's folder,
-   * and its requests don't say which it is. Codex's hook names the folder of each command.
-   */
-  shell: string;
   log: TaskLog;
 }
 
@@ -600,7 +595,7 @@ export class AgentEngine implements Engine, ToolHandler {
     // The log gets every event as cli-funnel sends it, after a line saying what the run was started with. The run's
     // tool server token and the course key are masked wherever they would appear.
     const log = this.taskLog(task.id, [session.token, apiKey]);
-    const live: Live = { channel, signal, workdir, made, pending: new Set(), allowed: new Set(), shell: workdir, log };
+    const live: Live = { channel, signal, workdir, made, pending: new Set(), allowed: new Set(), log };
     this.live.set(task.id, live);
     const access = codex ? "full" : "supervised";
     log.write({
@@ -619,6 +614,13 @@ export class AgentEngine implements Engine, ToolHandler {
     const skills = await this.skills().catch(() => []);
     // Claude Code can leave a command or a subagent running in the background and end its turn, saying it will look
     // later. Nothing would wake it to look, and the task would show as finished, so here it waits for each one.
+    // CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR starts each of Claude Code's commands in the task's folder. Its shell
+    // would otherwise keep the folder a cd moved to, and the policy never sees a cd that Claude Code runs without
+    // asking, so it couldn't tell where a relative path in the next command lands. The documentation limits the
+    // setting to the main session. In one run of Claude Code 2.1.319 a subagent's shell went back to the task's folder
+    // too, but nothing guarantees that: if a later version lets a subagent's shell keep a cd, its relative paths
+    // resolve against the wrong folder and a replaced file goes unasked.
+    // shortcut: no folder tracking for subagents, because the requests don't say which come from one.
     // Codex's hook finds Tost Work through the run's address and token, which the commands Codex runs don't get.
     const env = codex
       ? {
@@ -626,7 +628,11 @@ export class AgentEngine implements Engine, ToolHandler {
           [HOOK_URL_ENV]: new URL("/hook", session.url).toString(),
           [HOOK_TOKEN_ENV]: session.token,
         }
-      : { ...this.documents?.env, CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1" };
+      : {
+          ...this.documents?.env,
+          CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1",
+          CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR: "1",
+        };
     const stream = this.funnel.stream({
       selection: { provider, model: task.model, effort: task.effort, cwd: workdir, access },
       // Files sent without a message come with a note that says so, in place of an empty prompt.
@@ -932,7 +938,8 @@ export class AgentEngine implements Engine, ToolHandler {
    * A command that writes files goes through the same card as a file change when it would replace a file that was
    * already in the task's folder. It runs only once the user allows it, after the copy is kept. The files it writes
    * that weren't there yet count as made by the task. Files outside the folder are left to the sandbox. `cwd` is the
-   * folder Codex's hook names; for Claude Code it's the folder its shell is in.
+   * folder Codex's hook names; Claude Code's requests name none, and each of its commands starts in the task's folder
+   * (see the run's env).
    */
   private async commandOverwrites(
     taskId: string,
@@ -940,7 +947,7 @@ export class AgentEngine implements Engine, ToolHandler {
     command: string,
     cwd: string | null,
   ): Promise<ApprovalDecision> {
-    const from = cwd ?? live.shell;
+    const from = cwd ?? live.workdir;
     const writes = commandWrites(command, from);
     const overwrites: string[] = [];
     const added: string[] = [];
@@ -956,10 +963,6 @@ export class AgentEngine implements Engine, ToolHandler {
     const decision = await this.overwrite(taskId, live, overwrites);
     if (!allows(decision)) return decision;
     for (const path of added) live.made.add(path);
-    // Claude Code's shell stays in the folder a cd moved it to, and goes back to the task's folder when it leaves it.
-    if (cwd === null)
-      live.shell =
-        writes.cwd && (writes.cwd === live.workdir || inside(live.workdir, writes.cwd)) ? writes.cwd : live.workdir;
     return decision;
   }
 

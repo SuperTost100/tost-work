@@ -605,19 +605,15 @@ class Writes {
  * The files a command may write, from its words: redirections (>, >>, 2>, &>, >|, tee), programs whose arguments name
  * what they write (cp, mv, sed -i, curl -o, Set-Content, Copy-Item, copy, OfficeCLI's add and set, and the rest of
  * WRITERS), and .NET's [IO.File] writes with a literal path, in bash, cmd and PowerShell, inside nested shells too.
- * Relative paths resolve against `cwd`, following the command's own cd. Also returns the folder the command ends in.
+ * Relative paths resolve against `cwd`, following the command's own cd.
  * A path that can't be known from the words, such as one in a variable, is left out.
  * shortcut: what a script or an interpreter writes (python -c "open('x','w')", node, a .sh the AI wrote) and programs
  * not in WRITERS go unseen; snapshotting the folder before each run would close the gap.
  */
-export function commandWrites(
-  command: string,
-  cwd: string,
-  home = homedir(),
-): { targets: WriteTarget[]; cwd: string | null } {
+export function commandWrites(command: string, cwd: string, home = homedir()): { targets: WriteTarget[] } {
   const writes = new Writes(pathsFor(cwd), home);
-  const after = writes.script(command, 0, cwd);
-  return { targets: writes.targets, cwd: after };
+  writes.script(command, 0, cwd);
+  return { targets: writes.targets };
 }
 
 /** A glob's last part as a pattern for names in one folder: *, ? and [ ] as the shell reads them. */

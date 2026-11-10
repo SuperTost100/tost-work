@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 import { mkdir, mkdtemp, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import { commandWrites, writtenPaths } from "./commands";
 
@@ -65,7 +65,9 @@ describe("commandWrites", () => {
       "/w/b.txt",
     ]);
     expect(writes('cd "$DIR" && printf x > a.txt && printf y > /w/abs.txt')).toEqual(["/w/abs.txt"]);
-    expect(commandWrites("cd sub", "/w").cwd).toBe("/w/sub");
+    // A cd ends with the command: the next one starts from the folder it is given.
+    expect(writes("cd sub")).toEqual([]);
+    expect(writes("printf x > a.txt")).toEqual(["/w/a.txt"]);
   });
 
   it("finds what programs write from their arguments", () => {
@@ -214,7 +216,14 @@ describe("writtenPaths", () => {
     await mkdir(join(work, "docs"));
     for (const name of ["a.txt", "b.txt", "c.md", ".hidden.txt", "docs/a.txt"]) await writeFile(join(work, name), "x");
     const paths = async (command: string) =>
-      (await writtenPaths(commandWrites(command, work).targets, work)).map((p) => p.slice(work.length + 1)).sort();
+      (await writtenPaths(commandWrites(command, work).targets, work))
+        .map((p) =>
+          p
+            .slice(work.length + 1)
+            .split(sep)
+            .join("/"),
+        )
+        .sort();
     expect(await paths("sed -i 's/x/y/' *.txt")).toEqual(["a.txt", "b.txt"]);
     expect(await paths("sed -i 's/x/y/' '*.txt'")).toEqual(["*.txt"]);
     expect(await paths("sed -i 's/x/y/' [ab].txt ?.md")).toEqual(["a.txt", "b.txt", "c.md"]);

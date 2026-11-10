@@ -686,6 +686,8 @@ describe("AgentEngine", () => {
     expect(off?.some((t) => t.startsWith("mcp__"))).toBe(false);
     // It waits for each command and subagent instead of leaving one in the background and finishing the task.
     expect(inputs[0]?.env).toMatchObject({ CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1" });
+    // Each of its commands starts in the task's folder, which is where the policy resolves a relative path.
+    expect(inputs[0]?.env).toMatchObject({ CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR: "1" });
     expect(decisions).toEqual([
       "allow",
       { decision: "deny", message: "Work only inside the task's folder." },
@@ -1667,23 +1669,21 @@ describe("Commands that replace a file", () => {
     expect(asked).toEqual([[at("sub/a.txt")], [at("sub/b.txt")]]);
   });
 
-  it("asks before Claude Code's commands replace a file, from the folder its shell is in", async () => {
+  it("resolves Claude Code's relative paths against the task's folder, plus the cd inside the same command", async () => {
     const { decisions, asked, go, at, work } = await folder("claude");
     await mkdir(join(work, "sub"));
     await writeFile(join(work, "sub", "a.txt"), "x");
     decisions.push("allow", "allow");
     const answers = await go(async (run) => {
       await run("printf 'v9' > note.txt");
-      // Claude Code's shell stays in the folder a cd moved it to.
+      // Each of its commands starts in the task's folder (CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR), so an earlier cd
+      // doesn't move where the next one writes: this makes a.txt at the top, and sub/a.txt stays as it is.
       await run("cd sub");
       await run("printf x > a.txt");
-      // It goes back to the task's folder when a cd leaves it.
-      await run("cd /");
-      await run("printf x > note.txt");
-      await run("printf x > a.txt");
+      // A cd inside the command does move it.
+      await run("cd sub && printf x > a.txt");
     });
-    // The last command writes a new a.txt in the task's folder.
     expect(asked).toEqual([[at("note.txt")], [at("sub/a.txt")]]);
-    expect(answers).toEqual(Array(6).fill("allow"));
+    expect(answers).toEqual(Array(4).fill("allow"));
   });
 });
