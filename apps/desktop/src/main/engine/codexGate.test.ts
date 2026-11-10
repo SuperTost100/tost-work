@@ -234,7 +234,7 @@ describe("Codex's hook calls", () => {
 
   it("turns each kind of step into what the policy decides on", () => {
     expect(gateRequest(call("Bash", { command: "ls" }))).toEqual({
-      command: { id: "call_1", tool: "command", input: { command: "ls" } },
+      command: { id: "call_1", tool: "command", input: { command: "ls", cwd: "/w" } },
     });
     expect(gateRequest(call("apply_patch", { command: patch("*** Add File: a.md", "+a") }))).toEqual({
       change: { id: "call_1", tool: "file_change", input: { changes: [{ path: "/w/a.md", kind: "add" }] } },

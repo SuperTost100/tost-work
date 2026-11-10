@@ -507,6 +507,17 @@ describe.runIf(runs("chatgpt") && homes)("Codex's steps through Tost Work's hook
     expect(await readFile(join(t.work, "notes.txt"), "utf8")).toBe("final\n");
   });
 
+  it("asks before a shell command replaces a file, keeps a copy, and runs it", { timeout: 300_000 }, async () => {
+    const t = await live(
+      "Run exactly this shell command and nothing else, and do not ask me for approval first: printf 'v9' > note.txt",
+      allow,
+    );
+    const final = await t.run((w) => writeFile(join(w, "note.txt"), "v1"));
+    expect(final.kept?.map((k) => k.path)).toEqual([join(t.work, "note.txt")]);
+    expect(await readFile(final.kept?.[0]?.copy ?? "", "utf8")).toBe("v1");
+    expect(await readFile(join(t.work, "note.txt"), "utf8")).toBe("v9");
+  });
+
   it("leaves the file as it is when the user refuses", { timeout: 300_000 }, async () => {
     const t = await live(
       "Use the apply_patch tool with an Update File patch to replace the line 'old' in budget.txt with 'new'. If it's refused, stop.",
