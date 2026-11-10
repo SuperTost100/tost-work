@@ -15,6 +15,30 @@
   wait here until the release bumps the version.
 -->
 
+## 0.0.31-dev
+
+### en
+
+- **ChatGPT stays inside the task's folder:** a command it runs can no longer write anywhere else on the computer. Tost Work now checks each of its steps itself, so it still asks before a file is replaced or deleted. On Windows this adds about a second to each step.
+- **ChatGPT on Windows can create files:** its tasks ran read-only there, and said they couldn't save anything.
+- **Claude on Windows:** its tasks start now. Claude can't be limited to the task's folder on Windows yet, so Tost Work tells you before you connect it and before its first task.
+- **Linux:** before a task, Tost Work checks that the AI's sandbox can start. When something is missing, it shows the commands to install it for your distribution.
+- **Folders with their own AI settings:** a folder you received can carry settings for Codex or Claude Code. ChatGPT tasks ignore them, and a Claude task doesn't start in such a folder and names the file.
+- **One copy at a time:** opening Tost Work again on Windows or Linux brings its window forward. It used to start a second copy.
+- **Installing an AI shows progress:** the button keeps turning while Codex or Claude Code installs.
+- **Windows and Linux look:** dropdown lists match the rest of the app, a field has one outline when you type in it, and the empty band above the sidebar is gone.
+
+### it
+
+- **ChatGPT resta nella cartella dell'attività:** un comando che lancia non può più scrivere altrove nel computer. Ora è Tost Work a controllare ogni suo passo, quindi continua a chiedere prima che un file venga sostituito o eliminato. Su Windows ogni passo dura circa un secondo in più.
+- **ChatGPT su Windows può creare file:** lì le sue attività lavoravano in sola lettura e dicevano di non poter salvare nulla.
+- **Claude su Windows:** ora le sue attività partono. Su Windows Claude non può ancora essere limitato alla cartella dell'attività, quindi Tost Work te lo dice prima di collegarlo e prima della sua prima attività.
+- **Linux:** prima di un'attività Tost Work controlla che il sandbox dell'AI possa partire. Se manca qualcosa, mostra i comandi per installarlo sulla tua distribuzione.
+- **Cartelle con impostazioni proprie per le AI:** una cartella ricevuta da altri può contenere impostazioni per Codex o Claude Code. Le attività con ChatGPT le ignorano, mentre un'attività con Claude non parte in una cartella così e indica il file.
+- **Una sola copia alla volta:** riaprire Tost Work su Windows o Linux porta la sua finestra in primo piano. Prima partiva una seconda copia.
+- **L'installazione di un'AI mostra che sta lavorando:** il pulsante continua a girare mentre Codex o Claude Code si installa.
+- **Aspetto su Windows e Linux:** gli elenchi a discesa hanno lo stile del resto dell'app, un campo ha un solo contorno mentre scrivi e la fascia vuota sopra la barra laterale non c'è più.
+
 ## 0.0.30-dev
 
 ### en

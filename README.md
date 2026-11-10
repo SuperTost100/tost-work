@@ -86,7 +86,7 @@ Download the file for your computer from the [releases page](https://github.com/
 
 - **Mac:** open the `.dmg` and drag Tost Work to Applications. From 0.0.25-dev on, the app is signed with an Apple Developer ID and notarized by Apple, so it opens like any other app. Builds before that need one extra step on their first launch: open the app once, then go to System Settings > Privacy & Security and choose Open Anyway.
 - **Windows:** run the installer. It isn't signed yet, so Windows SmartScreen warns about an unknown publisher: choose More info, then Run anyway. On a Windows 11 PC with Smart App Control turned on, Windows blocks unsigned installers with no Run anyway button, so the app can't be installed there until it's signed ([#148](https://github.com/SuperTost100/tost-work/issues/148)).
-- **Linux:** make the file executable (`chmod +x Tost.Work-*.AppImage`) and open it. AppImages need FUSE 2, which Ubuntu 24.04 and later don't install by default: `sudo apt install libfuse2t64`.
+- **Linux:** make the file executable (`chmod +x Tost.Work-*.AppImage`) and open it. AppImages need FUSE 2, which Ubuntu 24.04 and later don't install by default: `sudo apt install libfuse2t64`. The AIs run their commands in a sandbox that needs `bubblewrap`, and `socat` for Claude Code. When something is missing, the app shows the commands to install it.
 
 Tost Work doesn't update itself yet. Until 0.1.0, download each new build from the releases page.
 
