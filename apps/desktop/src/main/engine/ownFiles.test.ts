@@ -98,16 +98,23 @@ async function setup(provider: "codex" | "claude") {
   const { id } = runner.create({ projectId: "p1", brief: "Prepara il preventivo", workdir: work, provider });
   const get = () => store.getTask(id) as Task;
 
+  /** Resolves once the run that answering a question started has ended. */
+  const answered = async () => {
+    while (runner.isRunning(id)) await sleep(2);
+  };
   /**
    * Runs `steps` once, as the task's first run or a follow-up, and answers every card a step waits on with the next
-   * of `decisions`, or "refuse". Returns the files each card asked about, including a card left on the task.
+   * of `decisions`, or "refuse". When the last run ended on a question, `followUp` is the answer to it. Returns the
+   * files each card asked about, including a card left on the task.
    */
   const go = async (steps: Steps, decisions: Decision[] = [], followUp: string | null = null) => {
-    if (followUp !== null) runner.followUp(id, followUp);
     holder.steps = steps;
+    const answer = get().question ? followUp : null;
+    if (answer !== null) runner.answer(id, [answer]);
+    else if (followUp !== null) runner.followUp(id, followUp);
     const cards: string[][] = [];
     let finished = false;
-    const done = runner.start(id, followUp).finally(() => {
+    const done = (answer !== null ? answered() : runner.start(id, followUp)).finally(() => {
       finished = true;
     });
     let seen = "";
@@ -129,10 +136,13 @@ async function setup(provider: "codex" | "claude") {
     if (left && left.id !== seen) cards.push(left.paths);
     return cards;
   };
-  return { id, work, note, quote, get, go, store };
+  return { id, work, note, quote, get, go, store, runner };
 }
 
 const listed = (t: Task, path: string) => t.files.find((f) => f.path === path);
+/** Ends a run on a question, so the files it made stay the task's own in the run that follows the answer. */
+const askWhich = (engine: AgentEngine, id: string) =>
+  engine.ask(id, [{ text: "Quale data?", options: ["Venerdì", "Lunedì"] }]);
 const MADE = { kind: "add", role: "made" } as const;
 
 /** Tost's first run: a script copies the template into a new quote, and officecli then edits that quote. */
@@ -162,13 +172,14 @@ for (const provider of ["codex", "claude"] as const) {
       expect(get().own).toEqual([quote]);
     });
 
-    it("needs no card when the AI asks with request_approval, in the run that made it and in a later one", async () => {
+    it("needs no card when the AI asks with request_approval, in the run that made it and after a question", async () => {
       const { id, quote, get, go } = await setup(provider);
       const heard: string[] = [];
       const cards = await go(async ({ engine, ask }) => {
         await ask({ command: PYTHON(REL) });
         await writeFile(quote, "Torino, 10 novembre 2026");
         heard.push(await engine.approve(id, "overwrite", [quote]));
+        await askWhich(engine, id);
       });
       const later = await go(
         async ({ engine }) => {
@@ -188,7 +199,7 @@ for (const provider of ["codex", "claude"] as const) {
       expect(get().kept ?? []).toEqual([]);
     });
 
-    it("is changed without a card in a follow-up run, when a file tool made it and the AI never reported it", async () => {
+    it("is changed without a card after a question, when a file tool made it and the AI never reported it", async () => {
       const { work, get, go } = await setup(provider);
       const draft = join(work, "Bozza.docx");
       const create =
@@ -200,9 +211,10 @@ for (const provider of ["codex", "claude"] as const) {
           ? { patch: `*** Begin Patch\n*** Update File: ${draft}\n@@\n-uno\n+due\n*** End Patch` }
           : ({ tool: "Edit", path: draft } as const);
       const answers: boolean[] = [];
-      await go(async ({ ask }) => {
+      await go(async ({ engine, ask }) => {
         answers.push(await ask(create));
         await writeFile(draft, "uno");
+        await askWhich(engine, get().id);
       });
       const cards = await go(
         async ({ ask }) => {
@@ -216,6 +228,141 @@ for (const provider of ["codex", "claude"] as const) {
       expect(cards).toEqual([]);
       expect(answers).toEqual([true, true, true]);
       expect(get().own).toEqual([draft]);
+    });
+  });
+
+  describe(`a file the task made in a run that finished, on ${provider}`, () => {
+    /** Tost's first run: a script makes Ciao.docx, and the run ends with the work done. */
+    const makeCiao = async (ctx: Awaited<ReturnType<typeof setup>>) => {
+      const ciao = join(ctx.work, "Ciao.docx");
+      await ctx.go(async ({ ask }) => {
+        await ask({ command: `python3 -c "open('Ciao.docx', 'w').write('Ciao')"` });
+        await writeFile(ciao, "Ciao");
+      });
+      expect(ctx.get().status).toBe("done");
+      return ciao;
+    };
+    const buonasera = (ciao: string) => `/bin/zsh -lc "officecli set '${ciao}' / --find 'Ciao' --replace 'Buonasera'"`;
+
+    it("asks before a command changes it in the next run, and the kept copy gives back the first run's version", async () => {
+      const ctx = await setup(provider);
+      const { id, get, go, runner } = ctx;
+      const ciao = await makeCiao(ctx);
+      const cards = await go(
+        async ({ ask }) => {
+          if (await ask({ command: buonasera(ciao) })) await writeFile(ciao, "Buonasera");
+        },
+        ["allow"],
+        "ora deve dire buonasera",
+      );
+      expect(cards).toEqual([[ciao]]);
+      expect(await readFile(ciao, "utf8")).toBe("Buonasera");
+      // Listed as changed, with the first run's version to go back to, and no longer the task's own.
+      expect(listed(get(), ciao)).toEqual({ path: ciao, kind: "update", role: "made" });
+      expect(get().own ?? []).not.toContain(ciao);
+      await runner.restore(id, ciao);
+      expect(await readFile(ciao, "utf8")).toBe("Ciao");
+    });
+
+    it("asks before a file tool changes it, and when the AI asks with request_approval", async () => {
+      const ctx = await setup(provider);
+      const { id, go } = ctx;
+      const ciao = await makeCiao(ctx);
+      const change =
+        provider === "codex"
+          ? { patch: `*** Begin Patch\n*** Update File: ${ciao}\n@@\n-Ciao\n+Buonasera\n*** End Patch` }
+          : ({ tool: "Edit", path: ciao } as const);
+      const answers: boolean[] = [];
+      const cards = await go(async ({ ask }) => answers.push(await ask(change)), ["refuse"], "ora deve dire buonasera");
+      expect(cards).toEqual([[ciao]]);
+      expect(answers).toEqual([false]);
+      expect(await readFile(ciao, "utf8")).toBe("Ciao");
+      const asked = await go(({ engine }) => engine.approve(id, "overwrite", [ciao]), [], "Riprova");
+      expect(asked).toEqual([[ciao]]);
+    });
+
+    it("asks with the delete card before it goes", async () => {
+      const ctx = await setup(provider);
+      const { id, go } = ctx;
+      const ciao = await makeCiao(ctx);
+      const cards = await go(({ engine }) => engine.approve(id, "delete", [ciao]), [], "Cancellalo");
+      expect(cards).toEqual([[ciao]]);
+    });
+
+    it("leaves a file the next run makes the task's own in that run", async () => {
+      const ctx = await setup(provider);
+      const { work, get, go } = ctx;
+      const ciao = await makeCiao(ctx);
+      const sera = join(work, "Buonasera.docx");
+      const answers: boolean[] = [];
+      const cards = await go(
+        async ({ ask }) => {
+          answers.push(await ask({ command: `printf uno > '${sera}'` }));
+          await writeFile(sera, "uno");
+          answers.push(await ask({ command: `printf due > '${sera}'` }));
+          await writeFile(sera, "due");
+        },
+        [],
+        "Fanne un altro",
+      );
+      expect(cards).toEqual([]);
+      expect(answers).toEqual([true, true]);
+      expect(get().own).toEqual([sera]);
+      expect(get().own).not.toContain(ciao);
+    });
+  });
+
+  describe(`a file the task made in a run that didn't finish, on ${provider}`, () => {
+    /** A first run that makes a draft with a file tool, changes it, and ends as `end` says. */
+    const draftThen = async (ctx: Awaited<ReturnType<typeof setup>>, end: Steps) => {
+      const draft = join(ctx.work, "Bozza.docx");
+      const create =
+        provider === "codex"
+          ? { patch: `*** Begin Patch\n*** Add File: ${draft}\n+uno\n*** End Patch` }
+          : ({ tool: "Write", path: draft } as const);
+      const change =
+        provider === "codex"
+          ? { patch: `*** Begin Patch\n*** Update File: ${draft}\n@@\n-uno\n+due\n*** End Patch` }
+          : ({ tool: "Edit", path: draft } as const);
+      await ctx.go(async (step) => {
+        await step.ask(create);
+        await writeFile(draft, "uno");
+        await step.ask(change);
+        await writeFile(draft, "due");
+        await end(step);
+      });
+      return draft;
+    };
+    const changeAgain = (ctx: Awaited<ReturnType<typeof setup>>, draft: string, followUp: string) =>
+      ctx.go(async ({ ask }) => ask({ command: `printf tre > '${draft}'` }), ["refuse"], followUp);
+
+    it("stays the task's own after the run asked the user something", async () => {
+      const ctx = await setup(provider);
+      const draft = await draftThen(ctx, ({ engine }) =>
+        engine.ask(ctx.id, [{ text: "Per chi è?", options: ["Ferrari", "Rossi"] }]),
+      );
+      expect(ctx.get().status).toBe("needs-you");
+      expect(await changeAgain(ctx, draft, "Ferrari")).toEqual([]);
+      expect(ctx.get().own).toEqual([draft]);
+    });
+
+    it("stays the task's own after the user stopped the run", async () => {
+      const ctx = await setup(provider);
+      const draft = await draftThen(ctx, async () => {
+        ctx.runner.stop(ctx.id);
+        throw new Error("The run was stopped");
+      });
+      expect(ctx.get().status).toBe("stopped");
+      expect(await changeAgain(ctx, draft, "Continua")).toEqual([]);
+    });
+
+    it("stays the task's own after the run failed", async () => {
+      const ctx = await setup(provider);
+      const draft = await draftThen(ctx, async () => {
+        throw new Error("The connection dropped");
+      });
+      expect(ctx.get().status).toBe("failed");
+      expect(await changeAgain(ctx, draft, "Continua")).toEqual([]);
     });
   });
 
@@ -259,11 +406,15 @@ for (const provider of ["codex", "claude"] as const) {
     });
   });
   describe(`a file the task made and the user saved since, on ${provider}`, () => {
-    /** Tost's first run: a script makes the quote and the AI writes the date into it. */
+    /**
+     * Tost's first run: a script makes the quote, the AI writes the date into it and asks something, so the quote is
+     * still the task's own when the answer comes.
+     */
     const makeQuote = (ctx: Awaited<ReturnType<typeof setup>>) =>
-      ctx.go(async ({ ask }) => {
+      ctx.go(async ({ engine, ask }) => {
         await ask({ command: PYTHON(REL) });
         await writeFile(ctx.quote, "Torino, 10 novembre 2026");
+        await askWhich(engine, ctx.id);
       });
     /** The user opens the quote, edits it and saves: new text, and a modification time that is only ever different. */
     const userSaves = async (path: string, text: string, as?: { mtimeMs?: number }) => {
@@ -334,9 +485,10 @@ for (const provider of ["codex", "claude"] as const) {
       const { quote, get, go } = ctx;
       await makeQuote(ctx);
       const second = await go(
-        async ({ ask }) => {
+        async ({ engine, ask }) => {
           await ask({ command: OFFICECLI(REL) });
           await writeFile(quote, "Torino, 11 novembre 2026");
+          await askWhich(engine, ctx.id);
         },
         [],
         "Cambia la data",

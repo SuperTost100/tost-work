@@ -202,7 +202,10 @@ export class TaskRunner {
       // offline, leaves Resume on the task to try again.
       // A sandbox that couldn't start last time may have been fixed since: this run checks again.
       const { sandboxNotReady: _fixed, sandboxRun: _replayed, ...rest } = task;
-      task = this.save({ ...rest, status: "running", error: null, updatedAt: this.now() });
+      // A task is done only when its last run finished the work, not when it asked something, put up a card, was
+      // stopped or failed. The files that run made are the user's from now on, so changing them asks.
+      const released = task.status === "done" ? { own: [], ownSeen: {} } : {};
+      task = this.save({ ...rest, ...released, status: "running", error: null, updatedAt: this.now() });
       this.log("info", `Task ${taskId} started ${followUp === null ? "its first run" : "a run that follows up"}`, {
         provider: task.provider,
         model: task.model,

@@ -237,6 +237,25 @@ async function stillOwn(
   return own;
 }
 
+/** How many files from finished requests the AI is told about by name. */
+const FINISHED_NAMED = 50;
+
+/**
+ * The files the task listed as made that are no longer its own, because the run that made them finished its request
+ * (the runner releases them as the next run starts), and that are still there. The AI is told they're the user's now.
+ * Files with a kept copy, and those the user saved since, which the AI hears about apart, are left out.
+ * shortcut: only the newest FINISHED_NAMED are named; rule 2 still covers the rest, and the policy asks about them all.
+ */
+async function finishedFiles(task: Task, own: Set<string>, kept: Set<string>, saved: string[]): Promise<string[]> {
+  const paths = task.files
+    .filter((f) => f.kind === "add" && !own.has(f.path) && !kept.has(f.path) && !saved.includes(f.path))
+    .map((f) => f.path)
+    .slice(-FINISHED_NAMED);
+  const there: string[] = [];
+  for (const path of paths) if (await stampOf(path)) there.push(path);
+  return there;
+}
+
 /**
  * Programs and PowerShell commands that delete: rm, unlink, shred and trash; cmd's del, erase, rd and rmdir; and
  * PowerShell's Remove-Item with its aliases rm, ri, del, erase, rd and rmdir.
@@ -769,6 +788,7 @@ export class AgentEngine implements Engine, ToolHandler {
       task.ownSeen,
     );
     const own = new Set(earlier.paths);
+    const finished = await finishedFiles(task, own, kept, earlier.saved);
     const made = new Set(own);
     for (const path of this.cleared.get(task.id) ?? []) made.add(path);
     this.cleared.delete(task.id);
@@ -875,6 +895,7 @@ export class AgentEngine implements Engine, ToolHandler {
         task.jobId ? (this.job(task.jobId) ?? null) : null,
         this.platform,
         earlier.saved,
+        finished,
       ),
       env,
       ...(apiKey ? { apiKey } : {}),

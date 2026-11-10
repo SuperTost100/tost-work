@@ -103,16 +103,23 @@ async function setup(provider: "codex" | "claude") {
   const { id: taskId } = runner.create({ projectId: "p1", brief: "Prepara il preventivo", workdir: work, provider });
   const get = () => store.getTask(taskId) as Task;
 
+  /** Resolves once the run that answering a question started has ended. */
+  const answered = async () => {
+    while (runner.isRunning(taskId)) await sleep(2);
+  };
   /**
    * Runs `steps` once, as the first run or a follow-up, and answers every card a step waits on with the next of
-   * `decisions`, or "refuse". Returns the files each card asked about.
+   * `decisions`, or "refuse". When the last run ended on a question, `followUp` is the answer to it. Returns the files
+   * each card asked about.
    */
   const go = async (steps: Steps, decisions: Decision[] = [], followUp: string | null = null) => {
-    if (followUp !== null) runner.followUp(taskId, followUp);
     holder.steps = steps;
+    const answer = get().question ? followUp : null;
+    if (answer !== null) runner.answer(taskId, [answer]);
+    else if (followUp !== null) runner.followUp(taskId, followUp);
     const cards: string[][] = [];
     let finished = false;
-    const done = runner.start(taskId, followUp).finally(() => {
+    const done = (answer !== null ? answered() : runner.start(taskId, followUp)).finally(() => {
       finished = true;
     });
     let seen = "";
@@ -134,6 +141,9 @@ async function setup(provider: "codex" | "claude") {
 }
 
 const listed = (t: Task, path: string) => t.files.find((f) => f.path === path);
+/** Ends a run on a question, so the files it made stay the task's own in the run that follows the answer. */
+const askWhich = (engine: AgentEngine, id: string) =>
+  engine.ask(id, [{ text: "Per chi è?", options: ["Rossi", "Bianchi"] }]);
 const CHANGED = { kind: "update", role: "made" } as const;
 
 /** The user opens a file, edits it and saves: new text, and a modification time that is only ever different. */
@@ -157,14 +167,18 @@ const POWERSHELL_FIRST_LINE = [
 
 for (const provider of ["codex", "claude"] as const) {
   describe(`a user's file a command names, on ${provider}`, () => {
-    /** Tost's first run makes Preventivo.txt; the tester then rewrites it from outside the app, as an editor would. */
-    const testerCase = async (ctx: Awaited<ReturnType<typeof setup>>) => {
+    /**
+     * Tost's first run makes Preventivo.txt, and ends on a question when `asks`; the tester then rewrites the file
+     * from outside the app, as an editor would.
+     */
+    const testerCase = async (ctx: Awaited<ReturnType<typeof setup>>, asks = false) => {
       const quote = join(ctx.work, "Preventivo.txt");
       await ctx.go(async ({ engine, run }) => {
         await run(`printf 'Preventivo\\nRiga due\\n' > Preventivo.txt`, () =>
           writeFile(quote, "Preventivo\nRiga due\n"),
         );
         await engine.reportFile(ctx.taskId, { path: quote, kind: "add" });
+        if (asks) await askWhich(engine, ctx.taskId);
       });
       expect(ctx.get().own).toEqual([quote]);
       expect(listed(ctx.get(), quote)).toEqual({ path: quote, kind: "add", role: "made" });
@@ -216,11 +230,49 @@ for (const provider of ["codex", "claude"] as const) {
 
     it("tells the AI in the next run that the files the user saved since are theirs again", async () => {
       const ctx = await setup(provider);
-      const quote = await testerCase(ctx);
-      await ctx.go(async () => {}, [], "Ancora una cosa");
+      const quote = await testerCase(ctx, true);
+      await ctx.go(async () => {}, [], "Rossi");
       expect(ctx.systems[0]).not.toContain("The user changed these files");
       expect(ctx.systems[1]).toContain(`The user changed these files after your last turn.`);
       expect(ctx.systems[1]).toContain(`- ${quote}`);
+    });
+
+    it("tells the AI in the next run that the files of a finished request are the user's now", async () => {
+      const ctx = await setup(provider);
+      const quote = join(ctx.work, "Preventivo.txt");
+      await ctx.go(async ({ engine, run }) => {
+        await run(`printf uno > Preventivo.txt`, () => writeFile(quote, "uno"));
+        await engine.reportFile(ctx.taskId, { path: quote, kind: "add" });
+      });
+      await ctx.go(async () => {}, [], "Ancora una cosa");
+      expect(ctx.systems[0]).not.toContain("You made these files for a request you finished");
+      expect(ctx.systems[1]).toContain("You made these files for a request you finished in an earlier turn");
+      expect(ctx.systems[1]).toContain(`- ${quote}`);
+      expect(ctx.systems[1]).not.toContain("The user changed these files");
+    });
+
+    it("keeps a copy before a command it can't read changes a file a finished run made, and Restore brings it back", async () => {
+      const ctx = await setup(provider);
+      const quote = join(ctx.work, "Preventivo.txt");
+      await ctx.go(async ({ engine, run }) => {
+        await run(`printf 'Preventivo\\nRiga due\\n' > Preventivo.txt`, () =>
+          writeFile(quote, "Preventivo\nRiga due\n"),
+        );
+        await engine.reportFile(ctx.taskId, { path: quote, kind: "add" });
+      });
+      expect(ctx.get().status).toBe("done");
+      const cards = await ctx.go(
+        async ({ run }) => {
+          await run(PYTHON_FIRST_LINE(quote), () => writeFile(quote, "Preventivo per Rossi\nRiga due\n"));
+        },
+        [],
+        "Change the first line of Preventivo.txt to: Preventivo per Rossi.",
+      );
+      expect(cards).toEqual([]);
+      expect(listed(ctx.get(), quote)).toEqual({ path: quote, ...CHANGED });
+      expect(ctx.get().kept?.map((k) => k.path)).toEqual([quote]);
+      await ctx.runner.restore(ctx.taskId, quote);
+      expect(await readFile(quote, "utf8")).toBe("Preventivo\nRiga due\n");
     });
 
     it("lists a file the task made, that the user saved since, as changed when an unseen change hits it", async () => {
@@ -376,19 +428,20 @@ for (const provider of ["codex", "claude"] as const) {
       }
     });
 
-    it("never copies a file the task made itself", async () => {
+    it("never copies a file the task made itself, in its run or after a question", async () => {
       const ctx = await setup(provider);
       const draft = join(ctx.work, "Bozza.txt");
-      await ctx.go(async ({ run }) => {
+      await ctx.go(async ({ engine, run }) => {
         await run(`python3 -c "open('Bozza.txt', 'w').write('uno')"`, () => writeFile(draft, "uno"));
         await run(`python3 -c "open('Bozza.txt', 'w').write('due')"`, () => writeFile(draft, "due"));
+        await askWhich(engine, ctx.taskId);
       });
       await ctx.go(
         async ({ run }) => {
           await run(`python3 -c "open('Bozza.txt', 'w').write('tre')"`, () => writeFile(draft, "tre"));
         },
         [],
-        "Ancora",
+        "Rossi",
       );
       expect(await ctx.keptFiles()).toEqual([]);
       expect(ctx.get().own).toEqual([draft]);

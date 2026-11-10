@@ -12,6 +12,7 @@ export const PARTS = [
   "In a quick edit",
   "Rules",
   "Files the user changed",
+  "Files from a finished request",
   "Office files",
   "Office files on Windows",
   "The user's skills",
@@ -62,6 +63,7 @@ const PART = readParts(source);
  * resources/instructions.md; this picks the parts that apply and fills them in. `platform` picks the words that
  * differ by system: where deleted files go, and on Windows how to pass text to officecli in PowerShell. `saved` are
  * files the task made that the user has saved since its last run: they're the user's again, so changing one asks.
+ * `finished` are files the task made for a request it finished in an earlier run, which are the user's now too.
  */
 export function instructionsFor(
   task: Task,
@@ -73,6 +75,7 @@ export function instructionsFor(
   job: Pick<Job, "title" | "output"> | null = null,
   platform: string = process.platform,
   saved: string[] = [],
+  finished: string[] = [],
 ): string {
   const parts = [
     fill(PART["Every task"], { language: LANGUAGE_NAMES[language] }),
@@ -83,6 +86,8 @@ export function instructionsFor(
   ];
   if (saved.length)
     parts.push(fill(PART["Files the user changed"], { files: saved.map((path) => `- ${path}`).join("\n") }));
+  if (finished.length)
+    parts.push(fill(PART["Files from a finished request"], { files: finished.map((path) => `- ${path}`).join("\n") }));
   if (documents) {
     const guide = (kind: string) => join(documents.skills, kind, "SKILL.md");
     parts.push(
