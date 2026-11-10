@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, posix, sep, win32 } from "node:path";
 import { describe, expect, it } from "vitest";
+import { deletesFiles } from "./agent";
 import { commandWrites, FileNames, onlyReads, scriptsNamed, writtenPaths } from "./commands";
 
 /** The files a command writes, from /w, as the policy sees them before it looks at the disk. */
@@ -317,6 +318,94 @@ describe("onlyReads", () => {
       "cat $(./make-name.sh)",
     ])
       expect(onlyReads(command, "/w"), command).toBe(false);
+  });
+});
+
+describe("substitutions inside parameter expansions, $((…)), process substitutions and double quotes", () => {
+  /** Each form, with the command it runs put in, for each of the three checks. */
+  const forms = (inner: string) => [
+    `echo \${x:-$(${inner})}`,
+    `echo \${x:=$(${inner})}`,
+    `: \${x:=$(${inner})}`,
+    `echo \${x:+$(${inner})}`,
+    `echo \${x:?$(${inner})}`,
+    `echo \${x:-\`${inner}\`}`,
+    `echo \${x:-"$(${inner})"}`,
+    `echo \${x:-\${y:-$(${inner})}}`,
+    `echo \${x:-$(echo $(${inner}))}`,
+    `echo "\${x:-$(${inner})}"`,
+    `echo "\${x:-$(echo "q" && ${inner})}"`,
+    `echo "$(echo "q" && ${inner})"`,
+    `echo $(( $(${inner}) + 1 ))`,
+    `echo "$(( \${x:-$(${inner})} + 1 ))"`,
+    `cat <(${inner})`,
+    `echo x > >(${inner})`,
+    `/bin/bash -lc 'echo \${x:-$(${inner})}'`,
+  ];
+
+  it("reads a deletion in any of them", () => {
+    for (const command of [
+      ...forms("rm -f Offerta.docx"),
+      `Write-Output "$(Remove-Item Offerta.docx)"`,
+      `Write-Output "$((Get-Item Offerta.docx).Delete())"`,
+    ])
+      expect(deletesFiles(command), command).toBe(true);
+  });
+
+  it("reads a write in any of them", () => {
+    for (const command of [...forms("echo hi > Offerta.docx"), `Write-Output "$(Set-Content Offerta.docx hi)"`]) {
+      expect(writes(command), command).toEqual(["/w/Offerta.docx"]);
+      expect(onlyReads(command, "/w"), command).toBe(false);
+    }
+  });
+
+  it("takes text, quoted text and arithmetic for what they are", () => {
+    for (const command of [
+      `echo \${x:-plain text}`,
+      `echo \${x:-'$(rm -f Offerta.docx)'}`,
+      `echo '\${x:-$(rm -f Offerta.docx)}'`,
+      `echo \${x:-{rm}}`,
+      "echo $((1 + 2))",
+      'echo "$((1 + 2))"',
+      "echo $((rm + 1))",
+      `echo \${#x} \${x%.docx} \${x//a/b}`,
+    ]) {
+      expect(deletesFiles(command), command).toBe(false);
+      expect(writes(command), command).toEqual([]);
+      expect(onlyReads(command, "/w"), command).toBe(true);
+    }
+    // $(( that doesn't end in )) is a command in a subshell.
+    expect(deletesFiles("echo $((cd x) ; rm -f Offerta.docx)")).toBe(true);
+  });
+});
+
+describe("onlyReads with a write it can't place", () => {
+  it("is false for a redirection or a writer whose file it can't resolve", () => {
+    for (const command of [
+      'out=$(printf note.txt); echo x > "$out"',
+      'echo x > "$OUT"',
+      `echo x >> "\${OUT:-note.txt}"`,
+      'cd "$DIR" && echo x > note.txt',
+      "$p = $env:OUT; Write-Output x > $p",
+      `/bin/bash -lc 'echo x > "$out"'`,
+    ]) {
+      expect(writes(command), command).toEqual([]);
+      expect(onlyReads(command, "/w"), command).toBe(false);
+    }
+  });
+
+  it("stays true for a copied stream and the null device", () => {
+    for (const command of [
+      "cat note.txt 2>&1",
+      "echo ok >&2",
+      "echo ok > /dev/null",
+      "cat note.txt 2>/dev/null | head -5",
+      "echo ok 2>nul",
+      "echo ok > NUL",
+      "Get-Content note.txt > $null",
+      "Get-Content note.txt 2> $NULL",
+    ])
+      expect(onlyReads(command, "/w"), command).toBe(true);
   });
 });
 

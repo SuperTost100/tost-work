@@ -266,6 +266,19 @@ for (const provider of ["codex", "claude"] as const) {
       expect(ctx.get().kept?.map((k) => k.path)).toEqual([ctx.note]);
     });
 
+    it("keeps a copy before a command writes to a path the policy can't resolve, such as one in a variable", async () => {
+      const ctx = await setup(provider);
+      const answers: boolean[] = [];
+      const cards = await ctx.go(async ({ run }) => {
+        answers.push(await run(`out=$(printf note.txt); echo v2 > "$out"`, () => writeFile(ctx.note, "v2")));
+      });
+      expect([cards, answers]).toEqual([[], [true]]);
+      expect(listed(ctx.get(), ctx.note)).toEqual({ path: ctx.note, ...CHANGED });
+      expect(ctx.get().kept?.map((k) => k.path)).toEqual([ctx.note]);
+      await ctx.runner.restore(ctx.taskId, ctx.note);
+      expect(await readFile(ctx.note, "utf8")).toBe("v1");
+    });
+
     it("asks with the card about a file too big to copy", async () => {
       const ctx = await setup(provider);
       const video = join(ctx.work, "Presentazione.mp4");

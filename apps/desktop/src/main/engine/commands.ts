@@ -31,7 +31,6 @@ const SHELL = String.raw`(^|[\s;&|(])(\S*\/)?((ba|z|da|k)?sh|fish)`;
 /** A line that hands a heredoc to a shell, whose body is then commands. */
 const SHELL_READS = new RegExp(String.raw`${SHELL}(\s|<|$)`);
 const HEREDOC = /<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2[ \t]*(?=\n|$)/g;
-export const SUBSTITUTION = /\$\(([^()]*)\)|`([^`]*)`/g;
 
 /** The text before `offset` on its line. */
 const lineBefore = (text: string, offset: number) => text.slice(text.lastIndexOf("\n", offset - 1) + 1, offset);
@@ -50,7 +49,9 @@ export function heredocs(script: string): { text: string; bodies: string[] } {
     bodies.push(body);
     if (SHELL_READS.test(lineBefore(script, offset))) return body;
     if (quote) return "";
-    return [...body.matchAll(SUBSTITUTION)].map((m) => `\n${m[1] ?? m[2] ?? ""}\n`).join("");
+    return inQuotes(body, 0, false, 0)
+      .runs.map((run) => `\n${run}\n`)
+      .join("");
   });
   return { text, bodies };
 }
@@ -68,29 +69,129 @@ export interface Word {
   redirect?: "in" | "out";
 }
 
-/** The index of the parenthesis that closes the one at `open`, skipping quoted text, or the script's end. */
+/** The index of the double quote that ends the text starting at `from`, past \" and \\, or the script's end. */
+function quoteEnd(script: string, from: number): number {
+  let j = from;
+  while (j < script.length && script[j] !== '"') j += script[j] === "\\" && /["\\]/.test(script[j + 1] ?? "") ? 2 : 1;
+  return j;
+}
+
+/**
+ * The index of the bracket that closes the one at `open`, a ( or the { of a ${, or the script's end. It skips quoted
+ * text and the brackets nested inside. Inside ${…}, as in bash, only $( opens a parenthesis and only ${ a brace, so
+ * ${x:-{a}b} ends at the first }.
+ */
 function closing(script: string, open: number): number {
-  let depth = 0;
+  const stack: string[] = [];
   for (let i = open; i < script.length; i++) {
     const c = script[i];
-    if (c === "'" || c === '"') {
-      const end = script.indexOf(c, i + 1);
-      if (end < 0) return script.length;
+    const top = stack.at(-1);
+    const dollar = script[i - 1] === "$";
+    if (c === "\\" && /["'`\\]/.test(script[i + 1] ?? "")) i++;
+    else if (c === "'" || c === '"') {
+      const end = c === "'" ? script.indexOf("'", i + 1) : quoteEnd(script, i + 1);
+      if (end < 0 || end >= script.length) return script.length;
       i = end;
-    } else if (c === "(") depth++;
-    else if (c === ")" && --depth === 0) return i;
+    } else if (c === "(" && (i === open || top === ")" || dollar)) stack.push(")");
+    else if (c === "{" && (i === open || dollar)) stack.push("}");
+    else if (c === top) {
+      stack.pop();
+      if (!stack.length) return i;
+    }
   }
   return script.length;
 }
 
 /**
+ * Whether the inside of a $((…)) is bash's arithmetic, which runs no command, rather than PowerShell's $(…) around a
+ * ( ): numbers, names and operators, with no two words side by side, no option, no quotes and no method call. The
+ * substitutions nested in it count as numbers.
+ */
+function arithmetic(text: string): boolean {
+  let plain = "";
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i] as string;
+    const end =
+      c === "$" && /[({]/.test(text[i + 1] ?? "") ? closing(text, i + 1) : c === "`" ? text.indexOf("`", i + 1) : -1;
+    if (end < 0) plain += c;
+    else {
+      plain += "0";
+      i = end;
+    }
+  }
+  return !/[\w\])}]\s+[\w$]|(^|\s)-[A-Za-z]|[.'"]/.test(plain);
+}
+
+/**
+ * The $(…), ${…} or $((…)) that starts at `at`: the index of its closing bracket, and the scripts it runs. A $(…) runs
+ * what's inside. The words of a ${…}, such as the $(…) of ${x:-$(…)}, and the inside of an arithmetic $((…)) run the
+ * substitutions in them, read as text in double quotes when `quoted`. Past MAX_DEPTH nested ${…}, the inside is
+ * returned whole, so whoever reads it as a script finds more than a read. Null for a $ that starts none of them.
+ */
+function expansion(script: string, at: number, nest: number, quoted: boolean): { end: number; runs: string[] } | null {
+  const bracket = script[at + 1];
+  if (bracket !== "(" && bracket !== "{") return null;
+  const end = closing(script, at + 1);
+  const inside = (text: string) => {
+    if (nest >= MAX_DEPTH) return [text];
+    return quoted ? inQuotes(text, 0, false, nest + 1).runs : parse(text, nest + 1).substitutions;
+  };
+  if (bracket === "{") return { end, runs: inside(script.slice(at + 2, end)) };
+  if (script[at + 2] === "(" && closing(script, at + 2) === end - 1 && arithmetic(script.slice(at + 3, end - 1)))
+    return { end, runs: inside(script.slice(at + 3, end - 1)) };
+  return { end, runs: [script.slice(at + 2, end)] };
+}
+
+/**
+ * Text read as a POSIX shell reads it inside double quotes, from `from`: to the closing quote when `closed`, or to the
+ * end, as in a heredoc's body. Returns where it ends, its text with the escapes taken out, and the scripts its $(…),
+ * `…` and ${…} run. A \$ still starts a substitution, because in PowerShell a backslash escapes nothing.
+ */
+function inQuotes(
+  script: string,
+  from: number,
+  closed: boolean,
+  nest: number,
+): { end: number; text: string; runs: string[] } {
+  let text = "";
+  const runs: string[] = [];
+  let j = from;
+  while (j < script.length && !(closed && script[j] === '"')) {
+    const c = script[j] as string;
+    const after = script[j + 1] ?? "";
+    const found = c === "$" ? expansion(script, j, nest, true) : null;
+    const tick = c === "`" && after !== '"' ? script.indexOf("`", j + 1) : -1;
+    // A POSIX shell's \" \\ \`, and PowerShell's `".
+    if ((c === "\\" && after && '"\\`'.includes(after)) || (c === "`" && after === '"')) {
+      text += after;
+      j += 2;
+    } else if (c === "\\" && after === "$") j++;
+    else if (found) {
+      runs.push(...found.runs);
+      text += script.slice(j, found.end + 1);
+      j = found.end + 1;
+    } else if (tick > j && !(closed && script.slice(j, tick).includes('"'))) {
+      // `…`, unless the backtick is PowerShell's escape: one with no partner before the quote ends.
+      runs.push(script.slice(j + 1, tick));
+      text += script.slice(j, tick + 1);
+      j = tick + 1;
+    } else {
+      text += c;
+      j++;
+    }
+  }
+  return { end: j, text, runs };
+}
+
+/**
  * A script split into commands of words, as POSIX shells, cmd and PowerShell would split it closely enough for the
  * delete check: commands end at a newline, ;, &, |, a parenthesis or a brace, which also skips PowerShell's call
- * operator. It also returns the $(…) and `…` substitutions, which run even inside double quotes. A backtick with no
- * partner is PowerShell's escape. A backslash escapes only what a POSIX shell would treat specially, because in
- * Windows paths it separates folders.
+ * operator. It also returns the scripts the $(…) and `…` substitutions run, inside double quotes and inside ${…} too,
+ * but not bash's arithmetic $((…)) itself. A backtick with no partner is PowerShell's escape. A backslash escapes only
+ * what a POSIX shell would treat specially, because in Windows paths it separates folders. `nest` counts the ${…}
+ * this script sits in.
  */
-export function parse(script: string): { commands: Word[][]; substitutions: string[] } {
+export function parse(script: string, nest = 0): { commands: Word[][]; substitutions: string[] } {
   const commands: Word[][] = [];
   const substitutions: string[] = [];
   let words: Word[] = [];
@@ -124,6 +225,7 @@ export function parse(script: string): { commands: Word[][]; substitutions: stri
   while (i < script.length) {
     const c = script[i] as string;
     const next = script[i + 1] ?? "";
+    const found = c === "$" ? expansion(script, i, nest, false) : null;
     if (c === "'") {
       const end = script.indexOf("'", i + 1);
       const close = end < 0 ? script.length : end;
@@ -132,32 +234,17 @@ export function parse(script: string): { commands: Word[][]; substitutions: stri
       w.quotes.push([i, close + 1]);
       i = close + 1;
     } else if (c === '"') {
-      let j = i + 1;
-      let text = "";
-      while (j < script.length && script[j] !== '"') {
-        const after = script[j + 1] ?? "";
-        // A POSIX shell's \" \\ \$ \`, and PowerShell's `".
-        if ((script[j] === "\\" && after && '"\\$`'.includes(after)) || (script[j] === "`" && after === '"')) {
-          text += after;
-          j += 2;
-        } else text += script[j++];
-      }
+      const { end, text, runs } = inQuotes(script, i + 1, true, nest);
       const w = piece();
       w.text += text;
-      w.quotes.push([i, j + 1]);
-      for (const m of script.slice(i + 1, j).matchAll(SUBSTITUTION)) substitutions.push(m[1] ?? m[2] ?? "");
-      i = j + 1;
-    } else if (c === "$" && next === "{") {
-      // ${name}, a variable, whose braces don't end the command.
-      const end = script.indexOf("}", i + 2);
-      const close = end < 0 ? script.length : end;
-      bare(script.slice(i, close + 1));
-      i = close + 1;
-    } else if (c === "$" && next === "(") {
-      const end = closing(script, i + 1);
-      substitutions.push(script.slice(i + 2, end));
-      bare(script.slice(i, end + 1));
+      w.quotes.push([i, end + 1]);
+      substitutions.push(...runs);
       i = end + 1;
+    } else if (found) {
+      // ${name} or $(…), whose brackets don't end the command.
+      substitutions.push(...found.runs);
+      bare(script.slice(i, found.end + 1));
+      i = found.end + 1;
     } else if (c === "`") {
       const end = script.indexOf("`", i + 1);
       if (end < 0) {
@@ -538,9 +625,14 @@ function assignment(words: Word[]): { name: string; value: string | null; ps: bo
   return posix?.[1] ? { name: posix[1], value: posix[2] ?? "", ps: false } : null;
 }
 
+/** A word that names no file: standard output, the null device (/dev/null, NUL, PowerShell's $null), a console. */
+const NO_FILE = /^(-|\$null)$|^(nul|con)(:|$)|^\/dev\//i;
+
 /** Collects the files the commands of one script write, as the script runs from folder to folder. */
 class Writes {
   targets: WriteTarget[] = [];
+  /** Whether the script writes a file the reader can't place, such as `> "$out"` with $out set by a command. */
+  unplaced = false;
   /** Variables the script set to a literal value, by name; PowerShell's in lowercase, since it ignores case. */
   private vars = new Map<string, string | null>();
   private psVars = new Map<string, string | null>();
@@ -570,7 +662,7 @@ class Writes {
     const pwd = /^\$PWD(?=$|[\\/])/;
     const expanded = this.expand(word);
     const text = cwd !== null && pwd.test(expanded) ? expanded.replace(pwd, cwd) : expanded;
-    if (!text || text === "-" || /[$`]/.test(text) || /^(nul|con)(:|$)|^\/dev\//i.test(text)) return null;
+    if (!text || NO_FILE.test(text) || /[$`]/.test(text)) return null;
     const path = /^~($|[\\/])/.test(text) ? this.home + text.slice(1) : text;
     if (this.paths.isAbsolute(path)) return this.paths.resolve(path);
     return cwd === null ? null : this.paths.resolve(cwd, path);
@@ -589,10 +681,13 @@ class Writes {
       const renamed = this.resolve(spec.beside.text, cwd);
       target = renamed ? this.target(spec.word, this.paths.dirname(renamed)) : null;
     } else target = this.target(spec.word, cwd, spec.folder);
-    if (!target) return;
     const from = spec.from && this.target(spec.from, cwd);
     // A file copied into a folder takes its source's name, which has to be known.
-    if (spec.from && !from && target.folder) return;
+    if (!target || (spec.from && !from && target.folder)) {
+      const expanded = this.expand(spec.word.text);
+      if (expanded && !NO_FILE.test(expanded)) this.unplaced = true;
+      return;
+    }
     this.targets.push(from ? { ...target, from } : target);
   }
 
@@ -670,7 +765,8 @@ class Writes {
  * what they write (cp, mv, sed -i, curl -o, Set-Content, Copy-Item, copy, OfficeCLI's add and set, and the rest of
  * WRITERS), and .NET's [IO.File] writes with a literal path, in bash, cmd and PowerShell, inside nested shells too.
  * Relative paths resolve against `cwd`, following the command's own cd.
- * A path that can't be known from the words, such as one in a variable, is left out.
+ * A path that can't be known from the words, such as one in a variable, is left out, and `onlyReads` takes the
+ * command as one that writes.
  * shortcut: what a script or an interpreter writes (python -c "open('x','w')", node, a .sh the AI wrote) and programs
  * not in WRITERS go unseen; snapshotting the folder before each run would close the gap.
  */
@@ -793,12 +889,15 @@ function readsOnly(script: string, depth: number): boolean {
 }
 
 /**
- * Whether a command only reads files: it writes nothing the reader can see, and every program it runs is one that
- * only prints what it reads, such as cat, grep, Get-Content or `officecli view`. A command that isn't is taken as one
- * that may write any file it names.
+ * Whether a command only reads files: it writes no file, not even one whose path the reader can't place, and every
+ * program it runs is one that only prints what it reads, such as cat, grep, Get-Content or `officecli view`. A command
+ * that isn't is taken as one that may write any file it names. Output sent to another stream or the null device
+ * (2>&1, > /dev/null, > $null) is no write.
  */
 export function onlyReads(command: string, cwd: string): boolean {
-  return commandWrites(command, cwd).targets.length === 0 && readsOnly(command, 0);
+  const writes = new Writes(pathsFor(cwd), homedir());
+  writes.script(command, 0, cwd);
+  return !writes.targets.length && !writes.unplaced && readsOnly(command, 0);
 }
 
 /** A script's extension, for the files a command may run: python3 fix.py, bash go.sh, pwsh x.ps1, node a.mjs. */
