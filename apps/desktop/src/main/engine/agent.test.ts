@@ -1,5 +1,5 @@
 /** @vitest-environment node */
-import { mkdir, mkdtemp, realpath, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FunnelEvent, RunRequest } from "cli-funnel";
@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { Decision, EngineEvent, Task } from "../../shared/model";
 import type { SandboxReadiness } from "../../shared/sandbox";
 import { SandboxNotReady, UserError } from "../userError";
-import { AgentEngine, type AgentFunnel, asCodexRequest, deletesFiles, isNetworkError } from "./agent";
+import { AgentEngine, type AgentFunnel, asCodexRequest, deletesFiles, isNetworkError, outside } from "./agent";
 
 /** A hook check that passes, for engines whose Codex runs aren't about the hook. */
 const PASSES = { codexHook: async () => {} };
@@ -932,6 +932,152 @@ describe("deletesFiles", () => {
       "cat <<'EOF' > plan.md\n$(rm old.docx)\nEOF",
     ])
       expect(deletesFiles(command), command).toBe(false);
+  });
+
+  it("reads a command's words the way the shell does: quotes, paths, joined pieces and call operators", () => {
+    const encoded = (text: string) => Buffer.from(text, "utf16le").toString("base64");
+    for (const command of [
+      // Found in review: each of these passed the check.
+      "/bin/rm victim.txt",
+      '"rm" victim.txt',
+      'r"m" victim.txt',
+      '& "ri" victim.txt',
+      'Get-ChildItem victim.txt | & "ri"',
+      "cmd /c del/q victim.txt",
+      'cmd /d /s /c "del victim.txt"',
+      String.raw`powershell -WorkingDirectory "C:\Work" -Command "ri victim.txt"`,
+      "powershell -en cgBpACAAdgBpAGMAdABpAG0ALgB0AHgAdAA=",
+      "Get-ChildItem | ForEach-Object {$_.Delete($true)}",
+      // Their neighbours.
+      "/usr/bin/rm victim.txt",
+      String.raw`\rm victim.txt`,
+      "'/bin/rm' victim.txt",
+      "command rm victim.txt",
+      "env rm victim.txt",
+      "sudo rm victim.txt",
+      "sudo /bin/rm victim.txt",
+      "busybox rm victim.txt",
+      "xargs /bin/rm < list.txt",
+      "unlink victim.txt",
+      "rmdir drafts",
+      "find . -name '*.tmp' -delete",
+      "find . -exec /bin/rm {} +",
+      "git clean -fdx",
+      "git -C drafts clean -f",
+      "rd /s /q drafts",
+      "erase victim.txt",
+      "Remove-Item victim.txt",
+      "&('Remove-Item') victim.txt",
+      "rm.exe victim.txt",
+      String.raw`C:\Windows\System32\cmd.exe /c del victim.txt`,
+      "cmd /c d^el victim.txt",
+      'cmd /c "cd drafts && del victim.txt"',
+      'bash -lc "rm victim.txt"',
+      "bash <<< 'rm victim.txt'",
+      "sudo sh <<<'rm victim.txt'",
+      "sudo -u bob sh -c 'rm victim.txt'",
+      'pwsh -NoProfile -c "ri victim.txt"',
+      'powershell "ri victim.txt"',
+      'powershell -Command "& { ri victim.txt }"',
+      'iex "ri victim.txt"',
+      "[IO.File]::Delete('victim.txt')",
+      "(Get-Item victim.txt).Delete($true)",
+      "$f.Delete('victim.txt')",
+      `powershell -e ${encoded("ri victim.txt")}`,
+      `powershell -ec ${encoded("ri victim.txt")}`,
+      `powershell -encod ${encoded("ri victim.txt")}`,
+      `powershell -EncodedCommand ${encoded("ri victim.txt")}`,
+      `cmd /c powershell -enc ${encoded('cmd /c "del victim.txt"')}`,
+    ])
+      expect(deletesFiles(command), command).toBe(true);
+  });
+
+  it("leaves alone code that a command only writes as text", () => {
+    for (const command of [
+      'Set-Content note.txt "Use [IO.File]::Delete() to delete a file"',
+      'echo "run rm -rf to clean"',
+      "Add-Content readme.md 'del /q *.tmp removes temp files'",
+      "python3 -c \"print('unlink')\"",
+      "Write-Output 'Call os.remove(path) or shutil.rmtree(folder)'",
+      'Set-Content -Value "(Get-Item x).Delete()" -Path note.txt',
+      "echo 'rm'",
+      "node -e \"const m = new Map(); m.delete('a')\"",
+      'git commit -m "clean up the drafts"',
+      "cat <<< 'rm is a command'",
+      // The same inside a shell's payload, as Codex on Windows and bash -c send it.
+      String.raw`"C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -Command 'Set-Content note.txt "Use [IO.File]::Delete() to delete a file"'`,
+      `bash -c "echo 'Call os.remove(path) to delete' > note.txt"`,
+    ])
+      expect(deletesFiles(command), command).toBe(false);
+    // Code a command runs is still checked.
+    for (const command of [
+      "powershell -Command \"[IO.File]::Delete('x')\"",
+      "python3 -c 'import os; os.unlink(\"a\")'",
+      "powershell -Command \"Set-Content note.txt '[IO.File]::Delete() deletes'; ri x\"",
+    ])
+      expect(deletesFiles(command), command).toBe(true);
+  });
+});
+
+describe("the folder check", () => {
+  /** A task's folder `work` next to a folder `out` that the task may not write to. */
+  async function folders() {
+    const root = await mkdtemp(join(tmpdir(), "tw-links-"));
+    const work = join(root, "work");
+    const out = join(root, "out");
+    await mkdir(work);
+    await mkdir(out);
+    return { root, work, out, done: () => rm(root, { recursive: true, force: true }) };
+  }
+
+  it("refuses a write through a link whose target isn't there yet", async () => {
+    const { work, out, done } = await folders();
+    try {
+      // Writing to work/link.txt would create out/new.txt.
+      await symlink(join(out, "new.txt"), join(work, "link.txt"));
+      expect(await outside(work, "link.txt")).toBe(true);
+      const write = { id: "1", tool: "Write", input: { file_path: "link.txt", content: "x" } };
+      expect(await asCodexRequest(write, work)).toMatchObject({ tool: "file_change" });
+      // A link to a missing file inside the folder is refused too: what it points to isn't checked.
+      await symlink(join(work, "later.txt"), join(work, "inner.txt"));
+      expect(await outside(work, "inner.txt")).toBe(true);
+      // A chain of links that ends at a missing file outside.
+      await symlink(join(work, "link.txt"), join(work, "chain.txt"));
+      expect(await outside(work, "chain.txt")).toBe(true);
+      // A folder link that leads nowhere, with a new file under it.
+      await symlink(join(out, "gone"), join(work, "gone"));
+      expect(await outside(work, join("gone", "new.txt"))).toBe(true);
+    } finally {
+      await done();
+    }
+  });
+
+  it("allows a new file in a new subfolder, and a link that resolves inside", async () => {
+    const { work, out, done } = await folders();
+    try {
+      expect(await outside(work, join("sub", "deeper", "new.txt"))).toBe(false);
+      expect(await outside(work, "new.txt")).toBe(false);
+      await writeFile(join(work, "there.txt"), "x");
+      await symlink(join(work, "there.txt"), join(work, "alias.txt"));
+      expect(await outside(work, "alias.txt")).toBe(false);
+      // A link to a folder outside that exists is resolved and refused, as before.
+      await symlink(out, join(work, "away"));
+      expect(await outside(work, join("away", "new.txt"))).toBe(true);
+      expect(await outside(work, join("..", "out", "new.txt"))).toBe(true);
+    } finally {
+      await done();
+    }
+  });
+
+  it("doesn't take an error other than a missing file as allowed", async () => {
+    const { work, done } = await folders();
+    try {
+      // A file used as a folder can't be resolved: that's ENOTDIR, not a missing file.
+      await writeFile(join(work, "plain.txt"), "x");
+      await expect(outside(work, join("plain.txt", "new.txt"))).rejects.toThrow(/ENOTDIR/);
+    } finally {
+      await done();
+    }
   });
 });
 

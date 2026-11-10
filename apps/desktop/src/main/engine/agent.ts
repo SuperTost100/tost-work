@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { realpath, stat } from "node:fs/promises";
+import { lstat, realpath, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
 import { translate } from "../../shared/i18n";
@@ -74,76 +74,297 @@ const END_TURN =
   "It's in front of the user now. End your turn here: don't do anything else and don't repeat it. Their reply arrives as your next message.";
 
 /**
- * Shell words that delete. Any standalone one counts, whatever comes before it (sudo, env, options, then, xargs), so
- * the check runs only on what the shell runs: shellText takes out the text a command writes. The Windows ones are
- * cmd's del, erase, rd and rmdir, and PowerShell's aliases for Remove-Item: rm, ri, del, erase, rd and rmdir.
+ * Programs and PowerShell commands that delete: rm, unlink, shred and trash; cmd's del, erase, rd and rmdir; and
+ * PowerShell's Remove-Item with its aliases rm, ri, del, erase, rd and rmdir.
  */
-const SHELL_DELETES =
-  /(^|[\s;&|(`{!])(rm|rmdir|del|erase|rd|ri|unlink|shred|trash)(\s|$)|(^|\s)find\s[^\n]*\s-delete\b/im;
+const DELETES = new Set(["rm", "rmdir", "del", "erase", "rd", "ri", "unlink", "shred", "trash", "remove-item"]);
 /**
- * Deletions in code a command runs, such as a Python, Node or PowerShell script. Looked for in the whole command.
- * PowerShell's also include .NET's [IO.File]::Delete(…) and (Get-Item x).Delete().
+ * Words that run a program named later in the command, such as sudo, xargs and find's -exec, and the shell's keywords
+ * before a command. Every word after one of them is read as a program's name too.
  */
-const CODE_DELETES =
-  /os\.(remove|unlink|rmdir)\(|shutil\.rmtree\(|\.(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync)\(|Remove-Item|::Delete\(|\.Delete\(\)/i;
+const RUNS_NEXT = new Set([
+  ...["sudo", "doas", "env", "command", "builtin", "exec", "nohup", "nice", "ionice", "time", "timeout", "stdbuf"],
+  ...["xargs", "busybox", "toybox", "-exec", "-execdir", "-ok", "-okdir", ".", "call", "start"],
+  ...["if", "then", "else", "elif", "do", "while", "until", "!"],
+]);
+const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "mksh", "ash", "fish", "csh", "tcsh"]);
+/** Programs whose payload runs as commands, which the check reads as a script of its own. */
+const UNWRAPS = new Set([...SHELLS, "cmd", "powershell", "pwsh", "eval", "iex", "invoke-expression"]);
+/**
+ * Deletions in code a command runs, such as a Python, Node or PowerShell script. They're looked for in the command's
+ * unquoted text and in quoted code handed to an interpreter, never in quoted text a command only writes. PowerShell's
+ * include .NET's [IO.File]::Delete(…) and (Get-Item x).Delete(…). A lowercase .delete( counts only before nothing or a
+ * PowerShell variable, so JavaScript's map.delete(key) doesn't.
+ */
+const CODE_DELETES = [
+  /os\.(remove|unlink|rmdir)\(|shutil\.rmtree\(|\.(unlink|unlinkSync|rm|rmSync|rmdir|rmdirSync)\(|::Delete\(|\.delete\(\s*[)$]/i,
+  /\.Delete\(/,
+];
+/** An interpreter's flag for running the quoted text after it as code: python -c, node -e, perl -pe, php -r. */
+const CODE_FLAG = /^(-[a-z]{0,2}[ce]|-p|-r|--eval|--print|--command|-command)$/i;
+/** Nested shells and payloads deeper than this aren't read: the command is taken as deleting. */
+const MAX_DEPTH = 10;
 /** A shell where a command starts, by name or path: bash and /bin/sh, but not a file named cleanup.sh. */
 const SHELL = String.raw`(^|[\s;&|(])(\S*\/)?((ba|z|da|k)?sh|fish)`;
-/** A PowerShell option, with its value when it has one, such as -NoProfile or -ExecutionPolicy Bypass. */
-const PS_OPTION = String.raw`-\w+(\s+[^-\s'"]\S*)?\s+`;
-/**
- * A shell's flag for running the string that follows: that string is a command, not text. On Windows the program's
- * path may be quoted, as in Codex's `"C:\…\powershell.exe" -NoProfile -Command '…'`.
- */
-const PAYLOAD = new RegExp(
-  String.raw`${SHELL}\s+(-\w+\s+)*-c\s*$|\bcmd(\.exe)?["']?\s+\/[ck]\s*$|\b(powershell|pwsh)(\.exe)?["']?\s+(${PS_OPTION})*-c(ommand)?\s*$`,
-  "i",
-);
-/** PowerShell's -EncodedCommand (or -enc, -e), whose base64 hides the command it runs. */
-const ENCODED =
-  /\b(?:powershell|pwsh)(?:\.exe)?["']?(?:[ \t]+\S+)*?[ \t]+-e(?:c|nc|ncodedcommand)?[ \t]+['"]?([A-Za-z0-9+/=]+)/gi;
 /** A line that hands a heredoc to a shell, whose body is then commands. */
 const SHELL_READS = new RegExp(String.raw`${SHELL}(\s|<|$)`);
 const HEREDOC = /<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2[ \t]*(?=\n|$)/g;
-const QUOTED = /'[^']*'|"(?:[^"\\]|\\.)*"/g;
 const SUBSTITUTION = /\$\(([^()]*)\)|`([^`]*)`/g;
 
 /** The text before `offset` on its line. */
 const lineBefore = (text: string, offset: number) => text.slice(text.lastIndexOf("\n", offset - 1) + 1, offset);
 
-/** The $(…) and `…` in a piece of text, which the shell runs even inside double quotes or an unquoted heredoc. */
-const substitutions = (text: string) =>
-  [...text.matchAll(SUBSTITUTION)].map((m) => `; ${shellText(m[1] ?? m[2] ?? "")} ;`).join(" ");
+const codeDeletes = (text: string) => CODE_DELETES.some((pattern) => pattern.test(text));
+
+/** Whether `option` is `full` or a prefix of it at least `min` characters long, as PowerShell reads its options. */
+const prefixOf = (full: string, option: string, min = 2) => option.length >= min && full.startsWith(option);
 
 /**
- * A command with the text it only writes taken out: heredoc bodies and quoted strings. What still runs stays: a
- * quoted command given to a shell with -c, a heredoc a shell reads, and $(…) or `…` inside double quotes or an
- * unquoted heredoc.
+ * A script with its heredocs' bodies taken out, and the bodies, whose code is still checked. A body a shell reads
+ * stays in as commands. Any other body is text, except for the $(…) and `…` in one whose delimiter isn't quoted,
+ * which the shell runs.
  */
-function shellText(command: string): string {
-  return command
-    .replace(HEREDOC, (body: string, quote: string, _tag: string, offset: number) => {
-      if (SHELL_READS.test(lineBefore(command, offset))) return body;
-      return quote ? "" : substitutions(body);
-    })
-    .replace(QUOTED, (quoted: string, offset: number, whole: string) => {
-      const inner = quoted.slice(1, -1);
-      if (PAYLOAD.test(lineBefore(whole, offset))) return `; ${shellText(inner)} ;`;
-      if (quoted.startsWith("'")) return "''";
-      return substitutions(inner) || '""';
-    });
+function heredocs(script: string): { text: string; bodies: string[] } {
+  const bodies: string[] = [];
+  const text = script.replace(HEREDOC, (body: string, quote: string, _tag: string, offset: number) => {
+    bodies.push(body);
+    if (SHELL_READS.test(lineBefore(script, offset))) return body;
+    if (quote) return "";
+    return [...body.matchAll(SUBSTITUTION)].map((m) => `\n${m[1] ?? m[2] ?? ""}\n`).join("");
+  });
+  return { text, bodies };
+}
+
+/** One word of a command as the shell passes it on: quotes removed and adjacent pieces joined. */
+interface Word {
+  text: string;
+  /** Whether any of it stood outside quotes. */
+  bare: boolean;
+  /** Where its quoted pieces sit in the script, so the code check can leave out quoted text. */
+  quotes: [number, number][];
+  /** Whether it follows <<<, so it's the program's input: a script, when the program is a shell. */
+  fed: boolean;
+}
+
+/** The index of the parenthesis that closes the one at `open`, skipping quoted text, or the script's end. */
+function closing(script: string, open: number): number {
+  let depth = 0;
+  for (let i = open; i < script.length; i++) {
+    const c = script[i];
+    if (c === "'" || c === '"') {
+      const end = script.indexOf(c, i + 1);
+      if (end < 0) return script.length;
+      i = end;
+    } else if (c === "(") depth++;
+    else if (c === ")" && --depth === 0) return i;
+  }
+  return script.length;
 }
 
 /**
- * Whether a command deletes files. Those are refused, so deletions go through the approval card and the Trash.
- * Shell words are looked for only in what runs, so an Italian document saying "del corso" is not a `del` command.
+ * A script split into commands of words, as POSIX shells, cmd and PowerShell would split it closely enough for the
+ * delete check: commands end at a newline, ;, &, |, a parenthesis or a brace, which also skips PowerShell's call
+ * operator. It also returns the $(…) and `…` substitutions, which run even inside double quotes. A backtick with no
+ * partner is PowerShell's escape. A backslash escapes only what a POSIX shell would treat specially, because in
+ * Windows paths it separates folders.
+ */
+function parse(script: string): { commands: Word[][]; substitutions: string[] } {
+  const commands: Word[][] = [];
+  const substitutions: string[] = [];
+  let words: Word[] = [];
+  let word: Word | null = null;
+  let feed = false;
+  const piece = (): Word => {
+    word ??= { text: "", bare: false, quotes: [], fed: feed };
+    feed = false;
+    return word;
+  };
+  const bare = (text: string) => {
+    const w = piece();
+    w.text += text;
+    w.bare = true;
+  };
+  const endWord = () => {
+    if (word) words.push(word);
+    word = null;
+  };
+  const endCommand = () => {
+    endWord();
+    if (words.length) commands.push(words);
+    words = [];
+  };
+  let i = 0;
+  while (i < script.length) {
+    const c = script[i] as string;
+    const next = script[i + 1] ?? "";
+    if (c === "'") {
+      const end = script.indexOf("'", i + 1);
+      const close = end < 0 ? script.length : end;
+      const w = piece();
+      w.text += script.slice(i + 1, close);
+      w.quotes.push([i, close + 1]);
+      i = close + 1;
+    } else if (c === '"') {
+      let j = i + 1;
+      let text = "";
+      while (j < script.length && script[j] !== '"') {
+        const after = script[j + 1] ?? "";
+        // A POSIX shell's \" \\ \$ \`, and PowerShell's `".
+        if ((script[j] === "\\" && after && '"\\$`'.includes(after)) || (script[j] === "`" && after === '"')) {
+          text += after;
+          j += 2;
+        } else text += script[j++];
+      }
+      const w = piece();
+      w.text += text;
+      w.quotes.push([i, j + 1]);
+      for (const m of script.slice(i + 1, j).matchAll(SUBSTITUTION)) substitutions.push(m[1] ?? m[2] ?? "");
+      i = j + 1;
+    } else if (c === "$" && next === "(") {
+      const end = closing(script, i + 1);
+      substitutions.push(script.slice(i + 2, end));
+      bare(script.slice(i, end + 1));
+      i = end + 1;
+    } else if (c === "`") {
+      const end = script.indexOf("`", i + 1);
+      if (end < 0) {
+        bare(next);
+        i += 2;
+      } else {
+        substitutions.push(script.slice(i + 1, end));
+        bare(script.slice(i, end + 1));
+        i = end + 1;
+      }
+    } else if (c === "\\" && next === "\n") i += 2;
+    else if (c === "\\" && next && /[\s"'`$;&|<>(){}\\]/.test(next)) {
+      bare(next);
+      i += 2;
+    } else if (c === "\n") {
+      endCommand();
+      i++;
+    } else if (/\s/.test(c)) {
+      endWord();
+      i++;
+    } else if (c === "<" || c === ">" || (c === "&" && next === ">")) {
+      // A redirection, such as > out.txt, 2>&1 or &> log.txt: its target is a word of the command.
+      endWord();
+      const start = i;
+      while (i < script.length && /[<>&|]/.test(script[i] as string)) i++;
+      feed = script.slice(start, i) === "<<<";
+      if (script[i - 1] === "&") while (/[\d-]/.test(script[i] ?? "")) i++;
+    } else if (";&|(){}".includes(c)) {
+      endCommand();
+      i++;
+    } else {
+      bare(c);
+      i++;
+    }
+  }
+  endCommand();
+  return { commands, substitutions };
+}
+
+/**
+ * The names a word may run as a program, in lowercase: the word, its last part without folders and .exe, and, in a
+ * program's place, the part before a slash, because cmd reads del/q as del /q.
+ */
+function namesOf(word: string, program: boolean): string[] {
+  const lower = word.toLowerCase();
+  const base = (lower.split(/[\\/]/).pop() ?? "").replace(/\.exe$/, "");
+  return program ? [lower, base, lower.split("/")[0] ?? ""] : [lower, base];
+}
+
+/** Whether a program, given the words after it, runs a deletion: a nested shell's payload, find's -delete, git clean. */
+function nestedDeletes(name: string, rest: string[], depth: number): boolean {
+  if (SHELLS.has(name)) {
+    const flag = rest.findIndex((t) => /^-[a-z]*c[a-z]*$/i.test(t));
+    return flag >= 0 && deletes(rest[flag + 1] ?? "", depth + 1);
+  }
+  if (name === "cmd") {
+    // cmd's switches, such as /d /s /q, may come before /c or /k, and ^ is its escape.
+    const at = rest.findIndex((t) => /^\/[ck]/i.test(t));
+    if (at < 0) return false;
+    const payload = [rest[at]?.slice(2) ?? "", ...rest.slice(at + 1)].join(" ");
+    return deletes(payload.replace(/\^([\s\S])/g, "$1"), depth + 1);
+  }
+  if (name === "powershell" || name === "pwsh") {
+    for (const [at, option] of rest.map((t) => t.toLowerCase()).entries()) {
+      // PowerShell reads -EncodedCommand (any prefix from -e, or -ec) as base64 of UTF-16LE text.
+      if (prefixOf("-encodedcommand", option) || option === "-ec")
+        return deletes(Buffer.from(rest[at + 1] ?? "", "base64").toString("utf16le"), depth + 1);
+      if (prefixOf("-command", option)) return deletes(rest.slice(at + 1).join(" "), depth + 1);
+      if (prefixOf("-file", option)) return false;
+    }
+    // With neither, Windows PowerShell runs the words after its options as a command.
+    return deletes(rest.filter((t) => !t.startsWith("-")).join(" "), depth + 1);
+  }
+  if (name === "eval" || name === "iex" || name === "invoke-expression") return deletes(rest.join(" "), depth + 1);
+  if (name === "find") return rest.some((t) => t.toLowerCase() === "-delete");
+  if (name === "git") {
+    for (let at = 0; at < rest.length; at++) {
+      const t = rest[at] ?? "";
+      if (/^(-C|-c|--git-dir|--work-tree|--namespace)$/.test(t)) at++;
+      else if (!t.startsWith("-")) return t === "clean";
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether one command deletes. Any bare word that names a deleting program counts, whatever comes before it (options,
+ * xargs, then), and so does a quoted one in a program's place: the first word after variable assignments, or any word
+ * after sudo, env, xargs and the like. Only the first nested shell is unwrapped, since its payload holds the rest; a
+ * shell's payload is the word after its -c, or a here-string it reads.
+ */
+function commandDeletes(words: Word[], depth: number): boolean {
+  const first = words.findIndex((w) => !(w.bare && /^[A-Za-z_]\w*=/.test(w.text)));
+  let runsNext = false;
+  let unwrapped = false;
+  for (const [n, word] of words.entries()) {
+    const program = n === first || runsNext;
+    if (!program && !word.bare) continue;
+    const names = namesOf(word.text, program);
+    if (names.some((name) => DELETES.has(name))) return true;
+    if (!unwrapped) {
+      const rest = words.slice(n + 1).map((w) => w.text);
+      if (names.some((name) => nestedDeletes(name, rest, depth))) return true;
+      if (names.some((name) => SHELLS.has(name)) && words.some((w) => w.fed && deletes(w.text, depth + 1))) return true;
+      unwrapped = names.some((name) => UNWRAPS.has(name));
+    }
+    if (names.some((name) => RUNS_NEXT.has(name))) runsNext = true;
+  }
+  return false;
+}
+
+/** Whether a script deletes, reading `depth` nested shells deep. */
+function deletes(script: string, depth: number): boolean {
+  if (depth > MAX_DEPTH) return true;
+  const { text, bodies } = heredocs(script);
+  if (bodies.some(codeDeletes)) return true;
+  const { commands, substitutions } = parse(text);
+  // The code check reads the unquoted text and the quoted code after an interpreter's -c or -e, but not what echo
+  // writes. A shell's payload is left out here too: it's read as a script of its own, with its own quoted text.
+  let code = text;
+  for (const words of commands) {
+    const runner = words.findIndex((w) => namesOf(w.text, true).some((name) => UNWRAPS.has(name) || name === "echo"));
+    for (const [n, word] of words.entries()) {
+      const isCode = n > 0 && CODE_FLAG.test(words[n - 1]?.text ?? "") && (runner < 0 || runner > n);
+      if (!isCode)
+        for (const [start, end] of word.quotes) code = code.slice(0, start) + " ".repeat(end - start) + code.slice(end);
+    }
+  }
+  if (codeDeletes(code)) return true;
+  return substitutions.some((s) => deletes(s, depth + 1)) || commands.some((words) => commandDeletes(words, depth));
+}
+
+/**
+ * Whether a command deletes files. Those are refused, so deletions go through the approval card and the Trash. The
+ * command is read as its shell would split it, so a quoted word that only names something, such as an Italian
+ * document saying "del corso", is not a `del` command.
  * shortcut: a script that deletes in another way still deletes; snapshot the folder before each run to close the gap.
  */
 export function deletesFiles(command: string): boolean {
-  if (CODE_DELETES.test(command) || SHELL_DELETES.test(shellText(command))) return true;
-  // PowerShell reads -EncodedCommand as base64 of UTF-16LE text.
-  return [...command.matchAll(ENCODED)].some((m) =>
-    deletesFiles(Buffer.from(m[1] ?? "", "base64").toString("utf16le")),
-  );
+  return deletes(command, 0);
 }
 
 /** OfficeCLI and the document skills, which the agent uses for Word, Excel, PowerPoint and PDF files. */
@@ -246,28 +467,41 @@ const CLAUDE_WRITES: Record<string, string> = {
   NotebookEdit: "notebook_path",
 };
 
-/** A path with its links resolved, for a file that may not exist yet: the nearest existing folder is resolved. */
-async function realTarget(path: string): Promise<string> {
+/**
+ * A path with its links resolved, for a file that may not exist yet: the nearest existing folder is resolved. Null when
+ * a link on the way leads nowhere, because writing through it would create whatever it points to. Any error other than
+ * a missing file is thrown.
+ */
+async function realTarget(path: string): Promise<string | null> {
   const rest: string[] = [];
   let dir = path;
   while (true) {
     try {
       return join(await realpath(dir), ...rest);
-    } catch {
-      const parent = dirname(dir);
-      if (parent === dir) return path;
-      rest.unshift(basename(dir));
-      dir = parent;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
     }
+    // Missing, or a link to something missing: lstat tells them apart, as writablePath does in files.ts.
+    const link = await lstat(dir).catch((err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") return null;
+      throw err;
+    });
+    if (link) return null;
+    const parent = dirname(dir);
+    if (parent === dir) return path;
+    rest.unshift(basename(dir));
+    dir = parent;
   }
 }
 
 /**
  * Whether a path, taken from the task's folder, lands outside it. Links are resolved first, because on a Mac a
- * temporary folder under /var is really under /private/var.
+ * temporary folder under /var is really under /private/var, and a link that leads nowhere counts as outside.
  */
 export async function outside(workdir: string, path: string): Promise<boolean> {
-  return !inside(await realTarget(workdir), await realTarget(resolve(workdir, path)));
+  const folder = await realTarget(workdir);
+  const target = await realTarget(resolve(workdir, path));
+  return !folder || !target || !inside(folder, target);
 }
 
 /** Whether a file is there. */
