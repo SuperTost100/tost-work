@@ -16,7 +16,22 @@ const NAMES = {
   board: "Board",
   settings: "Settings",
   cards: "Cards",
+  errors: "Tasks that can't start",
+  linux: "Linux sandbox notice",
+  install: "Installing an AI",
+  windows: "Windows only",
 };
+// A line under a section's name, for frames that aren't the capture's own platform or that a script had to stage.
+const NOTES = {
+  errors:
+    "Staged: the fake engine runs none of the checks, so each failure is saved as the real engine would leave it, with the app's own sentence. The last frame is a Linux state.",
+  linux:
+    "Linux only. The real check runs on a PATH without bubblewrap and socat; each step links one in and presses Check again.",
+  install: "Staged: the status and the install are patched, so nothing is installed and the install never finishes.",
+  windows:
+    "Windows only, staged on this capture: Claude is set to run unconfined, as on Windows. The window itself is the capture's platform.",
+};
+const PLATFORMS = { linux: "Linux", darwin: "macOS", win32: "Windows" };
 const manifest = JSON.parse(readFileSync(join(OUT, THEME, "manifest.json"), "utf8"));
 const flows = [];
 for (const shot of manifest) {
@@ -24,8 +39,13 @@ for (const shot of manifest) {
     flows.push({ key: shot.flow, name: `${flows.length + 1} · ${NAMES[shot.flow] ?? shot.flow}`, screens: [] });
   flows.at(-1).screens.push(`${String(shot.n).padStart(2, "0")} · ${shot.screen.replaceAll("-", " ")}`);
 }
+const platform = PLATFORMS[manifest[0]?.platform] ?? "an unknown system";
+const layoutNote =
+  platform === "macOS"
+    ? "Captured on macOS."
+    : `Captured on ${platform}: no space is kept above the sidebar. The Mac layout keeps it for the window buttons.`;
 const page = THEME === "light" ? "Light" : "Dark";
-console.log(`const FLOWS = ${JSON.stringify(flows.map(({ name, screens }) => ({ name, screens })))};
+console.log(`const FLOWS = ${JSON.stringify(flows.map(({ key, name, screens }) => ({ name, screens, note: NOTES[key] ?? null })))};
 await figma.loadFontAsync({ family: "Inter", style: "Semi Bold" });
 // The page of this theme, made if it's missing, and emptied, so the map is rebuilt from scratch each time.
 let page = figma.root.children.find((p) => p.name === ${JSON.stringify(page)});
@@ -42,6 +62,13 @@ title.fontSize = 96;
 title.fills = [ink];
 page.appendChild(title);
 title.x = 0; title.y = -400;
+const layout = figma.createText();
+layout.fontName = { family: "Inter", style: "Semi Bold" };
+layout.characters = ${JSON.stringify(layoutNote)};
+layout.fontSize = 44;
+layout.fills = [{ type: "SOLID", color: { r: 0.4, g: 0.36, b: 0.31 } }];
+page.appendChild(layout);
+layout.x = 0; layout.y = -250;
 let y = 0;
 for (const f of FLOWS) {
   const sec = figma.createSection();
@@ -49,6 +76,17 @@ for (const f of FLOWS) {
   page.appendChild(sec);
   sec.x = 0; sec.y = y;
   sec.resizeWithoutConstraints(PAD * 2 + f.screens.length * W + (f.screens.length - 1) * GAP, PAD * 2 + LABEL + H);
+  if (f.note) {
+    const note = figma.createText();
+    note.fontName = { family: "Inter", style: "Semi Bold" };
+    note.characters = f.note;
+    note.fontSize = 32;
+    note.fills = [{ type: "SOLID", color: { r: 0.4, g: 0.36, b: 0.31 } }];
+    sec.appendChild(note);
+    note.textAutoResize = "HEIGHT";
+    note.resize(Math.max(W, sec.width - PAD * 2), note.height);
+    note.x = PAD; note.y = 20;
+  }
   for (let i = 0; i < f.screens.length; i++) {
     const x = PAD + i * (W + GAP);
     const t = figma.createText();
