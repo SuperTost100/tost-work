@@ -48,7 +48,7 @@ Business users expect a Word file they can open, edit and send. Make one with th
 
 The user's own documents carry their formatting, styles and layout. Keep all of it.
 
-- Ask with `request_approval` before changing a file that was there before the task. Tost Work keeps a copy.
+- Ask with `request_approval` before changing a file that was there before the task. Tost Work keeps a copy. A file this task made needs no approval: change it directly.
 - Replace text in place, which keeps the formatting of the words around it:
 
   ```bash

@@ -2,13 +2,14 @@ import { randomUUID } from "node:crypto";
 import { lstat } from "node:fs/promises";
 import { basename } from "node:path";
 import { type Language, trashName } from "../../shared/i18n";
-import type { AgentProvider, Approval, Decision, KeptCopy, Project, Task } from "../../shared/model";
+import type { AgentProvider, Approval, Decision, EngineEvent, KeptCopy, Project, Task } from "../../shared/model";
 import { answersText, BRIEF_MAX, questionItems } from "../../shared/model";
 import { type Choice, choiceOf, type ModelChoices, type ModelPick } from "../../shared/modelChoice";
 import { applyEvent, resume } from "../../shared/reduce";
 import type { Guard } from "../guard";
 import type { Store } from "../store/store";
 import { SandboxNotReady, UserError, userMessage } from "../userError";
+import { noteText } from "./activity";
 import type { Engine } from "./engine";
 
 export interface NewTask {
@@ -208,9 +209,14 @@ export class TaskRunner {
         effort: task.effort,
         workdir,
       });
-      for await (const event of this.engine.run({ task, project, workdir, followUp, signal: controller.signal })) {
+      for await (const sent of this.engine.run({ task, project, workdir, followUp, signal: controller.signal })) {
         // A reply already waits for the next run, so this run's end isn't the task's: it stays running.
-        if (event.type === "done" && this.queued.has(taskId)) continue;
+        if (sent.type === "done" && this.queued.has(taskId)) continue;
+        // The user answered or decided while the agent was still writing its last words. Those words were written
+        // before the reply, as a card is put up: shown as the answer, they would come after the user's decision and
+        // read as the reply to it. They go into the activity as a note, and the next run's answer follows.
+        const note = sent.type === "message" && this.queued.has(taskId) ? noteText(sent.text) : null;
+        const event: EngineEvent = note ? { type: "activity", kind: "note", target: note } : sent;
         // Words as they're written go straight to the window: saving the task for each would be a write per word.
         if (event.type === "text") {
           this.drafts.set(taskId, this.draft(taskId) + event.text);

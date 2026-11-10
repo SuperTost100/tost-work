@@ -40,14 +40,29 @@ export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
     case "file": {
       // A later change to the same path replaces the earlier one, so each file is listed once. A file the task made
       // and then edited still counts as made. A file Tost Work kept a copy of was there before the task, so it stays
-      // listed as changed, with its earlier version, whatever the agent reports.
+      // listed as changed, with its earlier version, whatever the agent reports. A file Tost Work saw the task make
+      // stays listed as made, even when the agent reports it as changed.
       const { change } = event;
       const others = task.files.filter((f) => f.path !== change.path);
       if (change.kind !== "delete" && task.kept?.some((k) => k.path === change.path))
         return { ...next, files: [...others, { path: change.path, kind: "update", role: "made" }] };
       const before = task.files.find((f) => f.path === change.path);
-      const made = before?.kind === "add" && before.role === "made" && change.kind === "update";
+      const made =
+        change.kind === "update" &&
+        ((before?.kind === "add" && before.role === "made") ||
+          (change.role === "made" && task.own?.includes(change.path)));
       return { ...next, files: [...others, made ? { ...change, kind: "add" as const } : change] };
+    }
+    case "own": {
+      // A file the task made that the agent reported as changed is listed as made from now on.
+      const own = new Set(event.paths);
+      const kept = new Set(task.kept?.map((k) => k.path));
+      const files = task.files.map((f) =>
+        f.role === "made" && f.kind === "update" && own.has(f.path) && !kept.has(f.path)
+          ? { ...f, kind: "add" as const }
+          : f,
+      );
+      return { ...next, own: event.paths, ownSeen: event.seen, files };
     }
     case "question":
       return { ...next, status: "needs-you", question: event.question };
