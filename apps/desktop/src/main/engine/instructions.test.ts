@@ -47,6 +47,31 @@ describe("instructionsFor", () => {
     expect(instructionsFor(task, project, "it")).not.toContain("The user changed these files");
   });
 
+  it("says a file the task made is its own only until the request is finished", () => {
+    expect(instructionsFor(task, project, "en")).toContain(
+      "A file you make is this task's own until you finish the request you made it for",
+    );
+  });
+
+  it("names the files from a finished request, and only when there are some", () => {
+    const text = instructionsFor(
+      task,
+      project,
+      "it",
+      null,
+      undefined,
+      [],
+      null,
+      "linux",
+      [],
+      ["/Users/giulia/Proposte/Ciao.docx"],
+    );
+    expect(text).toContain("You made these files for a request you finished in an earlier turn");
+    expect(text).toContain("- /Users/giulia/Proposte/Ciao.docx");
+    expect(text).not.toContain("The user changed these files");
+    expect(instructionsFor(task, project, "it")).not.toContain("You made these files for a request you finished");
+  });
+
   it("explains the quick edit's copies and lists the attachments", () => {
     const quick = { workdir: "/tmp/q", attachments: ["/tmp/q/letter.docx"] } as unknown as Task;
     const text = instructionsFor(quick, null, "en");

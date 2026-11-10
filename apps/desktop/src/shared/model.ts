@@ -190,7 +190,8 @@ export interface Task {
   kept?: KeptCopy[];
   /**
    * The files Tost Work saw this task make, which weren't in its folder before. The agent may change them without
-   * asking, and they stay listed as made. Missing on tasks saved before it was kept: their files ask first.
+   * asking, and they stay listed as made. A run that finishes the work (the task is done) gives them to the user: the
+   * next run starts with none. Missing on tasks saved before it was kept: their files ask first.
    */
   own?: string[];
   /**
