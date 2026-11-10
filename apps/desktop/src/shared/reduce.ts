@@ -62,7 +62,7 @@ export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
           ? { ...f, kind: "add" as const }
           : f,
       );
-      return { ...next, own: event.paths, files };
+      return { ...next, own: event.paths, ownSeen: event.seen, files };
     }
     case "question":
       return { ...next, status: "needs-you", question: event.question };

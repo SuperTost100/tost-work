@@ -3,7 +3,17 @@ import { lstat, opendir, realpath, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
 import { translate, trashName } from "../../shared/i18n";
-import type { AgentProvider, AiId, Decision, EngineEvent, Job, KeyVendor, Review, Skill } from "../../shared/model";
+import type {
+  AgentProvider,
+  AiId,
+  Decision,
+  EngineEvent,
+  FileStamp,
+  Job,
+  KeyVendor,
+  Review,
+  Skill,
+} from "../../shared/model";
 import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
 import {
   type AiModels,
@@ -134,6 +144,52 @@ async function listFolder(folder: string, log: TaskLog): Promise<Map<string, str
     log.write({ type: "listing.failed", message: err instanceof Error ? err.message : String(err) });
     return null;
   }
+}
+
+/** The files a task owns, and how each looked when its last run ended. */
+interface Owned {
+  paths: string[];
+  seen: Record<string, FileStamp>;
+}
+
+/** A file's modification time and size, or null when it isn't a file that can be read now. */
+async function stampOf(path: string): Promise<FileStamp | null> {
+  const entry = await stat(path).catch(() => null);
+  return entry?.isFile() ? { mtimeMs: entry.mtimeMs, size: entry.size } : null;
+}
+
+const sameStamp = (a: FileStamp | undefined, b: FileStamp | undefined) =>
+  a?.mtimeMs === b?.mtimeMs && a?.size === b?.size;
+
+const sameOwned = (a: Owned, b: Owned) =>
+  a.paths.length === b.paths.length &&
+  a.paths.every((path) => b.paths.includes(path) && sameStamp(a.seen[path], b.seen[path]));
+
+/**
+ * The files from an earlier run that are still the task's own: the ones that are still there and look as they did when
+ * that run ended. A file whose modification time or size differs was saved by the user since, and is theirs from then
+ * on, so changing it asks and keeps a copy like any file that was there before. Comparing with what the app saw, and
+ * not with a clock, keeps a wrong clock from hiding a save, and catches a save that leaves the size as it was. A file
+ * a cloud folder (OneDrive, Dropbox, iCloud) syncs can get a new modification time without the user touching it: it
+ * asks again, which is the safe side.
+ * shortcut: a file saved by a build before `ownSeen` existed has nothing to compare with, so it stays the task's own,
+ * even if it's gone, until this run's end records it; drop this once no saved task lacks `ownSeen`.
+ */
+async function stillOwn(paths: string[], seen: Record<string, FileStamp> | undefined): Promise<Owned> {
+  const own: Owned = { paths: [], seen: {} };
+  for (const path of paths) {
+    const before = seen?.[path];
+    if (!before) {
+      own.paths.push(path);
+      continue;
+    }
+    const now = await stampOf(path);
+    // Gone, or saved by the user since: not the task's own.
+    if (!now || !sameStamp(before, now)) continue;
+    own.paths.push(path);
+    own.seen[path] = before;
+  }
+  return own;
 }
 
 /**
@@ -629,7 +685,11 @@ export class AgentEngine implements Engine, ToolHandler {
     // may have been in the folder before. A file with a kept copy existed before the task (it was overwritten with
     // approval, or restored since), so changing it again always asks.
     const kept = new Set((task.kept ?? []).map((k) => k.path));
-    const own = new Set((task.own ?? []).filter((path) => !kept.has(path)));
+    const earlier = await stillOwn(
+      (task.own ?? []).filter((path) => !kept.has(path)),
+      task.ownSeen,
+    );
+    const own = new Set(earlier.paths);
     const made = new Set(own);
     for (const path of this.cleared.get(task.id) ?? []) made.add(path);
     this.cleared.delete(task.id);
@@ -668,6 +728,14 @@ export class AgentEngine implements Engine, ToolHandler {
     const before = await listFolder(workdir, log);
     const live: Live = { channel, signal, workdir, made, own, before, pending: new Set(), allowed: new Set(), log };
     this.live.set(task.id, live);
+    // What the task owns is saved on the task as it is: files the user saved since the last run are no longer in it.
+    let recorded: Owned = { paths: task.own ?? [], seen: task.ownSeen ?? {} };
+    const record = (owned: Owned) => {
+      if (sameOwned(recorded, owned)) return;
+      recorded = owned;
+      channel.push({ type: "own", ...owned });
+    };
+    record(earlier);
 
     // A skills folder that can't be read leaves the task without skills rather than failing it.
     const skills = await this.skills().catch(() => []);
@@ -747,11 +815,7 @@ export class AgentEngine implements Engine, ToolHandler {
     // Set when Codex started a step its hook never allowed: the hook isn't running, so the task stops.
     let unchecked: string | null = null;
     // The files the task owns go on the task before the run ends, however it ends, and only when they changed.
-    const recordOwn = async () => {
-      const paths = await this.ownAtEnd(live);
-      const had = new Set(task.own ?? []);
-      if (paths.length !== had.size || paths.some((path) => !had.has(path))) channel.push({ type: "own", paths });
-    };
+    const recordOwn = async () => record(await this.ownAtEnd(live));
     const pump = (async () => {
       try {
         for await (const event of stream) {
@@ -1078,19 +1142,23 @@ export class AgentEngine implements Engine, ToolHandler {
   /**
    * The files the task owns once the run ends: those it owned before, those found while it ran, and every other file
    * that's in the folder now and wasn't when the run started, less any that are gone. Without both listings only the
-   * first two count.
+   * first two count. Each comes with how it looks now, which the next run compares with, so a change the task made in
+   * this run isn't taken for the user's.
    */
-  private async ownAtEnd(live: Live): Promise<string[]> {
+  private async ownAtEnd(live: Live): Promise<Owned> {
     const { before } = live;
     const after = before && (await listFolder(live.workdir, live.log));
     const found = new Set(live.own);
     if (before && after) for (const [key, path] of after) if (!before.has(key)) found.add(path);
-    const own: string[] = [];
+    const own: Owned = { paths: [], seen: {} };
     for (const path of found) {
-      if (own.length >= OWN_MAX) break;
+      if (own.paths.length >= OWN_MAX) break;
       // A file that's gone, or that can't be read now, is left out: changing it later asks first.
-      const entry = await stat(path).catch(() => null);
-      if (entry?.isFile()) own.push(path);
+      const stamp = await stampOf(path);
+      if (stamp) {
+        own.paths.push(path);
+        own.seen[path] = stamp;
+      }
     }
     return own;
   }

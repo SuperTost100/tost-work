@@ -1,5 +1,5 @@
 /** @vitest-environment node */
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ApprovalRequest } from "cli-funnel";
@@ -129,7 +129,7 @@ async function setup(provider: "codex" | "claude") {
     if (left && left.id !== seen) cards.push(left.paths);
     return cards;
   };
-  return { id, work, note, quote, get, go };
+  return { id, work, note, quote, get, go, store };
 }
 
 const listed = (t: Task, path: string) => t.files.find((f) => f.path === path);
@@ -256,6 +256,126 @@ for (const provider of ["codex", "claude"] as const) {
       });
       expect(cards).toEqual([[note]]);
       expect(heard).toEqual([expect.stringContaining(`No approval is needed for ${quote}`)]);
+    });
+  });
+  describe(`a file the task made and the user saved since, on ${provider}`, () => {
+    /** Tost's first run: a script makes the quote and the AI writes the date into it. */
+    const makeQuote = (ctx: Awaited<ReturnType<typeof setup>>) =>
+      ctx.go(async ({ ask }) => {
+        await ask({ command: PYTHON(REL) });
+        await writeFile(ctx.quote, "Torino, 10 novembre 2026");
+      });
+    /** The user opens the quote, edits it and saves: new text, and a modification time that is only ever different. */
+    const userSaves = async (path: string, text: string, as?: { mtimeMs?: number }) => {
+      const before = await stat(path);
+      await writeFile(path, text);
+      await utimes(path, new Date(), new Date(as?.mtimeMs ?? before.mtimeMs + 60_000));
+    };
+
+    it("asks, and keeps a copy of the user's version, the next time the task changes it", async () => {
+      const ctx = await setup(provider);
+      const { quote, get, go } = ctx;
+      await makeQuote(ctx);
+      expect(get().own).toEqual([quote]);
+      await userSaves(quote, "Torino, 10 novembre 2026, con le mie correzioni");
+      const cards = await go(async ({ ask }) => ask({ command: OFFICECLI(REL) }), ["allow"], "Cambia la data");
+      expect(cards).toEqual([[quote]]);
+      const copy = get().kept?.find((k) => k.path === quote)?.copy as string;
+      expect(await readFile(copy, "utf8")).toBe("Torino, 10 novembre 2026, con le mie correzioni");
+      // Listed as changed, with its earlier version, and no longer the task's own.
+      expect(listed(get(), quote)).toEqual({ path: quote, kind: "update", role: "made" });
+      expect(get().own ?? []).not.toContain(quote);
+    });
+
+    it("asks through request_approval too, with the file on the card", async () => {
+      const ctx = await setup(provider);
+      const { id, quote, go } = ctx;
+      await makeQuote(ctx);
+      await userSaves(quote, "Torino, 10 novembre 2026, con le mie correzioni");
+      const cards = await go(({ engine }) => engine.approve(id, "overwrite", [quote]), [], "Cambia la data");
+      expect(cards).toEqual([[quote]]);
+    });
+
+    it.each([
+      ["rewritten with the same size", "Torino, 10 novembre 2025", undefined],
+      // A clock set back leaves a time before the one recorded: only a comparison for equality sees it.
+      ["saved with a modification time in the past", "Torino, 10 novembre 2025", 1_000_000],
+    ])("asks when the user's save is %s", async (_name, text, mtimeMs) => {
+      const ctx = await setup(provider);
+      const { quote, go } = ctx;
+      await makeQuote(ctx);
+      await userSaves(quote, text, { mtimeMs });
+      const cards = await go(async ({ ask }) => ask({ command: OFFICECLI(REL) }), ["refuse"], "Cambia la data");
+      expect(cards).toEqual([[quote]]);
+    });
+
+    it("asks when only the size differs and the modification time is the same", async () => {
+      const ctx = await setup(provider);
+      const { quote, go } = ctx;
+      await makeQuote(ctx);
+      const { mtimeMs } = await stat(quote);
+      await userSaves(quote, "Torino, 10 novembre 2026, con le mie correzioni", { mtimeMs });
+      const cards = await go(async ({ ask }) => ask({ command: OFFICECLI(REL) }), ["refuse"], "Cambia la data");
+      expect(cards).toEqual([[quote]]);
+    });
+
+    it("doesn't ask when the file is as the task left it", async () => {
+      const ctx = await setup(provider);
+      const { quote, get, go } = ctx;
+      await makeQuote(ctx);
+      const cards = await go(async ({ ask }) => ask({ command: OFFICECLI(REL) }), [], "Cambia la data");
+      expect(cards).toEqual([]);
+      expect(get().own).toEqual([quote]);
+      expect(get().kept ?? []).toEqual([]);
+    });
+
+    it("doesn't ask in a third run about a change the task made itself in the second", async () => {
+      const ctx = await setup(provider);
+      const { quote, get, go } = ctx;
+      await makeQuote(ctx);
+      const second = await go(
+        async ({ ask }) => {
+          await ask({ command: OFFICECLI(REL) });
+          await writeFile(quote, "Torino, 11 novembre 2026");
+        },
+        [],
+        "Cambia la data",
+      );
+      const third = await go(
+        async ({ ask }) => {
+          await ask({ command: OFFICECLI(REL) });
+          await writeFile(quote, "Torino, 12 novembre 2026");
+        },
+        [],
+        "Ancora",
+      );
+      expect([...second, ...third]).toEqual([]);
+      expect(get().own).toEqual([quote]);
+      expect(get().ownSeen?.[quote]?.size).toBe("Torino, 12 novembre 2026".length);
+    });
+
+    it("drops a file that is gone", async () => {
+      const ctx = await setup(provider);
+      const { quote, get, go } = ctx;
+      await makeQuote(ctx);
+      await rm(quote);
+      await go(async () => {}, [], "Com'è andata?");
+      expect(get().own).toEqual([]);
+      expect(get().ownSeen).toEqual({});
+    });
+
+    it("stays the task's own when the task was saved before the app recorded how the file looked", async () => {
+      const ctx = await setup(provider);
+      const { id, quote, get, go, store } = ctx;
+      await makeQuote(ctx);
+      const { ownSeen: _recorded, ...legacy } = get();
+      store.saveTask(legacy);
+      await userSaves(quote, "Torino, 10 novembre 2026, con le mie correzioni");
+      const cards = await go(async ({ ask }) => ask({ command: OFFICECLI(REL) }), [], "Cambia la data");
+      expect(cards).toEqual([]);
+      // The run's end records it, so the next run compares.
+      expect(get().ownSeen?.[quote]).toBeDefined();
+      expect(get().id).toBe(id);
     });
   });
 }
