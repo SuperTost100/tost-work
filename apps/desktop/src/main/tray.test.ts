@@ -1,8 +1,9 @@
 /** @vitest-environment node */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { translate } from "../shared/i18n";
 import type { Job, Task } from "../shared/model";
-import { opensWindow, panelBounds, staysInMenuBar, trayMenu } from "./tray";
+import { AT_LOGIN } from "./loginItem";
+import { onSecondLaunch, opensWindow, panelBounds, showsForSecondLaunch, staysInMenuBar, trayMenu } from "./tray";
 
 const job = (title: string, time: string, on = true) =>
   ({ title, on, skip: null, schedule: { repeat: "daily", time } }) as unknown as Job;
@@ -20,6 +21,37 @@ describe("opensWindow", () => {
     expect(opensWindow(true, { loginOpens: "menuBar" })).toBe(false);
     expect(opensWindow(true, { loginOpens: "window" })).toBe(true);
     expect(opensWindow(false, { loginOpens: "menuBar" })).toBe(true);
+  });
+});
+
+describe("showsForSecondLaunch", () => {
+  const exe = "C:\\Users\\giulia\\AppData\\Local\\Programs\\tost-work\\Tost Work.exe";
+
+  it("brings the window forward when the user opens Tost Work again", () => {
+    expect(showsForSecondLaunch({ atLogin: false }, [exe])).toBe(true);
+    // Data that didn't arrive, or came from an unexpected sender, counts as a plain launch.
+    expect(showsForSecondLaunch(null, [exe])).toBe(true);
+    expect(showsForSecondLaunch("at-login", [exe])).toBe(true);
+  });
+
+  it("leaves the running copy alone when the login started the second one", () => {
+    expect(showsForSecondLaunch({ atLogin: true }, [exe, AT_LOGIN])).toBe(false);
+    expect(showsForSecondLaunch({ atLogin: true }, [exe])).toBe(false);
+    // Windows can reorder the arguments and add Chromium's own; the flag still counts.
+    expect(showsForSecondLaunch(undefined, [exe, "--allow-file-access-from-files", AT_LOGIN])).toBe(false);
+  });
+});
+
+describe("onSecondLaunch", () => {
+  const exe = "C:\\Users\\giulia\\AppData\\Local\\Programs\\tost-work\\Tost Work.exe";
+  const cwd = "C:\\Users\\giulia";
+
+  it("reads the data from the event's fourth argument, after the working directory", () => {
+    const show = vi.fn();
+    onSecondLaunch(show)({}, [exe], cwd, { atLogin: true });
+    expect(show).not.toHaveBeenCalled();
+    onSecondLaunch(show)({}, [exe], cwd, { atLogin: false });
+    expect(show).toHaveBeenCalledTimes(1);
   });
 });
 

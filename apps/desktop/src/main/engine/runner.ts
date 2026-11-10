@@ -8,7 +8,7 @@ import { type Choice, choiceOf, type ModelChoices, type ModelPick } from "../../
 import { applyEvent, resume } from "../../shared/reduce";
 import type { Guard } from "../guard";
 import type { Store } from "../store/store";
-import { UserError, userMessage } from "../userError";
+import { SandboxNotReady, UserError, userMessage } from "../userError";
 import type { Engine } from "./engine";
 
 export interface NewTask {
@@ -80,6 +80,16 @@ export const FILES_ONLY =
 export const taskTitle = (brief: string, files: string[]): string =>
   titleFrom(brief) || titleFrom(basename(files[0] ?? ""));
 
+/**
+ * The prompt of a run that never started, as its message left it: the user's last instruction when it was a follow-up,
+ * and null, which runs the brief, when it was the task's first run. Only for a task saved before `sandboxRun` was:
+ * it can't tell an answer or a decision from the brief.
+ */
+function lastMessageToRun(task: Task): string | null {
+  const last = task.messages.at(-1);
+  return last?.from === "user" && last.followUp ? withFiles(last.text, last.attachments ?? []) : null;
+}
+
 export const RESUME_PROMPT =
   "Tost Work closed while you were working on this task, so your last turn was cut short. Check what you had already done in the folder, then carry on where you left off.";
 
@@ -114,6 +124,8 @@ export class TaskRunner {
     private log: AppLog = () => {},
     /** The language a task's saved failure is said in. */
     private language: () => Language = () => "en",
+    /** Throws a UserError when the task mustn't run now, such as Claude on Windows before the user's OK. */
+    private mayRun: (task: Task) => void = () => {},
   ) {}
 
   /** What the running task's agent has written of its answer so far, or "" between answers. */
@@ -184,9 +196,12 @@ export class TaskRunner {
     let release = () => {};
     this.ended.set(taskId, new Promise<void>((resolve) => (release = resolve)));
     try {
+      this.mayRun(task);
       // An interrupted task stays resumable until its run really starts: a resume that fails at once, for example
       // offline, leaves Resume on the task to try again.
-      task = this.save({ ...task, status: "running", error: null, updatedAt: this.now() });
+      // A sandbox that couldn't start last time may have been fixed since: this run checks again.
+      const { sandboxNotReady: _fixed, sandboxRun: _replayed, ...rest } = task;
+      task = this.save({ ...rest, status: "running", error: null, updatedAt: this.now() });
       this.log("info", `Task ${taskId} started ${followUp === null ? "its first run" : "a run that follows up"}`, {
         provider: task.provider,
         model: task.model,
@@ -228,10 +243,28 @@ export class TaskRunner {
           : latest;
     } catch (err) {
       const message = userMessage(err, this.language());
+      // What the sandbox lacks goes on the task with the sentence, for the window's notice, and so does what the run
+      // was started with, which Resume replays once it's fixed.
+      const notReady = err instanceof SandboxNotReady ? err.readiness : undefined;
+      const replay = notReady ? { sandboxRun: { followUp } } : {};
       const current = this.mustGet(taskId);
       task = current.interrupted
-        ? this.save({ ...current, status: "stopped", error: message, updatedAt: this.now() })
-        : this.save(applyEvent(current, { type: "failed", error: message }, this.now()));
+        ? this.save({
+            ...current,
+            status: "stopped",
+            error: message,
+            ...(notReady ? { sandboxNotReady: notReady } : {}),
+            ...replay,
+            updatedAt: this.now(),
+          })
+        : this.save({
+            ...applyEvent(
+              current,
+              { type: "failed", error: message, ...(notReady ? { sandboxNotReady: notReady } : {}) },
+              this.now(),
+            ),
+            ...replay,
+          });
     } finally {
       this.running.delete(taskId);
       this.drafts.delete(taskId);
@@ -392,15 +425,23 @@ export class TaskRunner {
 
   /**
    * Carries on with a task that stopped when Tost Work closed. With a conversation to go back to, the agent is told why
-   * it stopped; without one, the brief runs again from the start.
+   * it stopped; without one, the brief runs again from the start. A run the sandbox check stopped never reached its AI,
+   * so it runs again with exactly what it was started with.
    */
   resume(taskId: string): Task {
     const task = this.mustGet(taskId);
     if (this.running.has(taskId)) throw new UserError("error.stillWorking");
-    if (!task.interrupted) throw new UserError("error.onlyInterrupted");
+    if (!task.interrupted && !task.sandboxNotReady) throw new UserError("error.onlyInterrupted");
     // A run started now could write to a file the restore is about to put back.
     if (this.restoring.has(taskId)) throw new UserError("error.waitRestore");
-    this.launch(taskId, task.sessionId ? RESUME_PROMPT : null);
+    const prompt = task.sandboxRun
+      ? task.sandboxRun.followUp
+      : task.interrupted
+        ? task.sessionId
+          ? RESUME_PROMPT
+          : null
+        : lastMessageToRun(task);
+    this.launch(taskId, prompt);
     return task;
   }
 

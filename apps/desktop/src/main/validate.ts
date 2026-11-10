@@ -184,6 +184,9 @@ export const settingsPatch = (v: unknown): Partial<Settings> => {
     } else if (key === "setupDone") {
       if (typeof value !== "boolean") throw new Error("setupDone must be true or false");
       patch.setupDone = value;
+    } else if (key === "unconfinedAcknowledged") {
+      if (typeof value !== "boolean") throw new Error("unconfinedAcknowledged must be true or false");
+      patch.unconfinedAcknowledged = value;
     } else throw new Error(`Unknown setting: ${key}`);
   }
   return patch;

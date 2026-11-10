@@ -157,6 +157,38 @@ describe("first-run setup", () => {
     expect(tries).toEqual(["codex", "codex"]);
   });
 
+  it("shows an install in progress on its button, which can't be pressed again, and drops it when it ends", async () => {
+    const api = createMemoryApi({ name: "Giulia" });
+    let installed = false;
+    api.account.status = async (provider) => ({ installed: provider === "codex" ? installed : true, loggedIn: false });
+    let finish: (result: { ok: true }) => void = () => {};
+    let tries = 0;
+    api.account.install = () => {
+      tries++;
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    };
+    render(<Root api={api} />);
+    await click("Next");
+    await click("Skip for now");
+    await click("Next");
+    await click("Next");
+    await click("Install Codex");
+
+    const busy = await screen.findByRole("button", { name: "Installing…" });
+    expect(busy.hasAttribute("disabled")).toBe(true);
+    expect(busy.getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByText("Installing Codex. It takes a minute or two.")).toBeTruthy();
+    fireEvent.click(busy);
+    expect(tries).toBe(1);
+
+    installed = true;
+    await act(async () => finish({ ok: true }));
+    expect(await screen.findByRole("button", { name: "Sign in to ChatGPT" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Installing…" })).toBeNull();
+  });
+
   it("switches the language as soon as it's picked", async () => {
     render(<Root api={createMemoryApi({})} />);
     const language = await screen.findByLabelText("Language");

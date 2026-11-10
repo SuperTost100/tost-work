@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccountRow } from "@/components/AccountRow";
 import { KeyRow } from "@/components/KeyRow";
+import { SetupSandboxNotice } from "@/components/SandboxNotice";
 import { Sprigs } from "@/components/Sprigs";
 import { Switch } from "@/components/Switch";
 import { errorText } from "@/lib/errorText";
@@ -15,7 +16,7 @@ const TOTAL = 6;
 const LEVELS: Level[] = ["beginner", "intermediate", "advanced", "expert"];
 const folderName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? "";
 
-/** The ways to connect an AI: the two subscriptions and the course key. */
+/** The ways to connect an AI: the two subscriptions and the course key, under the sandbox notice when Linux needs one. */
 function Connect({
   api,
   onConnected,
@@ -26,12 +27,15 @@ function Connect({
   onSignedIn: (ai: AiId) => void;
 }) {
   return (
-    <div className="opts">
-      {SUBSCRIPTIONS.map((ai) => (
-        <AccountRow key={ai} api={api} ai={ai} variant="setup" onConnected={onConnected} onSignedIn={onSignedIn} />
-      ))}
-      <KeyRow api={api} variant="setup" onConnected={onConnected} onSaved={() => onSignedIn("key")} />
-    </div>
+    <>
+      <SetupSandboxNotice api={api} />
+      <div className="opts">
+        {SUBSCRIPTIONS.map((ai) => (
+          <AccountRow key={ai} api={api} ai={ai} variant="setup" onConnected={onConnected} onSignedIn={onSignedIn} />
+        ))}
+        <KeyRow api={api} variant="setup" onConnected={onConnected} onSaved={() => onSignedIn("key")} />
+      </div>
+    </>
   );
 }
 

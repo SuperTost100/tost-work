@@ -279,8 +279,9 @@ h3 {
 .search input::placeholder {
   color: var(--t3);
 }
-/* The box shows the focus, as other fields do, rather than a ring round the text inside it. */
-.search input:focus-visible {
+/* The box shows the focus, as other fields do, rather than a ring round the text inside it. :root outranks the
+   keyboard ring every other text field gets, which comes later in this file and otherwise drew a second outline. */
+:root .search input:focus-visible {
   outline: none;
 }
 /* :root outranks the dark theme's own border. */
@@ -533,7 +534,14 @@ h3 {
   width: 24px;
   height: 24px;
 }
-.st.run svg {
+.spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
   animation: spin 1.6s linear infinite;
 }
 .st.seen {
@@ -562,7 +570,7 @@ h3 {
   color: var(--danger);
 }
 @media (prefers-reduced-motion: reduce) {
-  .st.run svg {
+  .spinner {
     animation: none;
   }
 }
@@ -4339,6 +4347,9 @@ fieldset.fld > legend {
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .search {
     background: var(--panel);
+  }
+  /* Not while it's focused: the ink border is then the only sign of the focus. */
+  :root:not([data-theme="light"]) .search:not(:focus-within) {
     border-color: transparent;
   }
   :root:not([data-theme="light"]) .sprig {
@@ -4356,6 +4367,9 @@ fieldset.fld > legend {
   :root:not([data-theme="light"]) .scrim {
     background: rgba(20, 18, 16, 0.7);
   }
+  :root:not([data-theme="light"]) .sbx-code {
+    background: var(--side);
+  }
 }
 
 /* The window has no title bar on Mac: the sidebar top and the page top bar drag the window. */
@@ -4371,9 +4385,8 @@ fieldset.fld > legend {
 :focus-visible {
   outline: none;
 }
-:root[data-keys] :focus-visible,
-input:not([type="radio"], [type="checkbox"]):focus-visible,
-select:focus-visible {
+:root[data-keys] :focus-visible:not(.input),
+input:not([type="radio"], [type="checkbox"], .input):focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
@@ -4382,7 +4395,7 @@ select:focus-visible {
   outline: none;
 }
 /* A text box shows its focus on its own frame, so the keyboard ring above stays off it. */
-:root[data-keys] textarea:focus-visible {
+:root[data-keys] textarea:not(.input):focus-visible {
   outline: none;
 }
 :root[data-keys] .composer:has(textarea:focus-visible) {
@@ -4438,6 +4451,10 @@ button.item {
 .btn:disabled {
   opacity: 0.4;
   cursor: default;
+}
+/* A button waiting for its work to end is dimmed less, so its spinner and label stay readable. */
+.btn.busy:disabled {
+  opacity: 0.75;
 }
 .composer textarea:disabled {
   cursor: default;
@@ -4773,9 +4790,14 @@ button.item {
     400 15px "Schibsted Grotesk",
     sans-serif;
 }
+/* One ring, for the mouse and the keyboard alike: the field's own border turns ink and a second ink line sits against
+   it, as a chosen card's does. A ring set off from the border, as the keyboard ring elsewhere is, drew two outlines. */
 .input:focus {
-  outline: none;
   border-color: var(--ink);
+}
+.input:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 0;
 }
 /* The system's arrow sits against the edge and differs per platform, so a select draws its own, inset like the text. */
 select.input {
@@ -4785,6 +4807,99 @@ select.input {
   background-repeat: no-repeat;
   background-position: right 11px center;
   background-size: 16px;
+}
+/* Where Chromium can customise a select (Electron 45 can), its list is drawn here, as the app's own menu: the same
+   paper, radius, shadow, row height and hover as .menu, and the select keeps its keyboard and screen-reader behaviour. */
+@supports (appearance: base-select) {
+  select.input,
+  select.input::picker(select) {
+    appearance: base-select;
+  }
+  /* A long choice, such as a project's name, stays on one line and is cut off before the arrow. The select's own text
+     can't be styled, so the arrow sits on a block of the field's paper that covers the text's end. */
+  select.input {
+    display: block;
+    position: relative;
+    padding: 0 34px 0 11px;
+    line-height: 34px;
+    overflow: hidden;
+    white-space: nowrap;
+    background-image: none;
+    cursor: default;
+  }
+  select.input::picker-icon {
+    content: "";
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: 34px;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23878070' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+      center / 16px no-repeat,
+      var(--paper);
+    transition: rotate 150ms ease-out;
+  }
+  select.input:open::picker-icon {
+    rotate: 180deg;
+  }
+  select.input::picker(select) {
+    box-sizing: border-box;
+    min-width: anchor-size(width);
+    /* As wide as the select, so a long choice can't push the list past the window. */
+    max-width: max(anchor-size(width), 280px);
+    margin: 4px 0;
+    /* Below the select, and above it only when there's no room, rather than on the side with the most. */
+    position-try-order: normal;
+    padding: 5px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 12px 32px rgba(27, 23, 18, 0.14);
+  }
+  select.input option {
+    display: block;
+    position: relative;
+    padding: 0 34px 0 10px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    border-radius: 8px;
+    font:
+      400 14px / 32px "Schibsted Grotesk",
+      sans-serif;
+    color: var(--ink);
+    cursor: default;
+  }
+  select.input option:is(:hover, :focus) {
+    background: var(--hover);
+  }
+  select.input option:checked {
+    background: var(--sel);
+  }
+  select.input option::checkmark {
+    content: "";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    margin-top: -7.5px;
+    width: 15px;
+    height: 15px;
+    background-color: currentColor;
+    mask: url("../assets/icons/check.svg") center / contain no-repeat;
+  }
+  /* In forced colours the list's shadow and the chosen row's tint are gone, and the check takes the list's own
+     colour. The list gets a real border, and the check the text colour. */
+  @media (forced-colors: active) {
+    select.input::picker(select) {
+      border: 1px solid CanvasText;
+    }
+    select.input option::checkmark {
+      forced-color-adjust: none;
+      background-color: CanvasText;
+    }
+  }
 }
 fieldset.fld {
   margin: 0;
@@ -5091,6 +5206,152 @@ label.opt:hover:not(.on) {
   margin-top: 4px;
   color: var(--ink);
 }
+/* Windows: the note under Claude's row, spanning the row's two columns. */
+.unconfined {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: -2px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--t2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.unconfined-ic {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  color: var(--need);
+}
+/* The confirmation card's paragraphs. */
+.confirmmodal .cb .detail {
+  display: grid;
+  gap: 10px;
+}
+
+/* Linux: what the sandbox lacks, in setup (.sbx) and in a task that couldn't start (.sbx-fail). */
+.sbx {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: var(--panel);
+}
+.sbx-fail {
+  display: grid;
+  gap: 12px;
+}
+.sbx-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.sbx-ic {
+  width: 16px;
+  height: 16px;
+  color: var(--need);
+}
+.sbx.ok .sbx-ic {
+  color: var(--ink);
+}
+.sbx-p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--t2);
+}
+.sbx-fail .sbx-p {
+  font-size: inherit;
+  color: inherit;
+}
+.sbx-p.small {
+  font-size: 13px;
+  color: var(--t3);
+}
+.sbx-p.err {
+  color: var(--need);
+}
+.sbx-name {
+  font:
+    500 13px / 1 "IBM Plex Mono",
+    ui-monospace,
+    monospace;
+}
+.sbx-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sbx-tags .tag {
+  background: var(--canvas);
+}
+.sbx-step {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.sbx-step-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t2);
+}
+.sbx-raw {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--canvas);
+  color: var(--ink);
+  font:
+    500 12px / 1.45 "IBM Plex Mono",
+    ui-monospace,
+    monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sbx-code {
+  position: relative;
+  border-radius: 8px;
+  background: var(--canvas);
+  box-shadow: 0 0 0 1px var(--line);
+  padding: 10px 96px 10px 12px;
+  color: var(--ink);
+}
+:root[data-theme="dark"] .sbx-code {
+  background: var(--side);
+}
+.sbx-cmd {
+  margin: 0;
+  font:
+    500 12.5px / 1.5 "IBM Plex Mono",
+    ui-monospace,
+    monospace;
+  white-space: pre;
+  overflow-x: auto;
+  user-select: all;
+}
+.sbx-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.sbx-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sbx-status {
+  font-size: 13px;
+  color: var(--t3);
+}
 .opt .cmd {
   display: block;
   margin-top: 8px;
@@ -5107,12 +5368,13 @@ label.opt:hover:not(.on) {
 [data-full-screen] .lights-space {
   display: none;
 }
-/* In full screen there are no window buttons, so the sidebar button moves up into the logo's row. */
-[data-full-screen] .side .chrome {
+/* With no window buttons, in full screen and on Windows and Linux (whose title bar is the system's, above the page),
+   the sidebar button moves up into the logo's row instead of leaving an empty band over it. */
+:is([data-full-screen], :where(.app):not(.mac)) .side .chrome {
   position: relative;
   height: 0;
 }
-[data-full-screen] .side .chrome .iconbtn {
+:is([data-full-screen], :where(.app):not(.mac)) .side .chrome .iconbtn {
   position: absolute;
   top: 14px;
   right: 4px;
@@ -5121,7 +5383,7 @@ label.opt:hover:not(.on) {
   padding: 0;
   gap: 8px;
 }
-[data-full-screen] .side .brand {
+:is([data-full-screen], :where(.app):not(.mac)) .side .brand {
   padding-top: 16px;
 }
 .rail-chrome {
@@ -5131,7 +5393,7 @@ label.opt:hover:not(.on) {
   -webkit-app-region: drag;
 }
 /* The rail's logo stays level with the sidebar's. */
-[data-full-screen] .rail-chrome {
+:is([data-full-screen], :where(.app):not(.mac)) .rail-chrome {
   height: 10px;
 }
 /* A round of answered questions: one grey line like the steps, which opens onto each question and its answer. */

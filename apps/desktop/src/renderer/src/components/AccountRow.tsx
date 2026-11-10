@@ -1,11 +1,13 @@
 import { useCallback, useRef, useState } from "react";
 import { Icon } from "@/lib/Icon";
+import { Spinner } from "@/lib/Spinner";
 import { useAccount } from "@/lib/useAccount";
 import { useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
 import { installLine } from "../../../shared/install";
 import { PROVIDER_OF, type Subscription } from "../../../shared/model";
+import { UnconfinedNote, useAskUnconfined } from "./Unconfined";
 
 /** The agent CLI behind each subscription. */
 const CLI: Record<Subscription, string> = { chatgpt: "Codex", claude: "Claude Code" };
@@ -61,6 +63,10 @@ export function AccountRow({
     onSignedOut: () => onSignedOut?.(ai),
   });
   const [code, setCode] = useState("");
+  // On Windows Claude runs without a sandbox, so the row says so and asks before Install and Sign in go ahead.
+  const unconfined = ai === "claude" && api.claudeUnconfined;
+  const askUnconfined = useAskUnconfined(api, unconfined);
+  const goAhead = (run: () => Promise<void>) => () => void askUnconfined().then((yes) => (yes ? run() : undefined));
   const setup = variant === "setup";
   const cli = CLI[ai];
   const name = t(`ai.${ai}.short` as MessageKey);
@@ -68,8 +74,16 @@ export function AccountRow({
   let detail: React.ReactNode = setup ? t(`ai.${ai}.d` as MessageKey) : t("settings.notConnected");
   let action: React.ReactNode = null;
   let ok = false;
-  if (installing) detail = t("ai.installing", { cli });
-  else if (checking) detail = t("ai.checking", { cli });
+  if (installing) {
+    detail = t("ai.installing", { cli });
+    // The button stays, so the row keeps its shape and the install can't be started twice.
+    action = (
+      <button type="button" className="btn busy" disabled aria-busy="true">
+        <Spinner />
+        {t("ai.installingShort")}
+      </button>
+    );
+  } else if (checking) detail = t("ai.checking", { cli });
   else if (account && !account.installed) {
     detail = installFailed ? (
       <>
@@ -91,7 +105,7 @@ export function AccountRow({
             {t("ai.checkAgain")}
           </button>
         )}
-        <button type="button" className="btn" onClick={() => void install()}>
+        <button type="button" className="btn" onClick={goAhead(install)}>
           {t("ai.install", { cli })}
         </button>
       </span>
@@ -124,7 +138,7 @@ export function AccountRow({
     );
   } else if (account) {
     action = (
-      <button type="button" className="btn" aria-label={t("ai.signInTo", { name })} onClick={() => void signIn()}>
+      <button type="button" className="btn" aria-label={t("ai.signInTo", { name })} onClick={goAhead(signIn)}>
         {t("ai.signIn")}
       </button>
     );
@@ -162,6 +176,7 @@ export function AccountRow({
     <div className={setup ? (ok ? "opt on" : "opt") : "acct"}>
       {body}
       {action}
+      {unconfined && <UnconfinedNote />}
     </div>
   );
 }

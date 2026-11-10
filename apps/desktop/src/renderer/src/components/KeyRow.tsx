@@ -4,6 +4,7 @@ import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import { type CourseKey, keyVendor } from "../../../shared/model";
+import { UnconfinedNote, useAskUnconfined } from "./Unconfined";
 
 const VENDOR = { openai: "OpenAI", anthropic: "Anthropic" } as const;
 
@@ -33,6 +34,9 @@ export function KeyRow({
   const connected = useRef(onConnected);
   connected.current = onConnected;
   const setup = variant === "setup";
+  // An Anthropic key runs tasks on Claude Code, which has no sandbox on Windows: the same notice as Claude's own row.
+  const askUnconfined = useAskUnconfined(api, api.claudeUnconfined);
+  const unconfined = api.claudeUnconfined && info?.vendor === "anthropic";
 
   useEffect(() => {
     api.key.info().then(
@@ -51,6 +55,7 @@ export function KeyRow({
       setError(t("ai.key.invalid"));
       return;
     }
+    if (keyVendor(key) === "anthropic" && !(await askUnconfined())) return;
     setBusy(true);
     setError(null);
     try {
@@ -132,6 +137,7 @@ export function KeyRow({
           {t("ai.key.remove")}
         </button>
       )}
+      {unconfined && <UnconfinedNote />}
     </div>
   );
 }

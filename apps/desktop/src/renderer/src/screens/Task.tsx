@@ -6,6 +6,7 @@ import { FileLine, fileName } from "@/components/FileLine";
 import { ModelUsed } from "@/components/ModelPicker";
 import { Preview } from "@/components/Preview";
 import { ProjectPicker } from "@/components/ProjectPicker";
+import { TaskSandboxNotice } from "@/components/SandboxNotice";
 import { TaskTag } from "@/components/TaskTag";
 import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
@@ -888,7 +889,7 @@ export function Task({
   onDecide: (decision: Decision) => Promise<unknown>;
   onRestore: (path: string) => Promise<unknown>;
   onStop: () => void;
-  /** Carries on with a task that stopped when Tost Work closed. */
+  /** Carries on with a task that stopped when Tost Work closed, or runs again one whose sandbox couldn't start. */
   onResume: () => void;
   /** Starts a task the user saved for later. */
   onStartSaved: () => void;
@@ -1250,7 +1251,16 @@ export function Task({
                   <Artifact api={api} task={task} files={made} picked={picked} onPick={setPicked} onError={onError} />
                 )}
                 {task.status === "stopped" &&
-                  (task.interrupted ? (
+                  (task.interrupted && task.sandboxNotReady ? (
+                    // A resume that failed on the sandbox shows what to install, and runs it again once it's fixed.
+                    <TaskSandboxNotice
+                      api={api}
+                      provider={task.provider ?? "codex"}
+                      readiness={task.sandboxNotReady}
+                      onReady={onResume}
+                      onError={onError}
+                    />
+                  ) : task.interrupted ? (
                     <div className="agent row">
                       {/* Only the note is grey: Resume is a normal button. */}
                       <span className="grow t3">
@@ -1270,7 +1280,19 @@ export function Task({
                   ) : (
                     <p className="agent t3">{t("task.stopped")}</p>
                   ))}
-                {task.status === "failed" && <p className="agent">{t("task.failed", { error: task.error ?? "" })}</p>}
+                {task.status === "failed" &&
+                  (task.sandboxNotReady ? (
+                    // The sandbox couldn't start, so the notice says what to install instead of the plain sentence.
+                    <TaskSandboxNotice
+                      api={api}
+                      provider={task.provider ?? "codex"}
+                      readiness={task.sandboxNotReady}
+                      onReady={onResume}
+                      onError={onError}
+                    />
+                  ) : (
+                    <p className="agent">{t("task.failed", { error: task.error ?? "" })}</p>
+                  ))}
                 {checked ? (
                   <>
                     <div className="check-h">

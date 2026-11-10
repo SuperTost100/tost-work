@@ -1,6 +1,7 @@
 /** The data Tost Work keeps about projects and tasks. Shared by the main process and the interface. */
 
 import type { Choice, ModelPick } from "./modelChoice";
+import type { SandboxReadiness } from "./sandbox";
 import type { JobSchedule } from "./schedule";
 
 export interface Project {
@@ -197,6 +198,16 @@ export interface Task {
    */
   reviewedAt?: string;
   error: string | null;
+  /**
+   * Set when the last run couldn't start because its AI's sandbox can't on this Linux system: what's missing, so the
+   * window can show how to fix it. `error` has the plain sentence. A new run clears it.
+   */
+  sandboxNotReady?: SandboxReadiness;
+  /**
+   * What the run the sandbox stopped was started with (`followUp` null for the brief), so Resume replays exactly that:
+   * an answer, a decision or a follow-up. Set and cleared with `sandboxNotReady`; missing on tasks saved before.
+   */
+  sandboxRun?: { followUp: string | null };
   createdAt: string;
   updatedAt: string;
 }
@@ -217,7 +228,7 @@ export type EngineEvent =
   | { type: "approval"; approval: Approval }
   | { type: "review"; review: Review }
   | { type: "done" }
-  | { type: "failed"; error: string }
+  | { type: "failed"; error: string; sandboxNotReady?: SandboxReadiness }
   | { type: "stopped" };
 
 /** A finished task the user hasn't marked as reviewed yet. */
@@ -276,6 +287,11 @@ export interface Settings {
    */
   debug: boolean;
   setupDone: boolean;
+  /**
+   * The user pressed Continue on the notice that Claude on Windows isn't limited to the task's folder. Until then no
+   * task runs on Claude there: the window shows the notice first, and a job's run is refused.
+   */
+  unconfinedAcknowledged: boolean;
   /** The pre-release version whose welcome card the user closed, so the card comes back with the next update. */
   welcomed: string | null;
 }
@@ -374,6 +390,7 @@ export const DEFAULT_SETTINGS: Settings = {
   boardGroup: "status",
   debug: false,
   setupDone: false,
+  unconfinedAcknowledged: false,
   welcomed: null,
 };
 

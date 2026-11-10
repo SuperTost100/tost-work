@@ -6,6 +6,9 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import { MAX_QUESTIONS, type Review } from "../../shared/model";
 
+/** The answer to Codex's hook before one step: run it, or refuse it with the reason the agent reads. */
+export type HookAnswer = { decision: "allow" } | { decision: "deny"; reason: string };
+
 /** What the tools do for a task. The engine that runs the task implements it. */
 export interface ToolHandler {
   /** Puts the question on the task and resolves at once with what the agent does next: end its turn and wait. */
@@ -16,6 +19,8 @@ export interface ToolHandler {
   /** Makes a PDF of a Word, Excel or PowerPoint file and resolves with what to tell the agent. */
   makePdf(taskId: string, path: string): Promise<string>;
   review(taskId: string, review: Review): Promise<void>;
+  /** Decides one step Codex is about to take, sent by its hook as Codex's own JSON. May wait for the user. */
+  gate(taskId: string, step: unknown): Promise<HookAnswer>;
 }
 
 const absolute = z
@@ -137,8 +142,11 @@ function readBody(req: IncomingMessage): Promise<string> {
 
 /**
  * Tost Work's tools for agents, as an MCP server over HTTP on 127.0.0.1. Each agent session gets its own bearer token,
- * which says which task a call belongs to, so no environment variables are needed. A session keeps one MCP server and
- * transport for its whole life. Every tool returns at once: nothing holds a request open waiting for the user.
+ * which says which task a call belongs to. A session keeps one MCP server and transport for its whole life. Every tool
+ * returns at once: nothing holds a request open waiting for the user.
+ *
+ * Codex's hook asks at /hook, with the same token, before each step Codex takes. That request does wait, as long as a
+ * card is open, and its answer is always 200 with the decision as JSON: any other answer makes the hook refuse.
  */
 export class ToolServer {
   private http: Server | null = null;
@@ -199,10 +207,11 @@ export class ToolServer {
     } catch {
       return deny(404, "Not found");
     }
-    if (pathname !== "/mcp") return deny(404, "Not found");
+    if (pathname !== "/mcp" && pathname !== "/hook") return deny(404, "Not found");
     const auth = req.headers.authorization ?? "";
     const session = auth.startsWith("Bearer ") ? this.sessions.get(auth.slice(7)) : undefined;
     if (!session) return deny(401, "Unauthorized");
+    if (pathname === "/hook") return this.hook(session, req, res);
 
     try {
       let body: unknown;
@@ -223,5 +232,23 @@ export class ToolServer {
     } catch (err) {
       deny(500, err instanceof Error ? err.message : "Internal error");
     }
+  }
+
+  private async hook(session: Session, req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (req.method !== "POST") {
+      res.writeHead(405, { "content-type": "text/plain" }).end("Method not allowed");
+      return;
+    }
+    let answer: HookAnswer;
+    try {
+      answer = await this.handler.gate(session.taskId, JSON.parse(await readBody(req)));
+    } catch (err) {
+      answer = {
+        decision: "deny",
+        reason: `Tost Work couldn't check this step: ${err instanceof Error ? err.message : err}`,
+      };
+    }
+    // The hook may have gone meanwhile, as when Codex stopped the turn: the step can't run without its answer.
+    if (!res.destroyed) res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(answer));
   }
 }

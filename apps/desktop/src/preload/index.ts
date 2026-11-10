@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { JobChange, MenuAction, SignInEvent, WindowQuestion } from "../shared/api";
 import { IPC, type TostWorkApi } from "../shared/api";
 import { type AgentProvider, ATTACH_MAX, PASTED_MAX_BYTES, type Settings, type Task } from "../shared/model";
+import { claudeUnconfined } from "../shared/sandbox";
 
 // In full screen macOS hides the traffic lights, so the page drops the space it keeps for them.
 ipcRenderer.on(IPC.fullScreen, (_: unknown, on: boolean) => {
@@ -23,6 +24,7 @@ function deliverQuestion(question: WindowQuestion): void {
 
 const api: TostWorkApi = {
   platform: process.platform as TostWorkApi["platform"],
+  claudeUnconfined: claudeUnconfined(process.platform),
   versions: { app: __APP_VERSION__, electron: process.versions.electron ?? "" },
   settings: {
     get: () => ipcRenderer.invoke(IPC.settingsGet),
@@ -86,6 +88,9 @@ const api: TostWorkApi = {
       listening = false;
       ipcRenderer.removeListener(IPC.openTask, handler);
     };
+  },
+  sandbox: {
+    check: (provider) => ipcRenderer.invoke(IPC.sandboxCheck, provider ?? null),
   },
   account: {
     status: (provider) => ipcRenderer.invoke(IPC.accountStatus, provider),

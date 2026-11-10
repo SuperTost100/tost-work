@@ -15,6 +15,7 @@ import type {
   Task,
 } from "./model";
 import type { ModelChoices, ModelPick } from "./modelChoice";
+import type { SandboxReadiness } from "./sandbox";
 
 export interface NewProjectInput {
   name: string;
@@ -96,6 +97,8 @@ export type JobChange = Job | { id: string; removed: true };
 
 export interface TostWorkApi {
   platform: "darwin" | "win32" | "linux";
+  /** Whether Claude runs its commands without a sandbox here (Windows), so setup can warn before it's chosen. */
+  claudeUnconfined: boolean;
   versions: { app: string; electron: string };
   settings: {
     get(): Promise<Settings>;
@@ -135,6 +138,14 @@ export interface TostWorkApi {
     /** Installs the CLI with the vendor's official installer. Resolves when it's done, never rejects. */
     install(provider: AgentProvider): Promise<InstallResult>;
     onSignIn(listener: (provider: AgentProvider, event: SignInEvent) => void): () => void;
+  };
+  /** The Linux sandbox the AIs run commands in. */
+  sandbox: {
+    /**
+     * Whether it can start for `provider`, or for both AIs when it's left out, and what's missing. Checked afresh on
+     * every call, so "check again" sees a fix made in a terminal. Always ready on Mac and Windows.
+     */
+    check(provider?: AgentProvider): Promise<SandboxReadiness>;
   };
   /** The AIs and models a new task can run on, for the picker under the task box. */
   models: {
@@ -205,7 +216,10 @@ export interface TostWorkApi {
     /** Asks for a folder, every time, and copies the files the task made into it. Null when the user cancels. */
     saveCopy(id: string): Promise<SaveResult | null>;
     stop(id: string): Promise<void>;
-    /** Carries on with a task that stopped when Tost Work closed, in the same conversation. */
+    /**
+     * Carries on with a task that stopped when Tost Work closed, in the same conversation. Also runs again a task
+     * that failed because its AI's sandbox couldn't start (`sandboxNotReady`), with the message that didn't run.
+     */
     resume(id: string): Promise<Task>;
     /** Shows the task's menu where the pointer is, and resolves with what the user picked, or null. */
     menu(id: string): Promise<TaskMenuAction | null>;
@@ -355,6 +369,7 @@ export const IPC = {
   accountCancel: "account:cancel",
   accountSignOut: "account:sign-out",
   accountInstall: "account:install",
+  sandboxCheck: "sandbox:check",
   settingsChanged: "settings:changed",
   menuAction: "menu:action",
   menuState: "menu:state",

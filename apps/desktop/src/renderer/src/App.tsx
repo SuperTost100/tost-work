@@ -7,6 +7,7 @@ import { ProjectInstructionsDialog } from "@/components/ProjectInstructionsDialo
 import { ReportDialog } from "@/components/ReportDialog";
 import { SavedToast } from "@/components/SavedToast";
 import { SearchDialog } from "@/components/SearchDialog";
+import { useClaudeGate } from "@/components/Unconfined";
 import { WelcomeCard } from "@/components/WelcomeCard";
 import { stageOf } from "@/lib/changelog";
 import { errorText } from "@/lib/errorText";
@@ -87,6 +88,8 @@ function MainQuestions({ api }: { api?: TostWorkApi }) {
 function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSettings }: AppProps) {
   const t = useT();
   const confirm = useConfirm();
+  // Every run on Claude on Windows waits for the user's OK to the notice, the first time.
+  const claudeGate = useClaudeGate(api);
   // Without settings (the tests' default) the user is set up and has seen this stage's welcome card.
   const current = settings ?? {
     ...DEFAULT_SETTINGS,
@@ -217,11 +220,17 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
     else if (action === "remove") dropProject(id);
   };
   // Starting a saved task opens it, to watch it work, as starting a new one does.
-  const startSaved = (id: string) =>
-    void api?.tasks.startSaved(id, pick).then((task) => {
+  const startSaved = async (id: string) => {
+    if (!api) return;
+    try {
+      const task = await claudeGate({ pick }, () => api.tasks.startSaved(id, pick));
+      if (!task) return;
       addTask(task);
       setRoute({ name: "task", id: task.id });
-    }, report);
+    } catch (err) {
+      report(err);
+    }
+  };
   // The task menu, the same in Recent and on the Board. Rename is the one item carried out where the menu opened,
   // since the title there turns into the field.
   const taskMenu = async (id: string, rename: () => void) => {
@@ -234,7 +243,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
     }
     if (action === "rename") rename();
     else if (action === "reveal") void api.tasks.reveal(id).catch(report);
-    else if (action === "start") startSaved(id);
+    else if (action === "start") void startSaved(id);
     else if (action === "review") void api.tasks.markReviewed(id).then(addTask, report);
     else if (action === "unreview") void api.tasks.markUnreviewed(id).then(addTask, report);
     else if (action === "delete") void deleteTask(id);
@@ -297,7 +306,11 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
     starting.current = true;
     setError(null);
     try {
-      const task = await api.tasks.start({ projectId: inProject, brief: text.trim(), attachments, pick });
+      // Cancel on the notice leaves the message in the box.
+      const task = await claudeGate({ pick }, () =>
+        api.tasks.start({ projectId: inProject, brief: text.trim(), attachments, pick }),
+      );
+      if (!task) return;
       clear();
       setRoute({ name: "task", id: task.id });
     } catch (err) {
@@ -579,8 +592,8 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
           project={project}
           debug={current.debug}
           onAnswer={(answers, files) =>
-            api.tasks.answer(task.id, answers, files).then(
-              () => true,
+            claudeGate({ taskId: task.id }, () => api.tasks.answer(task.id, answers, files)).then(
+              (sent) => sent !== null,
               (err: unknown) => {
                 report(err);
                 return false;
@@ -588,8 +601,8 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
             )
           }
           onFollowUp={(text, files) =>
-            api.tasks.followUp(task.id, text, files).then(
-              () => true,
+            claudeGate({ taskId: task.id }, () => api.tasks.followUp(task.id, text, files)).then(
+              (sent) => sent !== null,
               (err: unknown) => {
                 report(err);
                 return false;
@@ -597,11 +610,16 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
             )
           }
           onSaveCopy={() => api.tasks.saveCopy(task.id)}
-          onDecide={(decision) => api.tasks.decide(task.id, decision)}
+          onDecide={(decision) => claudeGate({ taskId: task.id }, () => api.tasks.decide(task.id, decision))}
           onRestore={(path) => api.files.restore(task.id, path)}
           onStop={() => void api.tasks.stop(task.id).catch(report)}
-          onResume={() => void api.tasks.resume(task.id).catch(report)}
-          onStartSaved={() => void api.tasks.startSaved(task.id, pick).then(addTask, report)}
+          onResume={() => void claudeGate({ taskId: task.id }, () => api.tasks.resume(task.id)).catch(report)}
+          onStartSaved={() =>
+            void claudeGate({ pick }, () => api.tasks.startSaved(task.id, pick)).then(
+              (started) => started && addTask(started),
+              report,
+            )
+          }
           modelPicker={modelPicker}
           projects={projects}
           allowNoProject={quickEdit}

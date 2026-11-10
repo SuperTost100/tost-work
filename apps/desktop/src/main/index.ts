@@ -21,9 +21,11 @@ import { languageFrom, translate } from "../shared/i18n";
 import type { AgentProvider, AiId } from "../shared/model";
 import { PROVIDER_OF } from "../shared/model";
 import { choiceOf } from "../shared/modelChoice";
+import { needsUnconfinedOk } from "../shared/sandbox";
 import { Accounts } from "./accounts";
 import { giveAgentsOwnHomes } from "./agentHomes";
 import { menuTemplate, nextTextSize, textMenuTemplate } from "./appMenu";
+import { type CodexHook, codexHookCheck } from "./codexHook";
 import { DebugLogs } from "./debugLog";
 import { documentTools } from "./documents";
 import { AgentEngine } from "./engine/agent";
@@ -42,14 +44,34 @@ import { ToolServer } from "./mcp/server";
 import { confirmsNotifications, Notifier } from "./notify";
 import { pickAi } from "./pickAi";
 import { WindowQuestions } from "./questions";
+import { checkSandbox, systemFor } from "./sandbox";
 import { SkillFolder } from "./skills";
 import { SkillVersions } from "./skillVersions";
 import { setStartupTask } from "./startupTask";
 import { Store } from "./store/store";
-import { opensWindow, panelBounds, staysInMenuBar, trayMenu } from "./tray";
+import { onSecondLaunch, opensWindow, panelBounds, type SecondLaunch, staysInMenuBar, trayMenu } from "./tray";
+import { UserError } from "./userError";
 import { buttonsPosition } from "./windowButtons";
 
 const isMac = process.platform === "darwin";
+
+// One copy of Tost Work at a time, since two would write to the same database. A second launch quits here, before
+// anything opens the database, and tells the running copy, which brings its window forward unless the login started
+// the second one. Electron ties the lock to the data folder, so a test run with its own --user-data-dir still starts
+// next to an installed copy.
+const launch: SecondLaunch = { atLogin: process.argv.includes(AT_LOGIN) };
+const firstCopy = app.requestSingleInstanceLock(launch);
+if (!firstCopy) app.exit(0);
+// Set once the app is ready. A second launch before then is remembered, and the window shows once the app can show it.
+let showForSecondLaunch: (() => void) | null = null;
+let secondLaunchWaiting = false;
+app.on(
+  "second-instance",
+  onSecondLaunch(() => {
+    if (showForSecondLaunch) showForSecondLaunch();
+    else secondLaunchWaiting = true;
+  }),
+);
 
 let mainWindow: BrowserWindow | null = null;
 // The menu-bar panel, once the icon has been clicked. Hidden rather than closed between clicks.
@@ -177,6 +199,8 @@ function createWindow(store: Store): BrowserWindow {
 }
 
 app.whenReady().then(async () => {
+  // This copy is quitting because another one runs.
+  if (!firstCopy) return;
   // Codex's Windows installer puts it where cli-funnel doesn't look, so it's pointed there before anything runs.
   findInstalledCodex();
   const store = new Store(join(app.getPath("userData"), "tost-work.db"));
@@ -188,6 +212,8 @@ app.whenReady().then(async () => {
   // Where people can see, back up and copy their skills, as the course teaches.
   // The Word, Excel, PowerPoint and PDF guides show among them as built in; earlier versions stay in the app's data.
   const documents = documentTools();
+  // The sandbox check looks for bubblewrap and socat on the PATH the CLIs get, which OfficeCLI's env sets.
+  const sandboxSystem = systemFor(documents?.env.PATH);
   const skills = new SkillFolder(
     join(app.getPath("documents"), "Tost Work", "Skills"),
     (path) => shell.trashItem(path),
@@ -229,9 +255,12 @@ app.whenReady().then(async () => {
   store.stopInterrupted(new Date().toISOString());
   // Before the window, so its background colour already follows the chosen theme.
   applyLook(null, store.getSettings());
-  // Codex and Claude Code read only what Tost Work gives them, not the user's own setup.
-  if (process.env.TOST_WORK_ENGINE !== "fake") giveAgentsOwnHomes(join(app.getPath("userData"), "agents"));
+  // Codex and Claude Code read only what Tost Work gives them, not the user's own setup. Codex's home also gets Tost
+  // Work's check before each step, which is checked in turn before each Codex task.
+  let codexHook: CodexHook | null = null;
+  if (process.env.TOST_WORK_ENGINE !== "fake") codexHook = giveAgentsOwnHomes(join(app.getPath("userData"), "agents"));
   const funnel = createFunnel();
+
   const language = () => store.getSettings().language ?? languageFrom(app.getLocale());
 
   // Tasks run on Codex or Claude Code. TOST_WORK_ENGINE=fake replays a script instead, for trying the interface without an account.
@@ -263,6 +292,8 @@ app.whenReady().then(async () => {
       },
       courseKey: () => keys.get(),
       online: () => net.isOnline(),
+      sandboxReady: (provider) => checkSandbox(provider, sandboxSystem),
+      codexHook: codexHookCheck(codexHook, () => funnel.providers.codex.detect()),
       skills: () => skills.list(),
       job: (id) => store.getJob(id),
       verbose: () => debugOn,
@@ -380,6 +411,12 @@ app.whenReady().then(async () => {
   // Off as well as on, so a removal that failed last time is tried again.
   applyLogin(atLogin);
 
+  // Claude on Windows runs without a sandbox, and no run starts on it before the user has read the notice that says so
+  // and pressed Continue. The window shows the notice before it starts a run; this refuses one that comes another way.
+  const refuseUnconfined = (provider: AgentProvider) => {
+    if (needsUnconfinedOk(provider, process.platform, store.getSettings().unconfinedAcknowledged))
+      throw new UserError("error.unconfinedNotOk");
+  };
   // shortcut: kept copies are never cleaned up; add a size limit or an age limit before the public beta.
   const guard = fileGuard(join(app.getPath("userData"), "kept"), (path) => shell.trashItem(path));
   const runner = new TaskRunner(
@@ -399,6 +436,7 @@ app.whenReady().then(async () => {
     },
     appLog,
     language,
+    (task) => refuseUnconfined(task.provider ?? "codex"),
   );
   // Set once the tray exists below; jobs and tasks changing before that have nothing to update.
   let trayChanged = () => {};
@@ -411,6 +449,9 @@ app.whenReady().then(async () => {
       const project = store.getProject(job.projectId);
       if (!project) throw new Error(translate(language(), "jobs.projectGone"));
       const { provider, auth, model, effort } = await runner.defaults();
+      // Nobody may be watching a job, so it doesn't run on an unconfined Claude before the user has said yes to the
+      // notice in the window: its run fails with the reason, and the next one runs once they have.
+      refuseUnconfined(provider);
       // The project may have been removed while the account was being read.
       if (!store.getProject(job.projectId)) throw new Error(translate(language(), "jobs.projectGone"));
       const day = new Intl.DateTimeFormat(language(), { day: "numeric", month: "short" }).format(at);
@@ -611,6 +652,7 @@ app.whenReady().then(async () => {
     debugLogs,
     askInWindow,
     events,
+    sandboxSystem,
   );
   // Quitting stops the tasks still working, so it asks first, in the window's card. They show as interrupted, with
   // Resume, next time. Quit again while the card is open only brings the window forward.
@@ -655,6 +697,8 @@ app.whenReady().then(async () => {
   const startedAtLogin = process.argv.includes(AT_LOGIN) || (isMac && app.getLoginItemSettings().wasOpenedAtLogin);
   if (opensWindow(startedAtLogin, store.getSettings())) mainWindow = createWindow(store);
   else if (isMac) void app.dock?.hide();
+  showForSecondLaunch = () => showWindow();
+  if (secondLaunchWaiting) showWindow();
   // Closing the window leaves Tost Work in the menu bar (the tray elsewhere), and a Mac drops its Dock icon until the
   // window comes back. Without that, Windows and Linux quit, and a Mac keeps the app in the Dock, as Mac apps do.
   mainClosed = () => {

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { EngineEvent, Task } from "../../shared/model";
 import { Store } from "../store/store";
-import { UserError } from "../userError";
+import { SandboxNotReady, UserError } from "../userError";
 import type { Engine, RunContext } from "./engine";
 import { FakeEngine, PROPOSAL_SCRIPT } from "./fake";
 import { decisionNote, FILES_ONLY, RESUME_PROMPT, TaskRunner, taskTitle, titleFrom, withFiles } from "./runner";
@@ -212,6 +212,238 @@ describe("TaskRunner when a run fails with a message for the user", () => {
       status: "failed",
       error: "Questa attività usava la chiave del corso, che non c'è più. Incollala di nuovo in Impostazioni.",
     });
+  });
+});
+
+describe("TaskRunner when the sandbox can't start", () => {
+  it("saves what's missing with the sentence, and clears it when the next run starts", async () => {
+    const store = new Store(":memory:");
+    const readiness = {
+      ready: false,
+      missing: ["socat" as const],
+      distro: { id: "ubuntu", like: ["debian"], name: "Ubuntu", version: "24.04" },
+      appArmorRestrictsUserns: true,
+    };
+    let fixed = false;
+    const engine: Engine = {
+      defaults: async () => ({ provider: "claude", model: "m", effort: "low" }),
+      choices: async () => ({ ai: "claude", provider: "claude", lists: [] }),
+      async *run() {
+        if (!fixed) throw new SandboxNotReady("claude", readiness);
+        yield { type: "message", text: "Done" };
+      },
+      answer: () => false,
+      decide: () => false,
+    };
+    const runner = new TaskRunner(
+      store,
+      engine,
+      () => {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      () => "it",
+    );
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
+    await runner.start(task.id);
+    expect(store.getTask(task.id)).toMatchObject({
+      status: "failed",
+      error: expect.stringMatching(/Claude non può ancora lavorare in sicurezza.*socat non è installato/),
+      sandboxNotReady: readiness,
+    });
+
+    fixed = true;
+    await runner.start(task.id, "Try again");
+    const after = store.getTask(task.id);
+    expect(after?.status).toBe("done");
+    expect(after).not.toHaveProperty("sandboxNotReady");
+  });
+
+  it("runs the task again with the prompt that didn't run, from the notice's Check and try again", async () => {
+    const store = new Store(":memory:");
+    const readiness = {
+      ready: false,
+      missing: ["socat" as const],
+      distro: { id: "ubuntu", like: ["debian"], name: "Ubuntu", version: "24.04" },
+      appArmorRestrictsUserns: null,
+    };
+    const prompts: (string | null)[] = [];
+    let fixed = false;
+    const engine: Engine = {
+      defaults: async () => ({ provider: "claude", model: "m", effort: "low" }),
+      choices: async () => ({ ai: "claude", provider: "claude", lists: [] }),
+      async *run({ followUp }) {
+        prompts.push(followUp);
+        if (!fixed) throw new SandboxNotReady("claude", readiness);
+        yield { type: "message", text: "Done" };
+      },
+      answer: () => false,
+      decide: () => false,
+    };
+    const runner = new TaskRunner(store, engine, () => {});
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
+    await runner.start(task.id);
+    expect(store.getTask(task.id)?.sandboxNotReady).toEqual(readiness);
+
+    // The first run failed before it reached the AI, so the brief runs: no follow-up prompt.
+    fixed = true;
+    runner.resume(task.id);
+    await waitFor(() => store.getTask(task.id)?.status === "done");
+    expect(prompts).toEqual([null, null]);
+
+    // A follow-up that failed on the sandbox runs again with the same instruction.
+    fixed = false;
+    runner.followUp(task.id, "Make it shorter");
+    await runner.start(task.id, "Make it shorter");
+    expect(store.getTask(task.id)).toMatchObject({ status: "failed", sandboxNotReady: readiness });
+    fixed = true;
+    runner.resume(task.id);
+    await waitFor(() => store.getTask(task.id)?.status === "done");
+    expect(prompts.slice(2)).toEqual(["Make it shorter", "Make it shorter"]);
+
+    // A task that failed for another reason can't be resumed this way.
+    store.saveTask({ ...(store.getTask(task.id) as Task), status: "failed", error: "Offline" });
+    expect(() => runner.resume(task.id)).toThrow(/Only a task stopped by closing/);
+  });
+});
+
+describe("TaskRunner when a task mustn't run yet", () => {
+  it("fails the run with the reason before the engine starts", async () => {
+    const store = new Store(":memory:");
+    const runs: string[] = [];
+    const engine: Engine = {
+      defaults: async () => ({ provider: "claude", model: "m", effort: "low" }),
+      choices: async () => ({ ai: "claude", provider: "claude", lists: [] }),
+      async *run({ task }) {
+        runs.push(task.id);
+        yield { type: "done" };
+      },
+      answer: () => false,
+      decide: () => false,
+    };
+    let allowed = false;
+    const runner = new TaskRunner(
+      store,
+      engine,
+      () => {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      (task) => {
+        if (task.provider === "claude" && !allowed) throw new UserError("error.unconfinedNotOk");
+      },
+    );
+    const task = runner.create({ projectId: null, brief: "Plan the week", workdir: "/w", provider: "claude" });
+    await runner.start(task.id);
+    expect(runs).toEqual([]);
+    expect(store.getTask(task.id)).toMatchObject({ status: "failed", error: expect.stringMatching(/didn't start/) });
+    allowed = true;
+    await runner.start(task.id, "Plan the week");
+    expect(runs).toEqual([task.id]);
+  });
+});
+
+describe("TaskRunner replaying a run the sandbox stopped", () => {
+  const readiness = {
+    ready: false,
+    missing: ["socat" as const],
+    distro: { id: "ubuntu", like: ["debian"], name: "Ubuntu", version: "24.04" },
+    appArmorRestrictsUserns: null,
+  };
+
+  /** An engine that runs each step in turn, and fails at the sandbox check while `blocked` is on. */
+  function blockable(steps: (() => EngineEvent[])[]) {
+    const state = { blocked: false };
+    const prompts: (string | null)[] = [];
+    const engine: Engine = {
+      defaults: async () => ({ provider: "claude", model: "m", effort: "low" }),
+      choices: async () => ({ ai: "claude", provider: "claude", lists: [] }),
+      async *run({ followUp }) {
+        prompts.push(followUp);
+        if (state.blocked) throw new SandboxNotReady("claude", readiness);
+        for (const e of steps.shift()?.() ?? []) yield e;
+        yield { type: "done" };
+      },
+      answer: () => false,
+      decide: () => false,
+    };
+    const store = new Store(":memory:");
+    const runner = new TaskRunner(store, engine, () => {}, undefined, {
+      keep: async (_t, path) => ({ path, copy: `/k${path}`, at: "", reason: "overwrite" }),
+      trash: async () => {},
+      restore: async () => {},
+    });
+    const task = runner.create({ projectId: null, brief: "Who pays the transport?", workdir: "/w" });
+    /** Fixes the sandbox, resumes, and gives the prompt the replayed run got. */
+    const resumeFixed = async () => {
+      expect(store.getTask(task.id)?.sandboxNotReady).toEqual(readiness);
+      state.blocked = false;
+      const before = prompts.length;
+      runner.resume(task.id);
+      await waitFor(() => prompts.length > before && !runner.isRunning(task.id));
+      expect(store.getTask(task.id)?.status).toBe("done");
+      expect(store.getTask(task.id)).not.toHaveProperty("sandboxRun");
+      return prompts.at(-1);
+    };
+    return { state, prompts, store, runner, task, resumeFixed };
+  }
+
+  it("replays the brief when the first run failed", async () => {
+    const { state, runner, task, resumeFixed } = blockable([]);
+    state.blocked = true;
+    await runner.start(task.id);
+    expect(await resumeFixed()).toBeNull();
+  });
+
+  it("replays a follow-up", async () => {
+    const { state, runner, task, resumeFixed } = blockable([() => [{ type: "message", text: "Done." }]]);
+    await runner.start(task.id);
+    state.blocked = true;
+    runner.followUp(task.id, "Make it shorter");
+    await runner.start(task.id, "Make it shorter");
+    expect(await resumeFixed()).toBe("Make it shorter");
+  });
+
+  it("replays the answer to a question, not the brief", async () => {
+    const { state, prompts, store, runner, task, resumeFixed } = blockable([asks]);
+    await runner.start(task.id);
+    state.blocked = true;
+    runner.answer(task.id, ["Client"]);
+    await waitFor(() => store.getTask(task.id)?.status === "failed");
+    const answer = 'My answer to your question "Which goal?": Client';
+    expect(prompts.at(-1)).toBe(answer);
+    expect(await resumeFixed()).toBe(answer);
+  });
+
+  it("replays a decision on an approval", async () => {
+    const approval = { id: "a1", action: "overwrite" as const, paths: ["/w/plan.xlsx"] };
+    const { state, prompts, store, runner, task, resumeFixed } = blockable([() => [{ type: "approval", approval }]]);
+    await runner.start(task.id);
+    state.blocked = true;
+    await runner.decide(task.id, "allow");
+    await waitFor(() => store.getTask(task.id)?.status === "failed");
+    const note = decisionNote(approval, "allow");
+    expect(prompts.at(-1)).toBe(note);
+    expect(await resumeFixed()).toBe(note);
+  });
+
+  it("replays the resume note of a task Tost Work closed on", async () => {
+    const { state, store, runner, task, resumeFixed } = blockable([]);
+    store.saveTask({
+      ...(store.getTask(task.id) as Task),
+      status: "stopped",
+      interrupted: true,
+      sessionId: "s1",
+    });
+    state.blocked = true;
+    runner.resume(task.id);
+    await waitFor(() => store.getTask(task.id)?.sandboxNotReady !== undefined && !runner.isRunning(task.id));
+    // Still stopped and resumable, with what the notice needs on it.
+    expect(store.getTask(task.id)).toMatchObject({ status: "stopped", interrupted: true });
+    expect(await resumeFixed()).toBe(RESUME_PROMPT);
   });
 });
 
