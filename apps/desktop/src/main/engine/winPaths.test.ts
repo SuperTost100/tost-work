@@ -8,6 +8,14 @@ vi.mock("node:path", async () => {
   return { ...actual.win32, default: actual.win32 };
 });
 
+// Links that lead nowhere, which Linux can't make under Windows paths: lstat finds them, realpath doesn't.
+const { DANGLING } = vi.hoisted(() => ({ DANGLING: new Set<string>() }));
+vi.mock("node:fs/promises", async () => {
+  const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+  const lstat = (path: string) => (DANGLING.has(path) ? Promise.resolve({}) : actual.lstat(path));
+  return { ...actual, lstat, default: { ...actual, lstat } };
+});
+
 const { inside } = await import("../files");
 const { asCodexRequest, outside } = await import("./agent");
 
@@ -30,6 +38,7 @@ describe("the task's folder on Windows paths", () => {
     for (const path of [
       "note.txt",
       "sub\\note.txt",
+      "new\\deeper\\note.txt",
       `${WORK}\\note.txt`,
       "c:\\USERS\\giulia\\documents\\corso\\note.txt",
       "C:/Users/Giulia/Documents/Corso/note.txt",
@@ -51,5 +60,17 @@ describe("the task's folder on Windows paths", () => {
       "C:\\Windows\\System32\\drivers\\etc\\hosts",
     ])
       expect(await outside(WORK, path), path).toBe(true);
+  });
+
+  it("refuses a write through a link or junction in the folder that leads nowhere", async () => {
+    DANGLING.add(`${WORK}\\link.txt`);
+    DANGLING.add(`${WORK}\\Shared`);
+    try {
+      expect(await outside(WORK, "link.txt")).toBe(true);
+      expect(await outside(WORK, "Shared\\note.txt")).toBe(true);
+      expect(await outside(WORK, "other.txt")).toBe(false);
+    } finally {
+      DANGLING.clear();
+    }
   });
 });
