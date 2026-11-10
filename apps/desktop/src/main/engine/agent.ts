@@ -799,8 +799,21 @@ export class AgentEngine implements Engine, ToolHandler {
     return END_TURN;
   }
 
+  /**
+   * Lists a file the agent made, changed or deleted. A file it says it made or changed that isn't there isn't listed:
+   * the agent named the wrong path, as when it counted on a cd from an earlier command. It hears so, and where a file
+   * of that name is at the top of the task's folder, but the choice of path stays with it.
+   */
   async reportFile(taskId: string, change: { path: string; kind: "add" | "update" | "delete" }): Promise<void> {
-    this.mustLive(taskId).channel.push({ type: "file", change: { ...change, role: "made" } });
+    const live = this.mustLive(taskId);
+    if (change.kind !== "delete" && !(await exists(change.path))) {
+      const top = join(live.workdir, basename(change.path));
+      const there = top !== change.path && (await exists(top));
+      throw new Error(
+        `There's no file at ${change.path}, so it isn't listed.${there ? ` There is one at ${top}.` : ""} A cd in one command doesn't carry over to the next. Check where the file is and report that path.`,
+      );
+    }
+    live.channel.push({ type: "file", change: { ...change, role: "made" } });
   }
 
   /** Makes a PDF next to an Office file in the task's folder, under a free name, and adds it to the task. */

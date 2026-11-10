@@ -358,9 +358,12 @@ describe("AgentEngine", () => {
 
   it("carries the Tost Work tools' questions, files and review into the task", async () => {
     const holder: { engine?: AgentEngine } = {};
+    // A reported file has to be there to be listed.
+    const made = join(await mkdtemp(join(tmpdir(), "tw-report-")), "a.docx");
+    await writeFile(made, "x");
     const { engine, seen, run } = setup(async () => {
       await holder.engine?.ask("t1", [{ text: "Which template?", options: ["A", "B"] }]);
-      await holder.engine?.reportFile("t1", { path: "/w/a.docx", kind: "add" });
+      await holder.engine?.reportFile("t1", { path: made, kind: "add" });
       await holder.engine?.review("t1", { asked: [{ text: "A proposal" }], decided: [], checkYourself: [] });
       return { text: "" };
     });
@@ -368,9 +371,47 @@ describe("AgentEngine", () => {
     await run();
     expect(seen.slice(0, 3)).toMatchObject([
       { type: "question", question: { text: "Which template?" } },
-      { type: "file", change: { path: "/w/a.docx", role: "made" } },
+      { type: "file", change: { path: made, role: "made" } },
       { type: "review", review: { asked: [{ text: "A proposal" }] } },
     ]);
+  });
+
+  it("doesn't list a reported file that isn't there, and says where a file of that name is", async () => {
+    const work = await realpath(await mkdtemp(join(tmpdir(), "tw-report-")));
+    await writeFile(join(work, "a.txt"), "x");
+    const errors: string[] = [];
+    const { funnel } = fakeFunnel(async () => {
+      const report = (path: string, kind: "add" | "update" | "delete") =>
+        engine.reportFile("t1", { path, kind }).catch((e: Error) => errors.push(e.message));
+      // Claude made a.txt at the top after a cd in an earlier command, and reports it under sub.
+      await report(join(work, "sub", "a.txt"), "add");
+      await report(join(work, "gone.docx"), "update");
+      // A deleted file isn't there, as expected.
+      await report(join(work, "old.txt"), "delete");
+      await report(join(work, "a.txt"), "add");
+      return { text: "" };
+    });
+    const engine = new AgentEngine(funnel, () => "en", PASSES);
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const seen: EngineEvent[] = [];
+    const signal = new AbortController().signal;
+    for await (const e of engine.run({
+      task: task({ workdir: work }),
+      project: null,
+      workdir: work,
+      followUp: null,
+      signal,
+    }))
+      seen.push(e);
+    expect(seen.flatMap((e) => (e.type === "file" ? [[e.change.path, e.change.kind]] : []))).toEqual([
+      [join(work, "old.txt"), "delete"],
+      [join(work, "a.txt"), "add"],
+    ]);
+    expect(errors).toHaveLength(2);
+    expect(errors[0]).toContain(`no file at ${join(work, "sub", "a.txt")}`);
+    expect(errors[0]).toContain(`There is one at ${join(work, "a.txt")}.`);
+    expect(errors[1]).toContain(`no file at ${join(work, "gone.docx")}`);
+    expect(errors[1]).not.toContain("There is one");
   });
 
   it("ends a stopped run as stopped, and a held file change hears that nobody allowed it", async () => {
