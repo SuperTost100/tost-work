@@ -266,6 +266,8 @@ app.whenReady().then(async () => {
   // Tasks run on Codex or Claude Code. TOST_WORK_ENGINE=fake replays a script instead, for trying the interface without an account.
   let engine: Engine;
   let tools: ToolServer | null = null;
+  // shortcut: kept copies are never cleaned up; add a size limit or an age limit before the public beta.
+  const guard = fileGuard(join(app.getPath("userData"), "kept"), (path) => shell.trashItem(path));
   if (process.env.TOST_WORK_ENGINE === "fake") {
     engine = new FakeEngine(undefined, undefined, join(app.getAppPath(), "resources", "fake"), (taskId) =>
       debugLogs.forTask(taskId),
@@ -298,6 +300,7 @@ app.whenReady().then(async () => {
       job: (id) => store.getJob(id),
       verbose: () => debugOn,
       taskLog: (taskId, secrets) => debugLogs.forTask(taskId, secrets),
+      copies: guard,
     });
     tools = new ToolServer(agent);
     await tools.start();
@@ -417,8 +420,6 @@ app.whenReady().then(async () => {
     if (needsUnconfinedOk(provider, process.platform, store.getSettings().unconfinedAcknowledged))
       throw new UserError("error.unconfinedNotOk");
   };
-  // shortcut: kept copies are never cleaned up; add a size limit or an age limit before the public beta.
-  const guard = fileGuard(join(app.getPath("userData"), "kept"), (path) => shell.trashItem(path));
   const runner = new TaskRunner(
     store,
     engine,

@@ -37,6 +37,16 @@ describe("instructionsFor", () => {
     expect(text).toContain("so put a cd in the same command as what depends on it");
   });
 
+  it("names the files the task made that the user saved since, and only when there are some", () => {
+    const text = instructionsFor(task, project, "it", null, undefined, [], null, "linux", [
+      "/Users/giulia/Proposte/Preventivo.txt",
+    ]);
+    expect(text).toContain("The user changed these files after your last turn.");
+    expect(text).toContain("call request_approval with action overwrite");
+    expect(text).toContain("- /Users/giulia/Proposte/Preventivo.txt");
+    expect(instructionsFor(task, project, "it")).not.toContain("The user changed these files");
+  });
+
   it("explains the quick edit's copies and lists the attachments", () => {
     const quick = { workdir: "/tmp/q", attachments: ["/tmp/q/letter.docx"] } as unknown as Task;
     const text = instructionsFor(quick, null, "en");

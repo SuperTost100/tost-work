@@ -1,9 +1,9 @@
 /** @vitest-environment node */
 import { mkdir, mkdtemp, realpath, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, sep } from "node:path";
+import { join, posix, sep, win32 } from "node:path";
 import { describe, expect, it } from "vitest";
-import { commandWrites, writtenPaths } from "./commands";
+import { commandWrites, FileNames, onlyReads, scriptsNamed, writtenPaths } from "./commands";
 
 /** The files a command writes, from /w, as the policy sees them before it looks at the disk. */
 const writes = (command: string, cwd = "/w") =>
@@ -232,5 +232,156 @@ describe("writtenPaths", () => {
     expect(await paths("cp $SRC docs")).toEqual([]);
     expect(await paths("cp a.txt new-folder/")).toEqual(["new-folder/a.txt"]);
     expect(await paths("printf x > *.nothing")).toEqual([]);
+  });
+});
+
+describe("commandWrites with a variable set to a path", () => {
+  const win = (command: string) => writes(command, "C:\\w");
+
+  it("follows a PowerShell variable to the file Set-Content, Out-File and > write", () => {
+    // The tester's command on Windows, as ChatGPT sent it.
+    const tester = [
+      "$p = '.\\Preventivo.txt'",
+      "$lines = Get-Content -LiteralPath $p",
+      "$lines[0] = 'Preventivo per Rossi'",
+      "Set-Content -LiteralPath $p -Value $lines -Encoding UTF8",
+    ].join("\n");
+    const cases: [string, string[]][] = [
+      [tester, ["C:\\w\\Preventivo.txt"]],
+      ["$p = 'a.txt'; Set-Content -Path $p -Value x", ["C:\\w\\a.txt"]],
+      // PowerShell ignores the case of a variable's name.
+      ["$P = 'a.txt'\nSet-Content $p x", ["C:\\w\\a.txt"]],
+      ["$p='b.txt'; 'x' > $p", ["C:\\w\\b.txt"]],
+      ["$out = \"$PWD\\c.txt\"; 'x' | Out-File -FilePath $out", ["C:\\w\\c.txt"]],
+      ["$dir = 'docs'; $p = \"$dir\\d.txt\"; Add-Content -Path $p -Value x", ["C:\\w\\docs\\d.txt"]],
+      // A variable assigned a command's result still has the command read for what it writes.
+      ["$r = Set-Content -Path e.txt -Value x -PassThru", ["C:\\w\\e.txt"]],
+    ];
+    for (const [command, expected] of cases) expect(win(command), command).toEqual(expected);
+  });
+
+  it("follows a POSIX shell variable, read as it is when it's set, from the folder of the command that writes", () => {
+    const cases: [string, string[]][] = [
+      ['out=x.txt; printf v > "$out"', ["/w/x.txt"]],
+      [`out='my notes.txt'\nprintf v > \${out}`, ["/w/my notes.txt"]],
+      ['dir=docs; out="$dir/x.txt"; printf v > "$out"', ["/w/docs/x.txt"]],
+      ["export out=x.txt; printf v > $out", ["/w/x.txt"]],
+      ['out=x.txt; cd sub && printf v > "$out"', ["/w/sub/x.txt"]],
+      [`/bin/bash -lc "out=x.txt; printf v | tee \\"\\$out\\""`, ["/w/x.txt"]],
+    ];
+    for (const [command, expected] of cases) expect(writes(command), command).toEqual(expected);
+  });
+
+  it("leaves out a variable whose value it can't know", () => {
+    for (const command of [
+      'out=$(mktemp); printf v > "$out"',
+      'out="$TMPDIR/x.txt"; printf v > "$out"',
+      // The shell reads $out before a variable set for one command applies.
+      'out=x.txt printf v > "$out"',
+    ])
+      expect(writes(command), command).toEqual([]);
+    for (const command of [
+      "$p = Join-Path $PWD 'x.txt'; Set-Content $p v",
+      "$p = 'a.txt'; $p = Get-Item b; Set-Content $p v",
+      "Set-Content $env:TEMP v",
+    ])
+      expect(win(command), command).toEqual([]);
+  });
+});
+
+describe("onlyReads", () => {
+  it("is true for a command that only prints what it reads", () => {
+    for (const command of [
+      "cat note.txt",
+      `/bin/zsh -lc "grep -n Rossi 'Preventivo.txt' | head -5"`,
+      "cd 'Clienti/Rossi' && wc -l Preventivo.txt",
+      "Get-Content -Raw .\\note.txt | Select-Object -First 3",
+      "$t = Get-Content -LiteralPath 'note.txt'",
+      `powershell.exe -Command "Get-Content -Raw 'note.txt'"`,
+      "officecli view report.docx outline",
+      "officecli get budget.xlsx /Sheet1/A1",
+    ])
+      expect(onlyReads(command, "/w"), command).toBe(true);
+  });
+
+  it("is false for anything that writes, or runs code or a script", () => {
+    for (const command of [
+      "cat note.txt > copy.txt",
+      `python3 -c "print(open('note.txt').read())"`,
+      "python3 - <<'PY'\nprint(open('note.txt').read())\nPY",
+      "officecli set report.docx /body/p[1] --prop text=x",
+      "sed -n 1p note.txt",
+      "bash go.sh",
+      "cat note.txt | xargs touch",
+      "Get-Content note.txt | ForEach-Object { $_ }",
+      "cat $(./make-name.sh)",
+    ])
+      expect(onlyReads(command, "/w"), command).toBe(false);
+  });
+});
+
+describe("scriptsNamed", () => {
+  it("finds the script files a command may run, quoted or not", () => {
+    expect(scriptsNamed("python3 fix.py")).toEqual(["fix.py"]);
+    expect(scriptsNamed(`/bin/zsh -lc "cd sub && node build.mjs --fast"`)).toEqual(["build.mjs"]);
+    expect(scriptsNamed(`bash "my script.sh" --x`)).toEqual(["my script.sh"]);
+    expect(scriptsNamed("& '.\\do it.ps1'")).toEqual([".\\do it.ps1"]);
+    expect(scriptsNamed("pwsh -File .\\x.ps1")).toEqual([".\\x.ps1"]);
+    expect(scriptsNamed("cat notes.txt; python3 -c 'print(1)'")).toEqual([]);
+  });
+});
+
+describe("FileNames", () => {
+  const index = (files: string[], paths = posix) => new FileNames(files, paths);
+
+  it("finds a file by its name, its path from the folder or its full path, quoted or in code", () => {
+    const files = ["/w/Preventivo.txt", "/w/Clienti/Rossi/Offerta 2026.docx", "/w/Città.txt"];
+    const named = (text: string) => index(files).named(text, "/w", "/w");
+    expect(named("cat Preventivo.txt")).toEqual(["/w/Preventivo.txt"]);
+    expect(named("python3 - <<'PY'\np = Path('/w/Preventivo.txt')\np.write_bytes(b'x')\nPY")).toEqual([
+      "/w/Preventivo.txt",
+    ]);
+    expect(named(`python3 -c "open('Clienti/Rossi/Offerta 2026.docx', 'rb')"`)).toEqual([
+      "/w/Clienti/Rossi/Offerta 2026.docx",
+    ]);
+    // An escaped space, as a POSIX shell writes it and as PowerShell does.
+    expect(named("cp Clienti/Rossi/Offerta\\ 2026.docx /tmp")).toEqual(["/w/Clienti/Rossi/Offerta 2026.docx"]);
+    expect(named("Copy-Item Offerta` 2026.docx x")).toEqual(["/w/Clienti/Rossi/Offerta 2026.docx"]);
+    // Whatever the case, and whatever the Unicode form.
+    expect(named("type PREVENTIVO.TXT")).toEqual(["/w/Preventivo.txt"]);
+    expect(named("cat 'Citta\u0300.txt'")).toEqual(["/w/Città.txt"]);
+    expect(named("ls")).toEqual([]);
+  });
+
+  it("doesn't take a name for part of a longer one", () => {
+    const named = (text: string) => index(["/w/a.txt"]).named(text, "/w", "/w");
+    for (const text of ["cat data.txt", "cat my-a.txt", "cat a.txt.bak", "cat a.txt2", "cat x.a.txt"])
+      expect(named(text), text).toEqual([]);
+    for (const text of ["cat a.txt", "print('a.txt.')", 'open("a.txt")', "x=./a.txt", "f(a.txt,b)"])
+      expect(named(text), text).toEqual(["/w/a.txt"]);
+  });
+
+  it("reads Windows paths", () => {
+    const files = ["C:\\w\\Preventivo.txt", "C:\\w\\Clienti\\Rossi\\Offerta.docx"];
+    const named = (text: string) => index(files, win32).named(text, "C:\\w", "C:\\w");
+    expect(named("Get-Content -LiteralPath '.\\Preventivo.txt'")).toEqual(["C:\\w\\Preventivo.txt"]);
+    expect(named("[IO.File]::ReadAllBytes('C:\\w\\Clienti\\Rossi\\Offerta.docx')")).toEqual([
+      "C:\\w\\Clienti\\Rossi\\Offerta.docx",
+    ]);
+  });
+
+  it("among files of one name, takes the ones the command points to, or all when it points to none", () => {
+    const top = "/w/Preventivo.docx";
+    const rossi = "/w/Clienti/Rossi/Preventivo.docx";
+    const bianchi = "/w/Clienti/Bianchi/Preventivo.docx";
+    const named = (files: string[], text: string, cwd = "/w") => index(files).named(text, "/w", cwd).sort();
+    const all = [top, rossi, bianchi];
+    // By its path, plus the one in the folder the command runs in, which the bare name may mean.
+    expect(named(all, "officecli view Clienti/Rossi/Preventivo.docx; python3 x.py")).toEqual([rossi, top].sort());
+    // By a folder the command names.
+    expect(named(all, `cd Clienti/Bianchi && python3 -c "open('Preventivo.docx')"`)).toEqual([bianchi, top].sort());
+    expect(named(all, "python3 -c \"open('Preventivo.docx')\"", "/w/Clienti/Rossi")).toEqual([rossi]);
+    // Nothing points to either: both.
+    expect(named([rossi, bianchi], "python3 -c \"open('Preventivo.docx')\"")).toEqual([bianchi, rossi]);
   });
 });

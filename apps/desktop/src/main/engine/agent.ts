@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { lstat, opendir, realpath, stat } from "node:fs/promises";
+import { lstat, opendir, readFile, realpath, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import type { ApprovalDecision, ApprovalRequest, Funnel } from "cli-funnel";
 import { translate, trashName } from "../../shared/i18n";
@@ -10,9 +10,11 @@ import type {
   EngineEvent,
   FileStamp,
   Job,
+  KeptCopy,
   KeyVendor,
   Review,
   Skill,
+  Task,
 } from "../../shared/model";
 import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
 import {
@@ -31,16 +33,19 @@ import { freeName, inside } from "../files";
 import type { HookAnswer, ToolHandler } from "../mcp/server";
 import { SandboxNotReady, UserError } from "../userError";
 import { activityOf, noteText } from "./activity";
-import { gateRequest, hookCall, opensShell } from "./codexGate";
+import { gateRequest, hookCall, opensShell, pathsFor } from "./codexGate";
 import {
   commandWrites,
+  FileNames,
   heredocs,
   MAX_DEPTH,
   namesOf,
+  onlyReads,
   parse,
   payloadOf,
   RUNS_NEXT,
   SHELLS,
+  scriptsNamed,
   UNWRAPS,
   type Word,
   writtenPaths,
@@ -116,30 +121,63 @@ const LISTING_MAX = 200_000;
 const OWN_MAX = 2_000;
 
 /**
+ * The biggest file Tost Work copies on its own before a command that names it. Documents, sheets, decks and PDFs are
+ * almost always smaller, and 50 MB copies in a fraction of a second on an SSD. A bigger file, such as a video or an
+ * archive, would hold the command up for seconds and fill the disk with a copy that is usually dropped, so the
+ * overwrite card asks about it instead.
+ */
+export const COPY_MAX = 50 * 1024 * 1024;
+/** The biggest script file in the task's folder whose text is read for the files it names. */
+const SCRIPT_MAX = 256 * 1024;
+
+/**
  * How a path is looked up in a listing: one form for the spellings a Mac or Windows disk takes as the same name,
  * whatever their case or Unicode form. A Linux disk tells those apart, and then two names count as one, so a new
  * file whose name differs only in case from an older one is taken as the older one and asks first.
  */
 const pathKey = (path: string) => path.normalize("NFC").toLowerCase();
 
+/** One entry of a folder listing: the path as the task names it, and for a file how it looked then. */
+interface Listed {
+  path: string;
+  /** The file's modification time and size; null for a folder, or a file that couldn't be read. */
+  stamp: FileStamp | null;
+}
+
+/** How many files a listing stamps at once. One at a time, 30,000 files take a second; 64 at a time, a third of it. */
+const STAMP_BATCH = 64;
+
 /**
  * Every file and folder in `folder` and its subfolders, by the `pathKey` of its real path, each with the path as the
- * task names it. Null when part of the folder can't be read, or it holds more than LISTING_MAX entries: then nothing
- * counts as made by the task from the listing.
+ * task names it and, for a file, its modification time and size. Null when part of the folder can't be read, it holds
+ * more than LISTING_MAX entries, or Stop comes first: then nothing counts as made by the task from the listing, and
+ * the check at the run's end lists no change. On an SSD (Linux, ext4) 30,000 files took 175 ms to list by name and
+ * 305 ms with their stamps.
  */
-async function listFolder(folder: string, log: TaskLog, signal?: AbortSignal): Promise<Map<string, string> | null> {
+async function listFolder(folder: string, log: TaskLog, signal?: AbortSignal): Promise<Map<string, Listed> | null> {
   try {
     const real = await realpath(folder);
-    const entries = new Map<string, string>();
+    const entries = new Map<string, Listed>();
+    const files: Listed[] = [];
     for await (const entry of await opendir(real, { recursive: true })) {
       // Stop ends a long listing, as on a network folder. No listing means every existing file asks.
       if (signal?.aborted) return null;
       const name = relative(real, join(entry.parentPath, entry.name));
-      entries.set(pathKey(join(real, name)), join(folder, name));
+      const listed: Listed = { path: join(folder, name), stamp: null };
+      entries.set(pathKey(join(real, name)), listed);
+      if (entry.isFile() || entry.isSymbolicLink()) files.push(listed);
       if (entries.size > LISTING_MAX) {
         log.write({ type: "listing.skipped", reason: "too many files", max: LISTING_MAX });
         return null;
       }
+    }
+    for (let at = 0; at < files.length; at += STAMP_BATCH) {
+      if (signal?.aborted) return null;
+      await Promise.all(
+        files.slice(at, at + STAMP_BATCH).map(async (listed) => {
+          listed.stamp = await stampOf(listed.path);
+        }),
+      );
     }
     return entries;
   } catch (err) {
@@ -173,12 +211,16 @@ const sameOwned = (a: Owned, b: Owned) =>
  * on, so changing it asks and keeps a copy like any file that was there before. Comparing with what the app saw, and
  * not with a clock, keeps a wrong clock from hiding a save, and catches a save that leaves the size as it was. A file
  * a cloud folder (OneDrive, Dropbox, iCloud) syncs can get a new modification time without the user touching it: it
- * asks again, which is the safe side.
+ * asks again, which is the safe side. `saved` lists the files the user saved since, which are still there, so the AI
+ * can be told they're the user's again.
  * shortcut: a file saved by a build before `ownSeen` existed has nothing to compare with, so it stays the task's own,
  * even if it's gone, until this run's end records it; drop this once no saved task lacks `ownSeen`.
  */
-async function stillOwn(paths: string[], seen: Record<string, FileStamp> | undefined): Promise<Owned> {
-  const own: Owned = { paths: [], seen: {} };
+async function stillOwn(
+  paths: string[],
+  seen: Record<string, FileStamp> | undefined,
+): Promise<Owned & { saved: string[] }> {
+  const own: Owned & { saved: string[] } = { paths: [], seen: {}, saved: [] };
   for (const path of paths) {
     const before = seen?.[path];
     if (!before) {
@@ -187,6 +229,7 @@ async function stillOwn(paths: string[], seen: Record<string, FileStamp> | undef
     }
     const now = await stampOf(path);
     // Gone, or saved by the user since: not the task's own.
+    if (now && !sameStamp(before, now)) own.saved.push(path);
     if (!now || !sameStamp(before, now)) continue;
     own.paths.push(path);
     own.seen[path] = before;
@@ -298,6 +341,22 @@ export interface DocumentTools {
 /** The parts of cli-funnel the engine uses, so tests can stand in for Codex and Claude Code. */
 export type AgentFunnel = Pick<Funnel, "stream" | "models">;
 
+/** Where the engine keeps a copy of a user's file before a command that names it: the guard's folder of kept copies. */
+export interface Copies {
+  keep(task: Task, path: string, reason: KeptCopy["reason"]): Promise<KeptCopy>;
+  /** Removes a copy that turned out not to be needed. */
+  drop(copy: KeptCopy): Promise<void>;
+}
+
+/** A copy kept before a command that named a user's file, until the run shows whether the file changed. */
+interface Provisional {
+  copy: KeptCopy;
+  /** How the file looked when it was copied. */
+  stamp: FileStamp;
+  /** The commands that named it and haven't ended yet, by call id. */
+  running: Set<string>;
+}
+
 /** The tool server's session calls, so the engine can open one per run. */
 export interface ToolSessions {
   open(taskId: string): { url: string; token: string };
@@ -349,8 +408,19 @@ interface Live {
   made: Set<string>;
   /** Files Tost Work knows this task made, in this run or an earlier one. They're saved on the task when the run ends. */
   own: Set<string>;
+  task: Task;
   /** The folder as it was when the run started, from `listFolder`. A file that isn't in it was made by this run. */
-  before: Map<string, string> | null;
+  before: Map<string, Listed> | null;
+  /** The user's files when the run started, by name: every file in `before` that wasn't the task's own. */
+  theirs: FileNames | null;
+  /** Copies kept before commands that named a user's file, by path, until the file changes or the run ends. */
+  provisional: Map<string, Provisional>;
+  /** The files the task owned when the run started. */
+  startOwn: Set<string>;
+  /** Files the user let the task delete in this run, which Tost Work moved to the Trash. */
+  trashed: Set<string>;
+  /** The work on `provisional`, one piece at a time, since commands can be checked and end side by side. */
+  queue: Promise<void>;
   /** Approvals a step is waiting on, by id. */
   pending: Set<string>;
   /** Codex's steps that its hook allowed, by call id: each command and file change it starts must be one. */
@@ -522,6 +592,7 @@ export class AgentEngine implements Engine, ToolHandler {
   private sandboxReady: (provider: AgentProvider) => Promise<SandboxReadiness>;
   private codexHook: (workdir: string) => Promise<void>;
   private claudeFolder: (workdir: string) => Promise<void>;
+  private copies: Copies | null;
 
   constructor(
     private funnel: AgentFunnel,
@@ -560,6 +631,11 @@ export class AgentEngine implements Engine, ToolHandler {
        * checked before each Claude run. checkClaudeFolder when not given.
        */
       claudeFolder?: (workdir: string) => Promise<void>;
+      /**
+       * Keeps a copy of a user's file before a command names it in a way the policy can't read, and drops the copy
+       * when the file didn't change. Without it no such copy is kept, and only the card protects the user's files.
+       */
+      copies?: Copies | null;
     } = {},
   ) {
     this.documents = options.documents ?? null;
@@ -580,6 +656,7 @@ export class AgentEngine implements Engine, ToolHandler {
         throw new UserError("error.codexHookOff", { detail: "no check was given" });
       });
     this.claudeFolder = options.claudeFolder ?? ((workdir) => checkClaudeFolder(workdir));
+    this.copies = options.copies ?? null;
   }
 
   /** Why the task can't reach its AI, in the user's language. */
@@ -725,10 +802,32 @@ export class AgentEngine implements Engine, ToolHandler {
       ...(task.sessionId ? { sessionId: task.sessionId } : {}),
       followUp: followUp !== null,
     });
-    // The folder as it is before the CLI starts, so no file the run makes is in it. On an SSD a folder of 25,000 files
-    // takes about 50 ms to list; a network folder takes longer, and the run starts that much later.
+    // The folder as it is before the CLI starts, so no file the run makes is in it, with how each file looked, for the
+    // check at the run's end. A network folder takes longer to list, and the run starts that much later.
     const before = await listFolder(workdir, log, signal);
-    const live: Live = { channel, signal, workdir, made, own, before, pending: new Set(), allowed: new Set(), log };
+    const theirs =
+      before &&
+      new FileNames(
+        [...before.values()].filter((l) => l.stamp && !own.has(l.path)).map((l) => l.path),
+        pathsFor(workdir),
+      );
+    const live: Live = {
+      channel,
+      signal,
+      workdir,
+      task,
+      made,
+      own,
+      before,
+      theirs,
+      startOwn: new Set(own),
+      provisional: new Map(),
+      trashed: new Set(),
+      queue: Promise.resolve(),
+      pending: new Set(),
+      allowed: new Set(),
+      log,
+    };
     this.live.set(task.id, live);
     // What the task owns is saved on the task as it is: files the user saved since the last run are no longer in it.
     let recorded: Owned = { paths: task.own ?? [], seen: task.ownSeen ?? {} };
@@ -774,6 +873,8 @@ export class AgentEngine implements Engine, ToolHandler {
         this.user(),
         skills,
         task.jobId ? (this.job(task.jobId) ?? null) : null,
+        this.platform,
+        earlier.saved,
       ),
       env,
       ...(apiKey ? { apiKey } : {}),
@@ -816,8 +917,14 @@ export class AgentEngine implements Engine, ToolHandler {
     let said = "";
     // Set when Codex started a step its hook never allowed: the hook isn't running, so the task stops.
     let unchecked: string | null = null;
-    // The files the task owns go on the task before the run ends, however it ends, and only when they changed.
-    const recordOwn = async () => record(await this.ownAtEnd(live));
+    // However the run ends: the copies kept before commands are settled, the user's files that changed unseen are
+    // listed, and the files the task owns go on the task, only when they changed.
+    const wrapUp = async () => {
+      await this.serial(live, () => this.settleAll(live));
+      const after = live.before && (await listFolder(live.workdir, live.log, live.signal));
+      this.unseen(live, after);
+      record(await this.ownAtEnd(live, after));
+    };
     const pump = (async () => {
       try {
         for await (const event of stream) {
@@ -852,11 +959,11 @@ export class AgentEngine implements Engine, ToolHandler {
               live.own.delete(path);
             } else made.add(path);
             channel.push({ type: "file", change: { path, kind: event.kind, role: "made" } });
-          }
+          } else if (event.type === "tool.end") await this.serial(live, () => this.settle(live, event.id));
         }
         const result = await stream.result;
         log.write({ type: "run.end", finishReason: result.finishReason, deniedActions: result.deniedActions });
-        await recordOwn();
+        await wrapUp();
         if (unchecked) channel.push({ type: "failed", error: translate(this.language(), "error.codexUnchecked") });
         else if (result.finishReason === "cancelled") channel.push({ type: "stopped" });
         else {
@@ -864,7 +971,7 @@ export class AgentEngine implements Engine, ToolHandler {
           channel.push({ type: "done" });
         }
       } catch (err) {
-        await recordOwn();
+        await wrapUp();
         if (unchecked) channel.push({ type: "failed", error: translate(this.language(), "error.codexUnchecked") });
         else if (signal.aborted) channel.push({ type: "stopped" });
         else {
@@ -1050,7 +1157,13 @@ export class AgentEngine implements Engine, ToolHandler {
           message:
             "This command leaves a shell or an interpreter waiting for typed input, which Tost Work can't check. Run a script by its path (python3 convert.py, bash build.sh), or pass the code with -c (python3 -c '…', bash -c '…'), in this one call.",
         };
-      return this.commandOverwrites(taskId, live, command, typeof input.cwd === "string" ? input.cwd : null);
+      return this.commandOverwrites(
+        taskId,
+        live,
+        request.id,
+        command,
+        typeof input.cwd === "string" ? input.cwd : null,
+      );
     }
     if (request.tool !== "file_change") return "allow";
 
@@ -1080,6 +1193,7 @@ export class AgentEngine implements Engine, ToolHandler {
     }
     if (deletes.length) {
       const decided = await this.askApproval(taskId, "delete", deletes);
+      if (decided === "allow") for (const path of deletes) live.trashed.add(path);
       return {
         decision: "deny",
         message:
@@ -1096,11 +1210,13 @@ export class AgentEngine implements Engine, ToolHandler {
    * already in the task's folder. It runs only once the user allows it, after the copy is kept. The files it writes
    * that weren't there yet count as made by the task. Files outside the folder are left to the sandbox. `cwd` is the
    * folder Codex's hook names; Claude Code's requests name none, and each of its commands starts in the task's folder
-   * (see the run's env).
+   * (see the run's env). Any other user's file the command names gets a copy before it runs (`copyNamed`), and one too
+   * big to copy goes on the card too.
    */
   private async commandOverwrites(
     taskId: string,
     live: Live,
+    id: string,
     command: string,
     cwd: string | null,
   ): Promise<ApprovalDecision> {
@@ -1117,10 +1233,193 @@ export class AgentEngine implements Engine, ToolHandler {
       if (!entry) added.push(path);
       else if (entry.isFile() && !(await this.mayChange(live, path))) overwrites.push(path);
     }
-    const decision = await this.overwrite(taskId, live, overwrites);
-    if (!allows(decision)) return decision;
+    const named = await this.copyNamed(live, id, command, from, overwrites);
+    const decision = await this.overwrite(taskId, live, [...overwrites, ...named.ask]);
+    if (!allows(decision)) {
+      await this.serial(live, () => this.dropUnused(live, id, named.copied));
+      return decision;
+    }
     for (const path of added) live.made.add(path);
     return decision;
+  }
+
+  /** Runs work on the run's copies after whatever work on them came first. */
+  private serial<T>(live: Live, work: () => Promise<T>): Promise<T> {
+    const done = live.queue.then(work);
+    // The next piece waits for this one however it ends; this one's failure reaches its own caller.
+    live.queue = done.then(
+      () => undefined,
+      () => undefined,
+    );
+    return done;
+  }
+
+  /**
+   * Keeps a copy of each user's file a command names, before it runs, when the policy can't tell what the command does
+   * with it: code for an interpreter, a script, a path in a variable. A file is named by its name, its path from the
+   * folder or its full path, anywhere in the command or in a small script in the folder that the command names. A
+   * command that only reads (cat, grep, Get-Content, `officecli view`) needs no copy, and neither do files the card
+   * already covers (`skip`), files the task may change, or a file that has its copy in this run already: one copy per
+   * file per run, however many commands name it. A file bigger than COPY_MAX, or one that can't be copied, goes on the
+   * card instead (`ask`). `copied` are the copies made for this command.
+   * shortcut: a name the command builds (`'Preventivo' + '.txt'`, a loop over the folder) isn't found here; the check
+   * at the run's end lists such a change, without an earlier version.
+   */
+  private async copyNamed(
+    live: Live,
+    id: string,
+    command: string,
+    cwd: string,
+    skip: string[],
+  ): Promise<{ ask: string[]; copied: string[] }> {
+    const none = { ask: [], copied: [] };
+    const { theirs } = live;
+    if (!this.copies || !theirs || onlyReads(command, cwd)) return none;
+    const text = [command, ...(await this.scriptsIn(live, command, cwd))].join("\n");
+    const named = theirs.named(text, live.workdir, cwd).filter((path) => !skip.includes(path));
+    if (!named.length) return none;
+    const copies = this.copies;
+    return this.serial(live, async () => {
+      const ask: string[] = [];
+      const copied: string[] = [];
+      for (const path of named) {
+        if (live.made.has(path)) continue;
+        const kept = live.provisional.get(path);
+        if (kept) {
+          // A file that changed since its copy, by a step that didn't name it, keeps that copy as its earlier version.
+          if (!(await this.settled(live, path, kept, false))) kept.running.add(id);
+          continue;
+        }
+        const entry = await stat(path).catch((err: NodeJS.ErrnoException) => {
+          if (err.code === "ENOENT" || err.code === "ENOTDIR") return null;
+          throw err;
+        });
+        if (!entry?.isFile()) continue;
+        if (entry.size > COPY_MAX) {
+          ask.push(path);
+          continue;
+        }
+        try {
+          const copy = await copies.keep(live.task, path, "overwrite");
+          const stamp = { mtimeMs: entry.mtimeMs, size: entry.size };
+          live.provisional.set(path, { copy, stamp, running: new Set([id]) });
+          copied.push(path);
+        } catch (err) {
+          // Gone meanwhile: nothing to keep. Any other failure leaves the file to the card, where the user decides.
+          if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
+          live.log.write({ type: "copy.failed", path, message: err instanceof Error ? err.message : String(err) });
+          ask.push(path);
+        }
+      }
+      return { ask, copied };
+    });
+  }
+
+  /** The text of the scripts a command names that are in the task's folder and small enough to read. */
+  private async scriptsIn(live: Live, command: string, cwd: string): Promise<string[]> {
+    const texts: string[] = [];
+    const paths = pathsFor(cwd);
+    // shortcut: the first 10 scripts a command names are read; a command that names more is rare enough to leave.
+    for (const name of scriptsNamed(command).slice(0, 10)) {
+      const path = paths.resolve(cwd, name);
+      if (await outside(live.workdir, path)) continue;
+      const entry = await stat(path).catch(() => null);
+      if (!entry?.isFile() || entry.size > SCRIPT_MAX) continue;
+      // A script that can't be read is left out: what it changes, the check at the run's end lists.
+      const text = await readFile(path, "utf8").catch(() => null);
+      if (text !== null) texts.push(text);
+    }
+    return texts;
+  }
+
+  /** Drops the copies made for a command the user didn't let run, unless another command still counts on them. */
+  private async dropUnused(live: Live, id: string, paths: string[]): Promise<void> {
+    for (const path of paths) {
+      const kept = live.provisional.get(path);
+      if (!kept) continue;
+      kept.running.delete(id);
+      if (kept.running.size) continue;
+      live.provisional.delete(path);
+      await this.drop(live, kept.copy);
+    }
+  }
+
+  private async drop(live: Live, copy: KeptCopy): Promise<void> {
+    // A copy that can't be removed only takes space: the run goes on, and the log says so.
+    await this.copies?.drop(copy).catch((err: unknown) => {
+      live.log.write({
+        type: "copy.drop-failed",
+        copy: copy.copy,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    });
+  }
+
+  /**
+   * Whether a copied file changed since its copy was kept. One that changed or is gone keeps the copy as its earlier
+   * version and is listed as changed or deleted by the task, exactly as after an allowed card, and the task may change
+   * it again in this run without another copy. At the run's end (`ending`) the copy of a file that didn't change is
+   * dropped; before that it stays, for the next command that names the file.
+   */
+  private async settled(live: Live, path: string, kept: Provisional, ending: boolean): Promise<boolean> {
+    const now = await stampOf(path);
+    if (now && sameStamp(now, kept.stamp)) {
+      if (ending) {
+        live.provisional.delete(path);
+        await this.drop(live, kept.copy);
+      }
+      return false;
+    }
+    live.provisional.delete(path);
+    const gone = !(await lstat(path).catch((err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") return null;
+      throw err;
+    }));
+    // Like a file the user let the task replace: the copy covers it for the rest of the run, even once it's gone.
+    live.made.add(path);
+    live.channel.push({ type: "kept", copy: kept.copy, kind: gone ? "delete" : "update" });
+    return true;
+  }
+
+  /** A command ended: each file it named, and no other running command still names, is compared with its copy. */
+  private async settle(live: Live, id: string): Promise<void> {
+    for (const [path, kept] of [...live.provisional])
+      if (kept.running.delete(id) && !kept.running.size) await this.settleOne(live, path, kept, false);
+  }
+
+  /** At the run's end, every copy still held is compared with its file, whether or not its command's end came. */
+  private async settleAll(live: Live): Promise<void> {
+    for (const [path, kept] of [...live.provisional]) await this.settleOne(live, path, kept, true);
+  }
+
+  private async settleOne(live: Live, path: string, kept: Provisional, ending: boolean): Promise<void> {
+    try {
+      await this.settled(live, path, kept, ending);
+    } catch (err) {
+      // A file that can't be looked at doesn't fail the run: its copy stays in the kept folder, unlisted, and the log
+      // says so.
+      live.log.write({ type: "copy.settle-failed", path, message: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  /**
+   * Lists the user's files that changed or went during the run with neither a card nor a copy: a script that walked
+   * the folder, or code that built a file's name. There's no earlier version to give back, but the user sees what
+   * changed. Needs both listings, so a run with too many files, or one that Stop ended, lists none.
+   */
+  private unseen(live: Live, after: Map<string, Listed> | null): void {
+    if (!live.before || !after) return;
+    for (const [key, was] of live.before) {
+      const { path, stamp } = was;
+      if (!stamp || live.startOwn.has(path) || live.made.has(path) || live.trashed.has(path)) continue;
+      const now = after.get(key);
+      if (now?.stamp && sameStamp(stamp, now.stamp)) continue;
+      live.channel.push({
+        type: "file",
+        change: { path, kind: now ? "update" : "delete", role: "made" },
+        unkept: true,
+      });
+    }
   }
 
   /**
@@ -1147,11 +1446,10 @@ export class AgentEngine implements Engine, ToolHandler {
    * first two count. Each comes with how it looks now, which the next run compares with, so a change the task made in
    * this run isn't taken for the user's.
    */
-  private async ownAtEnd(live: Live): Promise<Owned> {
+  private async ownAtEnd(live: Live, after: Map<string, Listed> | null): Promise<Owned> {
     const { before } = live;
-    const after = before && (await listFolder(live.workdir, live.log, live.signal));
     const found = new Set(live.own);
-    if (before && after) for (const [key, path] of after) if (!before.has(key)) found.add(path);
+    if (before && after) for (const [key, { path }] of after) if (!before.has(key)) found.add(path);
     const own: Owned = { paths: [], seen: {} };
     for (const path of found) {
       if (own.paths.length >= OWN_MAX) break;

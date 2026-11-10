@@ -199,6 +199,11 @@ export interface Task {
    * kept.
    */
   ownSeen?: Record<string, FileStamp>;
+  /**
+   * Files of the user's the task changed or deleted in a way Tost Work couldn't see coming, so it kept no earlier
+   * version of them. Missing when there are none.
+   */
+  unkept?: string[];
   /** Stopped because Tost Work closed while the task was working, not by the user. Resume carries on. */
   interrupted?: boolean;
   /** The skills the agent read, by folder name, in any run. Built-in guides count too. */
@@ -238,7 +243,16 @@ export type EngineEvent =
   | { type: "message"; text: string }
   /** Words of the agent's answer as it writes them, shown live and never saved: the whole answer comes as a message. */
   | { type: "text"; text: string }
-  | { type: "file"; change: FileChange }
+  /**
+   * `unkept` marks a file of the user's that changed or went during the run in a way Tost Work couldn't see coming, so
+   * no earlier version was kept. It's listed as changed or deleted, never as made.
+   */
+  | { type: "file"; change: FileChange; unkept?: boolean }
+  /**
+   * A copy Tost Work kept of a user's file before a command that named it, now that the command changed or removed the
+   * file: it becomes the file's earlier version, as an allowed card's copy does.
+   */
+  | { type: "kept"; copy: KeptCopy; kind: "update" | "delete" }
   /** Every file Tost Work knows the task made, with how each looked, as a run starts and ends: they replace the task's `own`. */
   | { type: "own"; paths: string[]; seen: Record<string, FileStamp> }
   | { type: "question"; question: Question }

@@ -38,17 +38,20 @@ import { WorkingDots } from "../components/TaskTag";
 
 /**
  * A file the task made or changed. For a file it replaced, the line under the name says a copy is kept, and the row's
- * button puts it back, or undoes that.
+ * button puts it back, or undoes that. For a file of the user's that changed in a way Tost Work couldn't see coming
+ * (`unkept`), the line says there's no earlier version.
  */
 function MadeFile({
   task,
   path,
+  unkept,
   onRestore,
   onOpen,
   onSelect,
 }: {
   task: TaskT;
   path: string;
+  unkept?: boolean;
   onRestore: (path: string) => Promise<unknown>;
   onOpen?: () => void;
   onSelect?: () => void;
@@ -57,7 +60,8 @@ function MadeFile({
   const [error, setError] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
   const copies = (task.kept ?? []).filter((k) => k.path === path);
-  if (copies.length === 0) return <FileLine path={path} onOpen={onOpen} onSelect={onSelect} />;
+  if (copies.length === 0)
+    return <FileLine path={path} onOpen={onOpen} onSelect={onSelect} sub={unkept ? t("kept.none") : undefined} />;
   // Each restore swaps the file with its last kept copy, so an odd number of restores since the agent's last
   // overwrite means the older version is in place.
   const sinceOverwrite = copies.length - 1 - copies.map((k) => k.reason).lastIndexOf("overwrite");
@@ -158,6 +162,7 @@ function WhatChanged({
             key={f.path}
             task={task}
             path={f.path}
+            unkept={task.unkept?.includes(f.path)}
             onRestore={onRestore}
             onOpen={() => void api.files.open(task.id, f.path).catch(onError)}
           />
@@ -1393,6 +1398,7 @@ export function Task({
                       key={f.path}
                       task={task}
                       path={f.path}
+                      unkept={task.unkept?.includes(f.path)}
                       onRestore={onRestore}
                       onSelect={f.kind === "delete" ? undefined : () => showFile(f.path)}
                     />

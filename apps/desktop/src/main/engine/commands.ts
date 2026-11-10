@@ -147,6 +147,12 @@ export function parse(script: string): { commands: Word[][]; substitutions: stri
       w.quotes.push([i, j + 1]);
       for (const m of script.slice(i + 1, j).matchAll(SUBSTITUTION)) substitutions.push(m[1] ?? m[2] ?? "");
       i = j + 1;
+    } else if (c === "$" && next === "{") {
+      // ${name}, a variable, whose braces don't end the command.
+      const end = script.indexOf("}", i + 2);
+      const close = end < 0 ? script.length : end;
+      bare(script.slice(i, close + 1));
+      i = close + 1;
     } else if (c === "$" && next === "(") {
       const end = closing(script, i + 1);
       substitutions.push(script.slice(i + 2, end));
@@ -195,6 +201,21 @@ export function parse(script: string): { commands: Word[][]; substitutions: stri
   }
   endCommand();
   return { commands, substitutions };
+}
+
+/** A PowerShell variable as a word of its own, such as the $p of `$p = 'x.txt'`. */
+const PS_VARIABLE = /^\$([A-Za-z_]\w*)$/;
+
+/**
+ * Where a command's program is: after the variables set for it (out=x cmd), and after a PowerShell variable it's
+ * assigned to ($text = Get-Content x). -1 when the command only sets variables.
+ */
+function programAt(words: Word[]): number {
+  const first = words.findIndex((w) => !(w.bare && /^[A-Za-z_]\w*=/.test(w.text)));
+  if (first < 0) return -1;
+  const assigned = PS_VARIABLE.test(words[first]?.text ?? "") && words[first + 1]?.text === "=";
+  if (!assigned) return first;
+  return first + 2 < words.length ? first + 2 : -1;
 }
 
 /**
@@ -495,23 +516,60 @@ const DOTNET_WRITES =
 /** .NET's Copy, Move and Replace, whose second literal path is the file written. */
 const DOTNET_COPIES = /\[(?:System\.)?IO\.File\]::(?:Copy|Move|Replace)\(\s*(['"])(?:.*?)\1\s*,\s*(['"])(.*?)\2/gi;
 
+/** A variable in a word: $name or ${name}, but not $PWD, which `resolve` reads as the folder, or PowerShell's $env:X. */
+const VARIABLE = /\$\{([A-Za-z_]\w*)\}|\$([A-Za-z_]\w*)(?![\w:])/g;
+
+/**
+ * The variable a command sets to one literal value: out=x.txt in a POSIX shell (also after export, local and
+ * readonly), and $p = 'x.txt' or $p='x.txt' in PowerShell. Null for any other command, and for a value that comes
+ * from a command (`$p = Join-Path …`), whose variable then holds nothing known.
+ */
+function assignment(words: Word[]): { name: string; value: string | null; ps: boolean } | null {
+  const [first, second, third] = words;
+  if (!first) return null;
+  const ps = PS_VARIABLE.exec(first.text);
+  if (ps?.[1] && second?.text === "=" && second.bare)
+    return { name: ps[1], value: words.length === 3 && third ? third.text : null, ps: true };
+  const joined = /^\$([A-Za-z_]\w*)=([\s\S]*)$/.exec(first.text);
+  if (joined?.[1] && first.bare && words.length === 1) return { name: joined[1], value: joined[2] ?? "", ps: true };
+  const rest = /^(export|local|readonly)$/.test(first.text) && first.bare ? words.slice(1) : words;
+  const [only] = rest;
+  const posix = only && rest.length === 1 && only.bare ? /^([A-Za-z_]\w*)=([\s\S]*)$/.exec(only.text) : null;
+  return posix?.[1] ? { name: posix[1], value: posix[2] ?? "", ps: false } : null;
+}
+
 /** Collects the files the commands of one script write, as the script runs from folder to folder. */
 class Writes {
   targets: WriteTarget[] = [];
+  /** Variables the script set to a literal value, by name; PowerShell's in lowercase, since it ignores case. */
+  private vars = new Map<string, string | null>();
+  private psVars = new Map<string, string | null>();
 
   constructor(
     private paths: PlatformPath,
     private home: string,
   ) {}
 
+  /** A word with the variables the script set put in. One that holds nothing known is left as it is. */
+  private expand(word: string): string {
+    return word.replace(VARIABLE, (whole, braced?: string, plain?: string) => {
+      const name = braced ?? plain ?? "";
+      if (name === "PWD") return whole;
+      const value = this.psVars.has(name.toLowerCase()) ? this.psVars.get(name.toLowerCase()) : this.vars.get(name);
+      return value ?? whole;
+    });
+  }
+
   /**
-   * A word's path from `cwd`, or null when it can't be known (a variable or a command's output in it, or a relative
-   * path from an unknown folder) or names no file: standard output, /dev/null, NUL.
+   * A word's path from `cwd`, or null when it can't be known (a variable the script didn't set to a literal path, a
+   * command's output in it, or a relative path from an unknown folder) or names no file: standard output, /dev/null,
+   * NUL.
    */
   private resolve(word: string, cwd: string | null): string | null {
     // $PWD, in bash and PowerShell, is the folder the command runs in.
     const pwd = /^\$PWD(?=$|[\\/])/;
-    const text = cwd !== null && pwd.test(word) ? word.replace(pwd, cwd) : word;
+    const expanded = this.expand(word);
+    const text = cwd !== null && pwd.test(expanded) ? expanded.replace(pwd, cwd) : expanded;
     if (!text || text === "-" || /[$`]/.test(text) || /^(nul|con)(:|$)|^\/dev\//i.test(text)) return null;
     const path = /^~($|[\\/])/.test(text) ? this.home + text.slice(1) : text;
     if (this.paths.isAbsolute(path)) return this.paths.resolve(path);
@@ -559,7 +617,13 @@ class Writes {
   private command(all: Word[], depth: number, cwd: string | null): string | null {
     for (const word of all) if (word.redirect === "out") this.add({ word }, cwd);
     const words = all.filter((w) => !w.redirect);
-    const first = words.findIndex((w) => !(w.bare && /^[A-Za-z_]\w*=/.test(w.text)));
+    const set = assignment(words);
+    // The value is read when it's set, with the variables it names as they are then. One that holds a variable the
+    // script didn't set, or a command's output, keeps its $ and so resolves to nothing.
+    const value = set?.value == null ? null : this.expand(set.value);
+    if (set?.ps) this.psVars.set(set.name.toLowerCase(), value);
+    else if (set) this.vars.set(set.name, value);
+    const first = programAt(words);
     if (first < 0) return cwd;
     const programs = new Set([first]);
     for (const [n, word] of words.entries()) {
@@ -677,4 +741,148 @@ export async function writtenPaths(targets: WriteTarget[], cwd: string): Promise
       for (const source of await expand(target.from, paths)) found.add(paths.join(path, paths.basename(source)));
     }
   return [...found];
+}
+
+// Commands that only read, and the files a command names.
+
+/**
+ * Programs and cmdlets that never write a file of their own accord: they print what they read. What they print can
+ * still go to a file through a redirection, which `commandWrites` finds. sed, awk, sort and the like are left out:
+ * their scripts or options can write files the reader doesn't look for.
+ */
+const READS = new Set([
+  ...["cat", "type", "head", "tail", "less", "more", "wc", "grep", "egrep", "fgrep", "rg", "ls", "dir", "file"],
+  ...["stat", "diff", "cmp", "md5sum", "sha1sum", "sha256sum", "shasum", "cksum", "echo", "printf", "pwd", "true"],
+  ...["cd", "chdir", "pushd", "popd", "get-content", "gc", "select-string", "sls", "get-item", "gi", "get-childitem"],
+  ...["gci", "test-path", "get-filehash", "get-location", "gl", "set-location", "sl", "write-output", "write-host"],
+  ...["select-object", "select", "measure-object", "measure", "format-list", "fl", "format-table", "ft"],
+  "out-string",
+]);
+/** OfficeCLI's commands that only read the document. */
+const OFFICE_READS = new Set(["view", "get", "query", "validate"]);
+
+/** Whether a script only reads: every command in it, nested shells and substitutions included, is one of READS. */
+function readsOnly(script: string, depth: number): boolean {
+  if (depth > MAX_DEPTH) return false;
+  const { text, bodies } = heredocs(script);
+  // A heredoc is a file's text or a program's code: either way, more than a read.
+  if (bodies.length) return false;
+  const { commands, substitutions } = parse(text);
+  if (!substitutions.every((s) => readsOnly(s, depth + 1))) return false;
+  return commands.every((all) => {
+    const words = all.filter((w) => !w.redirect);
+    const set = assignment(words);
+    if (set && set.value !== null) return true;
+    const at = programAt(words);
+    if (at < 0) return true;
+    const names = namesOf(words[at]?.text ?? "", true);
+    const rest = words.slice(at + 1);
+    for (const name of names) {
+      const payload = payloadOf(
+        name,
+        rest.map((w) => w.text),
+      );
+      if (payload !== null) return readsOnly(payload, depth + 1);
+    }
+    // A shell or an interpreter running a script file, or reading one from its input, runs code.
+    if (names.some((name) => UNWRAPS.has(name)) || all.some((w) => w.fed)) return false;
+    if (names.includes("officecli"))
+      return OFFICE_READS.has(rest.find((w) => !w.text.startsWith("-"))?.text.toLowerCase() ?? "");
+    return names.some((name) => READS.has(name));
+  });
+}
+
+/**
+ * Whether a command only reads files: it writes nothing the reader can see, and every program it runs is one that
+ * only prints what it reads, such as cat, grep, Get-Content or `officecli view`. A command that isn't is taken as one
+ * that may write any file it names.
+ */
+export function onlyReads(command: string, cwd: string): boolean {
+  return commandWrites(command, cwd).targets.length === 0 && readsOnly(command, 0);
+}
+
+/** A script's extension, for the files a command may run: python3 fix.py, bash go.sh, pwsh x.ps1, node a.mjs. */
+const SCRIPT_EXT = String.raw`\.(?:py|sh|bash|zsh|ps1|psm1|js|mjs|cjs|ts|rb|pl|php|lua|r|bat|cmd|vbs)`;
+/** A script's name in quotes, which may have spaces in it. */
+const QUOTED_SCRIPT = new RegExp(String.raw`(['"])([^'"\n]*?${SCRIPT_EXT})\1`, "gi");
+/** A script's name as a bare word, in the command or inside a quoted command, such as bash -lc "python3 fix.py". */
+const BARE_SCRIPT = new RegExp(String.raw`(^|[\s=(;&|<>])([^\s'"\x60;&|<>()]+?${SCRIPT_EXT})(?=$|[\s;&|<>)'"])`, "gi");
+
+/** The script files a command names, as written, which it may run. */
+export function scriptsNamed(command: string): string[] {
+  const found = new Set<string>();
+  // A quoted name is taken whole and then left out, so the end of "my script.sh" isn't found again as script.sh.
+  const rest = command.replace(QUOTED_SCRIPT, (whole: string, _quote: string, name: string) => {
+    found.add(name);
+    return " ".repeat(whole.length);
+  });
+  for (const m of rest.matchAll(BARE_SCRIPT)) if (m[2]) found.add(m[2]);
+  return [...found];
+}
+
+/** A letter, digit, _ or - that would carry a name on, so "note.txt" isn't named by "my-note.txt" or "note.txt2". */
+const NAME_GOES_ON = /^(?:[\p{L}\p{N}_-]|\.[\p{L}\p{N}_-])/u;
+const NAME_BEFORE = /[\p{L}\p{N}_.-]/u;
+
+/** Text as names are looked for in it: one Unicode form, lowercase, and the shells' escaped spaces as spaces. */
+const searchable = (text: string) =>
+  text
+    .normalize("NFC")
+    .toLowerCase()
+    .replace(/[\\`] /g, " ");
+
+/** Whether `text` names `name` as a whole name, not as part of a longer one. Both are `searchable`. */
+function names(text: string, name: string): boolean {
+  for (let at = text.indexOf(name); at >= 0; at = text.indexOf(name, at + 1)) {
+    const before = text[at - 1];
+    if (before && NAME_BEFORE.test(before)) continue;
+    if (!NAME_GOES_ON.test(text.slice(at + name.length, at + name.length + 2))) return true;
+  }
+  return false;
+}
+
+/**
+ * The files in a folder, by name, to find the ones a command names. A command names a file by its name, its path from
+ * the folder or its full path, anywhere in its text: in quotes, in a heredoc or in code for an interpreter. All three
+ * end with the name, so the name is what's looked for, without regard to case or Unicode form.
+ */
+export class FileNames {
+  private byName = new Map<string, string[]>();
+
+  constructor(
+    files: Iterable<string>,
+    private paths: PlatformPath,
+  ) {
+    for (const path of files) {
+      const name = searchable(paths.basename(path));
+      if (!name) continue;
+      const same = this.byName.get(name);
+      if (same) same.push(path);
+      else this.byName.set(name, [path]);
+    }
+  }
+
+  /**
+   * The files `text` names. When several files share a name, the ones it points to: by their path, in the folder the
+   * command runs in, or in a folder it names. When it points to none of them, all of them, since it may reach any.
+   */
+  named(text: string, folder: string, cwd: string): string[] {
+    const hay = searchable(text);
+    const slashed = hay.replace(/\\/g, "/");
+    const found: string[] = [];
+    for (const [name, all] of this.byName) {
+      if (!names(hay, name)) continue;
+      const only = all.length === 1 ? all : null;
+      const pointed =
+        only ??
+        all.filter((path) => {
+          const from = [this.paths.relative(folder, path), this.paths.relative(cwd, path), path];
+          if (from.some((p) => /[\\/]/.test(p) && slashed.includes(searchable(p).replace(/\\/g, "/")))) return true;
+          const parent = this.paths.dirname(path);
+          return parent === this.paths.resolve(cwd) || names(hay, searchable(this.paths.basename(parent)));
+        });
+      found.push(...(pointed.length ? pointed : all));
+    }
+    return found;
+  }
 }

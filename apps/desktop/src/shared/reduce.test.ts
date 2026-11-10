@@ -49,6 +49,32 @@ describe("applyEvent file", () => {
   });
 });
 
+describe("applyEvent for a user's file the task changed without a card", () => {
+  const made = { path: "/w/Preventivo.txt", kind: "add", role: "made" } as const;
+
+  it("makes a kept copy the file's earlier version and lists it as changed or deleted", () => {
+    const copy = { path: made.path, copy: "/k/1", at: "t", reason: "overwrite" as const };
+    const base = { status: "running", files: [made], own: [] } as unknown as Task;
+    const changed = applyEvent(base, { type: "kept", copy, kind: "update" }, "t");
+    expect(changed.kept).toEqual([copy]);
+    expect(changed.files).toEqual([{ path: made.path, kind: "update", role: "made" }]);
+    const gone = applyEvent(base, { type: "kept", copy, kind: "delete" }, "t");
+    expect(gone.files).toEqual([{ path: made.path, kind: "delete", role: "made" }]);
+  });
+
+  it("lists a file changed with no copy as changed, not as made, and marks it as having no earlier version", () => {
+    // The task made the file in an earlier run; the user saved it since, so it's no longer the task's own.
+    const base = { status: "running", files: [made], own: [] } as unknown as Task;
+    const unkept = (kind: "update" | "delete") => ({ type: "file", change: { ...made, kind }, unkept: true }) as const;
+    const next = applyEvent(base, unkept("update"), "t");
+    expect(next.files).toEqual([{ path: made.path, kind: "update", role: "made" }]);
+    expect(next.unkept).toEqual([made.path]);
+    expect(applyEvent(next, unkept("delete"), "t").unkept).toEqual([made.path]);
+    // Without the mark, the same report keeps a file the task made listed as made.
+    expect(applyEvent(base, { type: "file", change: { ...made, kind: "update" } }, "t").files).toEqual([made]);
+  });
+});
+
 describe("applyEvent activity", () => {
   const task = { activity: [], messages: [{ from: "user", text: "brief", at: "t0" }] } as unknown as Task;
 

@@ -632,6 +632,34 @@ describe("approvals", () => {
   });
 });
 
+describe("a user's file the task changed without a card", () => {
+  it("offers its earlier version when Tost Work kept a copy, and says there's none when it couldn't", async () => {
+    const api = createMemoryApi();
+    render(<App userName="Giulia" api={api} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Update the proposal" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Start task" }));
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: /We do/ }));
+    });
+    await screen.findByText("Check it against your brief");
+    const copy = { path: "/tmp/Listino.xlsx", copy: "/k/1", at: "t", reason: "overwrite" as const };
+    act(() => {
+      api.emit("t1", { type: "kept", copy, kind: "update" });
+      api.emit("t1", {
+        type: "file",
+        change: { path: "/tmp/Note.docx", kind: "update", role: "made" },
+        unkept: true,
+      });
+    });
+    expect(screen.getByText("Earlier version")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Restore" })).toBeTruthy();
+    expect(screen.getByText("No earlier version")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Restore" })).toHaveLength(1);
+  });
+});
+
 describe("turning an overwrite down", () => {
   it("lets the user keep the file and save nothing in its place", async () => {
     const api = createMemoryApi();
