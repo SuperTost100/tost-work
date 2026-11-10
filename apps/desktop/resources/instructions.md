@@ -92,7 +92,7 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 '@ | officecli batch "Preventivo.xlsx" --json
 ```
 
-Short text on one line, without straight double quotes, can stay in a `--prop` value. There officecli turns \n into a new line, so a slide's bullets fit in one value: `--prop text="Modelli e strumenti\nLavorare sui propri file"`. Through `batch` it doesn't: a \n in a PowerShell string stays two characters and shows on the slide, so write each bullet on its own line of a here-string.
+Short text on one line, without straight double quotes, can stay in a `--prop` value. In a slide's `text`, officecli turns \n into a new line, so its bullets fit in one value: `--prop text="Modelli e strumenti\nLavorare sui propri file"`. A title keeps \n as two characters, and so does `batch`, where a \n written in a PowerShell string shows on the slide: there, write each bullet on its own line of a here-string.
 
 # The user's skills
 
