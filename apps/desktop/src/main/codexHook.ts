@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { realpathSync, renameSync, writeFileSync } from "node:fs";
+import { realpathSync, writeFileSync } from "node:fs";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -210,11 +210,12 @@ export class CodexConfigFile {
     return text;
   }
 
-  /** At start, before any Codex runs: Tost Work's settings alone. */
+  /**
+   * At start, before any Codex runs: Tost Work's settings alone. Nothing reads the file yet, so it's written in
+   * place. A rename over it could fail on Windows while an antivirus has it open, and that would stop the app's start.
+   */
   writeNow(): void {
-    const temporary = `${this.path}.${process.pid}.start.tmp`;
-    writeFileSync(temporary, this.text());
-    renameSync(temporary, this.path);
+    writeFileSync(this.path, this.text());
   }
 
   /** Keeps Codex from trusting these folders, in every task from now until the app quits. */
