@@ -942,6 +942,8 @@ export function Task({
   // A task without a project is a quick edit: it works on copies in a temporary folder until the user saves.
   const quick = task.projectId === null;
   const made = task.files.filter((f) => f.role === "made");
+  // A file the task deleted stays listed in the side panel, but there's nothing left to preview.
+  const previewed = made.filter((f) => f.kind !== "delete");
   const draft = useDraft(api, task.id, task.messages.length, task.status === "running");
   // How much of the draft shows, for the message it becomes: that one types on from there instead of starting over.
   const draftShown = useRef({ at: -1, n: 0 });
@@ -1247,8 +1249,15 @@ export function Task({
                 {draft && <TypedMessage key={`draft-${end}`} text={draft} onShown={followDraft} />}
                 {/* A follow-up hides the earlier turn's preview until it ends, so the preview isn't left under the new
                     instruction as if this turn had made it. */}
-                {made.length > 0 && !(live && runStart > 0 && pickedInRun !== runStart) && (
-                  <Artifact api={api} task={task} files={made} picked={picked} onPick={setPicked} onError={onError} />
+                {previewed.length > 0 && !(live && runStart > 0 && pickedInRun !== runStart) && (
+                  <Artifact
+                    api={api}
+                    task={task}
+                    files={previewed}
+                    picked={picked}
+                    onPick={setPicked}
+                    onError={onError}
+                  />
                 )}
                 {task.status === "stopped" &&
                   (task.interrupted && task.sandboxNotReady ? (

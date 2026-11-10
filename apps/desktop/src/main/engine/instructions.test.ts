@@ -33,6 +33,8 @@ describe("instructionsFor", () => {
     expect(text).toContain("Leave out warnings from tools");
     // A follow-up clears the review, so a turn that changes files has to write a new one.
     expect(text).toContain("Do this again at the end of every later turn in which you made, changed or deleted a file");
+    // Claude Code's commands each start in the task's folder, and Codex's too, so a cd only counts in its own command.
+    expect(text).toContain("so put a cd in the same command as what depends on it");
   });
 
   it("explains the quick edit's copies and lists the attachments", () => {
