@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { Decision, Task } from "../../shared/model";
 import { fileGuard } from "../guard";
 import { Store } from "../store/store";
-import { AgentEngine, type AgentFunnel } from "./agent";
+import { AgentEngine, type AgentFunnel, sameStamp } from "./agent";
 import { TaskRunner } from "./runner";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -309,7 +309,7 @@ for (const provider of ["codex", "claude"] as const) {
       expect(cards).toEqual([[quote]]);
     });
 
-    it("asks when only the size differs and the modification time is the same", async () => {
+    it("asks when the size differs", async () => {
       const ctx = await setup(provider);
       const { quote, go } = ctx;
       await makeQuote(ctx);
@@ -379,3 +379,13 @@ for (const provider of ["codex", "claude"] as const) {
     });
   });
 }
+
+describe("sameStamp", () => {
+  it("tells a file apart by its size alone, and by its time alone", () => {
+    const seen = { mtimeMs: 1_731_234_567_890.123, size: 40 };
+    expect(sameStamp(seen, { ...seen })).toBe(true);
+    expect(sameStamp(seen, { ...seen, size: 41 })).toBe(false);
+    expect(sameStamp(seen, { ...seen, mtimeMs: seen.mtimeMs + 0.001 })).toBe(false);
+    expect(sameStamp(seen, undefined)).toBe(false);
+  });
+});

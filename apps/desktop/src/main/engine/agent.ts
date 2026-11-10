@@ -127,11 +127,13 @@ const pathKey = (path: string) => path.normalize("NFC").toLowerCase();
  * task names it. Null when part of the folder can't be read, or it holds more than LISTING_MAX entries: then nothing
  * counts as made by the task from the listing.
  */
-async function listFolder(folder: string, log: TaskLog): Promise<Map<string, string> | null> {
+async function listFolder(folder: string, log: TaskLog, signal?: AbortSignal): Promise<Map<string, string> | null> {
   try {
     const real = await realpath(folder);
     const entries = new Map<string, string>();
     for await (const entry of await opendir(real, { recursive: true })) {
+      // Stop ends a long listing, as on a network folder. No listing means every existing file asks.
+      if (signal?.aborted) return null;
       const name = relative(real, join(entry.parentPath, entry.name));
       entries.set(pathKey(join(real, name)), join(folder, name));
       if (entries.size > LISTING_MAX) {
@@ -158,7 +160,7 @@ async function stampOf(path: string): Promise<FileStamp | null> {
   return entry?.isFile() ? { mtimeMs: entry.mtimeMs, size: entry.size } : null;
 }
 
-const sameStamp = (a: FileStamp | undefined, b: FileStamp | undefined) =>
+export const sameStamp = (a: FileStamp | undefined, b: FileStamp | undefined) =>
   a?.mtimeMs === b?.mtimeMs && a?.size === b?.size;
 
 const sameOwned = (a: Owned, b: Owned) =>
@@ -725,7 +727,7 @@ export class AgentEngine implements Engine, ToolHandler {
     });
     // The folder as it is before the CLI starts, so no file the run makes is in it. On an SSD a folder of 25,000 files
     // takes about 50 ms to list; a network folder takes longer, and the run starts that much later.
-    const before = await listFolder(workdir, log);
+    const before = await listFolder(workdir, log, signal);
     const live: Live = { channel, signal, workdir, made, own, before, pending: new Set(), allowed: new Set(), log };
     this.live.set(task.id, live);
     // What the task owns is saved on the task as it is: files the user saved since the last run are no longer in it.
@@ -1147,7 +1149,7 @@ export class AgentEngine implements Engine, ToolHandler {
    */
   private async ownAtEnd(live: Live): Promise<Owned> {
     const { before } = live;
-    const after = before && (await listFolder(live.workdir, live.log));
+    const after = before && (await listFolder(live.workdir, live.log, live.signal));
     const found = new Set(live.own);
     if (before && after) for (const [key, path] of after) if (!before.has(key)) found.add(path);
     const own: Owned = { paths: [], seen: {} };
