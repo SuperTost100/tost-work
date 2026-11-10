@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import source from "../../../resources/instructions.md?raw";
+import { trashName } from "../../shared/i18n";
 import type { Job, Project, Skill, Task } from "../../shared/model";
 
 const LANGUAGE_NAMES = { en: "English", it: "Italian" } as const;
@@ -11,6 +12,7 @@ export const PARTS = [
   "In a quick edit",
   "Rules",
   "Office files",
+  "Office files on Windows",
   "The user's skills",
   "A job's run",
 ] as const;
@@ -56,7 +58,8 @@ const PART = readParts(source);
 /**
  * The block every agent session starts with. It says who the agent works for, where it may work, the rules and the
  * Tost Work tools. The rules are enforced by Tost Work too; the text only explains them. The words are in
- * resources/instructions.md; this picks the parts that apply and fills them in.
+ * resources/instructions.md; this picks the parts that apply and fills them in. `platform` picks the words that
+ * differ by system: where deleted files go, and on Windows how to pass text to officecli in PowerShell.
  */
 export function instructionsFor(
   task: Task,
@@ -66,13 +69,14 @@ export function instructionsFor(
   user: { name: string; work: string; notes: string } = { name: "", work: "", notes: "" },
   skills: Pick<Skill, "title" | "description" | "folder">[] = [],
   job: Pick<Job, "title" | "output"> | null = null,
+  platform: NodeJS.Platform = process.platform,
 ): string {
   const parts = [
     fill(PART["Every task"], { language: LANGUAGE_NAMES[language] }),
     project
       ? fill(PART["In a project"], { project: project.name, folder: task.workdir })
       : fill(PART["In a quick edit"], { folder: task.workdir }),
-    fill(PART.Rules, {}),
+    fill(PART.Rules, { trash: trashName(platform) }),
   ];
   if (documents) {
     const guide = (kind: string) => join(documents.skills, kind, "SKILL.md");
@@ -86,6 +90,7 @@ export function instructionsFor(
         author: user.name.trim(),
       }),
     );
+    if (platform === "win32") parts.push(fill(PART["Office files on Windows"], {}));
   }
   const about = [
     user.name.trim() && `Name: ${user.name.trim()}`,

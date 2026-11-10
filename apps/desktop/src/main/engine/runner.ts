@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { lstat } from "node:fs/promises";
 import { basename } from "node:path";
-import type { Language } from "../../shared/i18n";
+import { type Language, trashName } from "../../shared/i18n";
 import type { AgentProvider, Approval, Decision, KeptCopy, Project, Task } from "../../shared/model";
 import { answersText, BRIEF_MAX, questionItems } from "../../shared/model";
 import { type Choice, choiceOf, type ModelChoices, type ModelPick } from "../../shared/modelChoice";
@@ -42,11 +42,11 @@ const REFUSE: Guard = {
 };
 
 /** What the agent hears when the user decides on an approval after its turn ended. */
-export function decisionNote(approval: Approval, decision: Decision): string {
+export function decisionNote(approval: Approval, decision: Decision, platform = process.platform): string {
   const files = approval.paths.join(", ");
   if (approval.action === "delete")
     return decision === "allow"
-      ? `The user allowed deleting ${files}, and Tost Work moved them to the Trash. Don't delete them again. Carry on.`
+      ? `The user allowed deleting ${files}, and Tost Work moved them to the ${trashName(platform)}. Don't delete them again. Carry on.`
       : `The user wants to keep ${files}. Leave them as they are and carry on.`;
   return OVERWRITE_NOTE[decision](files);
 }
