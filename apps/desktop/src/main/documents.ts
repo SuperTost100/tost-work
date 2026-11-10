@@ -17,10 +17,11 @@ export function documentTools(): DocumentTools | null {
     console.warn(`No OfficeCLI at ${officecli}. Run node scripts/fetch-officecli.mjs to add it.`);
     return null;
   }
-  // Windows spells it Path; a second PATH key would leave the child with either one.
-  const pathKey = Object.keys(process.env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
   const env = {
-    [pathKey]: `${bin}${delimiter}${process.env[pathKey] ?? ""}`,
+    // PATH even on Windows, where the app's own variable is spelled Path: cli-funnel starts a CLI with
+    // { ...process.env, PATH: its search path, ...env }, so the child gets both spellings, and Node on Windows keeps
+    // the one that sorts first, PATH. Under Path, this folder was dropped and `officecli` wasn't found.
+    PATH: `${bin}${delimiter}${process.env.PATH ?? ""}`,
     // OfficeCLI otherwise checks for updates online once a day and replaces its own binary.
     OFFICECLI_SKIP_UPDATE: "1",
     // And it otherwise leaves a background process holding the file after each command.

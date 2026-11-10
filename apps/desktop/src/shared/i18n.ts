@@ -455,7 +455,7 @@ const en = {
   "save.pick": "Choose where to save the copy",
   "save.here": "Save here",
   "save.exists": "{name} is already in that folder",
-  "save.existsDetail": "Replace it? The one in the folder goes to the Trash.",
+  "save.existsDetail": "Replace it? The one in the folder goes to the {trash}.",
   "save.keepBoth": "Keep both",
   "save.replace": "Replace",
   "attach.pick": "Choose the files to attach",
@@ -463,11 +463,11 @@ const en = {
   "approval.overwrite": "The task wants to replace {names}",
   "approval.delete": "The task wants to delete {names}",
   "approval.overwriteDetail": "If you allow it, a copy of the current file is kept and you can restore it.",
-  "approval.deleteDetail": "If you allow it, they go to the Trash, where you can get them back.",
+  "approval.deleteDetail": "If you allow it, they go to the {trash}, where you can get them back.",
   "approval.allowOverwrite": "Allow overwrite",
   "approval.saveNew": "Save as new file",
   "approval.discard": "Don't save",
-  "approval.trash": "Move to Trash",
+  "approval.trash": "Move to {trash}",
   "approval.keep": "Don't delete",
   "kept.note": "Earlier version",
   "kept.restored": "Restored",
@@ -578,7 +578,7 @@ const en = {
   "skills.whereOnBody": 'Every project. A task reads it when the work matches "When to use it".',
   "skills.folder": "Folder",
   "skills.removeConfirm": 'Delete "{title}"?',
-  "skills.removeDetail": "Its folder goes to the Trash.",
+  "skills.removeDetail": "Its folder goes to the {trash}.",
   "skills.discard": "Leave without saving?",
   "skills.discardDetail": "This skill has changes you haven't saved.",
   "skills.discardYes": "Leave without saving",
@@ -707,7 +707,7 @@ const en = {
   "error.codexHookOff":
     "ChatGPT tasks can't start, because Tost Work couldn't turn on its check of each step in Codex ({detail}). Restart Tost Work and try again.",
   "error.codexUnchecked":
-    "Tost Work stopped this task because ChatGPT took a step without Tost Work's check, which keeps a copy of a file before it's replaced and moves deleted files to the Trash. Restart Tost Work and send the task again.",
+    "Tost Work stopped this task because ChatGPT took a step without Tost Work's check, which keeps a copy of a file before it's replaced and moves deleted files to the {trash}. Restart Tost Work and send the task again.",
   "error.claudeFolderSettings":
     "Claude can't work in this folder, because of a file with Claude Code settings that would change Tost Work's checks: {path}. Folders received from others, as a zip or from a shared folder, can bring one. Move that file somewhere else or delete it, then send the task again.",
   "sandbox.missing.bwrap": "bubblewrap isn't installed",
@@ -1520,9 +1520,25 @@ export function languageFrom(locale: string | undefined): Language {
   return locale?.toLowerCase().startsWith("it") ? "it" : "en";
 }
 
+/**
+ * What the system calls the place deleted files go, in English: Windows has the Recycle Bin, macOS and Linux the
+ * Trash. Italian says "Cestino" for both, so its strings name it themselves.
+ */
+export function trashName(platform: string): string {
+  return platform === "win32" ? "Recycle Bin" : "Trash";
+}
+
+/** The system the app runs on: in a window, as the preload gives it; in the main process, as Node gives it. */
+function runningPlatform(): string {
+  const scope = globalThis as { tostWork?: { platform?: string }; process?: { platform?: string } };
+  return scope.tostWork?.platform ?? scope.process?.platform ?? "";
+}
+
+/** The string for `key` in `lang` with its {values} filled in. {trash} is filled in by itself, for the system. */
 export function translate(lang: Language, key: MessageKey, vars: Record<string, string> = {}): string {
   const text = dictionaries[lang][key] ?? en[key];
-  return text.replace(/\{(\w+)\}/g, (_, name: string) => vars[name] ?? `{${name}}`);
+  const values: Record<string, string> = { trash: trashName(runningPlatform()), ...vars };
+  return text.replace(/\{(\w+)\}/g, (_, name: string) => values[name] ?? `{${name}}`);
 }
 
 /** The greeting for the hour of the day: morning from 5 to 12, afternoon until 18, evening through the night. */
