@@ -6,6 +6,11 @@ allowBuilds:
   electron: true
   esbuild: true
   electron-winstaller: false
+# pnpm 12 installs nothing published less than a day ago. cli-funnel is the owner's own package, published from his
+# repository (SuperTost100/cli-funnel) with npm provenance, so a new release may come in at once. The rule stays on for
+# every other package.
+minimumReleaseAgeExclude:
+  - cli-funnel
 # electron-builder's dependencies still ask for minimatch 9 and 10, which have a denial-of-service bug fixed in 11.0.1
 # (GHSA via Dependabot alert #2). Remove this once electron-builder depends on 11.0.1 or later.
 overrides:
