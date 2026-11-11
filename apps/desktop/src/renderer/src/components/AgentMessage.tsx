@@ -113,7 +113,18 @@ const COPIED_FOR = 1500;
  * Copies a message. With `html` the copy keeps its formatting where it's pasted, such as bold and lists in Word, and
  * plain text goes along for places that take only text.
  */
-export function CopyButton({ text, html, at }: { text: () => string; html?: () => string; at?: string }) {
+export function CopyButton({
+  text,
+  html,
+  at,
+  label: named,
+}: {
+  text: () => string;
+  html?: () => string;
+  at?: string;
+  /** Draws a button with this name instead of the icon alone, such as "Copy the email's text". */
+  label?: string;
+}) {
   const t = useT();
   const [state, setState] = useState<"ready" | "copied" | "failed">("ready");
   useEffect(() => {
@@ -133,6 +144,20 @@ export function CopyButton({ text, html, at }: { text: () => string; html?: () =
     setState("copied");
   };
   const label = t(state === "copied" ? "message.copied" : state === "failed" ? "message.copyFailed" : "message.copy");
+  const icon = <Icon name={state === "copied" ? "check" : state === "failed" ? "alert" : "copy-2"} />;
+  if (named)
+    return (
+      <>
+        <button type="button" className="btn" onClick={() => copy().catch(() => setState("failed"))}>
+          {icon}
+          {state === "ready" ? named : label}
+        </button>
+        {/* The button's own words change too, but only a status gets read out when it happens. */}
+        <span className="sr" role="status">
+          {state === "ready" ? "" : label}
+        </span>
+      </>
+    );
   return (
     <div className="msg-tools">
       <button
@@ -142,7 +167,7 @@ export function CopyButton({ text, html, at }: { text: () => string; html?: () =
         aria-label={label}
         onClick={() => copy().catch(() => setState("failed"))}
       >
-        <Icon name={state === "copied" ? "check" : state === "failed" ? "alert" : "copy-2"} />
+        {icon}
       </button>
       {at && <SentAt at={at} />}
     </div>

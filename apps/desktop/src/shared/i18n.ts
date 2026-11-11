@@ -58,7 +58,9 @@ const en = {
   "result.kind.dangerous": "Dangerous or illegal",
   "result.kind.sexual": "Sexual or violent",
   "result.kind.other": "Other",
+  "result.chooseKind": "Choose what's wrong to continue.",
   "result.note": "What happened (optional)",
+  "result.cut": "The note was shortened to {max} characters.",
   "result.task": "Task",
   "result.ai": "AI and model",
   "result.attach": "Attach the task's conversation",
@@ -67,7 +69,7 @@ const en = {
   "result.whatSendAttached":
     "{maker} also receives the whole conversation, with the files and pages the task read, and {ai}'s technical logs. It may contain your clients' data.",
   "result.whatEmail":
-    "Your mail app opens with an email to {maker}, already written in English: the kind of problem, your note, the AI and model, and the app's version. The task's text isn't in it unless you add it.",
+    "Your mail app opens with an email to {maker}, already written in English: the kind of problem, your note, the AI and model, and the app's version. The task's text isn't in it unless you add it. If it doesn't open, the card then gives you the address and the email's text to copy.",
   "result.whatForm":
     "{maker}'s report form opens in your browser. Copy your note there: Tost Work sends nothing itself.",
   "result.send": "Send to {maker}",
@@ -75,6 +77,10 @@ const en = {
   "result.email": "Write to {maker}",
   "result.form": "Open {maker}'s form",
   "result.sent": "{maker} has received your report.",
+  "result.mailOpened": "Your mail app has opened with the email already written.",
+  "result.mailElse": "If it didn't open, or you use a different mail service, write to:",
+  "result.mailNotOpened": "Your mail app didn't open. Write to:",
+  "result.copyEmail": "Copy the email's text",
   "welcome.title.dev": "This is a test build.",
   "welcome.title.alpha": "This is the alpha.",
   "welcome.title.beta": "This is the beta.",
@@ -845,7 +851,9 @@ const it: Record<MessageKey, string> = {
   "result.kind.dangerous": "Pericoloso o illegale",
   "result.kind.sexual": "Sessuale o violento",
   "result.kind.other": "Altro",
+  "result.chooseKind": "Scegli cosa non va per continuare.",
   "result.note": "Cosa è successo (facoltativo)",
+  "result.cut": "La nota è stata accorciata a {max} caratteri.",
   "result.task": "Attività",
   "result.ai": "AI e modello",
   "result.attach": "Allega la conversazione dell'attività",
@@ -854,7 +862,7 @@ const it: Record<MessageKey, string> = {
   "result.whatSendAttached":
     "{maker} riceve anche tutta la conversazione, con i file e le pagine che l'attività ha letto, e i log tecnici di {ai}. Può contenere dati dei tuoi clienti.",
   "result.whatEmail":
-    "Si apre la tua app di posta con un'email {a} {maker} già scritta, in inglese: il tipo di problema, la tua nota, l'AI e il modello e la versione dell'app. Il testo dell'attività non c'è, a meno che tu non lo aggiunga.",
+    "Si apre la tua app di posta con un'email {a} {maker} già scritta, in inglese: il tipo di problema, la tua nota, l'AI e il modello e la versione dell'app. Il testo dell'attività non c'è, a meno che tu non lo aggiunga. Se non si apre, la scheda ti dà poi l'indirizzo e il testo dell'email da copiare.",
   "result.whatForm":
     "Si apre nel browser il modulo di {maker} per le segnalazioni. Copia lì la tua nota: Tost Work non invia niente da solo.",
   "result.send": "Invia {a} {maker}",
@@ -862,6 +870,10 @@ const it: Record<MessageKey, string> = {
   "result.email": "Scrivi {a} {maker}",
   "result.form": "Apri il modulo di {maker}",
   "result.sent": "{maker} ha ricevuto la tua segnalazione.",
+  "result.mailOpened": "Si è aperta la tua app di posta con l'email già scritta.",
+  "result.mailElse": "Se non si è aperta, o usi un'altra posta, scrivi a:",
+  "result.mailNotOpened": "La tua app di posta non si è aperta. Scrivi a:",
+  "result.copyEmail": "Copia il testo dell'email",
   "welcome.title.dev": "Questa è una versione di test.",
   "welcome.title.alpha": "Questa è l'alpha.",
   "welcome.title.beta": "Questa è la beta.",
