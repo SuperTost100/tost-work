@@ -1,6 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { useCallback, useContext, useEffect, useState } from "react";
 import { Icon } from "@/lib/Icon";
+import { lastModelChoices, rememberModelChoices } from "@/lib/lastModelChoices";
 import { LanguageContext, useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
@@ -63,11 +64,26 @@ export function ModelPicker({
 }) {
   const t = useT();
   const lang = useContext(LanguageContext);
-  const [choices, setChoices] = useState<ModelChoices | null>(null);
+  // Home mounts the picker anew at every visit, and the lists take seconds to read, so a new picker starts with the ones
+  // loaded last.
+  const [choices, setChoices] = useState<ModelChoices | null>(lastModelChoices);
   const [open, setOpen] = useState(false);
   const [all, setAll] = useState(false);
   // Read again each time the menu opens, since an AI may have been signed in or out since.
-  const load = useCallback(() => api.models.choices().then(setChoices, () => setChoices(null)), [api]);
+  // A call that fails keeps the lists already loaded.
+  const load = useCallback(
+    () =>
+      api.models.choices().then(
+        (loaded) => {
+          rememberModelChoices(loaded);
+          setChoices(loaded);
+        },
+        () => {
+          // Nothing to show for the failure: the lists on screen are the last ones that loaded, and the next call tries again.
+        },
+      ),
+    [api],
+  );
   useEffect(() => {
     void load();
   }, [load]);
@@ -92,7 +108,7 @@ export function ModelPicker({
   } else {
     const model =
       current?.model ?? choices?.lists.find((l) => l.ai === pick.ai)?.models.find((m) => m.id === pick.model);
-    name = model ? modelName(model) : pick.model;
+    name = model ? modelName(model) : nameFromId(pick.model);
     label = (
       <>
         <b>{name}</b>

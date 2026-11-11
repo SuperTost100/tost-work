@@ -19,3 +19,16 @@ export async function pickAi(
   if (hasKey) return "key";
   return chosen ?? "chatgpt";
 }
+
+/** The AIs a task could run on right now: the ones signed in, then the course key when there is one. */
+export async function usableAis(
+  signedIn: (provider: AgentProvider) => Promise<boolean | null>,
+  hasKey: boolean,
+): Promise<AiId[]> {
+  // Both checks start a CLI, so they run together.
+  const accounts = ["chatgpt", "claude"] as const;
+  const checks = await Promise.all(accounts.map((ai) => signedIn(PROVIDER_OF[ai])));
+  const ais: AiId[] = accounts.filter((_, i) => checks[i] === true);
+  if (hasKey) ais.push("key");
+  return ais;
+}

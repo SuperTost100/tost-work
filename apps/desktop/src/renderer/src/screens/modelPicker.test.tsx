@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
 import type { Settings } from "../../../shared/model";
+import type { ModelChoices } from "../../../shared/modelChoice";
+import { SAMPLE_CHOICES } from "../../../shared/modelChoice";
 
 // Find first, then act: waiting inside act holds back the updates the wait is for.
 const click = async (target: HTMLElement | Promise<HTMLElement>) => {
@@ -220,5 +222,49 @@ describe("the model picker under the task box", () => {
     });
     render(<Root api={api} />);
     await waitFor(() => expect(screen.getByRole("button", { name: /AI for this task/ }).textContent).toBe("Balanced"));
+  });
+
+  describe("while the lists are loading, and when a call fails", () => {
+    const never = () => new Promise<ModelChoices>(() => {});
+
+    it("names a model picked from the list in full while the lists load", async () => {
+      const api = createMemoryApi({
+        name: "Giulia",
+        setupDone: true,
+        modelPick: { ai: "claude", model: "claude-haiku-5-5", effort: "medium" },
+      });
+      api.models.choices = never;
+      render(<Root api={api} />);
+      expect((await picker(/AI for this task/)).textContent).toBe("Claude Haiku 5.5 · Medium");
+    });
+
+    it("shows the model lines at once when the picker is mounted again", async () => {
+      const api = createMemoryApi({ name: "Giulia", setupDone: true });
+      let calls = 0;
+      // The first call answers; the later ones never do, so only what was kept can fill the lines.
+      api.models.choices = () => (calls++ === 0 ? Promise.resolve(SAMPLE_CHOICES) : never());
+      const first = render(<Root api={api} />);
+      await click(picker(/AI for this task/));
+      await screen.findByText("GPT-6 Luna · medium");
+      first.unmount();
+
+      render(<Root api={api} />);
+      await click(picker(/AI for this task/));
+      expect((await choice(/Fast/)).textContent).toContain("GPT-6 Luna · medium");
+      expect((await choice(/Thorough/)).textContent).toContain("GPT-6.1 Sol · high");
+    });
+
+    it("keeps the lines that loaded when a later call is rejected", async () => {
+      const api = createMemoryApi({ name: "Giulia", setupDone: true });
+      let calls = 0;
+      api.models.choices = () => (calls++ === 0 ? Promise.resolve(SAMPLE_CHOICES) : Promise.reject(new Error("down")));
+      render(<Root api={api} />);
+      await click(picker(/AI for this task/));
+      // Opening the menu made the second call, which is rejected after the first one filled the lines.
+      await waitFor(() => expect(calls).toBeGreaterThanOrEqual(2));
+      await act(async () => {});
+      expect((await choice(/Fast/)).textContent).toContain("GPT-6 Luna · medium");
+      expect(screen.getByRole("menuitem", { name: "Choose the model…" })).toBeTruthy();
+    });
   });
 });

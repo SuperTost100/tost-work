@@ -564,6 +564,50 @@ describe("AgentEngine", () => {
     expect(choices.lists[0]?.models[0]).toMatchObject({ efforts: ["low", "medium", "high", "xhigh", "max"] });
   });
 
+  it("reads the AIs' model lists at the same time, keeping the default AI first and leaving out one that fails", async () => {
+    const efforts = [{ id: "medium" }];
+    /** A models() whose reads each answer only once both AIs' reads have started, so one that waits for the other hangs. */
+    const overlapping = (answer: (provider: string) => string) => {
+      let started = 0;
+      let release!: () => void;
+      const bothStarted = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return async (provider: string) => {
+        if (++started === 2) release();
+        await bothStarted;
+        return [{ id: answer(provider), name: answer(provider), efforts }];
+      };
+    };
+    const within = <T>(work: Promise<T>) =>
+      Promise.race([
+        work,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("the reads did not overlap")), 500)),
+      ]);
+    const engineWith = (ai: "chatgpt" | "claude", models: (provider: string) => Promise<unknown>) => {
+      const { funnel } = fakeFunnel(async () => ({ text: "" }));
+      (funnel as { models: unknown }).models = models;
+      return new AgentEngine(funnel, () => "it", { ai: async () => ai, usable: async () => ["claude", "chatgpt"] });
+    };
+
+    const ok = overlapping((p) => (p === "claude" ? "claude-sonnet-5-5" : "gpt-6.1-terra"));
+    expect((await within(engineWith("chatgpt", ok).choices())).lists.map((l) => l.ai)).toEqual(["chatgpt", "claude"]);
+    const okAgain = overlapping((p) => (p === "claude" ? "claude-sonnet-5-5" : "gpt-6.1-terra"));
+    expect((await within(engineWith("claude", okAgain).choices())).lists.map((l) => l.ai)).toEqual([
+      "claude",
+      "chatgpt",
+    ]);
+
+    // Claude can't be read: the other AI's list stands alone, as when the reads ran one after the other.
+    const read = overlapping(() => "gpt-6.1-terra");
+    const failing = engineWith("claude", async (p) => {
+      const models = await read(p);
+      if (p === "claude") throw new Error("claude isn't answering");
+      return models;
+    });
+    expect((await within(failing.choices())).lists.map((l) => l.ai)).toEqual(["chatgpt"]);
+  });
+
   it("runs on the course key through the agent its vendor needs, and stops when the key is gone", async () => {
     const { funnel, inputs } = fakeFunnel(async () => ({ text: "Done." }));
     const efforts = [{ id: "medium" }];

@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 import { describe, expect, it } from "vitest";
 import type { AgentProvider } from "../shared/model";
-import { pickAi } from "./pickAi";
+import { pickAi, usableAis } from "./pickAi";
 
 const signedIn =
   (...providers: AgentProvider[]) =>
@@ -36,5 +36,31 @@ describe("pickAi", () => {
   it("keeps the choice when nothing is signed in, so the error names that agent", async () => {
     expect(await pickAi("claude", signedIn())).toBe("claude");
     expect(await pickAi(null, signedIn())).toBe("chatgpt");
+  });
+});
+
+describe("usableAis", () => {
+  it("lists the signed-in AIs in order, then the course key", async () => {
+    expect(await usableAis(signedIn("codex", "claude"), true)).toEqual(["chatgpt", "claude", "key"]);
+    expect(await usableAis(signedIn("claude"), false)).toEqual(["claude"]);
+    expect(await usableAis(async () => null, false)).toEqual([]);
+  });
+
+  it("checks both accounts at the same time", async () => {
+    let started = 0;
+    let release!: () => void;
+    const bothStarted = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // Each check answers only once both have started, so a check that waits for the one before it never answers.
+    const check = async () => {
+      if (++started === 2) release();
+      await bothStarted;
+      return true;
+    };
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("the checks did not overlap")), 500),
+    );
+    expect(await Promise.race([usableAis(check, false), timeout])).toEqual(["chatgpt", "claude"]);
   });
 });
