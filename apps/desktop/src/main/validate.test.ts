@@ -23,6 +23,12 @@ describe("taskInput", () => {
     expect(taskInput({ brief: "Sum up" })).toEqual({ brief: "Sum up", projectId: null, attachments: [] });
   });
 
+  it("keeps the line breaks and blank lines inside a brief", () => {
+    expect(taskInput({ brief: "\nDear Anna,\n\nPlease sum up:\n- the offer\n- the price\n" }).brief).toBe(
+      "Dear Anna,\n\nPlease sum up:\n- the offer\n- the price",
+    );
+  });
+
   it("takes files without a brief, as a chat app does, but not neither", () => {
     expect(taskInput({ brief: " ", attachments: ["/shot.png"] })).toEqual({
       brief: "",

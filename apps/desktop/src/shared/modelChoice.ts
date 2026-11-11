@@ -3,7 +3,7 @@
  * from the full list. The main process starts tasks from this, and the interface shows the same result in the picker.
  */
 
-import { type AgentProvider, AIS, type AiId } from "./model";
+import { type AgentProvider, AIS, type AiId, type Level } from "./model";
 
 /** The three plain choices, from quickest to most thorough. */
 export type Preset = "fast" | "balanced" | "thorough";
@@ -43,6 +43,33 @@ export interface ModelChoices {
 
 /** The reasoning levels the picker offers, lowest first. Others, such as "ultra", are left out. */
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+
+/** The reasoning level that only the Expert level offers. */
+const EXPERT_ONLY_EFFORT = "max";
+
+/** The levels of `offered` that the app's level may use: all of them at Expert, none of "max" below it. */
+export const effortsFor = (level: Level, offered: readonly string[]): string[] =>
+  level === "expert" ? [...offered] : offered.filter((e) => e !== EXPERT_ONLY_EFFORT);
+
+/**
+ * The models as the app's level may use them. Everything that reads a model's levels, the picker and the resolving of
+ * a pick, goes through lists made with this, so a pick of "max" resolves to the nearest level left (see
+ * `nearestEffort`) below Expert, without an error.
+ */
+export function limitModels(models: ModelOption[], level: Level): ModelOption[] {
+  if (level === "expert") return models;
+  return models.map((m) => {
+    const efforts = effortsFor(level, m.efforts);
+    const { defaultEffort, ...rest } = m;
+    return { ...rest, efforts, ...(defaultEffort && efforts.includes(defaultEffort) ? { defaultEffort } : {}) };
+  });
+}
+
+/** `limitModels` on every AI's list. */
+export const limitChoices = (choices: ModelChoices, level: Level): ModelChoices => ({
+  ...choices,
+  lists: choices.lists.map((l) => ({ ...l, models: limitModels(l.models, level) })),
+});
 
 /**
  * What each choice runs on (Tost's decision, #196). Balanced on ChatGPT ran at high in 0.0.24-dev and went back to

@@ -15,6 +15,18 @@
   wait here until the release bumps the version.
 -->
 
+## 0.0.34-dev
+
+### en
+
+- **Line breaks in your message stay:** when you sent a task or a follow-up with several lines, the chat showed it as one run-on line, even though the AI received the line breaks. Now your message looks the way you wrote it, blank lines included.
+- **"Maximum" thinking is for Expert:** at Beginner, Intermediate and Advanced the model list offers Low, Medium, High and Very high, and a task never runs on Maximum. If you chose Maximum as an Expert and then lower your level, the picker shows Very high and the task runs on it. At Expert nothing changes.
+
+### it
+
+- **Gli a capo del tuo messaggio restano:** quando inviavi un'attività o una risposta su più righe, la chat le mostrava in una riga sola, anche se l'AI riceveva gli a capo. Ora il messaggio appare come l'hai scritto, righe vuote comprese.
+- **Il ragionamento "Massimo" è per Esperto:** a livello Principiante, Intermedio e Avanzato l'elenco dei modelli offre Basso, Medio, Alto e Molto alto, e un'attività non gira mai su Massimo. Se hai scelto Massimo da Esperto e poi abbassi il livello, il selettore mostra Molto alto e l'attività gira su quello. A livello Esperto non cambia nulla.
+
 ## 0.0.33-dev
 
 ### en

@@ -160,7 +160,7 @@ function AppScreens({ userName = "Giulia", api = window.tostWork, settings, onSe
       if (save === pickSave.current) onSettings?.(saved);
     }, report);
   };
-  const modelPicker = api && <ModelPicker api={api} pick={pick} onChange={changePick} />;
+  const modelPicker = api && <ModelPicker api={api} pick={pick} level={current.level} onChange={changePick} />;
   const [overviews, setOverviews] = useState<Record<string, ProjectOverview>>({});
   const isMac = api?.platform === "darwin";
   const renameProject = (id: string, name: string | null) => {

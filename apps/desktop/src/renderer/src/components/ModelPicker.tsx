@@ -1,14 +1,16 @@
 import { Menu } from "@base-ui/react/menu";
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Icon } from "@/lib/Icon";
 import { lastModelChoices, rememberModelChoices } from "@/lib/lastModelChoices";
 import { LanguageContext, useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
-import type { Task } from "../../../shared/model";
+import type { Level, Task } from "../../../shared/model";
 import {
   choiceFromModel,
   EFFORTS,
+  effortsFor,
+  limitChoices,
   type ModelChoices,
   type ModelPick,
   modelName,
@@ -56,17 +58,22 @@ export function ModelUsed({ task }: { task: Pick<Task, "choice" | "model" | "eff
 export function ModelPicker({
   api,
   pick,
+  level,
   onChange,
 }: {
   api: TostWorkApi;
   pick: ModelPick;
+  /** The user's level: below Expert the picker never offers "max", even in lists loaded while it was Expert. */
+  level: Level;
   onChange: (pick: ModelPick) => void;
 }) {
   const t = useT();
   const lang = useContext(LanguageContext);
   // Home mounts the picker anew at every visit, and the lists take seconds to read, so a new picker starts with the ones
   // loaded last.
-  const [choices, setChoices] = useState<ModelChoices | null>(lastModelChoices);
+  const [loaded, setChoices] = useState<ModelChoices | null>(lastModelChoices);
+  // The main process already limits the lists to the level. This covers the ones remembered from before it changed.
+  const choices = useMemo(() => loaded && limitChoices(loaded, level), [loaded, level]);
   const [open, setOpen] = useState(false);
   const [all, setAll] = useState(false);
   // Read again each time the menu opens, since an AI may have been signed in or out since.
@@ -112,7 +119,7 @@ export function ModelPicker({
     label = (
       <>
         <b>{name}</b>
-        {` · ${effortWord(current?.effort ?? pick.effort)}`}
+        {` · ${effortWord(current?.effort ?? nearestEffort(pick.effort, effortsFor(level, EFFORTS)) ?? pick.effort)}`}
       </>
     );
   }

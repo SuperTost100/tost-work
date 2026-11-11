@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FunnelEvent, RunRequest } from "cli-funnel";
 import { describe, expect, it } from "vitest";
-import type { Decision, EngineEvent, Task } from "../../shared/model";
+import type { Decision, EngineEvent, Level, Task } from "../../shared/model";
 import type { SandboxReadiness } from "../../shared/sandbox";
 import { SandboxNotReady, UserError } from "../userError";
 import { AgentEngine, type AgentFunnel, asCodexRequest, deletesFiles, isNetworkError, outside } from "./agent";
@@ -121,10 +121,13 @@ function bare(script: Script) {
   const { funnel } = fakeFunnel(script);
   const engine = new AgentEngine(funnel, () => "it", PASSES);
   engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
-  const drain = async (followUp: string | null) => {
+  const drain = async (followUp: string | null, onEvent?: (e: EngineEvent) => void) => {
     const seen: EngineEvent[] = [];
     const signal = new AbortController().signal;
-    for await (const e of engine.run({ task: task(), project: null, workdir: "/w", followUp, signal })) seen.push(e);
+    for await (const e of engine.run({ task: task(), project: null, workdir: "/w", followUp, signal })) {
+      seen.push(e);
+      onEvent?.(e);
+    }
     return seen;
   };
   return { engine, drain };
@@ -201,6 +204,14 @@ describe("AgentEngine", () => {
     expect(inputs[0]).toMatchObject({ prompt: "Make it shorter", sessionId: "s1" });
   });
 
+  it("sends the line breaks and blank lines of a brief and of a follow-up as the user wrote them", async () => {
+    const lines = "Dear Anna,\n\nPlease sum up:\n- the offer\n- the price";
+    const { inputs, run } = setup(async () => ({ text: "ok" }));
+    await run(task({ brief: lines }));
+    await run(task({ sessionId: "s1" }), "Shorter,\n\nand in Italian");
+    expect(inputs.map((i) => i.prompt)).toEqual([lines, "Shorter,\n\nand in Italian"]);
+  });
+
   it("puts ask_user's question on the task and tells the agent to end its turn", async () => {
     const holder: { engine?: AgentEngine } = {};
     let reply = "";
@@ -235,21 +246,29 @@ describe("AgentEngine", () => {
 
   it("keeps the card when a held file change ends with the turn, and asks again after a refusal", async () => {
     const decisions: unknown[] = [];
+    // Each turn ends once its card is out, however long the engine takes to ask.
+    let asked = () => {};
+    const whenAsked = (e: EngineEvent) => {
+      if (e.type === "approval") asked();
+    };
     const { engine, drain } = bare(async () => {
+      const shown = new Promise<void>((resolve) => {
+        asked = resolve;
+      });
       // A relative path is taken from the folder the step runs in.
       const held = engine.gate("t1", update("theirs.xlsx"));
       void held.then((d) => decisions.push(d));
-      await new Promise((r) => setTimeout(r, 5));
+      await shown;
       return { text: "" };
     });
-    const seen = await drain(null);
+    const seen = await drain(null, whenAsked);
     const ids = seen.flatMap((e) => (e.type === "approval" ? [e.approval.id] : []));
     expect(ids).toHaveLength(1);
     // The turn ended: Codex hears no, and the task keeps the card until the user decides.
     expect(seen.at(-1)).toEqual({ type: "done" });
     expect(decisions).toEqual([expect.objectContaining({ decision: "deny" })]);
     expect(engine.decide("t1", ids[0] ?? "", "refuse")).toBe(false);
-    const again = await drain("try again");
+    const again = await drain("try again", whenAsked);
     expect(again.filter((e) => e.type === "approval")).toHaveLength(1);
   });
 
@@ -467,6 +486,7 @@ describe("AgentEngine", () => {
       usable?: ("chatgpt" | "claude")[];
       codexFails?: boolean;
       claudeFails?: boolean;
+      level?: () => Level;
     } = {},
   ) {
     const { funnel } = fakeFunnel(async () => ({ text: "" }));
@@ -483,8 +503,59 @@ describe("AgentEngine", () => {
       ai: async () => over.ai ?? "chatgpt",
       usable: async () => over.usable ?? ["chatgpt", "claude"],
       courseKey: () => null,
+      ...(over.level ? { level: over.level } : {}),
     });
   }
+
+  it.each(["beginner", "intermediate", "advanced"] as const)(
+    "never offers or starts the Maximum level at %s: a pick of it runs on the nearest level left",
+    async (level) => {
+      const engine = engineWithModels({ level: () => level });
+      const offered = (await engine.choices()).lists.flatMap((l) => l.models.map((m) => m.efforts));
+      expect(offered.length).toBeGreaterThan(0);
+      for (const efforts of offered) expect(efforts).toEqual(["low", "medium", "high", "xhigh"]);
+      for (const ai of ["claude", "chatgpt"] as const)
+        expect(
+          await engine.defaults({ ai, model: ai === "claude" ? "claude-opus-5-5" : "gpt-6.1-sol", effort: "max" }),
+        ).toMatchObject({ effort: "xhigh" });
+      // The three choices don't use it either way.
+      expect(await engine.defaults({ preset: "thorough" })).toMatchObject({ model: "gpt-6.1-sol", effort: "high" });
+    },
+  );
+
+  it("runs a task started at Maximum on the nearest level its model offers once the level is below Expert", async () => {
+    let level: Level = "advanced";
+    const { funnel, inputs } = fakeFunnel(async () => ({ text: "ok" }));
+    // A model with no "xhigh": the nearest level left is "high".
+    (funnel as { models: unknown }).models = async () => [
+      { id: "m1", efforts: ["low", "medium", "high", "max"].map((id) => ({ id })) },
+    ];
+    const engine = new AgentEngine(funnel, () => "it", { ...PASSES, level: () => level });
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const followUp = async (text: string) => {
+      const seen: EngineEvent[] = [];
+      const run = { task: task({ model: "m1", effort: "max", sessionId: "s1" }), project: null, workdir: "/w" };
+      for await (const e of engine.run({ ...run, followUp: text, signal: new AbortController().signal })) seen.push(e);
+      return seen;
+    };
+    await followUp("go on");
+    level = "expert";
+    await followUp("and again");
+    expect(inputs.map((i) => i.selection.effort)).toEqual(["high", "max"]);
+  });
+
+  it("takes Maximum away when the level is lowered, and offers and starts it again at Expert", async () => {
+    let level: Level = "expert";
+    const engine = engineWithModels({ level: () => level });
+    const pick = { ai: "claude", model: "claude-opus-5-5", effort: "max" } as const;
+    expect((await engine.choices()).lists[0]?.models[0]?.efforts).toContain("max");
+    expect(await engine.defaults(pick)).toMatchObject({ effort: "max" });
+    level = "advanced";
+    expect((await engine.choices()).lists[0]?.models[0]?.efforts).not.toContain("max");
+    expect(await engine.defaults(pick)).toMatchObject({ effort: "xhigh" });
+    level = "expert";
+    expect(await engine.defaults(pick)).toMatchObject({ effort: "max" });
+  });
 
   it("starts the middle choice when nothing is picked, and each choice on the default AI", async () => {
     const codex = engineWithModels();

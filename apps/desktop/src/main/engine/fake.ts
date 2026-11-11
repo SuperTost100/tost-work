@@ -1,8 +1,8 @@
 import { constants } from "node:fs";
 import { copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { ActivityKind, Decision, EngineEvent, Review } from "../../shared/model";
-import { DEFAULT_PICK, type ModelPick, pickOn, SAMPLE_CHOICES } from "../../shared/modelChoice";
+import type { ActivityKind, Decision, EngineEvent, Level, Review } from "../../shared/model";
+import { DEFAULT_PICK, limitChoices, type ModelPick, pickOn, SAMPLE_CHOICES } from "../../shared/modelChoice";
 import type { TaskLog } from "../debugLog";
 import { freeName } from "../files";
 import type { Engine, RunContext } from "./engine";
@@ -155,16 +155,18 @@ export class FakeEngine implements Engine {
     private samples?: string,
     /** The task's debug log, written as the real engine writes it, so debug mode can be tried without an account. */
     private taskLog: (taskId: string) => TaskLog = () => ({ write: () => {} }),
+    /** The user's level, as the real engine reads it: below Expert, the sample models offer no "max" level. */
+    private level: () => Level = () => "expert",
   ) {}
 
   async defaults(pick: ModelPick = DEFAULT_PICK) {
-    const picked = pickOn(pick, SAMPLE_CHOICES);
+    const picked = pickOn(pick, limitChoices(SAMPLE_CHOICES, this.level()));
     if (!picked) throw new Error("The sample models are missing");
     return { provider: picked.provider, model: picked.model.id, effort: picked.effort };
   }
 
   async choices() {
-    return SAMPLE_CHOICES;
+    return limitChoices(SAMPLE_CHOICES, this.level());
   }
 
   /** Resolves with the user's reply, or null when the task is stopped first. */

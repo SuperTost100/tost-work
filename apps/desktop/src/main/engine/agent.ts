@@ -16,13 +16,17 @@ import type {
   Skill,
   Task,
 } from "../../shared/model";
-import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
+import { KEY_PROVIDER, type Level, PROVIDER_OF } from "../../shared/model";
 import {
   type AiModels,
   DEFAULT_PICK,
+  EFFORTS,
+  effortsFor,
+  limitModels,
   type ModelChoices,
   type ModelOption,
   type ModelPick,
+  nearestEffort,
   pickOn,
 } from "../../shared/modelChoice";
 import { type SandboxReadiness, sandboxFor } from "../../shared/sandbox";
@@ -607,6 +611,7 @@ export class AgentEngine implements Engine, ToolHandler {
   private job: (id: string) => Pick<Job, "title" | "output"> | undefined;
   private taskLog: (taskId: string, secrets: (string | undefined)[]) => TaskLog;
   private verbose: () => boolean;
+  private level: () => Level;
   private platform: string;
   private sandboxReady: (provider: AgentProvider) => Promise<SandboxReadiness>;
   private codexHook: (workdir: string) => Promise<void>;
@@ -634,6 +639,8 @@ export class AgentEngine implements Engine, ToolHandler {
       job?: (id: string) => Pick<Job, "title" | "output"> | undefined;
       /** Whether debug is on, so a run also sends what its CLI prints, for the log. */
       verbose?: () => boolean;
+      /** The user's level, read for each use: below Expert, no model offers the "max" reasoning level. Expert when not given. */
+      level?: () => Level;
       /** The task's debug log, which writes only while debug is on. `secrets` are masked in every line. */
       taskLog?: (taskId: string, secrets: (string | undefined)[]) => TaskLog;
       /** The system the CLIs run on, which decides whether Claude Code gets a sandbox. */
@@ -666,6 +673,7 @@ export class AgentEngine implements Engine, ToolHandler {
     this.skills = options.skills ?? (async () => []);
     this.job = options.job ?? (() => undefined);
     this.verbose = options.verbose ?? (() => false);
+    this.level = options.level ?? (() => "expert");
     this.taskLog = options.taskLog ?? (() => ({ write: () => {} }));
     this.platform = options.platform ?? process.platform;
     this.sandboxReady = options.sandboxReady ?? (async () => READY);
@@ -698,12 +706,28 @@ export class AgentEngine implements Engine, ToolHandler {
 
   private async modelsOf(provider: AgentProvider): Promise<ModelOption[]> {
     const models = await this.funnel.models(provider);
-    return models.map((m) => ({
-      id: m.id,
-      name: m.name ?? m.id,
-      efforts: m.efforts.map((e) => e.id),
-      ...(m.defaultEffort ? { defaultEffort: m.defaultEffort } : {}),
-    }));
+    // The one place a model's levels are read, so the picker and the run both follow the user's level.
+    return limitModels(
+      models.map((m) => ({
+        id: m.id,
+        name: m.name ?? m.id,
+        efforts: m.efforts.map((e) => e.id),
+        ...(m.defaultEffort ? { defaultEffort: m.defaultEffort } : {}),
+      })),
+      this.level(),
+    );
+  }
+
+  /**
+   * The level a run of the task uses. A task started at Expert keeps "max" in its record, so below Expert a later run
+   * of it takes the nearest level its model still offers.
+   */
+  private async effortNow(provider: AgentProvider, task: Task): Promise<string> {
+    if (effortsFor(this.level(), [task.effort]).length > 0) return task.effort;
+    // Without the model's list, the nearest of the usual levels stands in.
+    const models = await this.modelsOf(provider).catch(() => []);
+    const offered = models.find((m) => m.id === task.model)?.efforts ?? effortsFor(this.level(), EFFORTS);
+    return nearestEffort(task.effort, offered) ?? task.effort;
   }
 
   /** What a new task runs on, from `pickOn`: a choice of the three on the default AI, or a model from the full list. */
@@ -813,11 +837,12 @@ export class AgentEngine implements Engine, ToolHandler {
     // tool server token and the course key are masked wherever they would appear.
     const log = this.taskLog(task.id, [session.token, apiKey]);
     const access = codex ? "full" : "supervised";
+    const effort = await this.effortNow(provider, task);
     log.write({
       type: "run",
       provider,
       model: task.model,
-      effort: task.effort,
+      effort,
       access,
       sandbox,
       cwd: workdir,
@@ -884,7 +909,7 @@ export class AgentEngine implements Engine, ToolHandler {
           CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR: "1",
         };
     const stream = this.funnel.stream({
-      selection: { provider, model: task.model, effort: task.effort, cwd: workdir, access },
+      selection: { provider, model: task.model, effort, cwd: workdir, access },
       // Files sent without a message come with a note that says so, in place of an empty prompt.
       prompt: followUp ?? (task.brief || withFiles("", task.attachments)),
       system: instructionsFor(
