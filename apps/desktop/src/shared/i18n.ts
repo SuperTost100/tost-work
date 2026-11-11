@@ -63,7 +63,7 @@ const en = {
   "result.ai": "AI and model",
   "result.attach": "Attach the task's conversation",
   "result.whatSend":
-    "{maker} receives the kind of problem, your note and the conversation's code, but not the conversation.",
+    "{maker} receives the kind of problem, your note and the code that identifies this conversation. The conversation itself isn't attached.",
   "result.whatSendAttached":
     "{maker} also receives the whole conversation, with the files and pages the task read, and {ai}'s technical logs. It may contain your clients' data.",
   "result.whatEmail":
@@ -849,7 +849,7 @@ const it: Record<MessageKey, string> = {
   "result.ai": "AI e modello",
   "result.attach": "Allega la conversazione dell'attività",
   "result.whatSend":
-    "{maker} riceve il tipo di problema, la tua nota e il codice della conversazione, ma non la conversazione.",
+    "{maker} riceve il tipo di problema, la tua nota e il codice che identifica questa conversazione. La conversazione non viene allegata.",
   "result.whatSendAttached":
     "{maker} riceve anche tutta la conversazione, con i file e le pagine che l'attività ha letto, e i log tecnici di {ai}. Può contenere dati dei tuoi clienti.",
   "result.whatEmail":

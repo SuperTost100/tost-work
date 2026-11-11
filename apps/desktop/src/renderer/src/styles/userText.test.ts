@@ -26,4 +26,9 @@ describe("text the user wrote", () => {
     expect(rules.length).toBeGreaterThan(0);
     expect(rules.some((body) => /white-space:\s*pre-wrap/.test(body))).toBe(true);
   });
+
+  // A link has no spaces: without this it runs out of the bubble and over the task's panel.
+  it("breaks a long link or word inside the user's message", () => {
+    expect(rulesFor(".you").some((body) => /overflow-wrap:\s*anywhere/.test(body))).toBe(true);
+  });
 });

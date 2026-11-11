@@ -1,6 +1,15 @@
 import type { FeedbackClassification, FeedbackSupport, Funnel, ProviderId } from "cli-funnel";
 import type { ResultReportCard, ResultReportInput, ResultReportOutcome } from "../shared/api";
-import { AI_NAME, MAKER, REPORT_NOTE_MAX, RESULT_KINDS, type ResultKind, type Task, VENDOR_OF } from "../shared/model";
+import {
+  AI_NAME,
+  hasResult,
+  MAKER,
+  REPORT_NOTE_MAX,
+  RESULT_KINDS,
+  type ResultKind,
+  type Task,
+  VENDOR_OF,
+} from "../shared/model";
 import { nameFromId } from "../shared/modelChoice";
 import { UserError } from "./userError";
 import { text } from "./validate";
@@ -89,13 +98,15 @@ export function mailtoUrl(
   const ai = AI_NAME[provider];
   const through = provider === "claude" ? "Claude Code" : "Codex";
   const account = task.auth === "key" ? `an ${MAKER[VENDOR_OF[provider]]} API key` : `a ${ai} subscription`;
+  // Lines in an email end with CR LF, the note's own included (RFC 6068).
+  const words = note.trim().replace(/\r?\n/g, "\r\n");
   const body = [
     "Hello,",
     "",
     `I'm reporting a result that ${ai} wrote in Tost Work, a desktop app that runs ${through} on ${account}.`,
     "",
     `Kind: ${KIND_LABEL[kind]}`,
-    `What happened: ${note.trim()}`,
+    ...(words ? [`What happened: ${words}`] : []),
     `AI: ${ai}, model ${nameFromId(task.model)} (${task.model}), through ${through}`,
     `App: Tost Work ${app.version}, build ${app.build}`,
   ].join("\r\n");
@@ -135,8 +146,8 @@ export class ResultReports {
   private taskOf(id: unknown): Task {
     const task = this.deps.task(text(id, "id", 100));
     if (!task) throw new UserError("error.noTask");
-    // A task saved for later has no result yet.
-    if (task.status === "draft") throw new Error("Only a task that ran has a result to report");
+    // A task saved for later, or one that failed before the AI started, has no result.
+    if (!hasResult(task)) throw new Error("Only a task the AI has started on has a result to report");
     return task;
   }
 

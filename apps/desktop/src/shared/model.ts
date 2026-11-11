@@ -81,6 +81,11 @@ export type ResultKind = "offensive" | "dangerous" | "sexual" | "other";
 export const RESULT_KINDS: readonly ResultKind[] = ["offensive", "dangerous", "sexual", "other"];
 /** The longest note a result report takes. */
 export const REPORT_NOTE_MAX = 2000;
+/**
+ * True once the AI's conversation for the task has started. From then on its words are on screen, also while it is
+ * still writing, and they stay reportable after a stop or a failure, which clear a question it asked.
+ */
+export const hasResult = (task: Pick<Task, "sessionId">): boolean => Boolean(task.sessionId);
 
 /** A file's modification time and size, as `stat` reports them. */
 export interface FileStamp {

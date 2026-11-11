@@ -83,13 +83,20 @@ export function ResultReportDialog({
           : null;
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        // The card stays while a report is on its way: closed, its outcome would have nowhere to show, and reopening
+        // would offer the same report again.
+        if (next || !sending) onOpenChange(next);
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Backdrop className="dlg-backdrop" />
         <Dialog.Popup className="dlg report result-report">
           <div className="report-head">
             <Dialog.Title className="dlg-title">{t("result.title")}</Dialog.Title>
-            <Dialog.Close className="iconbtn" aria-label={t("dialog.close")}>
+            <Dialog.Close className="iconbtn" aria-label={t("dialog.close")} disabled={sending}>
               <Icon name="close" />
             </Dialog.Close>
           </div>
@@ -167,7 +174,9 @@ export function ResultReportDialog({
           <div className="report-acts">
             {action && !sent ? (
               <>
-                <Dialog.Close className="btn">{t("dialog.cancel")}</Dialog.Close>
+                <Dialog.Close className="btn" disabled={sending}>
+                  {t("dialog.cancel")}
+                </Dialog.Close>
                 <button
                   type="button"
                   className={sending ? "btn dark busy" : "btn dark"}

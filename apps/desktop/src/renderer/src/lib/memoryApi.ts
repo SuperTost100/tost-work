@@ -249,6 +249,8 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       ],
       updatedAt: at,
     });
+    // The AI's conversation starts, as in the real engine.
+    emit(id, { type: "session", sessionId: `memory-${id}` });
     emit(id, {
       type: "question",
       question: { id: "q1", text: "Who pays the insurance?", options: ["The client", "We do", "Leave it open"] },

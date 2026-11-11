@@ -213,6 +213,8 @@ export class FakeEngine implements Engine {
       followUp: !!followUp,
     });
     log.write({ type: "session", sessionId: `fake-${task.id}` });
+    // As the real engine does when the AI's conversation starts: the task has a result to report from here on.
+    yield { type: "session", sessionId: `fake-${task.id}` };
     for (let i = 0; i < steps.length; i++) {
       if (signal.aborted) return yield { type: "stopped" };
       if (s.question && s.question.beforeStep === i) {

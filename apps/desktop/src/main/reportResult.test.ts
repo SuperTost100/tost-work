@@ -7,6 +7,7 @@ import { fakeFeedback } from "./engine/fake";
 import {
   CLASSIFICATION,
   cardFor,
+  mailtoUrl,
   type ReportDeps,
   type ReportFunnel,
   ResultReports,
@@ -163,6 +164,19 @@ describe("the report", () => {
     expect(sendFeedback).toHaveBeenCalledTimes(1);
   });
 
+  it("ends every line of the email with CR LF, the note's own included, and leaves an empty note out", () => {
+    const claude = task({ provider: "claude", model: "claude-opus-5-5" });
+    const app = { version: "0.0.34-dev", build: "abc1234" };
+    const bodyOf = (note: string) =>
+      decodeURIComponent(
+        new URL(mailtoUrl("usersafety@anthropic.com", claude, "other", note, app)).searchParams.get("body") ?? "",
+      );
+    const body = bodyOf("First line\nSecond line\r\nThird line");
+    expect(body).toContain("What happened: First line\r\nSecond line\r\nThird line\r\n");
+    expect(body.replaceAll("\r\n", "")).not.toMatch(/[\r\n]/);
+    expect(bodyOf("  ")).not.toContain("What happened");
+  });
+
   it("opens the mail app for Claude, with the kind, the note, the model and the version, and not the task's text", async () => {
     const { funnel, sendFeedback } = stubFunnel();
     const claude = task({ provider: "claude", model: "claude-opus-5-5" });
@@ -215,10 +229,21 @@ describe("the report", () => {
 describe("what the window sends", () => {
   it("is checked before anything is sent", async () => {
     const { funnel, sendFeedback } = stubFunnel();
-    const { reports: r } = reports({ feedback: funnel, tasks: [task(), task({ id: "draft", status: "draft" })] });
+    // A task saved for later, and one that failed before the AI started, have no conversation and so no result.
+    const { sessionId: _none, ...unstarted } = task();
+    const empty: Task[] = [
+      { ...unstarted, id: "draft", status: "draft" },
+      { ...unstarted, id: "new", status: "failed" },
+    ];
+    // One the AI asked a question in and the user then stopped keeps its result, though the question is gone.
+    const stopped = task({ id: "stopped", status: "stopped", messages: [], question: null });
+    const { reports: r } = reports({ feedback: funnel, tasks: [task(), ...empty, stopped] });
+    expect(r.card("stopped").how).toBe("send");
     await expect(r.report("nope", input)).rejects.toMatchObject({ key: "error.noTask" });
     await expect(r.report(42, input)).rejects.toThrow("id must be text");
-    await expect(r.report("draft", input)).rejects.toThrow();
+    await expect(r.report("draft", input)).rejects.toThrow(/has a result to report/);
+    await expect(r.report("new", input)).rejects.toThrow(/has a result to report/);
+    expect(() => r.card("new")).toThrow(/has a result to report/);
     await expect(r.report("t1", { ...input, kind: "safety_check" })).rejects.toThrow(/kind must be one of/);
     await expect(r.report("t1", { ...input, attach: "yes" })).rejects.toThrow("attach must be true or false");
     await expect(r.report("t1", { ...input, note: "x".repeat(2001) })).rejects.toThrow("note is too long");
