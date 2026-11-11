@@ -112,10 +112,19 @@ describe("Report this result", () => {
   });
 
   it("opens the maker's form when there's only a form, and says the app sends nothing itself", async () => {
-    open(CARDS.form);
+    const { reportResult } = open(CARDS.form);
     const card = await openCard();
-    expect(await within(card).findByRole("button", { name: "Open OpenAI's form" })).toBeTruthy();
     expect(card.textContent).toContain("Tost Work sends nothing itself");
+    const note = within(card).getByRole("textbox", { name: "What happened (optional)" });
+    fireEvent.change(note, { target: { value: "It explained how to get round an alarm." } });
+    await press(await within(card).findByRole("button", { name: "Open OpenAI's form" }));
+    expect(reportResult).toHaveBeenCalledTimes(1);
+    // The form has nothing yet, so the card stays open with the note to copy into it.
+    await waitFor(() =>
+      expect(within(card).getByRole("button", { name: "Open OpenAI's form" })).toHaveProperty("disabled", false),
+    );
+    expect(screen.getByRole("dialog")).toBe(card);
+    expect((note as HTMLTextAreaElement).value).toBe("It explained how to get round an alarm.");
   });
 
   it("only offers Close when the AI has nowhere to report to", async () => {

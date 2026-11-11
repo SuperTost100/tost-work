@@ -64,8 +64,8 @@ export function ResultReportDialog({
       const outcome = await api.tasks.reportResult(task.id, { kind, note, attach: card.how === "send" && attach });
       if (n !== opening.current) return;
       if (outcome === "sent") setSent(true);
-      // The mail app or the browser has the report now.
-      else onOpenChange(false);
+      // The mail app has the report now. A form has nothing yet: the card stays, so the note can be copied into it.
+      else if (outcome === "email") onOpenChange(false);
     } catch (err) {
       if (n === opening.current) setError(errorText(err));
     } finally {
