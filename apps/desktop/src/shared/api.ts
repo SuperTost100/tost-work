@@ -8,6 +8,7 @@ import type {
   JobDraft,
   Project,
   ProjectOverview,
+  ResultKind,
   Settings,
   Skill,
   SkillDraft,
@@ -85,6 +86,31 @@ export type MenuAction =
   | "reveal"
   | "toggle-sidebar"
   | "report";
+
+/**
+ * How "Report this result" reaches the AI's maker, from what cli-funnel says about the AI: the AI sends the report
+ * itself, the user's mail app opens with an email already written, the maker's form opens in the browser, or the
+ * maker has no place for reports.
+ */
+export interface ResultReportCard {
+  how: "send" | "email" | "form" | "none";
+  /** The company that makes the AI, such as OpenAI. */
+  maker: string;
+  /** The AI by the name the app uses for it, such as ChatGPT. */
+  ai: string;
+  /** The model's id, as the task keeps it. */
+  model: string;
+}
+
+/** What the user filled in on the card. `attach` sends the task's conversation too, where the AI can send it. */
+export interface ResultReportInput {
+  kind: ResultKind;
+  note: string;
+  attach: boolean;
+}
+
+/** What happened: the report went, or the mail app or the maker's form opened. */
+export type ResultReportOutcome = "sent" | "email" | "form";
 
 /** What the confirmation says before a project is removed: the question, and what goes with it. */
 export interface RemovalText {
@@ -228,6 +254,13 @@ export interface TostWorkApi {
     reveal(id: string): Promise<void>;
     /** Removes the task. The files stay. The window asks the user first. */
     remove(id: string): Promise<void>;
+    /** How the task's results can be reported to the AI's maker. Starts nothing. */
+    reportCard(id: string): Promise<ResultReportCard>;
+    /**
+     * Reports a result of the task to the AI's maker as the card says: sends it, or opens the mail app or the maker's
+     * form. A send that fails may still have arrived, so it's never tried again by itself.
+     */
+    reportResult(id: string, input: ResultReportInput): Promise<ResultReportOutcome>;
     /** Called with the full task every time it changes. Returns a function that stops listening. */
     onChange(listener: (task: Task) => void): () => void;
     /** What the agent has written of its answer so far, while it writes it. */
@@ -439,6 +472,8 @@ export const IPC = {
   tasksRename: "tasks:rename",
   tasksReveal: "tasks:reveal",
   tasksRemove: "tasks:remove",
+  tasksReportCard: "tasks:report-card",
+  tasksReportResult: "tasks:report-result",
   taskChanged: "tasks:changed",
   taskText: "tasks:text",
   tasksDraft: "tasks:draft",

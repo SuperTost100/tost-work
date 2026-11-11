@@ -76,6 +76,12 @@ export interface Approval {
 export type Decision = "allow" | "refuse" | "discard";
 export const DECISIONS: readonly Decision[] = ["allow", "refuse", "discard"];
 
+/** What the user can say is wrong with an AI's result, in "Report this result". */
+export type ResultKind = "offensive" | "dangerous" | "sexual" | "other";
+export const RESULT_KINDS: readonly ResultKind[] = ["offensive", "dangerous", "sexual", "other"];
+/** The longest note a result report takes. */
+export const REPORT_NOTE_MAX = 2000;
+
 /** A file's modification time and size, as `stat` reports them. */
 export interface FileStamp {
   mtimeMs: number;
@@ -354,6 +360,12 @@ export const PROVIDER_OF: Record<Subscription, AgentProvider> = { chatgpt: "code
 /** Whose API key it is: OpenAI's runs through Codex, Anthropic's through Claude Code. */
 export type KeyVendor = "openai" | "anthropic";
 export const KEY_PROVIDER: Record<KeyVendor, AgentProvider> = { openai: "codex", anthropic: "claude" };
+/** The company whose AI each agent runs, the other way round. */
+export const VENDOR_OF: Record<AgentProvider, KeyVendor> = { codex: "openai", claude: "anthropic" };
+/** The companies by name, as the app writes them. */
+export const MAKER: Record<KeyVendor, string> = { openai: "OpenAI", anthropic: "Anthropic" };
+/** Each agent's AI by the name people know it by: the app never says Codex or Claude Code to them. */
+export const AI_NAME: Record<AgentProvider, string> = { codex: "ChatGPT", claude: "Claude" };
 /** The saved course key as the interface sees it: never the key, only whose it is and how it ends. */
 export interface CourseKey {
   vendor: KeyVendor;

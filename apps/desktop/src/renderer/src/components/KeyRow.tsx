@@ -3,10 +3,8 @@ import { errorText } from "@/lib/errorText";
 import { Icon } from "@/lib/Icon";
 import { useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
-import { type CourseKey, keyVendor } from "../../../shared/model";
+import { type CourseKey, keyVendor, MAKER } from "../../../shared/model";
 import { UnconfinedNote, useAskUnconfined } from "./Unconfined";
-
-const VENDOR = { openai: "OpenAI", anthropic: "Anthropic" } as const;
 
 /**
  * The course API key: a box to paste it in, then whose it is and how it ends. Setup shows it as an option card,
@@ -88,7 +86,7 @@ export function KeyRow({
 
   let detail: React.ReactNode = setup ? t("ai.key.d") : t("settings.notConnected");
   if (info) {
-    const saved = t("ai.key.saved", { vendor: VENDOR[info.vendor], last4: info.last4 });
+    const saved = t("ai.key.saved", { vendor: MAKER[info.vendor], last4: info.last4 });
     detail = info.untilClosed ? t("ai.key.untilClosed", { key: saved }) : saved;
   }
 

@@ -226,8 +226,11 @@ await page.evaluate(
     }),
   proj,
 );
-const start = (brief, projectId = null) =>
-  page.evaluate(([b, p]) => window.tostWork.tasks.start({ projectId: p, brief: b }), [brief, projectId]);
+const start = (brief, projectId = null, pick = null) =>
+  page.evaluate(
+    ([b, p, k]) => window.tostWork.tasks.start({ projectId: p, brief: b, ...(k ? { pick: k } : {}) }),
+    [brief, projectId, pick],
+  );
 const get = (id) => page.evaluate((i) => window.tostWork.tasks.get(i), id);
 const until = async (id, ok) => {
   for (let i = 0; i < 80; i++) {
@@ -287,6 +290,16 @@ await page.waitForSelector("text=Tost");
   await shot(page, "task-replace-file");
   await openTask(done.id);
   await shot(page, "task-done");
+  // Report this result: its row is under the panel in task-done, and here is its card for a ChatGPT task (Claude's is
+  // among the cards). The fake engine reports nowhere, and Cancel closes it.
+  await safe("report this result, ChatGPT", async () => {
+    await page.getByRole("button", { name: "Segnala questo risultato" }).click({ timeout: 3000 });
+    await page.getByRole("dialog").getByRole("button", { name: "Invia a OpenAI" }).waitFor({ timeout: 4000 });
+    await shot(page, "report-result-chatgpt");
+    await page.getByRole("dialog").getByRole("checkbox").check();
+    await shot(page, "report-result-chatgpt-attach");
+    await page.getByRole("dialog").getByRole("button", { name: "Annulla" }).click();
+  });
   await safe("file preview", async () => {
     await page.locator(".ftabs button, .ftabs a").first().click({ timeout: 3000 });
     await shot(page, "task-file-preview");
@@ -464,6 +477,26 @@ await safe("cards", async () => {
   await page.getByRole("dialog").waitFor({ timeout: 4000 });
   await shot(page, "report-a-problem");
   await page.keyboard.press("Escape");
+  await safe("report this result, Claude", async () => {
+    // A model the fake engine's list has: an unknown one would run on ChatGPT.
+    const c = await start("Rileggi il contratto di Ferraris Trasporti", proj.id, {
+      ai: "claude",
+      model: "claude-opus-5-5",
+      effort: "medium",
+    });
+    for (let i = 0; i < 80; i++) {
+      const t = await get(c.id);
+      if (t.question) await page.evaluate((id) => window.tostWork.tasks.answer(id, ["The client pays it"]), c.id);
+      else if (t.approval) await page.evaluate((id) => window.tostWork.tasks.decide(id, "allow"), c.id);
+      if (t.status === "done") break;
+      await page.waitForTimeout(400);
+    }
+    await openTask(c.id);
+    await page.getByRole("button", { name: "Segnala questo risultato" }).click({ timeout: 3000 });
+    await page.getByRole("dialog").getByRole("button", { name: "Scrivi ad Anthropic" }).waitFor({ timeout: 4000 });
+    await shot(page, "report-result-claude");
+    await page.getByRole("dialog").getByRole("button", { name: "Annulla" }).click();
+  });
   await start("Un'altra prova");
   await page.waitForTimeout(1200);
   await app.evaluate(({ app }) => app.quit());

@@ -8,6 +8,7 @@ import type {
   PanelTarget,
   ProjectMenuAction,
   QuestionAnswer,
+  ResultReportInput,
   SignInEvent,
   SkillMenuAction,
   TaskMenuAction,
@@ -83,6 +84,8 @@ export type MemoryApi = TostWorkApi & {
   log(taskId: string, line: LogLine): void;
   /** How many times the window asked to open the file with the licences. */
   licensesOpened: number;
+  /** What "Report this result" asked the main process to do, in order. */
+  reports: { taskId: string; input: ResultReportInput }[];
   /** What the debug log buttons and menu items asked for, in order. */
   debugCalls: {
     revealed: string[];
@@ -284,6 +287,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
     },
     menuStateNow: () => menuState,
     licensesOpened: 0,
+    reports: [],
     openLicenses: async () => {
       api.licensesOpened++;
     },
@@ -595,6 +599,20 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
       remove: async (id) => {
         tasks.delete(id);
         logs.delete(id);
+      },
+      // ChatGPT's tasks send the report, Claude's write an email, as cli-funnel says for the real ones.
+      reportCard: async (id) => {
+        const t = tasks.get(id);
+        if (!t) throw new Error("That task doesn't exist");
+        return t.provider === "claude"
+          ? { how: "email", maker: "Anthropic", ai: "Claude", model: t.model }
+          : { how: "send", maker: "OpenAI", ai: "ChatGPT", model: t.model };
+      },
+      reportResult: async (id, input) => {
+        const t = tasks.get(id);
+        if (!t) throw new Error("That task doesn't exist");
+        api.reports.push({ taskId: id, input });
+        return t.provider === "claude" ? "email" : "sent";
       },
       onChange: (l) => {
         listeners.add(l);

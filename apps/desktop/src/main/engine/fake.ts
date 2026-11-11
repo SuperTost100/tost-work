@@ -1,10 +1,12 @@
 import { constants } from "node:fs";
 import { copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { type Funnel, FunnelError } from "cli-funnel";
 import type { ActivityKind, Decision, EngineEvent, Level, Review } from "../../shared/model";
 import { DEFAULT_PICK, limitChoices, type ModelPick, pickOn, SAMPLE_CHOICES } from "../../shared/modelChoice";
 import type { TaskLog } from "../debugLog";
 import { freeName } from "../files";
+import type { ReportFunnel } from "../reportResult";
 import type { Engine, RunContext } from "./engine";
 
 /** A scripted run, for building the interface before the real engine is wired. */
@@ -140,6 +142,24 @@ function fakeCall(kind: ActivityKind, target: string | undefined, workdir: strin
     default:
       return { name: kind, input: target ? { target } : {}, output: "Done" };
   }
+}
+
+/**
+ * cli-funnel's report calls for the fake engine, so "Report this result" can be tried without an account. The channels
+ * are cli-funnel's own, which it reads without starting anything, and a send waits a moment and never leaves the
+ * computer. `mode` comes from TOST_WORK_FAKE_REPORT: "fail" makes a send fail as Codex's timeout does, and "none"
+ * gives every AI no place for reports.
+ */
+export function fakeFeedback(real: Pick<Funnel, "feedbackSupport">, mode = "", wait = 1500): ReportFunnel {
+  return {
+    feedbackSupport: (id) => (mode === "none" ? { provider: id, send: false } : real.feedbackSupport(id)),
+    sendFeedback: async (id, report) => {
+      await new Promise((resolve) => setTimeout(resolve, wait));
+      if (mode === "fail")
+        throw new FunnelError("feedback/upload failed: Codex did not answer feedback/upload in time.", "cli-failed");
+      return { provider: id, sent: true, reportId: report.sessionId ?? "fake-report" };
+    },
+  };
 }
 
 /** Replays a script with a delay between steps, and waits for real answers to its questions and approvals. */

@@ -6,6 +6,7 @@ import { FileLine, fileName } from "@/components/FileLine";
 import { ModelUsed } from "@/components/ModelPicker";
 import { Preview } from "@/components/Preview";
 import { ProjectPicker } from "@/components/ProjectPicker";
+import { ResultReportDialog, ResultReportRow } from "@/components/ResultReportDialog";
 import { TaskSandboxNotice } from "@/components/SandboxNotice";
 import { TaskTag } from "@/components/TaskTag";
 import { errorText } from "@/lib/errorText";
@@ -943,6 +944,8 @@ export function Task({
     });
   };
   const [message, setMessage] = useUnsent(`${task.id}:message`, "");
+  // The "Report this result" card.
+  const [reporting, setReporting] = useState(false);
   const followSending = useRef(false);
   // A task without a project is a quick edit: it works on copies in a temporary folder until the user saves.
   const quick = task.projectId === null;
@@ -1375,57 +1378,61 @@ export function Task({
               </div>
             </div>
           </div>
-          {quick ? (
-            <WhatChanged
-              api={api}
-              task={task}
-              made={made}
-              live={live}
-              onSaveCopy={onSaveCopy}
-              onRestore={onRestore}
-              onError={onError}
-              skillTitles={skillTitles}
-            />
-          ) : (
-            <aside className="rp">
-              <div className="body">
-                <h3>{t(madeHeading(made))}</h3>
-                {made.length === 0 && <p className="empty">{t("task.noFiles")}</p>}
-                <ShortList
-                  items={made}
-                  render={(f) => (
-                    <MadeFile
-                      key={f.path}
-                      task={task}
-                      path={f.path}
-                      unkept={task.unkept?.includes(f.path)}
-                      onRestore={onRestore}
-                      onSelect={f.kind === "delete" ? undefined : () => showFile(f.path)}
-                    />
-                  )}
-                />
-                {used.length > 0 && <h3>{t("task.used")}</h3>}
-                {used.map(({ path, attached }) => (
-                  <FileLine key={path} path={path} sub={attached ? t("task.attachedFile") : undefined} />
-                ))}
-                <SkillsFollowed names={task.skillsUsed} titles={skillTitles} />
-                <h3>{t("task.settings")}</h3>
-                <div className="setrow">
-                  <Icon name="chip" />
-                  <span className="grow">
-                    <ModelUsed task={task} />
-                  </span>
+          <div className="side-col">
+            {quick ? (
+              <WhatChanged
+                api={api}
+                task={task}
+                made={made}
+                live={live}
+                onSaveCopy={onSaveCopy}
+                onRestore={onRestore}
+                onError={onError}
+                skillTitles={skillTitles}
+              />
+            ) : (
+              <aside className="rp">
+                <div className="body">
+                  <h3>{t(madeHeading(made))}</h3>
+                  {made.length === 0 && <p className="empty">{t("task.noFiles")}</p>}
+                  <ShortList
+                    items={made}
+                    render={(f) => (
+                      <MadeFile
+                        key={f.path}
+                        task={task}
+                        path={f.path}
+                        unkept={task.unkept?.includes(f.path)}
+                        onRestore={onRestore}
+                        onSelect={f.kind === "delete" ? undefined : () => showFile(f.path)}
+                      />
+                    )}
+                  />
+                  {used.length > 0 && <h3>{t("task.used")}</h3>}
+                  {used.map(({ path, attached }) => (
+                    <FileLine key={path} path={path} sub={attached ? t("task.attachedFile") : undefined} />
+                  ))}
+                  <SkillsFollowed names={task.skillsUsed} titles={skillTitles} />
+                  <h3>{t("task.settings")}</h3>
+                  <div className="setrow">
+                    <Icon name="chip" />
+                    <span className="grow">
+                      <ModelUsed task={task} />
+                    </span>
+                  </div>
+                  <div className="setrow">
+                    <Icon name="folder" />
+                    <span className="grow">
+                      <span className="k">{t("task.savesTo")}</span>
+                      <span className="v">{project?.folder ?? t("task.tempFolder")}</span>
+                    </span>
+                  </div>
                 </div>
-                <div className="setrow">
-                  <Icon name="folder" />
-                  <span className="grow">
-                    <span className="k">{t("task.savesTo")}</span>
-                    <span className="v">{project?.folder ?? t("task.tempFolder")}</span>
-                  </span>
-                </div>
-              </div>
-            </aside>
-          )}
+              </aside>
+            )}
+            <ResultReportRow onOpen={() => setReporting(true)} />
+          </div>
+          <ResultReportDialog api={api} task={task} open={reporting} onOpenChange={setReporting} />
         </div>
       )}
     </main>

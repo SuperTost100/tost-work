@@ -147,6 +147,8 @@ const api: TostWorkApi = {
     rename: (id, title) => ipcRenderer.invoke(IPC.tasksRename, id, title),
     reveal: (id) => ipcRenderer.invoke(IPC.tasksReveal, id),
     remove: (id) => ipcRenderer.invoke(IPC.tasksRemove, id),
+    reportCard: (id) => ipcRenderer.invoke(IPC.tasksReportCard, id),
+    reportResult: (id, input) => ipcRenderer.invoke(IPC.tasksReportResult, id, input),
     onChange: (listener) => {
       const handler = (_: unknown, task: Task) => listener(task);
       ipcRenderer.on(IPC.taskChanged, handler);
