@@ -6,6 +6,9 @@ export function applyEvent(task: Task, event: EngineEvent, at: string): Task {
   switch (event.type) {
     case "session":
       return { ...next, sessionId: event.sessionId };
+    case "effort":
+      // The task says what it runs on, so its header and panel don't name a level the run didn't use.
+      return { ...next, effort: event.effort };
     case "plan":
       return { ...next, steps: event.steps };
     case "activity": {

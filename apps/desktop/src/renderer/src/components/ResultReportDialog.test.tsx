@@ -62,7 +62,7 @@ describe("Report this result", () => {
     const send = await within(card).findByRole("button", { name: "Send to OpenAI" });
     const box = within(card).getByRole("checkbox", { name: "Attach the task's conversation" }) as HTMLInputElement;
     expect(box.checked).toBe(false);
-    expect(card.textContent).toContain("but not the conversation");
+    expect(card.textContent).toContain("The conversation itself isn't attached");
     expect(card.textContent).toContain("Prepara il listino prezzi 2027");
     expect(card.textContent).toContain("ChatGPT · GPT-6.1 Terra");
     await press(box);

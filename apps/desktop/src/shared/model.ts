@@ -244,6 +244,8 @@ export interface Task {
 /** What an engine reports while it works. The task screen is built from these. */
 export type EngineEvent =
   | { type: "session"; sessionId: string }
+  /** The reasoning level this run uses, when the user's level no longer allows the one the task was started with. */
+  | { type: "effort"; effort: string }
   | { type: "plan"; steps: Step[] }
   /** `id` is the tool call's, for the debug view. */
   | { type: "activity"; kind: ActivityKind; target?: string; id?: string }

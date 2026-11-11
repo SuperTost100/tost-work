@@ -1463,6 +1463,8 @@ textarea {
   font-size: 15px;
   /* The user's own line breaks and blank lines, as typed or pasted. */
   white-space: pre-wrap;
+  /* A long link or word with no spaces breaks inside the bubble, where it would run over the task's panel. */
+  overflow-wrap: anywhere;
 }
 .you .outs {
   margin-top: 10px;

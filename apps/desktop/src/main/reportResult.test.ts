@@ -7,6 +7,7 @@ import { fakeFeedback } from "./engine/fake";
 import {
   CLASSIFICATION,
   cardFor,
+  mailtoUrl,
   type ReportDeps,
   type ReportFunnel,
   ResultReports,
@@ -161,6 +162,19 @@ describe("the report", () => {
     finish();
     expect(await first).toBe("sent");
     expect(sendFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it("ends every line of the email with CR LF, the note's own included, and leaves an empty note out", () => {
+    const claude = task({ provider: "claude", model: "claude-opus-5-5" });
+    const app = { version: "0.0.34-dev", build: "abc1234" };
+    const bodyOf = (note: string) =>
+      decodeURIComponent(
+        new URL(mailtoUrl("usersafety@anthropic.com", claude, "other", note, app)).searchParams.get("body") ?? "",
+      );
+    const body = bodyOf("First line\nSecond line\r\nThird line");
+    expect(body).toContain("What happened: First line\r\nSecond line\r\nThird line\r\n");
+    expect(body.replaceAll("\r\n", "")).not.toMatch(/[\r\n]/);
+    expect(bodyOf("  ")).not.toContain("What happened");
   });
 
   it("opens the mail app for Claude, with the kind, the note, the model and the version, and not the task's text", async () => {
