@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   choiceFromModel,
   choiceOf,
+  effortsFor,
   isModelPick,
+  limitChoices,
+  limitModels,
   type ModelChoices,
   type ModelOption,
   modelName,
@@ -138,6 +141,59 @@ describe("nearestEffort", () => {
     expect(nearestEffort("ultra", [...ALL, "ultra"])).toBe("low");
     expect(nearestEffort("max", ["ultra"])).toBeUndefined();
     expect(nearestEffort("xhigh", ["low", "medium", "high"])).toBe("high");
+  });
+});
+
+describe("the levels each app level offers", () => {
+  it("leaves out max below Expert and nothing at Expert", () => {
+    for (const level of ["beginner", "intermediate", "advanced"] as const)
+      expect(effortsFor(level, ALL)).toEqual(["low", "medium", "high", "xhigh"]);
+    expect(effortsFor("expert", ALL)).toEqual(ALL);
+  });
+
+  it("limits each model's levels, and drops a default that is no longer offered", () => {
+    const limited = limitModels([model("a", ALL, "max"), model("b", ALL, "medium")], "advanced");
+    expect(limited.map((m) => m.efforts)).toEqual([
+      ["low", "medium", "high", "xhigh"],
+      ["low", "medium", "high", "xhigh"],
+    ]);
+    expect(limited.map((m) => m.defaultEffort)).toEqual([undefined, "medium"]);
+    const models = [model("a")];
+    expect(limitModels(models, "expert")).toBe(models);
+  });
+
+  it("makes a pick of max run on the nearest level left: xhigh, else high", () => {
+    const choices: ModelChoices = {
+      ai: "claude",
+      provider: "claude",
+      lists: [
+        {
+          ai: "claude",
+          provider: "claude",
+          models: [model("claude-opus-5-5"), model("claude-haiku-5-5", ["low", "medium", "high", "max"])],
+        },
+      ],
+    };
+    const run = (id: string, level: "advanced" | "expert") =>
+      pickOn({ ai: "claude", model: id, effort: "max" }, limitChoices(choices, level))?.effort;
+    expect(run("claude-opus-5-5", "advanced")).toBe("xhigh");
+    expect(run("claude-haiku-5-5", "advanced")).toBe("high");
+    expect(run("claude-opus-5-5", "expert")).toBe("max");
+    expect(run("claude-haiku-5-5", "expert")).toBe("max");
+  });
+
+  it("keeps the three choices where they are at every level", () => {
+    for (const level of ["beginner", "advanced", "expert"] as const)
+      for (const provider of ["codex", "claude"] as const) {
+        const models = provider === "codex" ? codex : claude;
+        for (const preset of ["fast", "balanced", "thorough"] as const) {
+          const run = (list: ModelOption[]) => {
+            const found = resolvePreset(preset, provider, list);
+            return `${found?.model.id} ${found?.effort}`;
+          };
+          expect(run(limitModels(models, level))).toBe(run(models));
+        }
+      }
   });
 });
 

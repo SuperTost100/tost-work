@@ -37,7 +37,7 @@ import {
   type SkillVersion,
   type Task,
 } from "../../../shared/model";
-import { choiceOf, type ModelPick, pickOn, SAMPLE_CHOICES } from "../../../shared/modelChoice";
+import { choiceOf, limitChoices, type ModelPick, pickOn, SAMPLE_CHOICES } from "../../../shared/modelChoice";
 import { removalText } from "../../../shared/projectText";
 import { applyEvent, resume } from "../../../shared/reduce";
 import { nextRun } from "../../../shared/schedule";
@@ -190,7 +190,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   let taskCount = 0;
   // The agent, model and level a task starts on, as the main process works them out from a pick.
   const running = (pick: ModelPick = settings.modelPick) => {
-    const picked = pickOn(pick, SAMPLE_CHOICES);
+    const picked = pickOn(pick, limitChoices(SAMPLE_CHOICES, settings.level));
     if (!picked) throw new Error("No models");
     return {
       provider: picked.provider,
@@ -345,7 +345,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
         return settings;
       },
     },
-    models: { choices: async () => SAMPLE_CHOICES },
+    models: { choices: async () => limitChoices(SAMPLE_CHOICES, settings.level) },
     account: {
       status: async (provider) => accounts[provider],
       signIn: async (provider) => {

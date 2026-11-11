@@ -268,8 +268,12 @@ app.whenReady().then(async () => {
   // shortcut: kept copies are never cleaned up; add a size limit or an age limit before the public beta.
   const guard = fileGuard(join(app.getPath("userData"), "kept"), (path) => shell.trashItem(path));
   if (process.env.TOST_WORK_ENGINE === "fake") {
-    engine = new FakeEngine(undefined, undefined, join(app.getAppPath(), "resources", "fake"), (taskId) =>
-      debugLogs.forTask(taskId),
+    engine = new FakeEngine(
+      undefined,
+      undefined,
+      join(app.getAppPath(), "resources", "fake"),
+      (taskId) => debugLogs.forTask(taskId),
+      () => store.getSettings().level,
     );
   } else {
     // A failed check is unknown (null), not signed out.
@@ -293,6 +297,7 @@ app.whenReady().then(async () => {
       skills: () => skills.list(),
       job: (id) => store.getJob(id),
       verbose: () => debugOn,
+      level: () => store.getSettings().level,
       taskLog: (taskId, secrets) => debugLogs.forTask(taskId, secrets),
       copies: guard,
     });

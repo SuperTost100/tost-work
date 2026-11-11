@@ -16,10 +16,11 @@ import type {
   Skill,
   Task,
 } from "../../shared/model";
-import { KEY_PROVIDER, PROVIDER_OF } from "../../shared/model";
+import { KEY_PROVIDER, type Level, PROVIDER_OF } from "../../shared/model";
 import {
   type AiModels,
   DEFAULT_PICK,
+  limitModels,
   type ModelChoices,
   type ModelOption,
   type ModelPick,
@@ -607,6 +608,7 @@ export class AgentEngine implements Engine, ToolHandler {
   private job: (id: string) => Pick<Job, "title" | "output"> | undefined;
   private taskLog: (taskId: string, secrets: (string | undefined)[]) => TaskLog;
   private verbose: () => boolean;
+  private level: () => Level;
   private platform: string;
   private sandboxReady: (provider: AgentProvider) => Promise<SandboxReadiness>;
   private codexHook: (workdir: string) => Promise<void>;
@@ -634,6 +636,8 @@ export class AgentEngine implements Engine, ToolHandler {
       job?: (id: string) => Pick<Job, "title" | "output"> | undefined;
       /** Whether debug is on, so a run also sends what its CLI prints, for the log. */
       verbose?: () => boolean;
+      /** The user's level, read for each use: below Expert, no model offers the "max" reasoning level. Expert when not given. */
+      level?: () => Level;
       /** The task's debug log, which writes only while debug is on. `secrets` are masked in every line. */
       taskLog?: (taskId: string, secrets: (string | undefined)[]) => TaskLog;
       /** The system the CLIs run on, which decides whether Claude Code gets a sandbox. */
@@ -666,6 +670,7 @@ export class AgentEngine implements Engine, ToolHandler {
     this.skills = options.skills ?? (async () => []);
     this.job = options.job ?? (() => undefined);
     this.verbose = options.verbose ?? (() => false);
+    this.level = options.level ?? (() => "expert");
     this.taskLog = options.taskLog ?? (() => ({ write: () => {} }));
     this.platform = options.platform ?? process.platform;
     this.sandboxReady = options.sandboxReady ?? (async () => READY);
@@ -698,12 +703,16 @@ export class AgentEngine implements Engine, ToolHandler {
 
   private async modelsOf(provider: AgentProvider): Promise<ModelOption[]> {
     const models = await this.funnel.models(provider);
-    return models.map((m) => ({
-      id: m.id,
-      name: m.name ?? m.id,
-      efforts: m.efforts.map((e) => e.id),
-      ...(m.defaultEffort ? { defaultEffort: m.defaultEffort } : {}),
-    }));
+    // The one place a model's levels are read, so the picker and the run both follow the user's level.
+    return limitModels(
+      models.map((m) => ({
+        id: m.id,
+        name: m.name ?? m.id,
+        efforts: m.efforts.map((e) => e.id),
+        ...(m.defaultEffort ? { defaultEffort: m.defaultEffort } : {}),
+      })),
+      this.level(),
+    );
   }
 
   /** What a new task runs on, from `pickOn`: a choice of the three on the default AI, or a model from the full list. */

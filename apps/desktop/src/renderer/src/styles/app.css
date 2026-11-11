@@ -1452,6 +1452,8 @@ textarea {
   border-radius: 14px;
   padding: 11px 15px;
   font-size: 15px;
+  /* The user's own line breaks and blank lines, as typed or pasted. */
+  white-space: pre-wrap;
 }
 .you .outs {
   margin-top: 10px;

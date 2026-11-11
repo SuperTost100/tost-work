@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { rememberModelChoices } from "@/lib/lastModelChoices";
 import { createMemoryApi } from "@/lib/memoryApi";
 import { Root } from "@/Root";
 import type { Settings } from "../../../shared/model";
@@ -75,8 +76,8 @@ describe("the model picker under the task box", () => {
     expect((await choice(/Fast/)).getAttribute("aria-checked")).toBe("true");
   });
 
-  it("opens the full list at Beginner, and a model from it can switch the AI for the task", async () => {
-    const api = await open();
+  it("opens the full list at Expert, and a model from it can switch the AI for the task", async () => {
+    const api = await open({ level: "expert" });
     await click(screen.getByRole("menuitem", { name: "Choose the model…" }));
     // The signed-in AIs are sections, each with its models.
     expect(await screen.findByText("ChatGPT")).toBeTruthy();
@@ -101,6 +102,61 @@ describe("the model picker under the task box", () => {
     await start("Write a proposal for Alpi Logistica");
     const [task] = await api.tasks.list();
     expect(task).toMatchObject({ provider: "claude", model: "claude-sonnet-5-5", effort: "max", choice: "custom" });
+  });
+
+  // Reasoning at the maximum is for Expert. The others keep "Very high", the highest level below it.
+  it.each(["beginner", "intermediate", "advanced"] as const)("offers no Maximum reasoning at %s", async (level) => {
+    await open({ level });
+    await click(screen.getByRole("menuitem", { name: "Choose the model…" }));
+    await screen.findByText("ChatGPT");
+    expect(
+      screen
+        .getAllByRole("menuitemradio")
+        .map((r) => r.textContent)
+        .slice(-4),
+    ).toEqual(["Low", "Medium", "High", "Very high"]);
+    expect(screen.queryByRole("menuitemradio", { name: "Maximum" })).toBeNull();
+  });
+
+  it("offers Maximum reasoning at Expert", async () => {
+    await open({ level: "expert" });
+    await click(screen.getByRole("menuitem", { name: "Choose the model…" }));
+    await screen.findByText("ChatGPT");
+    expect(screen.getByRole("menuitemradio", { name: "Maximum" })).toBeTruthy();
+  });
+
+  it.each(["beginner", "intermediate", "advanced"] as const)(
+    "shows and runs a remembered Maximum as Very high at %s, without an error",
+    async (level) => {
+      const api = createMemoryApi({
+        name: "Giulia",
+        setupDone: true,
+        level,
+        modelPick: { ai: "claude", model: "claude-opus-5-5", effort: "max" },
+      });
+      render(<Root api={api} />);
+      expect((await picker(/AI for this task/)).textContent).toBe("Claude Opus 5.5 · Very high");
+      await start("Write a proposal for Alpi Logistica");
+      const [task] = await api.tasks.list();
+      expect(task).toMatchObject({ provider: "claude", model: "claude-opus-5-5", effort: "xhigh", choice: "custom" });
+    },
+  );
+
+  it("shows a Maximum that Expert remembered as Very high once the level is lowered, even before the lists load", async () => {
+    // Lists loaded while Expert still hold "max"; the level is lowered afterwards.
+    rememberModelChoices(SAMPLE_CHOICES);
+    const api = createMemoryApi({
+      name: "Giulia",
+      setupDone: true,
+      level: "advanced",
+      modelPick: { ai: "claude", model: "claude-opus-5-5", effort: "max" },
+    });
+    api.models.choices = () => new Promise(() => {});
+    render(<Root api={api} />);
+    expect((await picker(/AI for this task/)).textContent).toBe("Claude Opus 5.5 · Very high");
+    await click(screen.getByRole("button", { name: /AI for this task/ }));
+    await click(await screen.findByRole("menuitem", { name: "Choose the model…" }));
+    expect(screen.queryByRole("menuitemradio", { name: "Maximum" })).toBeNull();
   });
 
   it("lists only the newest model of each family, and keeps the one picked even when it's older", async () => {
