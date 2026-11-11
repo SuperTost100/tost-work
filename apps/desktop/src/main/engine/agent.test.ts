@@ -121,10 +121,13 @@ function bare(script: Script) {
   const { funnel } = fakeFunnel(script);
   const engine = new AgentEngine(funnel, () => "it", PASSES);
   engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
-  const drain = async (followUp: string | null) => {
+  const drain = async (followUp: string | null, onEvent?: (e: EngineEvent) => void) => {
     const seen: EngineEvent[] = [];
     const signal = new AbortController().signal;
-    for await (const e of engine.run({ task: task(), project: null, workdir: "/w", followUp, signal })) seen.push(e);
+    for await (const e of engine.run({ task: task(), project: null, workdir: "/w", followUp, signal })) {
+      seen.push(e);
+      onEvent?.(e);
+    }
     return seen;
   };
   return { engine, drain };
@@ -243,21 +246,29 @@ describe("AgentEngine", () => {
 
   it("keeps the card when a held file change ends with the turn, and asks again after a refusal", async () => {
     const decisions: unknown[] = [];
+    // Each turn ends once its card is out, however long the engine takes to ask.
+    let asked = () => {};
+    const whenAsked = (e: EngineEvent) => {
+      if (e.type === "approval") asked();
+    };
     const { engine, drain } = bare(async () => {
+      const shown = new Promise<void>((resolve) => {
+        asked = resolve;
+      });
       // A relative path is taken from the folder the step runs in.
       const held = engine.gate("t1", update("theirs.xlsx"));
       void held.then((d) => decisions.push(d));
-      await new Promise((r) => setTimeout(r, 5));
+      await shown;
       return { text: "" };
     });
-    const seen = await drain(null);
+    const seen = await drain(null, whenAsked);
     const ids = seen.flatMap((e) => (e.type === "approval" ? [e.approval.id] : []));
     expect(ids).toHaveLength(1);
     // The turn ended: Codex hears no, and the task keeps the card until the user decides.
     expect(seen.at(-1)).toEqual({ type: "done" });
     expect(decisions).toEqual([expect.objectContaining({ decision: "deny" })]);
     expect(engine.decide("t1", ids[0] ?? "", "refuse")).toBe(false);
-    const again = await drain("try again");
+    const again = await drain("try again", whenAsked);
     expect(again.filter((e) => e.type === "approval")).toHaveLength(1);
   });
 
