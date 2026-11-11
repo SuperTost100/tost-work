@@ -46,6 +46,7 @@ import {
 import type { Installer } from "./installer";
 import { type Jobs, jobDraft } from "./jobs";
 import type { KeyStore } from "./keys";
+import type { ResultReports } from "./reportResult";
 import { checkSandbox, type SandboxSystem } from "./sandbox";
 import type { GuideText, SkillFolder } from "./skills";
 import type { Store } from "./store/store";
@@ -74,6 +75,8 @@ export function registerIpc(
   events: EventLog,
   /** The computer as the CLIs see it, for the sandbox check. */
   sandboxSystem: SandboxSystem,
+  /** "Report this result", which checks what the window sends it. */
+  reports: ResultReports,
 ): void {
   // A handler that fails goes to the app's debug log too, and on to the window as before.
   const handle = (channel: string, listener: Parameters<typeof ipcMain.handle>[1]) =>
@@ -327,6 +330,8 @@ export function registerIpc(
   handle(IPC.tasksRename, (_e, id: unknown, title: unknown) =>
     runner.rename(text(id, "id", 100), text(title, "title", 200)),
   );
+  handle(IPC.tasksReportCard, (_e, id: unknown) => reports.card(id));
+  handle(IPC.tasksReportResult, (_e, id: unknown, input: unknown) => reports.report(id, input));
   handle(IPC.tasksReveal, async (_e, id: unknown) => {
     const error = await shell.openPath(taskOf(id).workdir);
     if (error) throw new Error(error);

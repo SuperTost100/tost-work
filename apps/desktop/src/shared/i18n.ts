@@ -47,6 +47,34 @@ const en = {
   "report.logsTitle": "Detailed logs are on",
   "report.logs": "They help most with a problem in a task. Export them, check them, and drag them into the form.",
   "report.open": "Open GitHub",
+  "result.row": "Report this result",
+  "result.title": "Report this result",
+  "result.lead":
+    "The answers here come from {ai}, {maker}'s AI. If it wrote something offensive, dangerous or out of place, report it to {maker}, who can correct the model.",
+  "result.leadNone":
+    "The answers here come from {ai}. {maker} has no place to report its AI's results, so there's nowhere to send this one.",
+  "result.kinds": "What's wrong",
+  "result.kind.offensive": "Offensive",
+  "result.kind.dangerous": "Dangerous or illegal",
+  "result.kind.sexual": "Sexual or violent",
+  "result.kind.other": "Other",
+  "result.note": "What happened (optional)",
+  "result.task": "Task",
+  "result.ai": "AI and model",
+  "result.attach": "Attach the task's conversation",
+  "result.whatSend":
+    "{maker} receives the kind of problem, your note and the conversation's code, but not the conversation.",
+  "result.whatSendAttached":
+    "{maker} also receives the whole conversation, with the files and pages the task read, and {ai}'s technical logs. It may contain your clients' data.",
+  "result.whatEmail":
+    "Your mail app opens with an email to {maker}, already written in English: the kind of problem, your note, the AI and model, and the app's version. The task's text isn't in it unless you add it.",
+  "result.whatForm":
+    "{maker}'s report form opens in your browser. Copy your note there: Tost Work sends nothing itself.",
+  "result.send": "Send to {maker}",
+  "result.sending": "Sending…",
+  "result.email": "Write to {maker}",
+  "result.form": "Open {maker}'s form",
+  "result.sent": "{maker} has received your report.",
   "welcome.title.dev": "This is a test build.",
   "welcome.title.alpha": "This is the alpha.",
   "welcome.title.beta": "This is the beta.",
@@ -640,6 +668,9 @@ const en = {
   "board.sorted": "Newest update first",
   "error.noProject": "That project doesn't exist",
   "error.noTask": "That task doesn't exist",
+  "error.reportMaybeSent":
+    "{maker} didn't confirm the report in time. It may have arrived anyway, so send it again only if you don't mind {maker} getting it twice.",
+  "error.reportSending": "The report for this task is still being sent.",
   "error.projectName": "A project needs a name",
   "error.changeFirst": "Write what to change first",
   "error.waitToSave": "Wait for the task to finish before saving",
@@ -802,6 +833,34 @@ const it: Record<MessageKey, string> = {
   "report.logsTitle": "I log dettagliati sono attivi",
   "report.logs": "Servono soprattutto per un problema in un'attività. Esportali, controllali e trascinali nel modulo.",
   "report.open": "Apri GitHub",
+  "result.row": "Segnala questo risultato",
+  "result.title": "Segnala questo risultato",
+  "result.lead":
+    "Le risposte qui le scrive {ai}, l'AI di {maker}. Se ha scritto qualcosa di offensivo, pericoloso o fuori luogo, segnalalo {a} {maker}, che può correggere il modello.",
+  "result.leadNone":
+    "Le risposte qui le scrive {ai}. {maker} non ha un canale per segnalare i risultati della sua AI, quindi questa segnalazione non ha dove andare.",
+  "result.kinds": "Cosa non va",
+  "result.kind.offensive": "Offensivo",
+  "result.kind.dangerous": "Pericoloso o illegale",
+  "result.kind.sexual": "Sessuale o violento",
+  "result.kind.other": "Altro",
+  "result.note": "Cosa è successo (facoltativo)",
+  "result.task": "Attività",
+  "result.ai": "AI e modello",
+  "result.attach": "Allega la conversazione dell'attività",
+  "result.whatSend":
+    "{maker} riceve il tipo di problema, la tua nota e il codice della conversazione, ma non la conversazione.",
+  "result.whatSendAttached":
+    "{maker} riceve anche tutta la conversazione, con i file e le pagine che l'attività ha letto, e i log tecnici di {ai}. Può contenere dati dei tuoi clienti.",
+  "result.whatEmail":
+    "Si apre la tua app di posta con un'email {a} {maker} già scritta, in inglese: il tipo di problema, la tua nota, l'AI e il modello e la versione dell'app. Il testo dell'attività non c'è, a meno che tu non lo aggiunga.",
+  "result.whatForm":
+    "Si apre nel browser il modulo di {maker} per le segnalazioni. Copia lì la tua nota: Tost Work non invia niente da solo.",
+  "result.send": "Invia {a} {maker}",
+  "result.sending": "Invio in corso…",
+  "result.email": "Scrivi {a} {maker}",
+  "result.form": "Apri il modulo di {maker}",
+  "result.sent": "{maker} ha ricevuto la tua segnalazione.",
   "welcome.title.dev": "Questa è una versione di test.",
   "welcome.title.alpha": "Questa è l'alpha.",
   "welcome.title.beta": "Questa è la beta.",
@@ -1399,6 +1458,9 @@ const it: Record<MessageKey, string> = {
   "board.sorted": "Prima gli aggiornamenti più recenti",
   "error.noProject": "Quel progetto non esiste",
   "error.noTask": "Quell'attività non esiste",
+  "error.reportMaybeSent":
+    "{maker} non ha confermato in tempo la segnalazione. Potrebbe essere arrivata lo stesso: inviala di nuovo solo se non ti importa che {maker} la riceva due volte.",
+  "error.reportSending": "La segnalazione di questa attività è ancora in invio.",
   "error.projectName": "Dai un nome al progetto",
   "error.changeFirst": "Scrivi prima cosa cambiare",
   "error.waitToSave": "Aspetta che l'attività finisca prima di salvare",

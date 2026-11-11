@@ -1028,6 +1028,15 @@ textarea {
 .setrow > .ic {
   color: var(--t2);
 }
+.result-row .ic {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.result-sent .ic {
+  flex: none;
+  color: var(--done);
+}
 .btn .ic {
   width: 15px;
   height: 15px;
@@ -1714,13 +1723,21 @@ textarea {
   margin-top: auto;
   background: var(--canvas);
 }
-.rp,
-.wc {
+/* The side panel with the "Report this result" row under it. */
+.side-col {
   grid-area: 1 / 2;
   z-index: 2;
   align-self: start;
   max-height: calc(100% - 16px);
   margin: 0 14px 16px 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.rp,
+.wc {
+  min-height: 0;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--paper);
@@ -1745,6 +1762,12 @@ textarea {
 /* "Show all" under a long list of files, lined up with the file names' icons. */
 .rp .more-files {
   margin: 2px 0 0 -10px;
+}
+.result-attach input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--ink);
 }
 .jobmodal .outfield .ic {
   color: var(--t2);
@@ -4528,6 +4551,63 @@ button.item {
 .btn.quiet:hover {
   border-color: transparent;
   background: var(--hover);
+  color: var(--ink);
+}
+
+/* Report this result: the quiet row under the task's panel, and its card, drawn as Report a problem's. */
+.result-row {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--t2);
+  text-align: left;
+  cursor: pointer;
+}
+.result-row:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.dlg.result-report {
+  width: min(568px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+}
+/* Three lines to start with, where other text areas start with five, so the card fits a small window. */
+.dlg .result-note {
+  width: 100%;
+  min-height: calc(3lh + 20px);
+  max-height: 30vh;
+  font-size: 15px;
+}
+.result-facts dd {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.result-attach {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.result-what {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.result-sent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: var(--ink);
 }
 

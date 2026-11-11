@@ -29,7 +29,7 @@ import { DebugLogs } from "./debugLog";
 import { documentTools } from "./documents";
 import { AgentEngine } from "./engine/agent";
 import type { Engine } from "./engine/engine";
-import { FakeEngine } from "./engine/fake";
+import { FakeEngine, fakeFeedback } from "./engine/fake";
 import { type AppLog, TaskRunner } from "./engine/runner";
 import { EventLog } from "./eventLog";
 import { fileGuard } from "./guard";
@@ -43,6 +43,7 @@ import { ToolServer } from "./mcp/server";
 import { confirmsNotifications, Notifier } from "./notify";
 import { pickAi, usableAis } from "./pickAi";
 import { WindowQuestions } from "./questions";
+import { ResultReports } from "./reportResult";
 import { checkSandbox, systemFor } from "./sandbox";
 import { SkillFolder } from "./skills";
 import { SkillVersions } from "./skillVersions";
@@ -258,7 +259,9 @@ app.whenReady().then(async () => {
   // Work's check before each step, which is checked in turn before each Codex task.
   let codexHook: CodexHook | null = null;
   if (process.env.TOST_WORK_ENGINE !== "fake") codexHook = giveAgentsOwnHomes(join(app.getPath("userData"), "agents"));
-  const funnel = createFunnel();
+  // The API providers are there only for "Report this result": a task on the course key reports on its API's channel.
+  // No run goes through them, so they never read a key.
+  const funnel = createFunnel({ apiKeys: {} });
 
   const language = () => store.getSettings().language ?? languageFrom(app.getLocale());
 
@@ -623,6 +626,7 @@ app.whenReady().then(async () => {
     taskState = { task: s.task, running: s.running };
     refreshMenu();
   });
+  const fake = process.env.TOST_WORK_ENGINE === "fake";
   registerIpc(
     store,
     runner,
@@ -653,6 +657,19 @@ app.whenReady().then(async () => {
     askInWindow,
     events,
     sandboxSystem,
+    // The fake engine reports nowhere: its sends wait and succeed (or fail, see fakeFeedback), and links only go to the log.
+    new ResultReports({
+      feedback: fake ? fakeFeedback(funnel, process.env.TOST_WORK_FAKE_REPORT) : funnel,
+      task: (id) => store.getTask(id),
+      // What a run adds to its CLI's environment that a report needs too: the PATH the engine runs it on. The rest of
+      // a run's environment (the step check's address, Claude Code's switches) is for the run only.
+      env: () => documents?.env,
+      open: fake
+        ? async (url) => appLog("info", "Fake engine: a report link would open", { scheme: url.split(":")[0] })
+        : (url) => shell.openExternal(url),
+      log: (level, message, detail) => appLog(level, message, detail),
+      app: { version: __APP_VERSION__, build: __APP_BUILD__ },
+    }),
   );
   // Quitting stops the tasks still working, so it asks first, in the window's card. They show as interrupted, with
   // Resume, next time. Quit again while the card is open only brings the window forward.
