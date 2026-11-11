@@ -22,12 +22,14 @@
 - **"Report this result" starts with nothing chosen:** the card used to open with "Offensive" already selected, so a note alone reported the result as offensive. Now you pick what's wrong first, and the send button stays off, with a line that says why, until you do.
 - **The note's limit shows:** past 1,800 characters the card counts them, for example 1,950 / 2,000. When a paste or typing is cut at 2,000, the card says the note was shortened. Before, the extra text vanished without a word.
 - **The card stays open after "Write to Anthropic":** your mail app still opens with the email written. The card now shows Anthropic's address and a button that copies the email's text, for when you use webmail or another mail app, or none opened.
+- **Setup says more about the AIs:** before you install ChatGPT's or Claude's program, its row says that Tost Work downloads it from OpenAI or Anthropic with their own installer. The "Connect an AI" step also says what a task sends to the AI, with a link to the privacy notice.
 
 ### it
 
 - **"Segnala questo risultato" parte senza niente scelto:** la scheda si apriva con "Offensivo" già selezionato, quindi una nota da sola segnalava il risultato come offensivo. Ora scegli prima cosa non va, e il pulsante per inviare resta spento, con una riga che ne dice il motivo, finché non l'hai fatto.
 - **Si vede il limite della nota:** oltre i 1.800 caratteri la scheda li conta, per esempio 1.950 / 2.000. Quando un incolla o la scrittura si ferma a 2.000, la scheda dice che la nota è stata accorciata. Prima il testo in più spariva senza avvisare.
 - **La scheda resta aperta dopo "Scrivi ad Anthropic":** la tua app di posta si apre ancora con l'email già scritta. Ora la scheda mostra l'indirizzo di Anthropic e un pulsante che copia il testo dell'email, per quando usi la webmail o un'altra app di posta, o non se n'è aperta nessuna.
+- **La configurazione dice di più sulle AI:** prima di installare il programma di ChatGPT o di Claude, la sua riga dice che Tost Work lo scarica da OpenAI o da Anthropic con il loro programma di installazione. Il passo "Collega un'AI" dice anche che cosa un'attività invia all'AI, con un link all'informativa privacy.
 
 ## 0.0.34-dev
 
