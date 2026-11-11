@@ -28,7 +28,7 @@ Each has my recommendation. The first one blocks the submission.
 | 7 | **Additional license terms.** | The URL of the terms of use (`legal/terms.en.md`, and `terms.it.md` for the Italian listing). Empty means only Microsoft's standard terms apply. |
 | 8 | **"Developed by"** on the listing. | `Tommaso Barbera`, the name in About and in the legal texts. It can stay empty: the listing shows the publisher name "Tost" anyway. |
 | 9 | **When the testers get it.** | Hold the release and press Publish now yourself after certification passes. |
-| 10 | **Two small app changes that lower the risk**, both found in [policy-check.md](policy-check.md). | Make both in the next build, not in 0.0.35-dev: say in the Install row that the download comes from OpenAI or Anthropic with their installer (policies 10.2.2 to 10.2.4), and say in setup's Connect an AI step what a task sends and link the privacy notice (policy 10.5.2). |
+| 10 | **Two small app changes that lower the risk**, both found in [policy-check.md](policy-check.md). | Both are made in 0.0.35-dev. The Install row now says that Tost Work downloads the program from OpenAI or Anthropic with their own installer (policies 10.2.2 to 10.2.4). Setup's Connect an AI step says what a task sends and links the privacy notice, which opens inside the app (policy 10.5.2). The installer pattern stays a risk, as [policy-check.md](policy-check.md) says. |
 
 ## What wasn't verified
 

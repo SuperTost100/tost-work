@@ -144,7 +144,12 @@ describe("first-run setup", () => {
     await click("Skip for now");
     await click("Next");
     await click("Next");
-    expect(await screen.findByText("Codex isn't installed yet. Tost Work installs it for you.")).toBeTruthy();
+    expect(
+      await screen.findByText(
+        "Codex isn't installed yet. Tost Work downloads it from OpenAI, with OpenAI's own installer.",
+      ),
+    ).toBeTruthy();
+    // Claude is there in this test, so the Anthropic wording is checked in its own test below.
     expect(screen.getByRole("button", { name: "Skip for now" })).toBeTruthy();
 
     await click("Install Codex");
@@ -155,6 +160,79 @@ describe("first-run setup", () => {
     await click("Install Codex");
     expect(await screen.findByRole("button", { name: "Sign in to ChatGPT" })).toBeTruthy();
     expect(tries).toEqual(["codex", "codex"]);
+  });
+
+  it("names the maker of the program it downloads, in both languages", async () => {
+    const missing = { codex: false, claude: false };
+    const cases = [
+      {
+        language: "en" as const,
+        next: "Next",
+        skip: "Skip for now",
+        codex: "Codex isn't installed yet. Tost Work downloads it from OpenAI, with OpenAI's own installer.",
+        claude:
+          "Claude Code isn't installed yet. Tost Work downloads it from Anthropic, with Anthropic's own installer.",
+      },
+      {
+        language: "it" as const,
+        next: "Avanti",
+        skip: "Salta per ora",
+        codex:
+          "Codex non è ancora installato. Tost Work lo scarica da OpenAI, con il programma di installazione di OpenAI.",
+        claude:
+          "Claude Code non è ancora installato. Tost Work lo scarica da Anthropic, con il programma di installazione di Anthropic.",
+      },
+    ];
+    for (const c of cases) {
+      const api = createMemoryApi({ name: "Giulia", language: c.language });
+      api.account.status = async (provider) => ({ installed: missing[provider], loggedIn: false });
+      const { unmount } = render(<Root api={api} />);
+      await click(c.next);
+      await click(c.skip);
+      await click(c.next);
+      await click(c.next);
+      expect(await screen.findByText(c.codex)).toBeTruthy();
+      expect(screen.getByText(c.claude)).toBeTruthy();
+      unmount();
+    }
+  });
+
+  it("says what a task sends and opens the privacy notice from a link, in both languages", async () => {
+    const cases = [
+      {
+        language: "en" as const,
+        next: "Next",
+        skip: "Skip for now",
+        sends: /A task sends your request and the files it reads to the AI you connect, OpenAI or Anthropic\./,
+        link: "Privacy notice",
+        close: "Close",
+      },
+      {
+        language: "it" as const,
+        next: "Avanti",
+        skip: "Salta per ora",
+        sends: /Un'attività invia la tua richiesta e i file che legge all'AI che colleghi, OpenAI o Anthropic\./,
+        link: "Informativa privacy",
+        close: "Chiudi",
+      },
+    ];
+    for (const c of cases) {
+      const api = createMemoryApi({ name: "Giulia", language: c.language });
+      const { unmount } = render(<Root api={api} />);
+      await click(c.next);
+      await click(c.skip);
+      await click(c.next);
+      await click(c.next);
+      expect(await screen.findByText(c.sends)).toBeTruthy();
+      // The link is a button, so the keyboard reaches it; it opens the notice that ships with the app.
+      await click(c.link);
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog.querySelector("h1")?.textContent).toBe(c.link);
+      expect(dialog.textContent).toMatch(/OpenAI/);
+      await click(c.close);
+      expect(screen.queryByRole("dialog")).toBeNull();
+      unmount();
+    }
   });
 
   it("shows an install in progress on its button, which can't be pressed again, and drops it when it ends", async () => {

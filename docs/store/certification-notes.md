@@ -21,7 +21,7 @@ HOW TO TEST IT
 1. Install and open Tost Work.
 2. Setup: type any name, a few words about your work, and pick a language. Pick any level (Intermediate shows every section).
 3. Connect an AI: choose "API key from your course" and paste the key below. ChatGPT is the better choice for testing on Windows, because Codex runs in a sandbox there.
-4. Codex isn't installed yet, so the row shows "Install Codex". Press it. This runs OpenAI's own installer (see below). It takes a minute or two and needs an internet connection.
+4. Codex isn't installed yet, so the row shows "Install Codex" and says Tost Work downloads it from OpenAI with OpenAI's own installer. Press it. This runs that installer (see below). It takes a minute or two and needs an internet connection.
 5. Pick a project folder: create an empty folder, for example Documents\Test, and choose it. Skip the notification question or answer it either way.
 6. On Home, type a request such as: "Write a one-page Word document that explains how to prepare a team meeting." Press Enter.
 7. The task shows its steps while it works. If the AI asks a question, pick an answer. When it finishes, the side panel lists the files it made, with a preview and a check of the result against the request.
@@ -59,7 +59,7 @@ STARTUP TASK
 The package declares a startup task that is off by default. It is turned on only by the "Open Tost Work when you log in" switch in setup or Settings, so scheduled jobs run on time, and it opens the app in the notification area.
 
 PRIVACY
-The app has no telemetry. A task sends the user's request and the files it reads to OpenAI or Anthropic through the user's own account. The privacy notice is linked in the listing and in Settings > About.
+The app has no telemetry. A task sends the user's request and the files it reads to OpenAI or Anthropic through the user's own account. The privacy notice is linked in the listing, in Settings > About and in setup's Connect an AI step, which also says what a task sends.
 ```
 
 ## Restricted capabilities

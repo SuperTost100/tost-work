@@ -6,7 +6,7 @@ import { useT } from "@/lib/useT";
 import type { TostWorkApi } from "../../../shared/api";
 import type { MessageKey } from "../../../shared/i18n";
 import { installLine } from "../../../shared/install";
-import { PROVIDER_OF, type Subscription } from "../../../shared/model";
+import { MAKER, PROVIDER_OF, type Subscription, VENDOR_OF } from "../../../shared/model";
 import { UnconfinedNote, useAskUnconfined } from "./Unconfined";
 
 /** The agent CLI behind each subscription. */
@@ -91,7 +91,7 @@ export function AccountRow({
         <code className="cmd">{installLine(provider, api.platform)}</code>
       </>
     ) : (
-      t("ai.missing", { cli })
+      t("ai.missing", { cli, maker: MAKER[VENDOR_OF[provider]] })
     );
     action = (
       <span className="row">

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccountRow } from "@/components/AccountRow";
 import { KeyRow } from "@/components/KeyRow";
+import { PrivacyDialog } from "@/components/PrivacyDialog";
 import { SetupSandboxNotice } from "@/components/SandboxNotice";
 import { Sprigs } from "@/components/Sprigs";
 import { Switch } from "@/components/Switch";
@@ -51,6 +52,7 @@ export function Setup({
 }) {
   const t = useT();
   const [step, setStep] = useState(0);
+  const [privacy, setPrivacy] = useState(false);
   // Each step starts at the top, where its title is, even when the step before was scrolled in a short window. After a
   // step change the title takes the focus, so the next Tab goes through the new step's fields; the first step is left
   // as the app opens it.
@@ -260,6 +262,12 @@ export function Setup({
           {step === 4 && (
             <>
               <p className="lede">{t("setup.ai.lede")}</p>
+              <p className="lede">
+                {t("setup.ai.sends")}{" "}
+                <button type="button" className="link" onClick={() => setPrivacy(true)}>
+                  {t("legal.privacy")}
+                </button>
+              </p>
               <Connect
                 api={api}
                 onConnected={onConnected}
@@ -295,6 +303,7 @@ export function Setup({
               {error}
             </p>
           )}
+          {privacy && <PrivacyDialog onClose={() => setPrivacy(false)} />}
 
           <div className="row">
             {step > 0 && (
