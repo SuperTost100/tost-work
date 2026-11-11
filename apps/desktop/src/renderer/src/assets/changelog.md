@@ -21,11 +21,13 @@
 
 - **A file the task made asks again once the task is done:** in 0.0.32-dev, changing a file the task made never asked. Now the file is the task's own only until the task finishes its answer. After that, its next change to the file asks first with the usual card and keeps a copy, so Restore brings that version back. While the task is waiting for your answer to a question, it doesn't ask.
 - **Claude Fable 5.2:** you can pick it from the full list of models, and the lists match the models ChatGPT and Claude offer today.
+- **The model picker is filled when you come back to Home:** it shows the models behind Fast, Balanced and Thorough at once instead of after a few seconds, and while it loads it names your pick in full ("Claude Haiku 5.5") rather than showing its id.
 
 ### it
 
 - **Un file creato dall'attività chiede di nuovo il permesso quando l'attività ha finito:** nella 0.0.32-dev modificare un file creato dall'attività non chiedeva mai il permesso. Ora il file resta dell'attività solo finché l'attività non ha finito la sua risposta. Dopo, la sua modifica successiva al file chiede prima il permesso con la solita richiesta e tiene una copia, così Ripristina riporta quella versione. Finché l'attività aspetta la tua risposta a una domanda, non chiede nulla.
 - **Claude Fable 5.2:** puoi sceglierlo dall'elenco completo dei modelli, e gli elenchi corrispondono ai modelli che ChatGPT e Claude offrono oggi.
+- **Il selettore del modello è già pieno quando torni alla Home:** mostra subito i modelli dietro Veloce, Equilibrato e Approfondito invece che dopo qualche secondo, e mentre carica chiama la tua scelta con il nome completo ("Claude Haiku 5.5") invece di mostrarne l'id.
 
 ## 0.0.32-dev
 

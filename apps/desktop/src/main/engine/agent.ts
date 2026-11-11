@@ -737,18 +737,20 @@ export class AgentEngine implements Engine, ToolHandler {
 
   /** The default AI, and the models of every AI a task could run on, for the picker under the task box. */
   async choices(): Promise<ModelChoices> {
-    const ai = await this.ai();
+    // Each check and read starts a CLI, which takes seconds on a slow machine, so they run together.
+    const [ai, usable] = await Promise.all([this.ai(), this.usable()]);
     const { provider } = await this.target(ai);
-    const ais = [ai, ...(await this.usable()).filter((x) => x !== ai)];
-    const lists: AiModels[] = [];
-    for (const id of ais) {
-      const target = await this.target(id).catch(() => null);
-      if (!target) continue;
-      // A list that can't be read leaves that AI out of the full list rather than failing the picker.
-      const models = await this.modelsOf(target.provider).catch(() => null);
-      if (models) lists.push({ ai: id, provider: target.provider, models });
-    }
-    return { ai, provider, lists };
+    const ais = [ai, ...usable.filter((x) => x !== ai)];
+    const read = await Promise.all(
+      ais.map(async (id): Promise<AiModels | null> => {
+        const target = await this.target(id).catch(() => null);
+        if (!target) return null;
+        // A list that can't be read leaves that AI out of the full list rather than failing the picker.
+        const models = await this.modelsOf(target.provider).catch(() => null);
+        return models && { ai: id, provider: target.provider, models };
+      }),
+    );
+    return { ai, provider, lists: read.filter((l) => l !== null) };
   }
 
   async *run({ task, project, workdir, followUp, signal: stopped }: RunContext): AsyncIterable<EngineEvent> {

@@ -18,8 +18,7 @@ import {
 } from "electron";
 import { IPC, type MenuAction, type MenuState, type QuestionAnswer, type WindowQuestion } from "../shared/api";
 import { languageFrom, translate } from "../shared/i18n";
-import type { AgentProvider, AiId } from "../shared/model";
-import { PROVIDER_OF } from "../shared/model";
+import type { AgentProvider } from "../shared/model";
 import { choiceOf } from "../shared/modelChoice";
 import { needsUnconfinedOk } from "../shared/sandbox";
 import { Accounts } from "./accounts";
@@ -42,7 +41,7 @@ import { AT_LOGIN, setOpenAtLogin } from "./loginItem";
 import { applyLook } from "./look";
 import { ToolServer } from "./mcp/server";
 import { confirmsNotifications, Notifier } from "./notify";
-import { pickAi } from "./pickAi";
+import { pickAi, usableAis } from "./pickAi";
 import { WindowQuestions } from "./questions";
 import { checkSandbox, systemFor } from "./sandbox";
 import { SkillFolder } from "./skills";
@@ -286,12 +285,7 @@ app.whenReady().then(async () => {
         return { name, work, notes };
       },
       ai: () => pickAi(store.getSettings().defaultAi, signedIn, keys.info() !== null),
-      usable: async () => {
-        const ais: AiId[] = [];
-        for (const ai of ["chatgpt", "claude"] as const) if ((await signedIn(PROVIDER_OF[ai])) === true) ais.push(ai);
-        if (keys.info() !== null) ais.push("key");
-        return ais;
-      },
+      usable: () => usableAis(signedIn, keys.info() !== null),
       courseKey: () => keys.get(),
       online: () => net.isOnline(),
       sandboxReady: (provider) => checkSandbox(provider, sandboxSystem),
