@@ -7,6 +7,8 @@ import { fakeFeedback } from "./engine/fake";
 import {
   CLASSIFICATION,
   cardFor,
+  mailMessage,
+  mailText,
   mailtoUrl,
   type ReportDeps,
   type ReportFunnel,
@@ -108,7 +110,7 @@ describe("the report", () => {
   it("sends a harmful result as a bad result, never as a safety check, with the kind first in the reason", async () => {
     const { funnel, sendFeedback } = stubFunnel();
     const { reports: r } = reports({ feedback: funnel });
-    expect(await r.report("t1", input)).toBe("sent");
+    expect(await r.report("t1", input)).toEqual({ outcome: "sent" });
     expect(sendFeedback).toHaveBeenCalledWith(
       "codex",
       {
@@ -160,7 +162,7 @@ describe("the report", () => {
     const first = r.report("t1", input);
     await expect(r.report("t1", input)).rejects.toMatchObject({ key: "error.reportSending" });
     finish();
-    expect(await first).toBe("sent");
+    expect(await first).toEqual({ outcome: "sent" });
     expect(sendFeedback).toHaveBeenCalledTimes(1);
   });
 
@@ -169,7 +171,9 @@ describe("the report", () => {
     const app = { version: "0.0.34-dev", build: "abc1234" };
     const bodyOf = (note: string) =>
       decodeURIComponent(
-        new URL(mailtoUrl("usersafety@anthropic.com", claude, "other", note, app)).searchParams.get("body") ?? "",
+        new URL(mailtoUrl("usersafety@anthropic.com", mailMessage(claude, "other", note, app))).searchParams.get(
+          "body",
+        ) ?? "",
       );
     const body = bodyOf("First line\nSecond line\r\nThird line");
     expect(body).toContain("What happened: First line\r\nSecond line\r\nThird line\r\n");
@@ -181,7 +185,8 @@ describe("the report", () => {
     const { funnel, sendFeedback } = stubFunnel();
     const claude = task({ provider: "claude", model: "claude-opus-5-5" });
     const { reports: r, deps } = reports({ feedback: funnel, tasks: [claude] });
-    expect(await r.report("t1", { kind: "sexual", note: "Rude words", attach: true })).toBe("email");
+    const outcome = await r.report("t1", { kind: "sexual", note: "Rude words", attach: true });
+    expect(outcome).toMatchObject({ outcome: "email", address: "usersafety@anthropic.com" });
     expect(sendFeedback).not.toHaveBeenCalled();
     const url = vi.mocked(deps.open).mock.calls[0]?.[0] ?? "";
     expect(url.startsWith("mailto:usersafety@anthropic.com?subject=")).toBe(true);
@@ -194,10 +199,33 @@ describe("the report", () => {
     expect(body).not.toContain(claude.title);
   });
 
+  it("gives the card the address and an email text equal to the link's subject and body", async () => {
+    const claude = task({ provider: "claude", model: "claude-opus-5-5" });
+    const { reports: r, deps } = reports({ tasks: [claude] });
+    const outcome = await r.report("t1", { kind: "dangerous", note: "Line one\nLine two", attach: false });
+    const params = new URL(vi.mocked(deps.open).mock.calls[0]?.[0] ?? "").searchParams;
+    const subject = params.get("subject") ?? "";
+    const body = params.get("body") ?? "";
+    expect(subject).toBe("Report of a Claude result: Dangerous or illegal");
+    expect(outcome).toEqual({
+      outcome: "email",
+      address: "usersafety@anthropic.com",
+      // The subject, a blank line, then the body: the link's lines end with CR LF, the clipboard's with LF.
+      text: `${subject}\n\n${body.replaceAll("\r\n", "\n")}`,
+    });
+    const text = outcome.outcome === "email" ? outcome.text : "";
+    expect(text.split("\n").slice(0, 3)).toEqual([subject, "", "Hello,"]);
+    expect(text).toContain("What happened: Line one\nLine two\n");
+    expect(text).not.toContain("\r");
+    expect(text).not.toContain(claude.brief);
+    expect(text).not.toContain(claude.title);
+    expect(text).toBe(mailText(mailMessage(claude, "dangerous", "Line one\nLine two", deps.app)));
+  });
+
   it("opens the maker's form for a task on an OpenAI key, and sends nothing itself", async () => {
     const { funnel, sendFeedback } = stubFunnel();
     const { reports: r, deps } = reports({ feedback: funnel, tasks: [task({ auth: "key" })] });
-    expect(await r.report("t1", input)).toBe("form");
+    expect(await r.report("t1", input)).toEqual({ outcome: "form" });
     expect(deps.open).toHaveBeenCalledWith("https://openai.com/form/report-content/");
     expect(sendFeedback).not.toHaveBeenCalled();
   });
@@ -245,6 +273,10 @@ describe("what the window sends", () => {
     await expect(r.report("new", input)).rejects.toThrow(/has a result to report/);
     expect(() => r.card("new")).toThrow(/has a result to report/);
     await expect(r.report("t1", { ...input, kind: "safety_check" })).rejects.toThrow(/kind must be one of/);
+    // No kind chosen is refused, and nothing is sent or opened.
+    await expect(r.report("t1", { ...input, kind: null })).rejects.toThrow(/kind must be one of/);
+    await expect(r.report("t1", { note: "Only a note", attach: false })).rejects.toThrow(/kind must be one of/);
+    expect(sendFeedback).not.toHaveBeenCalled();
     await expect(r.report("t1", { ...input, attach: "yes" })).rejects.toThrow("attach must be true or false");
     await expect(r.report("t1", { ...input, note: "x".repeat(2001) })).rejects.toThrow("note is too long");
     await expect(r.report("t1", null)).rejects.toThrow();

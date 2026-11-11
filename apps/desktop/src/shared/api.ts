@@ -109,8 +109,15 @@ export interface ResultReportInput {
   attach: boolean;
 }
 
-/** What happened: the report went, or the mail app or the maker's form opened. */
-export type ResultReportOutcome = "sent" | "email" | "form";
+/**
+ * What happened: the report went, the mail app opened, or the maker's form opened. For the email the card also gets
+ * the address the link went to and the email's text (subject, a blank line, body), so the user can write it from
+ * another mail app: the window never builds either.
+ */
+export type ResultReportOutcome =
+  | { outcome: "sent" }
+  | { outcome: "email"; address: string; text: string }
+  | { outcome: "form" };
 
 /** What the confirmation says before a project is removed: the question, and what goes with it. */
 export interface RemovalText {

@@ -4589,6 +4589,42 @@ button.item {
   max-height: 30vh;
   font-size: 15px;
 }
+/* Why the button is off, kept close to the kinds it asks about. */
+.result-hint {
+  margin: -6px 0 0;
+  font-size: 13px;
+  color: var(--t2);
+}
+/* The note with its counter. min-width 0 lets a long unbroken paste wrap in the field instead of widening the card. */
+.result-notebox {
+  min-width: 0;
+}
+/* The note's counter and its "shortened" line sit under the field and take no room while both are empty. */
+.result-limit {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--t2);
+}
+.result-limit > :not(:empty) {
+  margin-top: 6px;
+}
+.result-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+/* The address to write to, selectable so it can be copied by hand. */
+.result-address {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 15px;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
 .result-facts dd {
   min-width: 0;
   overflow: hidden;

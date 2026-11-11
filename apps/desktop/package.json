@@ -4,7 +4,7 @@
   "desktopName": "tost-work.desktop",
   "description": "Everyday work with AI: projects, skills and scheduled jobs, on your own ChatGPT or Claude subscription.",
   "author": "Tommaso Barbera",
-  "version": "0.0.34-dev",
+  "version": "0.0.35-dev",
   "private": true,
   "type": "module",
   "main": "out/main/index.js",

@@ -295,7 +295,9 @@ await page.waitForSelector("text=Tost");
   await safe("report this result, ChatGPT", async () => {
     await page.getByRole("button", { name: "Segnala questo risultato" }).click({ timeout: 3000 });
     await page.getByRole("dialog").getByRole("button", { name: "Invia a OpenAI" }).waitFor({ timeout: 4000 });
+    // As it opens: nothing chosen, so the button is off.
     await shot(page, "report-result-chatgpt");
+    await page.getByRole("dialog").locator("label", { hasText: "Offensivo" }).click();
     await page.getByRole("dialog").getByRole("checkbox").check();
     await shot(page, "report-result-chatgpt-attach");
     await page.getByRole("dialog").getByRole("button", { name: "Annulla" }).click();
@@ -495,7 +497,15 @@ await safe("cards", async () => {
     await page.getByRole("button", { name: "Segnala questo risultato" }).click({ timeout: 3000 });
     await page.getByRole("dialog").getByRole("button", { name: "Scrivi ad Anthropic" }).waitFor({ timeout: 4000 });
     await shot(page, "report-result-claude");
-    await page.getByRole("dialog").getByRole("button", { name: "Annulla" }).click();
+    // The fake engine opens no link: the card stays with the address and the email's text to copy.
+    await page.getByRole("dialog").locator("label", { hasText: "Pericoloso o illegale" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Scrivi ad Anthropic" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Copia il testo dell'email" })
+      .waitFor({ timeout: 4000 });
+    await shot(page, "report-result-claude-email");
+    await page.getByRole("dialog").getByRole("button", { name: "Chiudi" }).first().click();
   });
   await start("Un'altra prova");
   await page.waitForTimeout(1200);
