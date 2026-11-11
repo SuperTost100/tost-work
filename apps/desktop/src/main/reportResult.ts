@@ -1,6 +1,15 @@
 import type { FeedbackClassification, FeedbackSupport, Funnel, ProviderId } from "cli-funnel";
 import type { ResultReportCard, ResultReportInput, ResultReportOutcome } from "../shared/api";
-import { AI_NAME, MAKER, REPORT_NOTE_MAX, RESULT_KINDS, type ResultKind, type Task, VENDOR_OF } from "../shared/model";
+import {
+  AI_NAME,
+  hasResult,
+  MAKER,
+  REPORT_NOTE_MAX,
+  RESULT_KINDS,
+  type ResultKind,
+  type Task,
+  VENDOR_OF,
+} from "../shared/model";
 import { nameFromId } from "../shared/modelChoice";
 import { UserError } from "./userError";
 import { text } from "./validate";
@@ -137,8 +146,8 @@ export class ResultReports {
   private taskOf(id: unknown): Task {
     const task = this.deps.task(text(id, "id", 100));
     if (!task) throw new UserError("error.noTask");
-    // A task saved for later has no result yet.
-    if (task.status === "draft") throw new Error("Only a task that ran has a result to report");
+    // A task saved for later, or one whose AI hasn't written anything yet, has no result.
+    if (!hasResult(task)) throw new Error("Only a task the AI has answered in has a result to report");
     return task;
   }
 

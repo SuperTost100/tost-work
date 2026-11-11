@@ -30,7 +30,7 @@ const task = (over: Partial<Task> = {}): Task => ({
   status: "done",
   steps: [],
   files: [],
-  messages: [],
+  messages: [{ from: "agent", text: "Here is the price list.", at: "2026-11-10T10:01:00Z" }],
   question: null,
   approval: null,
   review: null,
@@ -229,10 +229,17 @@ describe("the report", () => {
 describe("what the window sends", () => {
   it("is checked before anything is sent", async () => {
     const { funnel, sendFeedback } = stubFunnel();
-    const { reports: r } = reports({ feedback: funnel, tasks: [task(), task({ id: "draft", status: "draft" })] });
+    // A task saved for later, and one that runs but whose AI hasn't written anything yet, have no result.
+    const empty = [
+      task({ id: "draft", status: "draft", messages: [] }),
+      task({ id: "new", status: "running", messages: [] }),
+    ];
+    const { reports: r } = reports({ feedback: funnel, tasks: [task(), ...empty] });
     await expect(r.report("nope", input)).rejects.toMatchObject({ key: "error.noTask" });
     await expect(r.report(42, input)).rejects.toThrow("id must be text");
-    await expect(r.report("draft", input)).rejects.toThrow();
+    await expect(r.report("draft", input)).rejects.toThrow(/has a result to report/);
+    await expect(r.report("new", input)).rejects.toThrow(/has a result to report/);
+    expect(() => r.card("new")).toThrow(/has a result to report/);
     await expect(r.report("t1", { ...input, kind: "safety_check" })).rejects.toThrow(/kind must be one of/);
     await expect(r.report("t1", { ...input, attach: "yes" })).rejects.toThrow("attach must be true or false");
     await expect(r.report("t1", { ...input, note: "x".repeat(2001) })).rejects.toThrow("note is too long");

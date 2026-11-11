@@ -19,13 +19,13 @@
 
 ### en
 
-- **Report this result:** a task that has run has "Report this result" under its side panel, for something offensive, dangerous or out of place that the AI wrote. For ChatGPT the report goes to OpenAI through ChatGPT itself, with the conversation only if you tick the box. For Claude your mail app opens with an email to Anthropic already written. Nothing goes to Tost Work.
+- **Report this result:** a task that has run has "Report this result" under its side panel, for something offensive, dangerous or out of place that the AI wrote. For ChatGPT the report goes to OpenAI through ChatGPT itself, with the conversation only if you tick the box. For Claude your mail app opens with an email to Anthropic already written. A task that ran on a course key opens OpenAI's report form or the email to Anthropic. Nothing goes to Tost Work.
 - **Line breaks in your message stay:** when you sent a task or a follow-up with several lines, the chat showed it as one run-on line, even though the AI received the line breaks. Now your message looks the way you wrote it, blank lines included.
 - **"Maximum" thinking is for Expert:** at Beginner, Intermediate and Advanced the model list offers Low, Medium, High and Very high, and a task never runs on Maximum. If you chose Maximum as an Expert and then lower your level, the picker shows Very high and the task runs on it. At Expert nothing changes.
 
 ### it
 
-- **Segnala questo risultato:** un'attività che ha lavorato ha "Segnala questo risultato" sotto il pannello a destra, per qualcosa di offensivo, pericoloso o fuori luogo scritto dall'AI. Per ChatGPT la segnalazione arriva a OpenAI tramite ChatGPT stesso, con la conversazione solo se spunti la casella. Per Claude si apre la tua app di posta con un'email ad Anthropic già scritta. A Tost Work non arriva niente.
+- **Segnala questo risultato:** un'attività che ha lavorato ha "Segnala questo risultato" sotto il pannello a destra, per qualcosa di offensivo, pericoloso o fuori luogo scritto dall'AI. Per ChatGPT la segnalazione arriva a OpenAI tramite ChatGPT stesso, con la conversazione solo se spunti la casella. Per Claude si apre la tua app di posta con un'email ad Anthropic già scritta. Un'attività che ha usato una chiave del corso apre il modulo di segnalazione di OpenAI o l'email ad Anthropic. A Tost Work non arriva niente.
 - **Gli a capo del tuo messaggio restano:** quando inviavi un'attività o una risposta su più righe, la chat le mostrava in una riga sola, anche se l'AI riceveva gli a capo. Ora il messaggio appare come l'hai scritto, righe vuote comprese.
 - **Il ragionamento "Massimo" è per Esperto:** a livello Principiante, Intermedio e Avanzato l'elenco dei modelli offre Basso, Medio, Alto e Molto alto, e un'attività non gira mai su Massimo. Se hai scelto Massimo da Esperto e poi abbassi il livello, il selettore mostra Molto alto e l'attività gira su quello. A livello Esperto non cambia nulla.
 

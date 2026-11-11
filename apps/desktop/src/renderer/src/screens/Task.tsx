@@ -27,6 +27,7 @@ import {
   BRIEF_MAX,
   type Decision,
   type FileChange,
+  hasResult,
   type Project,
   type Question,
   questionItems,
@@ -1430,7 +1431,7 @@ export function Task({
                 </div>
               </aside>
             )}
-            <ResultReportRow onOpen={() => setReporting(true)} />
+            {hasResult(task) && <ResultReportRow onOpen={() => setReporting(true)} />}
           </div>
           <ResultReportDialog api={api} task={task} open={reporting} onOpenChange={setReporting} />
         </div>

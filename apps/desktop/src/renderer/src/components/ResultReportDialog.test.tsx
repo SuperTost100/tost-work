@@ -94,6 +94,12 @@ describe("Report this result", () => {
     const busy = within(card).getByRole("button", { name: "Sending…" });
     expect((busy as HTMLButtonElement).disabled).toBe(true);
     await press(busy);
+    // The card can't be closed while the report is on its way: its outcome would have nowhere to show.
+    await act(async () => {
+      fireEvent.keyDown(card, { key: "Escape" });
+    });
+    await press(within(card).getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("dialog")).toBe(card);
     expect(reportResult).toHaveBeenCalledTimes(1);
     await act(async () => fail(new Error("OpenAI didn't confirm the report in time. It may have arrived anyway.")));
     expect((await within(card).findByRole("alert")).textContent).toMatch(/may have arrived/);
