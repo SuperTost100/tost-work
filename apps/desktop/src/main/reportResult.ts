@@ -83,17 +83,15 @@ const httpsUrl = (url: string | undefined): string | null => {
 
 /**
  * The email to the maker, already written, in English for the people who read it. It has the kind, the note, the AI
- * and model and the app's version, never the task's own text.
- * shortcut: a long note makes a long link, which some mail apps cut short; move the note to the clipboard if users
- * report it.
+ * and model and the app's version, never the task's own text. The mail link and the card's copy button both take
+ * their subject and body from here, so what the user pastes is what the link carries.
  */
-export function mailtoUrl(
-  email: string,
+export function mailMessage(
   task: Pick<Task, "provider" | "model" | "auth">,
   kind: ResultKind,
   note: string,
   app: { version: string; build: string },
-): string {
+): { subject: string; body: string } {
   const provider = task.provider ?? "codex";
   const ai = AI_NAME[provider];
   const through = provider === "claude" ? "Claude Code" : "Codex";
@@ -110,8 +108,21 @@ export function mailtoUrl(
     `AI: ${ai}, model ${nameFromId(task.model)} (${task.model}), through ${through}`,
     `App: Tost Work ${app.version}, build ${app.build}`,
   ].join("\r\n");
-  const subject = `Report of a ${ai} result: ${KIND_LABEL[kind]}`;
-  return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  return { subject: `Report of a ${ai} result: ${KIND_LABEL[kind]}`, body };
+}
+
+/**
+ * The link that opens the user's mail app on the email.
+ * shortcut: a long note makes a long link, which some mail apps cut short; the card's copy button has the whole text,
+ * so move the note out of the link only if users report it.
+ */
+export function mailtoUrl(email: string, message: { subject: string; body: string }): string {
+  return `mailto:${email}?subject=${encodeURIComponent(message.subject)}&body=${encodeURIComponent(message.body)}`;
+}
+
+/** The email as plain text for the clipboard: the subject, a blank line, then the body, with plain line breaks. */
+export function mailText(message: { subject: string; body: string }): string {
+  return `${message.subject}\n\n${message.body.replaceAll("\r\n", "\n")}`;
 }
 
 /** The card's fields as the window sent them, checked: IPC is a trust boundary. */
@@ -190,19 +201,30 @@ export class ResultReports {
         this.sending.delete(task.id);
       }
       this.deps.log("info", "AI result report sent", detail);
-      return "sent";
+      return { outcome: "sent" };
     }
     const email = mailAddress(support.channel?.email);
     const url = httpsUrl(support.channel?.url);
     if (card.how === "email" && email) {
-      await this.deps.open(mailtoUrl(email, task, input.kind, input.note, this.deps.app));
-      this.deps.log("info", "AI result report opened in the mail app", detail);
-      return "email";
+      const message = mailMessage(task, input.kind, input.note, this.deps.app);
+      // A computer with no mail app can refuse the link. The card then still gives the address and the text to copy.
+      const opened = await this.deps.open(mailtoUrl(email, message)).then(
+        () => true,
+        (err: unknown) => {
+          this.deps.log("warn", "AI result report: the mail app didn't open", {
+            ...detail,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return false;
+        },
+      );
+      if (opened) this.deps.log("info", "AI result report opened in the mail app", detail);
+      return { outcome: "email", address: email, text: mailText(message), opened };
     }
     if (card.how === "form" && url) {
       await this.deps.open(url);
       this.deps.log("info", "AI result report form opened", detail);
-      return "form";
+      return { outcome: "form" };
     }
     throw new Error("This AI has no place to report a result to");
   }
