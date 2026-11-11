@@ -45,6 +45,7 @@ function open(
           outcome: "email",
           address: "usersafety@anthropic.com",
           text: "Report of a Claude result: Offensive\n\nHello,",
+          opened: true,
         }
       : { outcome: card.how === "send" ? "sent" : "form" },
   lang: "en" | "it" = "en",
@@ -114,6 +115,22 @@ describe("Report this result", () => {
     // The user decides whether to send again; nothing is sent by itself.
     expect(within(card).getByRole("button", { name: "Send to OpenAI" })).toBeTruthy();
     expect(reportResult).toHaveBeenCalledTimes(1);
+  });
+
+  it("says the mail app didn't open, and still gives the address and the text to copy", async () => {
+    open(CARDS.email, async () => ({
+      outcome: "email",
+      address: "usersafety@anthropic.com",
+      text: "Report of a Claude result: Offensive\n\nHello,",
+      opened: false,
+    }));
+    const card = await openCard();
+    await press(within(card).getByRole("radio", { name: "Offensive" }));
+    await press(await within(card).findByRole("button", { name: "Write to Anthropic" }));
+    expect(await within(card).findByText("Your mail app didn't open. Write to:")).toBeTruthy();
+    expect(within(card).queryByText("Your mail app has opened with the email already written.")).toBeNull();
+    expect(within(card).getByText("usersafety@anthropic.com")).toBeTruthy();
+    expect(within(card).getByRole("button", { name: "Copy the email's text" })).toBeTruthy();
   });
 
   it("writes to Anthropic for a Claude task, and stays open with the address and the email's text", async () => {

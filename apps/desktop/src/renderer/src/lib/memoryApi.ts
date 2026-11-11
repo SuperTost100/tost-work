@@ -619,6 +619,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
               outcome: "email",
               address: "usersafety@anthropic.com",
               text: `Report of a Claude result: ${input.kind}\n\nKind: ${input.kind}\n${input.note}`,
+              opened: true,
             }
           : { outcome: "sent" };
       },

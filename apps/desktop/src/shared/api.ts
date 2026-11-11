@@ -116,7 +116,8 @@ export interface ResultReportInput {
  */
 export type ResultReportOutcome =
   | { outcome: "sent" }
-  | { outcome: "email"; address: string; text: string }
+  /** `opened` is false when the computer couldn't open a mail app: the address and the text are all the user has. */
+  | { outcome: "email"; address: string; text: string; opened: boolean }
   | { outcome: "form" };
 
 /** What the confirmation says before a project is removed: the question, and what goes with it. */

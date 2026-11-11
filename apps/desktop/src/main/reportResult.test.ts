@@ -199,6 +199,21 @@ describe("the report", () => {
     expect(body).not.toContain(claude.title);
   });
 
+  it("still gives the address and the email's text when the computer can't open a mail app", async () => {
+    const claude = task({ provider: "claude", model: "claude-opus-5-5" });
+    const open = vi.fn(async () => {
+      throw new Error("No application is set to open mailto links");
+    });
+    const { reports: r, deps } = reports({ tasks: [claude], open });
+    const outcome = await r.report("t1", { kind: "other", note: "Rude words", attach: false });
+    expect(outcome).toMatchObject({ outcome: "email", address: "usersafety@anthropic.com", opened: false });
+    expect(outcome.outcome === "email" ? outcome.text : "").toContain("What happened: Rude words");
+    // The log says the mail app didn't open, without the note.
+    const logged = JSON.stringify(vi.mocked(deps.log).mock.calls);
+    expect(logged).toContain("the mail app didn't open");
+    expect(logged).not.toContain("Rude words");
+  });
+
   it("gives the card the address and an email text equal to the link's subject and body", async () => {
     const claude = task({ provider: "claude", model: "claude-opus-5-5" });
     const { reports: r, deps } = reports({ tasks: [claude] });
@@ -212,6 +227,7 @@ describe("the report", () => {
       address: "usersafety@anthropic.com",
       // The subject, a blank line, then the body: the link's lines end with CR LF, the clipboard's with LF.
       text: `${subject}\n\n${body.replaceAll("\r\n", "\n")}`,
+      opened: true,
     });
     const text = outcome.outcome === "email" ? outcome.text : "";
     expect(text.split("\n").slice(0, 3)).toEqual([subject, "", "Hello,"]);

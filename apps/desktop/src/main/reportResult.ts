@@ -207,9 +207,19 @@ export class ResultReports {
     const url = httpsUrl(support.channel?.url);
     if (card.how === "email" && email) {
       const message = mailMessage(task, input.kind, input.note, this.deps.app);
-      await this.deps.open(mailtoUrl(email, message));
-      this.deps.log("info", "AI result report opened in the mail app", detail);
-      return { outcome: "email", address: email, text: mailText(message) };
+      // A computer with no mail app can refuse the link. The card then still gives the address and the text to copy.
+      const opened = await this.deps.open(mailtoUrl(email, message)).then(
+        () => true,
+        (err: unknown) => {
+          this.deps.log("warn", "AI result report: the mail app didn't open", {
+            ...detail,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return false;
+        },
+      );
+      if (opened) this.deps.log("info", "AI result report opened in the mail app", detail);
+      return { outcome: "email", address: email, text: mailText(message), opened };
     }
     if (card.how === "form" && url) {
       await this.deps.open(url);

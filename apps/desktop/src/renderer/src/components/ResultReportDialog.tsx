@@ -45,7 +45,7 @@ export function ResultReportDialog({
   const [attach, setAttach] = useState(false);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-  const [mail, setMail] = useState<{ address: string; text: string } | null>(null);
+  const [mail, setMail] = useState<{ address: string; text: string; opened: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Bumped each time the card opens, so a send or a read from an earlier opening doesn't land in this one.
   const opening = useRef(0);
@@ -81,7 +81,8 @@ export function ResultReportDialog({
       if (outcome.outcome === "sent") setSent(true);
       // The mail app has the report now, unless the user has another one: the card stays with the address and the text.
       // A form has nothing yet: the card stays too, so the note can be copied into it.
-      else if (outcome.outcome === "email") setMail({ address: outcome.address, text: outcome.text });
+      else if (outcome.outcome === "email")
+        setMail({ address: outcome.address, text: outcome.text, opened: outcome.opened });
     } catch (err) {
       if (n === opening.current) setError(errorText(err));
     } finally {
@@ -120,8 +121,10 @@ export function ResultReportDialog({
           </div>
           {mail ? (
             <>
-              <Dialog.Description className="report-p">{t("result.mailOpened")}</Dialog.Description>
-              <p className="report-p">{t("result.mailElse")}</p>
+              <Dialog.Description className="report-p">
+                {t(mail.opened ? "result.mailOpened" : "result.mailNotOpened")}
+              </Dialog.Description>
+              {mail.opened && <p className="report-p">{t("result.mailElse")}</p>}
               <p className="result-address">{mail.address}</p>
               <div>
                 <CopyButton text={() => mail.text} label={t("result.copyEmail")} />
