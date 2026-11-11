@@ -538,13 +538,10 @@ describe("AgentEngine", () => {
       for await (const e of engine.run({ ...run, followUp: text, signal: new AbortController().signal })) seen.push(e);
       return seen;
     };
-    const lowered = await followUp("go on");
+    await followUp("go on");
     level = "expert";
-    const expert = await followUp("and again");
+    await followUp("and again");
     expect(inputs.map((i) => i.selection.effort)).toEqual(["high", "max"]);
-    // The task's record follows the level that ran, so its header and panel name it.
-    expect(lowered).toContainEqual({ type: "effort", effort: "high" });
-    expect(expert.some((e) => e.type === "effort")).toBe(false);
   });
 
   it("takes Maximum away when the level is lowered, and offers and starts it again at Expert", async () => {

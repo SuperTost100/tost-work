@@ -146,8 +146,8 @@ export class ResultReports {
   private taskOf(id: unknown): Task {
     const task = this.deps.task(text(id, "id", 100));
     if (!task) throw new UserError("error.noTask");
-    // A task saved for later, or one whose AI hasn't written anything yet, has no result.
-    if (!hasResult(task)) throw new Error("Only a task the AI has answered in has a result to report");
+    // A task saved for later, or one that failed before the AI started, has no result.
+    if (!hasResult(task)) throw new Error("Only a task the AI has started on has a result to report");
     return task;
   }
 

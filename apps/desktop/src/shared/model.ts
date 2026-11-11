@@ -81,9 +81,11 @@ export type ResultKind = "offensive" | "dangerous" | "sexual" | "other";
 export const RESULT_KINDS: readonly ResultKind[] = ["offensive", "dangerous", "sexual", "other"];
 /** The longest note a result report takes. */
 export const REPORT_NOTE_MAX = 2000;
-/** True once the AI has written something in the task, an answer or a question: before that there is nothing to report. */
-export const hasResult = (task: Pick<Task, "messages" | "question">): boolean =>
-  task.question !== null || task.messages.some((m) => m.from === "agent");
+/**
+ * True once the AI's conversation for the task has started. From then on its words are on screen, also while it is
+ * still writing, and they stay reportable after a stop or a failure, which clear a question it asked.
+ */
+export const hasResult = (task: Pick<Task, "sessionId">): boolean => Boolean(task.sessionId);
 
 /** A file's modification time and size, as `stat` reports them. */
 export interface FileStamp {
@@ -247,8 +249,6 @@ export interface Task {
 /** What an engine reports while it works. The task screen is built from these. */
 export type EngineEvent =
   | { type: "session"; sessionId: string }
-  /** The reasoning level this run uses, when the user's level no longer allows the one the task was started with. */
-  | { type: "effort"; effort: string }
   | { type: "plan"; steps: Step[] }
   /** `id` is the tool call's, for the debug view. */
   | { type: "activity"; kind: ActivityKind; target?: string; id?: string }

@@ -838,7 +838,6 @@ export class AgentEngine implements Engine, ToolHandler {
     const log = this.taskLog(task.id, [session.token, apiKey]);
     const access = codex ? "full" : "supervised";
     const effort = await this.effortNow(provider, task);
-    if (effort !== task.effort) channel.push({ type: "effort", effort });
     log.write({
       type: "run",
       provider,

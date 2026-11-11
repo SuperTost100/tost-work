@@ -8,16 +8,6 @@ const waiting = {
   approval: null,
 } as unknown as Task;
 
-describe("applyEvent effort", () => {
-  it("makes the task say the reasoning level its run used", () => {
-    const started = { effort: "max", model: "m1" } as unknown as Task;
-    expect(applyEvent(started, { type: "effort", effort: "xhigh" }, "t")).toMatchObject({
-      effort: "xhigh",
-      model: "m1",
-    });
-  });
-});
-
 describe("applyEvent withdrawn", () => {
   it("takes the named question off the task and puts it back to running", () => {
     const next = applyEvent(waiting, { type: "withdrawn", id: "q2" }, "t");

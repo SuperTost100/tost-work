@@ -30,7 +30,7 @@ const task = (over: Partial<Task> = {}): Task => ({
   status: "done",
   steps: [],
   files: [],
-  messages: [{ from: "agent", text: "Here is the price list.", at: "2026-11-10T10:01:00Z" }],
+  messages: [],
   question: null,
   approval: null,
   review: null,
@@ -229,12 +229,16 @@ describe("the report", () => {
 describe("what the window sends", () => {
   it("is checked before anything is sent", async () => {
     const { funnel, sendFeedback } = stubFunnel();
-    // A task saved for later, and one that runs but whose AI hasn't written anything yet, have no result.
-    const empty = [
-      task({ id: "draft", status: "draft", messages: [] }),
-      task({ id: "new", status: "running", messages: [] }),
+    // A task saved for later, and one that failed before the AI started, have no conversation and so no result.
+    const { sessionId: _none, ...unstarted } = task();
+    const empty: Task[] = [
+      { ...unstarted, id: "draft", status: "draft" },
+      { ...unstarted, id: "new", status: "failed" },
     ];
-    const { reports: r } = reports({ feedback: funnel, tasks: [task(), ...empty] });
+    // One the AI asked a question in and the user then stopped keeps its result, though the question is gone.
+    const stopped = task({ id: "stopped", status: "stopped", messages: [], question: null });
+    const { reports: r } = reports({ feedback: funnel, tasks: [task(), ...empty, stopped] });
+    expect(r.card("stopped").how).toBe("send");
     await expect(r.report("nope", input)).rejects.toMatchObject({ key: "error.noTask" });
     await expect(r.report(42, input)).rejects.toThrow("id must be text");
     await expect(r.report("draft", input)).rejects.toThrow(/has a result to report/);
