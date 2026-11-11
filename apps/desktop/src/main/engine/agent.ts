@@ -20,10 +20,13 @@ import { KEY_PROVIDER, type Level, PROVIDER_OF } from "../../shared/model";
 import {
   type AiModels,
   DEFAULT_PICK,
+  EFFORTS,
+  effortsFor,
   limitModels,
   type ModelChoices,
   type ModelOption,
   type ModelPick,
+  nearestEffort,
   pickOn,
 } from "../../shared/modelChoice";
 import { type SandboxReadiness, sandboxFor } from "../../shared/sandbox";
@@ -715,6 +718,18 @@ export class AgentEngine implements Engine, ToolHandler {
     );
   }
 
+  /**
+   * The level a run of the task uses. A task started at Expert keeps "max" in its record, so below Expert a later run
+   * of it takes the nearest level its model still offers.
+   */
+  private async effortNow(provider: AgentProvider, task: Task): Promise<string> {
+    if (effortsFor(this.level(), [task.effort]).length > 0) return task.effort;
+    // Without the model's list, the nearest of the usual levels stands in.
+    const models = await this.modelsOf(provider).catch(() => []);
+    const offered = models.find((m) => m.id === task.model)?.efforts ?? effortsFor(this.level(), EFFORTS);
+    return nearestEffort(task.effort, offered) ?? task.effort;
+  }
+
   /** What a new task runs on, from `pickOn`: a choice of the three on the default AI, or a model from the full list. */
   async defaults(
     pick: ModelPick = DEFAULT_PICK,
@@ -822,11 +837,12 @@ export class AgentEngine implements Engine, ToolHandler {
     // tool server token and the course key are masked wherever they would appear.
     const log = this.taskLog(task.id, [session.token, apiKey]);
     const access = codex ? "full" : "supervised";
+    const effort = await this.effortNow(provider, task);
     log.write({
       type: "run",
       provider,
       model: task.model,
-      effort: task.effort,
+      effort,
       access,
       sandbox,
       cwd: workdir,
@@ -893,7 +909,7 @@ export class AgentEngine implements Engine, ToolHandler {
           CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR: "1",
         };
     const stream = this.funnel.stream({
-      selection: { provider, model: task.model, effort: task.effort, cwd: workdir, access },
+      selection: { provider, model: task.model, effort, cwd: workdir, access },
       // Files sent without a message come with a note that says so, in place of an empty prompt.
       prompt: followUp ?? (task.brief || withFiles("", task.attachments)),
       system: instructionsFor(

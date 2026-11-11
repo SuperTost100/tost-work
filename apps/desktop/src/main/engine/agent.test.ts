@@ -523,6 +523,27 @@ describe("AgentEngine", () => {
     },
   );
 
+  it("runs a task started at Maximum on the nearest level its model offers once the level is below Expert", async () => {
+    let level: Level = "advanced";
+    const { funnel, inputs } = fakeFunnel(async () => ({ text: "ok" }));
+    // A model with no "xhigh": the nearest level left is "high".
+    (funnel as { models: unknown }).models = async () => [
+      { id: "m1", efforts: ["low", "medium", "high", "max"].map((id) => ({ id })) },
+    ];
+    const engine = new AgentEngine(funnel, () => "it", { ...PASSES, level: () => level });
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const followUp = async (text: string) => {
+      const seen: EngineEvent[] = [];
+      const run = { task: task({ model: "m1", effort: "max", sessionId: "s1" }), project: null, workdir: "/w" };
+      for await (const e of engine.run({ ...run, followUp: text, signal: new AbortController().signal })) seen.push(e);
+      return seen;
+    };
+    await followUp("go on");
+    level = "expert";
+    await followUp("and again");
+    expect(inputs.map((i) => i.selection.effort)).toEqual(["high", "max"]);
+  });
+
   it("takes Maximum away when the level is lowered, and offers and starts it again at Expert", async () => {
     let level: Level = "expert";
     const engine = engineWithModels({ level: () => level });
