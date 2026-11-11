@@ -25,6 +25,7 @@ const model = (id: string, efforts = ALL, defaultEffort?: string): ModelOption =
 
 const codex = [model("gpt-6.1-sol", [...ALL, "ultra"], "low"), model("gpt-6.1-terra"), model("gpt-6-luna")];
 const claude = [
+  model("claude-fable-5-2"),
   model("claude-opus-5-5"),
   model("claude-sonnet-5-5"),
   model("claude-haiku-5-5"),
@@ -223,7 +224,9 @@ describe("the newest model of each family", () => {
     named("gpt-6-luna", "GPT-6-Luna"),
     named("gpt-5.6-luna", "GPT-5.6-Luna"),
   ];
+  // The list cli-funnel 0.9.1 gives.
   const claudeList = [
+    named("claude-fable-5-2", "Claude Fable 5.2"),
     named("claude-fable-5-1", "Claude Fable 5.1"),
     named("claude-opus-5-5", "Claude Opus 5.5"),
     named("claude-opus-4-6", "Claude Opus 4.6"),
@@ -238,9 +241,9 @@ describe("the newest model of each family", () => {
     expect(names(newestOfEachFamily(codexList))).toEqual(["GPT-6.1 Sol", "GPT-6 Astra", "GPT-6.1 Terra", "GPT-6 Luna"]);
   });
 
-  it("keeps Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5", () => {
+  it("keeps Fable 5.2, Opus 5.5, Sonnet 5.5 and Haiku 5.5", () => {
     expect(names(newestOfEachFamily(claudeList))).toEqual([
-      "Claude Fable 5.1",
+      "Claude Fable 5.2",
       "Claude Opus 5.5",
       "Claude Sonnet 5.5",
       "Claude Haiku 5.5",
@@ -283,6 +286,7 @@ describe("a model's name from its id", () => {
     ["gpt-6.1-terra", "GPT-6.1 Terra"],
     ["gpt-6-luna", "GPT-6 Luna"],
     ["claude-opus-5-5", "Claude Opus 5.5"],
+    ["claude-fable-5-2", "Claude Fable 5.2"],
     ["claude-sonnet-5", "Claude Sonnet 5"],
     ["claude-haiku-4-5-20251001", "Claude Haiku 4.5"],
     ["o4-mini", "o4-mini"],

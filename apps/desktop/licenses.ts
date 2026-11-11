@@ -91,7 +91,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
  * Keyed by name and version: a new version has to be checked again, and goes from here when it ships its own file.
  */
 const MISSING_TEXT: Record<string, LicenseText> = {
-  "cli-funnel@0.7.0": {
+  "cli-funnel@0.9.1": {
     file: "LICENSE (github.com/SuperTost100/cli-funnel)",
     text: mit("2026 cli-funnel contributors"),
   },

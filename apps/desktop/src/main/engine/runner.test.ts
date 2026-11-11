@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { EngineEvent, Task } from "../../shared/model";
+import { PRESET_MODELS } from "../../shared/modelChoice";
 import { Store } from "../store/store";
 import { SandboxNotReady, UserError } from "../userError";
 import type { Engine, RunContext } from "./engine";
@@ -30,6 +31,15 @@ const waitFor = async (check: () => boolean) => {
 };
 
 describe("TaskRunner with the fake engine", () => {
+  it("gives a task made without a model the middle choice's Codex model and level", () => {
+    const { runner } = setup();
+    const task = runner.create({ projectId: null, brief: "Write a proposal", workdir: "/tmp/p" });
+    expect({ provider: task.provider, model: task.model, effort: task.effort }).toEqual({
+      provider: "codex",
+      ...PRESET_MODELS.balanced.codex,
+    });
+  });
+
   it("pauses on the question, resumes with the answer and finishes with files and a review", async () => {
     const { store, runner } = setup();
     const task = runner.create({

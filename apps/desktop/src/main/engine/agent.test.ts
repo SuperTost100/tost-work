@@ -622,6 +622,32 @@ describe("AgentEngine", () => {
     expect(seen.at(-1)).toEqual({ type: "done" });
   });
 
+  it("writes a CLI's warnings and a narrower start to the task's log only, and the run goes on", async () => {
+    const { funnel } = fakeFunnel(async (_input, emit) => {
+      emit({ type: "session", sessionId: "s1" });
+      emit({ type: "access.reduced", access: "full", expected: "workspace-write", started: "read-only" });
+      emit({ type: "warning", message: "Under-development features enabled: hooks." });
+      return { text: "Fatto." };
+    });
+    const written: Record<string, unknown>[] = [];
+    const engine = new AgentEngine(funnel, () => "it", {
+      ...PASSES,
+      taskLog: () => ({ write: (l) => written.push(l) }),
+    });
+    engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
+    const seen: EngineEvent[] = [];
+    const signal = new AbortController().signal;
+    for await (const e of engine.run({ task: task(), project: null, workdir: "/w", followUp: null, signal }))
+      seen.push(e);
+    expect(seen).toEqual([{ type: "session", sessionId: "s1" }, { type: "message", text: "Fatto." }, { type: "done" }]);
+    expect(written).toEqual(
+      expect.arrayContaining([
+        { type: "access.reduced", access: "full", expected: "workspace-write", started: "read-only" },
+        { type: "warning", message: "Under-development features enabled: hooks." },
+      ]),
+    );
+  });
+
   it("writes the run and every event to the task's log, with the run's token and the course key among its secrets", async () => {
     const key = { key: "sk-ant-api03-thecoursekeyfortoday0123456789", vendor: "anthropic" as const };
     const { funnel, inputs } = fakeFunnel(async (_input, emit) => {
