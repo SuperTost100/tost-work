@@ -22,19 +22,23 @@ HOW TO TEST IT
 2. Setup: type any name, a few words about your work, and pick a language. Pick any level (Intermediate shows every section).
 3. Connect an AI: choose "API key from your course" and paste the key below. ChatGPT is the better choice for testing on Windows, because Codex runs in a sandbox there.
 4. Codex isn't installed yet, so the row shows "Install Codex" and says Tost Work downloads it from OpenAI with OpenAI's own installer. Press it. This runs that installer (see below). It takes a minute or two and needs an internet connection.
-5. Pick a project folder: create an empty folder, for example Documents\Test, and choose it. Skip the notification question or answer it either way.
+5. Prepare the project folder: create a folder, for example Documents\Test, and put one file in it that a task will have to replace: a text file called Agenda.txt with a line or two of text, made in Notepad. Choose that folder as the project. Skip the notification question or answer it either way.
 6. On Home, type a request such as: "Write a one-page Word document that explains how to prepare a team meeting." Press Enter.
 7. The task shows its steps while it works. If the AI asks a question, pick an answer. When it finishes, the side panel lists the files it made, with a preview and a check of the result against the request.
-8. Ask the same task: "Change the title of the document." The app asks before the AI replaces the existing file, and keeps a copy that "Restore" puts back.
+8. Start a new task (not a follow-up on the first one) in the same project: "In Agenda.txt, change the first line to Team meeting, Tuesday." Agenda.txt was in the folder before the task, so before the AI replaces it the app shows the card "The task wants to replace Agenda.txt". Press "Allow overwrite". When the task ends, Agenda.txt is listed with "Earlier version" and a "Restore" button, which puts the old text back. If the AI changes the file with a command the app can't read, there may be no card, and the file is then listed as changed, either with an earlier version to restore or marked "No earlier version".
 9. Under the task's side panel, "Report this result" shows the report card (described below). Please don't send a report: it reaches OpenAI.
 
 TEST ACCESS
 [FILL IN: the test access. For example: "OpenAI API key, valid until <date>, with a spending limit: <key>". Never put a real key in the repository.]
 
-Without a key, the app can also be tried in its sample mode, which replays scripted tasks with sample files and sends nothing anywhere: open a Command Prompt, run
+Without a key, the app can also be tried in its sample mode, which replays scripted tasks with sample files and sends nothing anywhere. Steps 3, 4 and 8 above need a key, so in sample mode follow this instead:
+1. Quit Tost Work if it is running. The app opens one copy at a time: a second start only brings the first window forward, and the sample mode is ignored. The first copy may still be running in the notification area after its window is closed. Right-click the Tost Work icon there (it may be under the "^" arrow at the right of the taskbar) and choose "Quit Tost Work". If you can't find the icon, end Tost Work in Task Manager.
+2. Open a Command Prompt and run
   set TOST_WORK_ENGINE=fake
   tost-work.exe
-then complete setup as above, pressing "Skip for now" at the Connect an AI step, and choose a project folder at the last step. Every task then replays a sample run, with a question and a request to replace a file. Our CI runs the installed package this way on every build.
+3. Complete setup as above, pressing "Skip for now" at the Connect an AI step. Before the last step, make a folder and put in it any file named Proposta.docx. Choose that folder at the last step.
+4. Type any request. Every task replays the same sample run, whatever you write: it asks a question and saves two files, Proposta.docx and prezzi.xlsx. Because Proposta.docx is already in the folder, the app shows the card "The task wants to replace Proposta.docx". Press "Allow overwrite" and answer the question. When the task ends, Proposta.docx is listed with "Earlier version" and a "Restore" button. A follow-up in sample mode shows no card, so use a new task each time.
+Our CI runs the installed package this way on every build.
 
 LIVE GENERATIVE AI (policy 11.16)
 The answers and files a task produces are generated live by ChatGPT or Claude on the user's own account. The Store listing says so in its description, and "This product incorporates generative AI features" is ticked. OpenAI's and Anthropic's own safety systems apply to every request, as they do in their own apps.
@@ -53,13 +57,16 @@ Nothing is installed until the user presses "Install Codex" or "Install Claude C
 Both install for the current user only, without admin rights, and check the download's SHA-256. The app passes -ExecutionPolicy Bypass to that one PowerShell process so the documented command can run. It changes no execution policy on the PC. On Windows, the Claude button first shows a card explaining that Claude Code has no sandbox on Windows yet.
 
 SAFETY OF THE AI'S WORK
-The AI works only in the project folder the user chose. Before it replaces or deletes a file, the app asks and keeps a copy the user can restore, and deleted files go to the Recycle Bin. Codex runs in its own sandbox. Claude Code has none on Windows, which the app explains before it is connected and before the first Claude task. Its file tools stay in the task's folder and delete commands are refused.
+The AI works in the project folder the user chose. What keeps its commands there depends on the AI:
+- ChatGPT (Codex): its commands run in Codex's own sandbox, which lets them write only inside the task's folder and temporary folders. Every step Codex takes first passes a check by the app, and a step that fails the check doesn't run.
+- Claude (Claude Code): it asks the app before it writes or deletes a file. On macOS and Linux its commands run in Claude Code's sandbox. On Windows Claude Code has no sandbox yet, so its commands are not confined to the folder: they could read or write elsewhere on the PC. Its file tools stay in the task's folder. The app says all this before the user connects Claude and before the first Claude task.
+Before a change to a file that was already in the folder, the app shows a card and keeps the earlier version, which "Restore" puts back. This covers the AI's file tools and the commands the app can read. A command or script that works out its file names as it runs, or that changes files from inside a program, can change a file without a card. The app then lists the file as changed with "No earlier version", unless the task was stopped or the folder is very large, where it can't compare. Commands that delete files are refused, and a deletion goes through the app's own tool: the user is asked, and the file goes to the Recycle Bin. A script that deletes in a way the app can't read isn't caught.
 
 STARTUP TASK
 The package declares a startup task that is off by default. It is turned on only by the "Open Tost Work when you log in" switch in setup or Settings, so scheduled jobs run on time, and it opens the app in the notification area.
 
 PRIVACY
-The app has no telemetry. A task sends the user's request and the files it reads to OpenAI or Anthropic through the user's own account. The privacy notice is linked in the listing, in Settings > About and in setup's Connect an AI step, which also says what a task sends.
+The app has no telemetry. A task sends the user's request and the files it reads to OpenAI or Anthropic through the user's own account. The privacy notice is linked in the listing, in Settings > About, and under the Connect an AI step of setup and at the top of Settings > AI accounts, where the same sentence says what a task sends.
 ```
 
 ## Restricted capabilities
@@ -88,7 +95,7 @@ The data folder stays after an uninstall. The privacy notice tells users which f
 
 ## Short version
 
-For use only if Partner Center refuses the long notes. It leaves out the safety details and the startup task.
+For use only if Partner Center refuses the long notes. It shortens the safety details and leaves out the startup task.
 
 ```text
 Notes written on [FILL IN: date]. Package 1.0.35.0 = Tost Work 0.0.35-dev, a test build for a private group of testers.
@@ -99,9 +106,9 @@ To test: complete setup, choose "API key from your course", paste the key below,
 
 TEST ACCESS: [FILL IN]
 
-Sample mode without a key: in a Command Prompt run "set TOST_WORK_ENGINE=fake" then "tost-work.exe", and press "Skip for now" at the Connect an AI step.
+Sample mode without a key: quit Tost Work first, including its icon in the notification area, because a second start only brings the first window forward. Then in a Command Prompt run "set TOST_WORK_ENGINE=fake" then "tost-work.exe", press "Skip for now" at the Connect an AI step, and choose a folder that already holds a file named Proposta.docx: the first task asks before replacing it.
 
 AI content (11.16): answers are generated live by ChatGPT or Claude. "Report this result" under each task sends a report to the model's maker (OpenAI through Codex's feedback channel, Anthropic by email), who can correct the model; users reach the developer through Settings > Report a problem.
 
-Nothing is installed until the user presses Install. The AI works only in the chosen folder, and replacing or deleting a file asks first and keeps a copy.
+Nothing is installed until the user presses Install. The AI works in the chosen folder: ChatGPT's commands are confined to it, Claude's are not on Windows (the app says so before Claude is connected). Replacing or deleting a file asks first and keeps a copy for the file tools and the commands the app can read, but a script that works out its file names can change a file without a card, and the app then lists the file as changed.
 ```

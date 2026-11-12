@@ -1,5 +1,6 @@
 import { type CSSProperties, useCallback, useState } from "react";
 import { AccountRow } from "@/components/AccountRow";
+import { AiSends } from "@/components/AiSends";
 import { KeyRow } from "@/components/KeyRow";
 import { Switch } from "@/components/Switch";
 import { errorText } from "@/lib/errorText";
@@ -227,6 +228,7 @@ export function Settings({
             {active === "accounts" && (
               <section aria-labelledby="settings-accounts">
                 <h1 id="settings-accounts">{t("settings.accounts")}</h1>
+                <AiSends />
                 {SUBSCRIPTIONS.map((ai) => (
                   <AccountRow
                     key={ai}

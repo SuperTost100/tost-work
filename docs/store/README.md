@@ -28,7 +28,7 @@ Each has my recommendation. The first one blocks the submission.
 | 7 | **Additional license terms.** | The URL of the terms of use (`legal/terms.en.md`, and `terms.it.md` for the Italian listing). Empty means only Microsoft's standard terms apply. |
 | 8 | **"Developed by"** on the listing. | `Tommaso Barbera`, the name in About and in the legal texts. It can stay empty: the listing shows the publisher name "Tost" anyway. |
 | 9 | **When the testers get it.** | Hold the release and press Publish now yourself after certification passes. |
-| 10 | **Two small app changes that lower the risk**, both found in [policy-check.md](policy-check.md). | Both are made in 0.0.35-dev. The Install row now says that Tost Work downloads the program from OpenAI or Anthropic with their own installer (policies 10.2.2 to 10.2.4). Setup's Connect an AI step says what a task sends and links the privacy notice, which opens inside the app (policy 10.5.2). The installer pattern stays a risk, as [policy-check.md](policy-check.md) says. |
+| 10 | **Two small app changes that lower the risk**, both found in [policy-check.md](policy-check.md). | Both are made in 0.0.35-dev. The Install row now says that Tost Work downloads the program from OpenAI or Anthropic with their own installer (policies 10.2.2 to 10.2.4). Setup's Connect an AI step and the top of Settings > AI accounts say what a task sends and link the privacy notice, which opens inside the app (policy 10.5.2). The installer pattern stays a risk, as [policy-check.md](policy-check.md) says. |
 
 ## What wasn't verified
 
@@ -36,6 +36,7 @@ Each has my recommendation. The first one blocks the submission.
 - Microsoft's pages give no length limit for the certification notes, so there's a short version in case Partner Center refuses the long one.
 - Whether Microsoft approves `unvirtualizedResources` for an app like this one: only the review will tell. Issue #148 says Claude Desktop ships in the Store with it, which I couldn't confirm on a Microsoft page.
 - The Windows App Certification Kit hasn't been run on the package.
+- The test steps in [certification-notes.md](certification-notes.md) were run in sample mode on the built app on Linux. The steps that need a real key (the task on Agenda.txt) weren't run, and nothing was run on Windows.
 
 ## About the screenshots
 

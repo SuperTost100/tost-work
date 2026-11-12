@@ -18,23 +18,23 @@ Un'app desktop per fare il lavoro di tutti i giorni con l'AI, sui tuoi file. Sce
 
 ## Description
 
-Limit 10,000 characters. This one is about 4,700.
+Limit 10,000 characters. This one is about 5,300.
 
 ```text
 Tost Work richiede un abbonamento a ChatGPT o a Claude, oppure una chiave API di OpenAI o di Anthropic. Il lavoro lo svolgono Codex CLI di OpenAI o Claude Code di Anthropic, che girano sul tuo PC. Se non sono installati, quando colleghi il tuo account Tost Work propone di installarli con gli installer ufficiali di OpenAI e di Anthropic.
 
 Tost Work usa l'AI generativa in tempo reale. Le risposte e i file prodotti da un'attività sono scritti da ChatGPT o da Claude mentre l'attività è in corso e possono contenere errori, perciò controllali prima di usarli. Se un risultato è offensivo o dannoso, "Segnala questo risultato" sotto l'attività invia una segnalazione a OpenAI o ad Anthropic.
 
-ChatGPT e Claude sanno già lavorare davvero su documenti, fogli di calcolo e presentazioni, ma le loro modalità di lavoro cambiano spesso e ti chiedono di ragionare come un programmatore. Tost Work porta quel lavoro in una semplice app desktop: ogni attività si svolge dentro la cartella di un progetto, il risultato è un file Word, Excel o PowerPoint che puoi aprire, e nulla viene sovrascritto o eliminato senza chiedertelo.
+ChatGPT e Claude sanno già lavorare davvero su documenti, fogli di calcolo e presentazioni, ma le loro modalità di lavoro cambiano spesso e ti chiedono di ragionare come un programmatore. Tost Work porta quel lavoro in una semplice app desktop: ogni attività si svolge dentro la cartella di un progetto, il risultato è un file Word, Excel o PowerPoint che puoi aprire, e Tost Work ti chiede il permesso prima che l'AI sostituisca o elimini un file che avevi già.
 
 LAVORA IN UN PROGETTO
-Un progetto è una cartella che usi già, per esempio quella delle proposte ai clienti. Scrivi cosa ti serve e allega i file. L'AI crea e modifica file solo in quella cartella, e per fare il lavoro legge anche gli allegati, le tue skill e le guide incluse. Salva file Word, Excel, PowerPoint e PDF quando servono, e risponde nella chat quando le hai fatto una domanda.
+Un progetto è una cartella che usi già, per esempio quella delle proposte ai clienti. Scrivi cosa ti serve e allega i file. L'AI lavora in quella cartella e, per fare il lavoro, legge anche gli allegati, le tue skill e le guide incluse. I comandi di ChatGPT restano confinati nella cartella. Su Windows quelli di Claude no, e Tost Work te lo segnala prima che tu colleghi Claude (vedi Prima di iniziare). Salva file Word, Excel, PowerPoint e PDF quando servono, e risponde nella chat quando le hai fatto una domanda.
 
 RISPONDI ALLE SUE DOMANDE
 Quando l'AI deve prendere una decisione, ti fa fino a 16 domande alla volta, ciascuna con risposte pronte e spazio per la tua, e riprende il lavoro appena rispondi.
 
 CONTROLLA COSA È CAMBIATO
-Ogni attività finisce con i file che ha creato o modificato, l'anteprima di ognuno e un controllo rispetto a quello che avevi chiesto. Un file sostituito conserva la versione precedente, che puoi ripristinare con un clic. I file eliminati finiscono nel Cestino.
+Ogni attività finisce con i file che ha creato o modificato, l'anteprima di ognuno e un controllo rispetto a quello che avevi chiesto. Prima che l'AI sostituisca o elimini un file che avevi già, Tost Work te lo chiede e conserva la versione precedente, che puoi ripristinare con un clic. I file eliminati finiscono nel Cestino. Questo vale per le modifiche ai file fatte dall'AI e per i comandi che Tost Work sa leggere. Uno script che calcola i nomi dei file mentre gira può modificare un file senza chiedere, e in quel caso Tost Work potrebbe non avere una versione precedente da ripristinare.
 
 MODIFICA VELOCE DI UN FILE
 Trascina un file e scrivi cosa cambiare. Il lavoro avviene in una cartella temporanea e sei tu a scegliere dove salvare il risultato.
@@ -57,7 +57,7 @@ Tost Work non ha account, non ha un server suo e non raccoglie dati di utilizzo.
 PRIMA DI INIZIARE
 - Windows 10 versione 2004 o successiva, oppure Windows 11, su un PC Intel o AMD a 64 bit.
 - Una connessione a internet mentre un'attività è in corso.
-- Su Windows, Claude Code non limita ancora i suoi comandi alla cartella dell'attività. Tost Work te lo spiega prima che tu colleghi Claude. ChatGPT invece resta nella cartella.
+- Su Windows, Claude Code non limita ancora i suoi comandi alla cartella dell'attività, quindi potrebbero leggere o scrivere altrove sul PC. Tost Work te lo spiega prima che tu colleghi Claude. I comandi di ChatGPT restano nella cartella.
 
 DISINSTALLAZIONE
 Disinstallando Tost Work restano la sua cartella dei dati, %APPDATA%\Tost Work, e Codex o Claude Code se li ha installati. Per eliminare tutto, esci dagli account nelle Impostazioni, disinstalla l'app, poi elimina quella cartella e disinstalla Codex o Claude Code come indicano OpenAI e Anthropic.
@@ -80,12 +80,12 @@ La prima versione nel Microsoft Store, per un piccolo gruppo di tester. Tost Wor
 Up to 20, at most 200 characters each.
 
 ```text
-Lavora nella cartella di un progetto: l'AI crea e modifica file solo lì
+Lavora nella cartella di progetto che scegli, dove l'AI crea e modifica i tuoi file
 File Word, Excel, PowerPoint e PDF che puoi aprire
 Domande con risposte pronte quando l'AI deve decidere qualcosa
 L'anteprima di ogni file creato o modificato
 Un controllo di ogni risultato rispetto a quello che hai chiesto
-Chiede prima di sostituire o eliminare un file e conserva la versione precedente
+Chiede prima di sostituire o eliminare un file che avevi già e conserva la versione precedente. I comandi che nascondono i nomi dei file possono saltare il controllo.
 Modifica veloce: trascina un file e scrivi cosa cambiare
 Skill: le tue istruzioni, più le guide incluse per i file Office e le email
 Lavori pianificati, come un riepilogo settimanale

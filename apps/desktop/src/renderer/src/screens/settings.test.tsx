@@ -50,6 +50,43 @@ describe("settings", () => {
     expect(document.documentElement.dataset.theme).toBe("dark");
   });
 
+  it("says what a task sends at the top of AI accounts and opens the privacy notice, in both languages", async () => {
+    const cases = [
+      {
+        language: "en" as const,
+        sends: /A task sends your request and the files it reads to the AI you connect, OpenAI or Anthropic\./,
+        link: "Privacy notice",
+        close: "Close",
+        accounts: "AI accounts",
+      },
+      {
+        language: "it" as const,
+        sends: /Un'attività invia la tua richiesta e i file che legge all'AI che colleghi, OpenAI o Anthropic\./,
+        link: "Informativa privacy",
+        close: "Chiudi",
+        accounts: "Account AI",
+      },
+    ];
+    for (const c of cases) {
+      const { unmount } = render(
+        <Root api={createMemoryApi({ name: "Giulia", setupDone: true, language: c.language })} />,
+      );
+      await click(c.language === "en" ? "Settings" : "Impostazioni");
+      await click(c.accounts);
+      const section = screen.getByRole("region", { name: c.accounts });
+      expect(within(section).getByText(c.sends)).toBeTruthy();
+      await act(async () => {
+        fireEvent.click(within(section).getByRole("button", { name: c.link }));
+      });
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog.querySelector("h1")?.textContent).toBe(c.link);
+      expect(dialog.textContent).toMatch(/OpenAI/);
+      await click(c.close);
+      expect(screen.queryByRole("dialog")).toBeNull();
+      unmount();
+    }
+  });
+
   it("signs in to ChatGPT and out again", async () => {
     render(<Root api={createMemoryApi()} />);
     await click("Settings");

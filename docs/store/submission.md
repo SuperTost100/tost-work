@@ -63,7 +63,7 @@ Source: [set pricing and availability](https://learn.microsoft.com/en-us/windows
 > [!WARNING]
 > Never send a submission with **Public audience** before 0.1.0-alpha. Microsoft: "If you submit a product with this option set to **Public audience**, you can't choose **Private audience** in a later submission."
 
-What the testers need to know: they open the private link while signed in to the Microsoft Store with the account you listed, on Windows 10 version 1607 or later. Reviews they write are visible to you only and never published, even after the app goes public. Microsoft suggests a feedback channel other than Feedback Hub, where everyone can read; the app's own Settings > Report a problem works.
+What the testers need to know: they open the private link while signed in to the Microsoft Store with the account you listed, on Windows 10 version 2004 (10.0.19041.0) or later, or Windows 11, on a 64-bit Intel or AMD PC. Reviews they write are visible to you only and never published, even after the app goes public. Microsoft suggests a feedback channel other than Feedback Hub, where everyone can read; the app's own Settings > Report a problem works.
 
 ## 4. Properties
 

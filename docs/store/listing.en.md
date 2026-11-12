@@ -18,23 +18,23 @@ A desktop app for doing everyday work with AI on your own files. Pick a project 
 
 ## Description
 
-Limit 10,000 characters. This one is about 4,200.
+Limit 10,000 characters. This one is about 4,700.
 
 ```text
 Tost Work needs a ChatGPT or Claude subscription, or an OpenAI or Anthropic API key. It does the work through OpenAI's Codex CLI or Anthropic's Claude Code, which run on your PC. If they aren't installed, Tost Work offers to install them with OpenAI's and Anthropic's own installers when you connect your account.
 
 Tost Work uses live generative AI. The answers and files a task produces are written by ChatGPT or Claude while the task runs, and they can contain mistakes, so check them before you use them. If a result is offensive or harmful, "Report this result" under the task sends a report to OpenAI or Anthropic.
 
-ChatGPT and Claude can already do real work on documents, spreadsheets and presentations, but their work modes change often and expect you to think like a programmer. Tost Work puts that work in a plain desktop app: every task happens inside a project folder, the result is a Word, Excel or PowerPoint file you can open, and nothing is overwritten or deleted without asking.
+ChatGPT and Claude can already do real work on documents, spreadsheets and presentations, but their work modes change often and expect you to think like a programmer. Tost Work puts that work in a plain desktop app: every task happens inside a project folder, the result is a Word, Excel or PowerPoint file you can open, and Tost Work asks before the AI replaces or deletes a file you already had.
 
 WORK IN A PROJECT
-A project is a folder you already use, such as client proposals. Write what you need and attach files. The AI makes and changes files in that folder only, and it also reads your attachments, your skills and the built-in guides to do the work. It saves Word, Excel, PowerPoint and PDF files where they fit, and answers in the chat when you asked a question.
+A project is a folder you already use, such as client proposals. Write what you need and attach files. The AI works in that folder, and it also reads your attachments, your skills and the built-in guides to do the work. ChatGPT's commands are confined to the folder. On Windows, Claude's commands are not, and Tost Work warns you before you connect Claude (see Before you start). It saves Word, Excel, PowerPoint and PDF files where they fit, and answers in the chat when you asked a question.
 
 ANSWER ITS QUESTIONS
 When the AI needs a decision, it asks up to 16 questions at once, each with ready answers and room for your own, and keeps going when you reply.
 
 CHECK WHAT CHANGED
-Every task ends with the files it made or changed, a preview of each one, and a check against what you asked. A replaced file keeps its previous version, which you can restore with one click. Deleted files go to the Recycle Bin.
+Every task ends with the files it made or changed, a preview of each one, and a check against what you asked. Before the AI replaces or deletes a file you already had, Tost Work asks and keeps the previous version, which you can restore with one click. Deleted files go to the Recycle Bin. This covers the AI's file edits and the commands Tost Work can read. A script that works out its file names while it runs can change a file without asking, and then Tost Work may have no earlier version to restore.
 
 EDIT ONE FILE QUICKLY
 Drop a file and say what to change. The work happens in a temporary folder, and you choose where to save the result.
@@ -57,7 +57,7 @@ Tost Work has no account, no server of its own and no telemetry. Your projects, 
 BEFORE YOU START
 - Windows 10 version 2004 or later, or Windows 11, on a 64-bit Intel or AMD PC.
 - An internet connection while a task runs.
-- On Windows, Claude Code doesn't yet keep its commands inside the task's folder. Tost Work explains this before you connect Claude. ChatGPT stays inside the folder.
+- On Windows, Claude Code doesn't yet keep its commands inside the task's folder, so they could read or write elsewhere on your PC. Tost Work explains this before you connect Claude. ChatGPT's commands stay inside the folder.
 
 UNINSTALLING
 Uninstalling Tost Work leaves its data folder, %APPDATA%\Tost Work, and Codex or Claude Code if it installed them. To remove everything, sign out in Settings first, uninstall the app, then delete that folder and uninstall Codex or Claude Code as OpenAI or Anthropic describe.
@@ -80,12 +80,12 @@ The first version in the Microsoft Store, for a small group of testers. Tost Wor
 Up to 20, at most 200 characters each. Partner Center adds the bullets.
 
 ```text
-Work in a project folder: the AI makes and changes files there only
+Work in a project folder you choose, where the AI makes and changes your files
 Word, Excel, PowerPoint and PDF files you can open
 Questions with ready answers when the AI needs a decision
 A preview of every file a task made or changed
 A check of each result against what you asked
-Asks before replacing or deleting a file, and keeps the earlier version
+Asks before replacing or deleting a file you already had, and keeps the earlier version. Commands that hide their file names can skip this.
 Quick edit: drop one file and say what to change
 Skills: your own instructions, plus built-in guides for Office files and email
 Scheduled jobs, such as a weekly summary
