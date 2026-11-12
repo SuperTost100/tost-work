@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccountRow } from "@/components/AccountRow";
+import { AiSends } from "@/components/AiSends";
 import { KeyRow } from "@/components/KeyRow";
 import { SetupSandboxNotice } from "@/components/SandboxNotice";
 import { Sprigs } from "@/components/Sprigs";
@@ -260,6 +261,7 @@ export function Setup({
           {step === 4 && (
             <>
               <p className="lede">{t("setup.ai.lede")}</p>
+              <AiSends />
               <Connect
                 api={api}
                 onConnected={onConnected}

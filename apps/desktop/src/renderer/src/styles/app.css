@@ -738,6 +738,12 @@ h3 {
 .link {
   color: var(--t2);
 }
+/* A link inside a sentence is underlined and in the text's ink, so it reads as a link. */
+.lede .link {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 /* The detail after a title gives way first. */
 .crumb > .truncate,
 .crumb > .link {
@@ -3817,6 +3823,18 @@ ol.editable li::before {
   flex-direction: column;
   width: min(680px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
+}
+.modal.legalmodal {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  width: min(680px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+}
+.legalmodal .ib {
+  padding: 16px 20px;
+  overflow: auto;
+  font-size: 14px;
 }
 .instrmodal .ib {
   display: grid;
