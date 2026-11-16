@@ -1,7 +1,9 @@
+import { open } from "node:fs/promises";
 import { join } from "node:path";
 import source from "../../../resources/instructions.md?raw";
 import { trashName } from "../../shared/i18n";
 import type { Job, Project, Skill, Task } from "../../shared/model";
+import type { TaskLog } from "../debugLog";
 
 const LANGUAGE_NAMES = { en: "English", it: "Italian" } as const;
 
@@ -17,6 +19,7 @@ export const PARTS = [
   "Office files on Windows",
   "The user's skills",
   "A job's run",
+  "The folder's instructions",
 ] as const;
 type Part = (typeof PARTS)[number];
 
@@ -57,6 +60,109 @@ export function fill(text: string, values: Record<string, string>): string {
 
 const PART = readParts(source);
 
+/** The instruction files a project's folder can have for AI tools, in the order they're passed on. */
+export const FOLDER_FILES = ["CLAUDE.md", "AGENTS.md"] as const;
+/** The most of each file that's passed on: 32 KiB, Codex's own default for its project file. */
+export const FOLDER_FILE_MAX = 32 * 1024;
+
+/** One of the folder's instruction files, as it's passed on. `cut` when only its first FOLDER_FILE_MAX bytes are. */
+export interface FolderFile {
+  name: string;
+  text: string;
+  cut: boolean;
+}
+
+/** A file's first `max` bytes as text, or null when there's no regular file there. Other errors are thrown. */
+async function readStart(path: string, max: number): Promise<{ text: string; cut: boolean } | null> {
+  let file: Awaited<ReturnType<typeof open>>;
+  try {
+    file = await open(path, "r");
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return null;
+    throw err;
+  }
+  try {
+    if (!(await file.stat()).isFile()) return null;
+    const buffer = Buffer.alloc(max + 1);
+    let size = 0;
+    while (size < buffer.length) {
+      const { bytesRead } = await file.read(buffer, size, buffer.length - size, size);
+      if (!bytesRead) break;
+      size += bytesRead;
+    }
+    const cut = size > max;
+    let end = Math.min(size, max);
+    // A cut in the middle of a character goes back to where that character starts.
+    if (cut) while (end > 0 && ((buffer[end] ?? 0) & 0xc0) === 0x80) end--;
+    return { text: buffer.subarray(0, end).toString("utf8"), cut };
+  } finally {
+    await file.close();
+  }
+}
+
+/** Whether a file's whole content is an import of another file (`@AGENTS.md`), which then says nothing of its own. */
+function onlyPointsTo(text: string, other: string): boolean {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return (
+    lines.length > 0 && lines.every((line) => line.replace(/^@(\.[\\/])?/, "").toLowerCase() === other.toLowerCase())
+  );
+}
+
+/**
+ * The CLAUDE.md and AGENTS.md in a project's folder, which people who use Claude Code or Codex there keep for them.
+ * Only the folder itself is read, not the folders above or inside it. A file that's empty, says the same as the one
+ * before it, or only imports the other one (a CLAUDE.md holding `@AGENTS.md`) is left out. Each is passed on up to
+ * FOLDER_FILE_MAX bytes. A file that can't be read is left out and written to the task's log, and the task still runs.
+ * shortcut: Claude Code also follows the imports (`@docs/style.md`) inside a CLAUDE.md; they're passed on as written,
+ * not followed. Follow them if people rely on it.
+ */
+export async function folderInstructions(folder: string, log: TaskLog): Promise<FolderFile[]> {
+  const read: FolderFile[] = [];
+  for (const name of FOLDER_FILES) {
+    const path = join(folder, name);
+    const start = await readStart(path, FOLDER_FILE_MAX).catch((err: unknown) => {
+      log.write({ type: "instructions.unreadable", path, error: err instanceof Error ? err.message : String(err) });
+      return null;
+    });
+    if (start?.text.trim()) read.push({ name, ...start });
+  }
+  const same = (a: string, b: string) => a.replace(/\r\n/g, "\n").trim() === b.replace(/\r\n/g, "\n").trim();
+  const kept = read.filter(
+    (file, i) =>
+      !FOLDER_FILES.some((other) => other !== file.name && onlyPointsTo(file.text, other)) &&
+      !read.slice(0, i).some((earlier) => same(earlier.text, file.text)),
+  );
+  if (read.length)
+    log.write({
+      type: "instructions.folder",
+      files: read.map((f) => ({ name: f.name, cut: f.cut, passed: kept.includes(f) })),
+    });
+  return kept;
+}
+
+/** The folder's instruction files as the AI gets them, under the words from instructions.md. */
+function folderPart(files: FolderFile[]): string {
+  return [
+    fill(PART["The folder's instructions"], {}),
+    ...files.map((f) =>
+      [
+        `<file name="${f.name}">`,
+        f.text.trim(),
+        "</file>",
+        ...(f.cut
+          ? [
+              `${f.name} is longer than ${FOLDER_FILE_MAX / 1024} KB, so only its first ${FOLDER_FILE_MAX / 1024} KB are above.`,
+            ]
+          : []),
+      ].join("\n"),
+    ),
+  ].join("\n\n");
+}
+
 /**
  * The block every agent session starts with. It says who the agent works for, where it may work, the rules and the
  * Tost Work tools. The rules are enforced by Tost Work too; the text only explains them. The words are in
@@ -64,6 +170,8 @@ const PART = readParts(source);
  * differ by system: where deleted files go, and on Windows how to pass text to officecli in PowerShell. `saved` are
  * files the task made that the user has saved since its last run: they're the user's again, so changing one asks.
  * `finished` are files the task made for a request it finished in an earlier run, which are the user's now too.
+ * `folderFiles` are the project folder's CLAUDE.md and AGENTS.md (folderInstructions), which come after Tost Work's own
+ * parts, below its rules, and before the project's instructions.
  */
 export function instructionsFor(
   task: Task,
@@ -76,6 +184,7 @@ export function instructionsFor(
   platform: string = process.platform,
   saved: string[] = [],
   finished: string[] = [],
+  folderFiles: FolderFile[] = [],
 ): string {
   const parts = [
     fill(PART["Every task"], { language: LANGUAGE_NAMES[language] }),
@@ -131,6 +240,7 @@ export function instructionsFor(
       }),
     );
   }
+  if (folderFiles.length) parts.push(folderPart(folderFiles));
   if (project?.instructions.trim()) parts.push(`The project's instructions:\n${project.instructions.trim()}`);
   if (task.attachments.length)
     parts.push(`Files the user attached:\n${task.attachments.map((p) => `- ${p}`).join("\n")}`);

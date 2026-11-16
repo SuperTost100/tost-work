@@ -153,6 +153,7 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
   const settingsListeners = new Set<(s: Settings) => void>();
   const menuListeners = new Set<(a: MenuAction) => void>();
   const openListeners = new Set<(id: string) => void>();
+  let pendingOpen: string | null = null;
   const questionListeners = new Set<(question: WindowQuestion) => void>();
   const questionAnswers = new Map<number, (answer: QuestionAnswer) => void>();
   let questionId = 0;
@@ -295,9 +296,21 @@ export function createMemoryApi(initial: Partial<Settings> = { name: "Giulia", s
     },
     onOpenTask: (l) => {
       openListeners.add(l);
+      // As the preload does: a click from before the window listened arrives a moment after it starts listening,
+      // unless a newer click came first. It waits for whoever listens then, as the app may subscribe again meanwhile.
+      if (pendingOpen !== null)
+        void Promise.resolve().then(() => {
+          const waiting = pendingOpen;
+          if (waiting === null || openListeners.size === 0) return;
+          pendingOpen = null;
+          for (const listener of openListeners) listener(waiting);
+        });
       return () => openListeners.delete(l);
     },
     openFromOutside: (id) => {
+      // The main process keeps a click until the window listens, so one that comes while the app is still loading,
+      // or before its effect has subscribed, isn't lost.
+      pendingOpen = openListeners.size === 0 ? id : null;
       for (const l of openListeners) l(id);
     },
     onQuestion: (l) => {

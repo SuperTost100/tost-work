@@ -4,6 +4,7 @@ import { App } from "@/App";
 import { acceptDroppedFiles } from "@/components/Composer";
 import { versionLabel } from "@/lib/changelog";
 import { createMemoryApi } from "@/lib/memoryApi";
+import { Root } from "@/Root";
 import { DEFAULT_SETTINGS } from "../../../shared/model";
 
 /** The page's own status line, not the window's message area, which is a status region too. */
@@ -1449,6 +1450,15 @@ describe("a notification click", () => {
     render(<App userName="Giulia" api={api} />);
     await screen.findAllByText(/Giulia/);
     expect(screen.queryByText("Write the course outline")).toBeNull();
+    await act(async () => api.openFromOutside(task.id));
+    expect(await screen.findByRole("button", { name: "Stop" })).toBeTruthy();
+  });
+
+  it("opens the task when the click came before the window was listening, as the main process keeps it", async () => {
+    const api = createMemoryApi({ name: "Giulia", setupDone: true });
+    const task = await api.tasks.start({ projectId: null, brief: "Write the course outline", attachments: [] });
+    // Root hasn't loaded the settings yet, so the app that listens for clicks isn't there.
+    render(<Root api={api} />);
     await act(async () => api.openFromOutside(task.id));
     expect(await screen.findByRole("button", { name: "Stop" })).toBeTruthy();
   });

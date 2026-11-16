@@ -24,6 +24,7 @@ import { needsUnconfinedOk } from "../shared/sandbox";
 import { Accounts } from "./accounts";
 import { giveAgentsOwnHomes } from "./agentHomes";
 import { menuTemplate, nextTextSize, textMenuTemplate } from "./appMenu";
+import { leavesFolderOut } from "./claudeFolder";
 import { type CodexHook, codexHookCheck } from "./codexHook";
 import { DebugLogs } from "./debugLog";
 import { documentTools } from "./documents";
@@ -297,6 +298,7 @@ app.whenReady().then(async () => {
       online: () => net.isOnline(),
       sandboxReady: (provider) => checkSandbox(provider, sandboxSystem),
       codexHook: codexHookCheck(codexHook, () => funnel.providers.codex.detect()),
+      leavesFolderOut: (provider) => leavesFolderOut(funnel.providers[provider]),
       skills: () => skills.list(),
       job: (id) => store.getJob(id),
       verbose: () => debugOn,
