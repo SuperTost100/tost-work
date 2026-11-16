@@ -32,6 +32,7 @@ afterAll(() => funnel.close());
 // newer, tasks run with `folderConfig: "ignore"`, and older ones run as before it.
 const leaves = (provider: "codex" | "claude") => leavesFolderOut(funnel.providers[provider]);
 const claudeLeavesOut = runs("claude") && (await leaves("claude"));
+const codexLeavesOut = runs("chatgpt") && (await leaves("codex"));
 
 /** Plays the user until the task ends: `reply` handles each question or approval once, across runs. */
 async function settle(runner: TaskRunner, store: Store, id: string, reply: (t: Task) => Promise<void>): Promise<Task> {
@@ -641,7 +642,7 @@ describe.runIf(runs("chatgpt") && homes)("Codex's steps through Tost Work's hook
  * `outside`, so a file there shows that something from the folder ran.
  */
 for (const ai of SUBSCRIPTIONS) {
-  const ready = ai === "claude" ? claudeLeavesOut : runs(ai) && Boolean(homes);
+  const ready = ai === "claude" ? claudeLeavesOut : codexLeavesOut && Boolean(homes);
   describe.runIf(ready)(`${ai} in a folder with Claude Code's and Codex's own settings`, () => {
     it("runs, starts nothing from the folder, still asks before replacing a file, and follows CLAUDE.md and AGENTS.md", {
       timeout: 600_000,

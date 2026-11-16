@@ -1,9 +1,11 @@
-import { open } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import source from "../../../resources/instructions.md?raw";
 import { trashName } from "../../shared/i18n";
 import type { Job, Project, Skill, Task } from "../../shared/model";
 import type { TaskLog } from "../debugLog";
+import { inside } from "../files";
 
 const LANGUAGE_NAMES = { en: "English", it: "Italian" } as const;
 
@@ -72,11 +74,20 @@ export interface FolderFile {
   cut: boolean;
 }
 
-/** A file's first `max` bytes as text, or null when there's no regular file there. Other errors are thrown. */
-async function readStart(path: string, max: number): Promise<{ text: string; cut: boolean } | null> {
+/**
+ * A file's first `max` bytes as text, or null when there's no regular file there. Other errors are thrown. A link is
+ * followed only to a file inside `folder`: one that leads out of it throws, so a folder that came from someone else
+ * can't make Tost Work send a file from elsewhere on the computer to the AI. A link that leads nowhere counts as no
+ * file.
+ */
+async function readStart(folder: string, path: string, max: number): Promise<{ text: string; cut: boolean } | null> {
   let file: Awaited<ReturnType<typeof open>>;
   try {
-    file = await open(path, "r");
+    const [root, real] = await Promise.all([realpath(folder), realpath(path)]);
+    if (!inside(root, real)) throw new Error("It links to a file outside the project's folder");
+    // Opened without waiting: a named pipe in place of the file would hold the run until something wrote to it. It's
+    // turned down by the check below, as anything that isn't a regular file is.
+    file = await open(real, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "ENOENT" || code === "ENOTDIR") return null;
@@ -114,7 +125,7 @@ function onlyPointsTo(text: string, other: string): boolean {
 
 /**
  * The CLAUDE.md and AGENTS.md in a project's folder, which people who use Claude Code or Codex there keep for them.
- * Only the folder itself is read, not the folders above or inside it. A file that's empty, says the same as the one
+ * Only the folder itself is read, not the folders above or inside it, and a link is followed only to a file inside it. A file that's empty, says the same as the one
  * before it, or only imports the other one (a CLAUDE.md holding `@AGENTS.md`) is left out. Each is passed on up to
  * FOLDER_FILE_MAX bytes. A file that can't be read is left out and written to the task's log, and the task still runs.
  * shortcut: Claude Code also follows the imports (`@docs/style.md`) inside a CLAUDE.md; they're passed on as written,
@@ -124,7 +135,7 @@ export async function folderInstructions(folder: string, log: TaskLog): Promise<
   const read: FolderFile[] = [];
   for (const name of FOLDER_FILES) {
     const path = join(folder, name);
-    const start = await readStart(path, FOLDER_FILE_MAX).catch((err: unknown) => {
+    const start = await readStart(folder, path, FOLDER_FILE_MAX).catch((err: unknown) => {
       log.write({ type: "instructions.unreadable", path, error: err instanceof Error ? err.message : String(err) });
       return null;
     });

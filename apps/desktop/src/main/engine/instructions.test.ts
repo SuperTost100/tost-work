@@ -1,5 +1,6 @@
 /** @vitest-environment node */
-import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -286,6 +287,40 @@ describe("the folder's CLAUDE.md and AGENTS.md", () => {
     expect(lines).toContainEqual(
       expect.objectContaining({ type: "instructions.unreadable", path: join(folder, "CLAUDE.md") }),
     );
+  });
+
+  it("follows a link to a file inside the folder, and never one that leads out of it", async () => {
+    const outside = await mkdtemp(join(tmpdir(), "tw-folder-md-out-"));
+    await writeFile(join(outside, "private.txt"), "A SECRET FROM ELSEWHERE");
+    folder = await mkdtemp(join(tmpdir(), "tw-folder-md-"));
+    await mkdir(join(folder, "docs"));
+    await writeFile(join(folder, "docs", "rules.md"), "Write in Italian.");
+    await symlink(join(folder, "docs", "rules.md"), join(folder, "AGENTS.md"));
+    await symlink(join(outside, "private.txt"), join(folder, "CLAUDE.md"));
+    lines.length = 0;
+    try {
+      const files = await folderInstructions(folder, log);
+      expect(files).toEqual([{ name: "AGENTS.md", text: "Write in Italian.", cut: false }]);
+      expect(JSON.stringify(files)).not.toContain("SECRET");
+      expect(lines).toContainEqual(
+        expect.objectContaining({ type: "instructions.unreadable", path: join(folder, "CLAUDE.md") }),
+      );
+      // A link that leads nowhere is no file, so it isn't logged as one that couldn't be read.
+      await rm(join(outside, "private.txt"));
+      lines.length = 0;
+      expect(names(await folderInstructions(folder, log))).toEqual(["AGENTS.md"]);
+      expect(lines).not.toContainEqual(expect.objectContaining({ type: "instructions.unreadable" }));
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  // Windows has no named pipes in a folder.
+  it.runIf(process.platform !== "win32")("doesn't wait on a named pipe that sits where a file should be", async () => {
+    folder = await mkdtemp(join(tmpdir(), "tw-folder-md-"));
+    execFileSync("mkfifo", [join(folder, "CLAUDE.md")]);
+    await writeFile(join(folder, "AGENTS.md"), "Write in Italian.");
+    expect(names(await folderInstructions(folder, log))).toEqual(["AGENTS.md"]);
   });
 
   it("comes after Tost Work's rules and before the project's instructions, as the owner's words", () => {
