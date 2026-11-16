@@ -7,6 +7,7 @@ import { createFunnel } from "cli-funnel";
 import { afterAll, describe, expect, it, onTestFinished } from "vitest";
 import { type AiId, questionItems, SUBSCRIPTIONS, type Task } from "../../shared/model";
 import { giveAgentsOwnHomes } from "../agentHomes";
+import { leavesFolderOut } from "../claudeFolder";
 import { codexHookCheck } from "../codexHook";
 import { fileGuard } from "../guard";
 import { ToolServer } from "../mcp/server";
@@ -27,6 +28,11 @@ const runs = (ai: AiId) => asked === "1" || asked.split(",").includes(ai);
 const funnel = createFunnel();
 const codexHook = codexHookCheck(hook, () => funnel.providers.codex.detect());
 afterAll(() => funnel.close());
+// The app's own decision, on whichever CLI is first on the PATH: with Claude Code 2.1.325 or newer, or Codex 0.150.0 or
+// newer, tasks run with `folderConfig: "ignore"`, and older ones run as before it.
+const leaves = (provider: "codex" | "claude") => leavesFolderOut(funnel.providers[provider]);
+const claudeLeavesOut = runs("claude") && (await leaves("claude"));
+const codexLeavesOut = runs("chatgpt") && (await leaves("codex"));
 
 /** Plays the user until the task ends: `reply` handles each question or approval once, across runs. */
 async function settle(runner: TaskRunner, store: Store, id: string, reply: (t: Task) => Promise<void>): Promise<Task> {
@@ -49,7 +55,7 @@ for (const ai of SUBSCRIPTIONS) {
       const work = await mkdtemp(join(tmpdir(), "tw-live-"));
       const kept = await mkdtemp(join(tmpdir(), "tw-live-kept-"));
       await writeFile(join(work, "notes.txt"), "draft\n");
-      const engine = new AgentEngine(funnel, () => "en", { codexHook, ai: async () => ai });
+      const engine = new AgentEngine(funnel, () => "en", { codexHook, ai: async () => ai, leavesFolderOut: leaves });
       const tools = new ToolServer(engine);
       await tools.start();
       engine.attachTools(tools);
@@ -108,7 +114,7 @@ for (const ai of SUBSCRIPTIONS) {
     it("writes a new review after a follow-up that changes a file", { timeout: 600_000 }, async () => {
       const work = await mkdtemp(join(tmpdir(), "tw-live-r-"));
       const kept = await mkdtemp(join(tmpdir(), "tw-live-r-kept-"));
-      const engine = new AgentEngine(funnel, () => "en", { codexHook, ai: async () => ai });
+      const engine = new AgentEngine(funnel, () => "en", { codexHook, ai: async () => ai, leavesFolderOut: leaves });
       const tools = new ToolServer(engine);
       await tools.start();
       engine.attachTools(tools);
@@ -155,7 +161,7 @@ for (const ai of SUBSCRIPTIONS) {
 
     it("waits for an answer as long as it takes, then carries on with it", { timeout: 600_000 }, async () => {
       const work = await mkdtemp(join(tmpdir(), "tw-live-q-"));
-      const engine = new AgentEngine(funnel, () => "en", { codexHook, ai: async () => ai });
+      const engine = new AgentEngine(funnel, () => "en", { codexHook, ai: async () => ai, leavesFolderOut: leaves });
       const tools = new ToolServer(engine);
       await tools.start();
       engine.attachTools(tools);
@@ -190,7 +196,7 @@ for (const ai of SUBSCRIPTIONS) {
       const work = await mkdtemp(join(tmpdir(), "tw-live-sb-"));
       // Outside the folder and outside the temp folders a sandbox lets commands write to.
       const outside = await mkdtemp(join(homedir(), ".tw-live-outside-"));
-      const engine = new AgentEngine(funnel, () => "en", { codexHook, ai: async () => ai });
+      const engine = new AgentEngine(funnel, () => "en", { codexHook, ai: async () => ai, leavesFolderOut: leaves });
       const tools = new ToolServer(engine);
       await tools.start();
       engine.attachTools(tools);
@@ -245,7 +251,7 @@ for (const ai of SUBSCRIPTIONS) {
         join(work, "call-engineers.txt"),
         "Call with the engineers' association, 27 Oct: they propose two dates in November; I must answer by Thursday.\n",
       );
-      const engine = new AgentEngine(funnel, () => "en", { codexHook, ai: async () => ai });
+      const engine = new AgentEngine(funnel, () => "en", { codexHook, ai: async () => ai, leavesFolderOut: leaves });
       const tools = new ToolServer(engine);
       await tools.start();
       engine.attachTools(tools);
@@ -305,7 +311,12 @@ for (const ai of SUBSCRIPTIONS) {
       const work = await mkdtemp(join(tmpdir(), "tw-live-job-"));
       await writeFile(join(work, "proposals.txt"), "Rossi: sent 1 Oct, no answer\nBianchi: sent 20 Oct, answered\n");
       const job = { title: "Follow-up check", output: "Follow-ups" };
-      const engine = new AgentEngine(funnel, () => "en", { codexHook, ai: async () => ai, job: () => job });
+      const engine = new AgentEngine(funnel, () => "en", {
+        codexHook,
+        ai: async () => ai,
+        job: () => job,
+        leavesFolderOut: leaves,
+      });
       const tools = new ToolServer(engine);
       await tools.start();
       engine.attachTools(tools);
@@ -360,7 +371,7 @@ for (const ai of SUBSCRIPTIONS) {
 
     it("searches the web and says where the facts came from", { timeout: 600_000 }, async () => {
       const work = await mkdtemp(join(tmpdir(), "tw-live-web-"));
-      const engine = new AgentEngine(funnel, () => "en", { codexHook, ai: async () => ai });
+      const engine = new AgentEngine(funnel, () => "en", { codexHook, ai: async () => ai, leavesFolderOut: leaves });
       const tools = new ToolServer(engine);
       await tools.start();
       engine.attachTools(tools);
@@ -431,6 +442,7 @@ describe.runIf(runs("chatgpt") && homes)("Codex's steps through Tost Work's hook
     const lines: Record<string, unknown>[] = [];
     const engine = new AgentEngine(plain, () => "en", {
       codexHook: options.codexHook ?? codexHook,
+      leavesFolderOut: leaves,
       taskLog: () => ({ write: (line) => lines.push(line) }),
     });
     const tools = new ToolServer(engine);
@@ -623,9 +635,136 @@ describe.runIf(runs("chatgpt") && homes)("Codex's steps through Tost Work's hook
 });
 
 /**
+ * A project folder like one the user also works in with Claude Code and Codex: their settings, a hook, MCP servers, and
+ * a CLAUDE.md and an AGENTS.md. On a CLI that takes `folderConfig: "ignore"`, the task runs, nothing the folder
+ * carries for the CLI runs, the overwrite card still comes, and the AI follows both instruction files. The folder sits
+ * under the home folder, outside the temp folders the sandbox lets commands write to, and every marker goes to
+ * `outside`, so a file there shows that something from the folder ran.
+ */
+for (const ai of SUBSCRIPTIONS) {
+  const ready = ai === "claude" ? claudeLeavesOut : codexLeavesOut && Boolean(homes);
+  describe.runIf(ready)(`${ai} in a folder with Claude Code's and Codex's own settings`, () => {
+    it("runs, starts nothing from the folder, still asks before replacing a file, and follows CLAUDE.md and AGENTS.md", {
+      timeout: 600_000,
+    }, async () => {
+      const root = await realpath(await mkdtemp(join(homedir(), ".tw-live-folder-config-")));
+      onTestFinished(() => rm(root, { recursive: true, force: true }));
+      const work = join(root, "task");
+      const outside = join(root, "outside");
+      await mkdir(join(work, ".claude"), { recursive: true });
+      await mkdir(join(work, ".codex"));
+      await mkdir(outside);
+      const touch = (name: string) => `touch '${join(outside, name)}'`;
+      const hookOn = (name: string) => ({ hooks: [{ type: "command", command: touch(name) }] });
+      await writeFile(
+        join(work, ".claude", "settings.local.json"),
+        JSON.stringify({
+          permissions: { allow: ["Bash(*)", "Write", "Edit"] },
+          hooks: { SessionStart: [hookOn("local-start")], PreToolUse: [{ matcher: "*", ...hookOn("local-tool") }] },
+        }),
+      );
+      await writeFile(
+        join(work, ".claude", "settings.json"),
+        JSON.stringify({
+          hooks: { UserPromptSubmit: [hookOn("project-prompt")], SessionStart: [hookOn("project-start")] },
+        }),
+      );
+      await writeFile(
+        join(work, ".mcp.json"),
+        JSON.stringify({ mcpServers: { folder: { command: "sh", args: ["-c", `${touch("mcp")}; cat`] } } }),
+      );
+      await writeFile(
+        join(work, ".codex", "config.toml"),
+        `[mcp_servers.folder]\ncommand = "sh"\nargs = ["-c", ${JSON.stringify(`${touch("codex-mcp")}; cat`)}]\n`,
+      );
+      await writeFile(join(work, "CLAUDE.md"), "End every answer with the codeword HERON on its own line.\n");
+      await writeFile(join(work, "AGENTS.md"), "End every answer with the codeword OTTER on its own line.\n");
+      await writeFile(join(work, "notes.txt"), "draft\n");
+
+      const lines: Record<string, unknown>[] = [];
+      const engine = new AgentEngine(funnel, () => "en", {
+        codexHook,
+        ai: async () => ai,
+        leavesFolderOut: leaves,
+        taskLog: () => ({ write: (line) => lines.push(line) }),
+      });
+      const tools = new ToolServer(engine);
+      await tools.start();
+      onTestFinished(() => tools.stop());
+      engine.attachTools(tools);
+      const store = new Store(":memory:");
+      const kept = await mkdtemp(join(tmpdir(), "tw-live-folder-config-kept-"));
+      onTestFinished(() => rm(kept, { recursive: true, force: true }));
+      const runner = new TaskRunner(
+        store,
+        engine,
+        () => {},
+        undefined,
+        fileGuard(kept, async () => {}),
+      );
+      store.saveProject({ id: "p", name: "Live", description: "", folder: work, instructions: "", createdAt: "" });
+      // The cheapest model of each, at its lowest level.
+      const [provider, model] = ai === "claude" ? ["claude", "claude-haiku-5-5"] : ["codex", "gpt-6-luna"];
+      const task = runner.create({
+        projectId: "p",
+        workdir: work,
+        provider: provider as "claude" | "codex",
+        model,
+        effort: "low",
+        brief: "Replace the whole content of notes.txt with the single line 'final'. Don't ask me anything first.",
+      });
+      const cards: string[][] = [];
+      runner.launch(task.id);
+      const final = await settle(runner, store, task.id, async (t) => {
+        if (t.approval) {
+          cards.push([t.approval.action, ...t.approval.paths]);
+          await runner.decide(task.id, "refuse");
+        } else if (t.question)
+          runner.answer(
+            task.id,
+            questionItems(t.question).map((q) => q.options[0] ?? "Go ahead"),
+          );
+      });
+      const said = final.messages
+        .filter((m) => m.from === "agent")
+        .map((m) => m.text)
+        .join("\n");
+      console.log(
+        JSON.stringify(
+          {
+            status: final.status,
+            error: final.error,
+            cards,
+            outside: await readdir(outside),
+            notes: await readFile(join(work, "notes.txt"), "utf8"),
+            run: lines.find((l) => l.type === "run"),
+            instructions: lines.find((l) => l.type === "instructions.folder"),
+            said,
+          },
+          null,
+          2,
+        ),
+      );
+      expect(lines.find((l) => l.type === "run")).toMatchObject({ folderConfig: "ignore" });
+      expect(final.error).toBeNull();
+      expect(final.status).toBe("done");
+      // No hook ran and no MCP server started, from either CLI's settings.
+      expect(await readdir(outside)).toEqual([]);
+      // The card came for the user's file, and refusing it kept the file as it was.
+      expect(cards).toContainEqual(["overwrite", join(work, "notes.txt")]);
+      expect(await readFile(join(work, "notes.txt"), "utf8")).toBe("draft\n");
+      expect(said).toMatch(/HERON/);
+      expect(said).toMatch(/OTTER/);
+    });
+  });
+}
+
+/**
  * Claude Code in a folder that brings its own .claude settings or .mcp.json, as a zip, a shared folder or a
- * repository can. Claude Code reads them by itself in every run. The folders sit under the home folder, outside the
- * temp folders where the sandbox lets commands write, so a file in `outside` shows that something ran unconfined.
+ * repository can. A Claude Code too old for `folderConfig: "ignore"` reads them by itself in every run, so there the
+ * task doesn't start; the tests of that refusal run only on such a Claude Code, the others on any. The folders sit
+ * under the home folder, outside the temp folders where the sandbox lets commands write, so a file in `outside` shows
+ * that something ran unconfined.
  */
 describe.runIf(runs("claude"))("Claude Code in a folder with its own settings", () => {
   /** Settings that would let every command and file change through without Tost Work, and run a command at start. */
@@ -678,7 +817,7 @@ describe.runIf(runs("claude"))("Claude Code in a folder with its own settings", 
         );
       },
     };
-    const engine = new AgentEngine(recording, () => "en", { ai: async () => "claude" });
+    const engine = new AgentEngine(recording, () => "en", { ai: async () => "claude", leavesFolderOut: leaves });
     const tools = new ToolServer(engine);
     await tools.start();
     onTestFinished(() => tools.stop());
@@ -709,34 +848,57 @@ describe.runIf(runs("claude"))("Claude Code in a folder with its own settings", 
   const BRIEF =
     "With your shell tool run exactly: printf one > one.txt\nThen create two.txt containing x with your file tool. Don't ask me anything.";
 
-  it("doesn't start when the task's folder has them", { timeout: 300_000 }, async () => {
-    const { root, outside } = await scratch();
-    const work = join(root, "task");
-    await mkdir(join(work, ".claude"), { recursive: true });
-    await writeFile(join(work, ".claude", "settings.local.json"), settings(outside));
-    await writeFile(join(work, ".mcp.json"), server(outside));
-    const { final, asked } = await claudeTask(work, BRIEF);
-    console.log(JSON.stringify({ status: final.status, error: final.error, asked }, null, 2));
-    expect(await readdir(outside)).toEqual([]);
-    expect(final.status).toBe("failed");
-    expect(final.error).toContain(join(work, ".claude", "settings.local.json"));
-  });
+  it.runIf(!claudeLeavesOut)(
+    "doesn't start when the task's folder has them, and says a newer Claude Code helps",
+    {
+      timeout: 300_000,
+    },
+    async () => {
+      const { root, outside } = await scratch();
+      const work = join(root, "task");
+      await mkdir(join(work, ".claude"), { recursive: true });
+      await writeFile(join(work, ".claude", "settings.local.json"), settings(outside));
+      await writeFile(join(work, ".mcp.json"), server(outside));
+      const { final, asked } = await claudeTask(work, BRIEF);
+      console.log(JSON.stringify({ status: final.status, error: final.error, asked }, null, 2));
+      expect(await readdir(outside)).toEqual([]);
+      expect(final.status).toBe("failed");
+      expect(final.error).toContain(join(work, ".claude", "settings.local.json"));
+      expect(final.error).toContain("A newer Claude Code leaves such files out of Tost Work's tasks");
+      // A folder without them runs on the same Claude Code, without the option.
+      const plain = join(root, "plain");
+      await mkdir(plain);
+      const other = await claudeTask(
+        plain,
+        "Create hello.txt containing hello with your file tool. Don't ask me anything.",
+      );
+      console.log(JSON.stringify({ status: other.final.status, error: other.final.error }, null, 2));
+      expect(other.final.status).toBe("done");
+      expect(await readFile(join(plain, "hello.txt"), "utf8")).toMatch(/hello/);
+    },
+  );
 
-  it("doesn't start when the repository the folder is in has them", { timeout: 300_000 }, async () => {
-    const { root, outside } = await scratch();
-    const repo = join(root, "repo");
-    const work = join(repo, "task");
-    await mkdir(work, { recursive: true });
-    await mkdir(join(repo, ".claude"));
-    expect(spawnSync("git", ["init", "-q"], { cwd: repo }).status).toBe(0);
-    await writeFile(join(repo, ".claude", "settings.local.json"), settings(outside));
-    await writeFile(join(repo, ".mcp.json"), server(outside));
-    const { final, asked } = await claudeTask(work, BRIEF);
-    console.log(JSON.stringify({ status: final.status, error: final.error, asked }, null, 2));
-    expect(await readdir(outside)).toEqual([]);
-    expect(final.status).toBe("failed");
-    expect(final.error).toContain(join(repo, ".claude", "settings.local.json"));
-  });
+  it.runIf(!claudeLeavesOut)(
+    "doesn't start when the repository the folder is in has them",
+    {
+      timeout: 300_000,
+    },
+    async () => {
+      const { root, outside } = await scratch();
+      const repo = join(root, "repo");
+      const work = join(repo, "task");
+      await mkdir(work, { recursive: true });
+      await mkdir(join(repo, ".claude"));
+      expect(spawnSync("git", ["init", "-q"], { cwd: repo }).status).toBe(0);
+      await writeFile(join(repo, ".claude", "settings.local.json"), settings(outside));
+      await writeFile(join(repo, ".mcp.json"), server(outside));
+      const { final, asked } = await claudeTask(work, BRIEF);
+      console.log(JSON.stringify({ status: final.status, error: final.error, asked }, null, 2));
+      expect(await readdir(outside)).toEqual([]);
+      expect(final.status).toBe("failed");
+      expect(final.error).toContain(join(repo, ".claude", "settings.local.json"));
+    },
+  );
 
   it("can't write Claude Code's settings into the folder for the next run", { timeout: 300_000 }, async () => {
     const { root, outside } = await scratch();

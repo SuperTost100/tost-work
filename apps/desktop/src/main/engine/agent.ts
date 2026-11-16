@@ -55,7 +55,7 @@ import {
   writtenPaths,
 } from "./commands";
 import type { Engine, RunContext } from "./engine";
-import { instructionsFor } from "./instructions";
+import { folderInstructions, instructionsFor } from "./instructions";
 import { OVERWRITE_NOTE, withFiles } from "./runner";
 
 /**
@@ -528,9 +528,10 @@ const SETTINGS_FOLDERS = new Set([".claude", ".codex"]);
 
 /**
  * Whether a path in the task's folder is one of the AI's own settings: anything in a .claude or .codex folder, or a
- * .mcp.json file. Claude Code reads them from the folder in the next run, and some at once, so a task could otherwise
- * plant settings that skip Tost Work's checks (claudeFolder.ts). The path is read as given and with its links
- * resolved, and without regard to case, as Windows and macOS name files.
+ * .mcp.json file. Runs with `folderConfig: "ignore"` leave them out, but a Claude Code too old for it reads them from
+ * the folder in the next run, and some at once, and so does the user's own Claude Code or Codex outside Tost Work, so
+ * a task could otherwise plant settings that skip Tost Work's checks (claudeFolder.ts). The path is read as given and
+ * with its links resolved, and without regard to case, as Windows and macOS name files.
  */
 export async function agentSettings(workdir: string, path: string): Promise<boolean> {
   const target = resolve(workdir, path);
@@ -616,6 +617,7 @@ export class AgentEngine implements Engine, ToolHandler {
   private sandboxReady: (provider: AgentProvider) => Promise<SandboxReadiness>;
   private codexHook: (workdir: string) => Promise<void>;
   private claudeFolder: (workdir: string) => Promise<void>;
+  private leavesFolderOut: (provider: AgentProvider) => Promise<boolean>;
   private copies: Copies | null;
 
   constructor(
@@ -654,9 +656,15 @@ export class AgentEngine implements Engine, ToolHandler {
       codexHook?: (workdir: string) => Promise<void>;
       /**
        * Throws a UserError when the task's folder brings Claude Code settings that would change Tost Work's checks,
-       * checked before each Claude run. checkClaudeFolder when not given.
+       * checked before each Claude run that can't leave them out (`leavesFolderOut`). checkClaudeFolder when not given.
        */
       claudeFolder?: (workdir: string) => Promise<void>;
+      /**
+       * Whether runs on an AI can pass `folderConfig: "ignore"`, decided before each run from cli-funnel's
+       * capabilities and the installed CLI's version (leavesFolderOut in claudeFolder.ts). When it says no, the run
+       * goes without the option and a Claude task keeps the folder check. No when not given.
+       */
+      leavesFolderOut?: (provider: AgentProvider) => Promise<boolean>;
       /**
        * Keeps a copy of a user's file before a command names it in a way the policy can't read, and drops the copy
        * when the file didn't change. Without it no such copy is kept, and only the card protects the user's files.
@@ -683,6 +691,7 @@ export class AgentEngine implements Engine, ToolHandler {
         throw new UserError("error.codexHookOff", { detail: "no check was given" });
       });
     this.claudeFolder = options.claudeFolder ?? ((workdir) => checkClaudeFolder(workdir));
+    this.leavesFolderOut = options.leavesFolderOut ?? (async () => false);
     this.copies = options.copies ?? null;
   }
 
@@ -793,11 +802,16 @@ export class AgentEngine implements Engine, ToolHandler {
         throw new SandboxNotReady(provider, readiness);
       }
     }
-    // Codex runs without approvals, so a task never starts unless its hook will check each step.
+    // With `folderConfig: "ignore"` the CLI leaves out everything the folder carries for it: settings, hooks, permission
+    // rules, MCP servers, skills and instruction files. A CLI too old for it runs as before the option existed.
+    const ignore = await this.leavesFolderOut(provider);
+    // Codex runs without approvals, so a task never starts unless its hook will check each step. The hook is in Tost
+    // Work's own Codex home, which "ignore" leaves in place, and the check also makes sure Codex doesn't trust the
+    // folder, which the option does too: both stay, so the check holds whatever the option does.
     if (codex) await this.codexHook(workdir);
-    // Claude Code reads a folder's own settings in every run, follow-ups included, and some of them would let its steps
-    // skip the policy or run commands outside the sandbox.
-    else await this.claudeFolder(workdir);
+    // Without the option, Claude Code reads a folder's own settings in every run, follow-ups included, and some of them
+    // would let its steps skip the policy or run commands outside the sandbox.
+    else if (!ignore) await this.claudeFolder(workdir);
     // Stop aborts the run, and so does the engine when Codex takes a step its hook never allowed.
     const abort = new AbortController();
     const onStop = () => abort.abort();
@@ -845,6 +859,7 @@ export class AgentEngine implements Engine, ToolHandler {
       effort,
       access,
       sandbox,
+      folderConfig: ignore ? "ignore" : "load",
       cwd: workdir,
       ...(task.sessionId ? { sessionId: task.sessionId } : {}),
       followUp: followUp !== null,
@@ -887,6 +902,9 @@ export class AgentEngine implements Engine, ToolHandler {
 
     // A skills folder that can't be read leaves the task without skills rather than failing it.
     const skills = await this.skills().catch(() => []);
+    // The CLAUDE.md and AGENTS.md of a project's folder, read again for each run so an edit shows in the next one.
+    // Neither CLI loads them in a Tost Work task (agentHomes.ts and "ignore"), so they come with the instructions.
+    const folderFiles = project ? await folderInstructions(workdir, log) : [];
     // Claude Code can leave a command or a subagent running in the background and end its turn, saying it will look
     // later. Nothing would wake it to look, and the task would show as finished, so here it waits for each one.
     // CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR starts each of Claude Code's commands in the task's folder. Its shell
@@ -923,6 +941,7 @@ export class AgentEngine implements Engine, ToolHandler {
         this.platform,
         earlier.saved,
         finished,
+        folderFiles,
       ),
       env,
       ...(apiKey ? { apiKey } : {}),
@@ -943,6 +962,7 @@ export class AgentEngine implements Engine, ToolHandler {
       sessionId: task.sessionId,
       signal,
       planTool: true,
+      ...(ignore ? { folderConfig: "ignore" as const } : {}),
       mcpServers: {
         tost_work: {
           type: "http",

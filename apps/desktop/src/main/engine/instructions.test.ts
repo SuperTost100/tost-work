@@ -1,7 +1,19 @@
 /** @vitest-environment node */
-import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import type { Project, Task } from "../../shared/model";
-import { fill, instructionsFor, PARTS, readParts } from "./instructions";
+import {
+  FOLDER_FILE_MAX,
+  type FolderFile,
+  fill,
+  folderInstructions,
+  instructionsFor,
+  PARTS,
+  readParts,
+} from "./instructions";
 
 const task = { workdir: "/Users/giulia/Proposte", attachments: [] } as unknown as Task;
 const project = { name: "Proposte", instructions: "Use our template.\n" } as Project;
@@ -208,5 +220,120 @@ describe("instructions.md", () => {
   it("fills values, leaves out a line whose value is empty, and refuses a name it wasn't given", () => {
     expect(fill("Hi {{name}}.\nBy {{author}}.\nEnd", { name: "Giulia", author: "" })).toBe("Hi Giulia.\nEnd");
     expect(() => fill("Hi {{nmae}}", { name: "Giulia" })).toThrow("no value for {{nmae}}");
+  });
+});
+
+describe("the folder's CLAUDE.md and AGENTS.md", () => {
+  let folder = "";
+  afterEach(() => rm(folder, { recursive: true, force: true }));
+  const lines: unknown[] = [];
+  const log = { write: (line: unknown) => lines.push(line) };
+  /** A folder with these files, read as a run reads it. */
+  async function read(files: Record<string, string>) {
+    folder = await mkdtemp(join(tmpdir(), "tw-folder-md-"));
+    for (const [name, text] of Object.entries(files)) await writeFile(join(folder, name), text);
+    lines.length = 0;
+    return folderInstructions(folder, log);
+  }
+  const names = (files: FolderFile[]) => files.map((f) => f.name);
+
+  it("reads both when both are there, and one when only one is", async () => {
+    expect(await read({ "CLAUDE.md": "Use our template.\n", "AGENTS.md": "Write in Italian.\n" })).toEqual([
+      { name: "CLAUDE.md", text: "Use our template.\n", cut: false },
+      { name: "AGENTS.md", text: "Write in Italian.\n", cut: false },
+    ]);
+    expect(names(await read({ "AGENTS.md": "Write in Italian." }))).toEqual(["AGENTS.md"]);
+    expect(names(await read({ "CLAUDE.md": "Use our template." }))).toEqual(["CLAUDE.md"]);
+    expect(await read({ "notes.md": "Not an instruction file." })).toEqual([]);
+  });
+
+  it("leaves out an empty file, a second one that says the same, and one that only points to the other", async () => {
+    expect(names(await read({ "CLAUDE.md": "\n  \n", "AGENTS.md": "Write in Italian." }))).toEqual(["AGENTS.md"]);
+    expect(names(await read({ "CLAUDE.md": "Same.\r\n", "AGENTS.md": "Same.\n" }))).toEqual(["CLAUDE.md"]);
+    expect(names(await read({ "CLAUDE.md": "@AGENTS.md\n", "AGENTS.md": "Write in Italian." }))).toEqual(["AGENTS.md"]);
+    expect(names(await read({ "CLAUDE.md": "Write in Italian.", "AGENTS.md": "@./CLAUDE.md" }))).toEqual(["CLAUDE.md"]);
+    // An import next to words of its own is kept as it is.
+    expect(names(await read({ "CLAUDE.md": "@AGENTS.md\nAlso: short.", "AGENTS.md": "Long." }))).toEqual([
+      "CLAUDE.md",
+      "AGENTS.md",
+    ]);
+    // A link from one to the other reads as the same text.
+    folder = await mkdtemp(join(tmpdir(), "tw-folder-md-"));
+    await writeFile(join(folder, "AGENTS.md"), "Write in Italian.");
+    await symlink(join(folder, "AGENTS.md"), join(folder, "CLAUDE.md"));
+    expect(names(await folderInstructions(folder, log))).toEqual(["CLAUDE.md"]);
+  });
+
+  it("cuts a file over the limit at a whole character, and the AI is told", async () => {
+    // Each è is two bytes, so the limit falls inside one.
+    const long = `x${"è".repeat(FOLDER_FILE_MAX)}`;
+    const [file] = await read({ "CLAUDE.md": long });
+    expect(file?.cut).toBe(true);
+    expect(Buffer.byteLength(file?.text ?? "")).toBe(FOLDER_FILE_MAX - 1);
+    expect(file?.text).toBe(long.slice(0, FOLDER_FILE_MAX / 2));
+    const text = instructionsFor(task, project, "en", null, undefined, [], null, "linux", [], [], file ? [file] : []);
+    expect(text).toContain("CLAUDE.md is longer than 32 KB, so only its first 32 KB are above.");
+    const [exact] = await read({ "CLAUDE.md": "y".repeat(FOLDER_FILE_MAX) });
+    expect(exact?.cut).toBe(false);
+  });
+
+  it("leaves out a file that can't be read, writes why to the task's log, and reads the other", async () => {
+    folder = await mkdtemp(join(tmpdir(), "tw-folder-md-"));
+    // A link to itself can't be opened, whoever runs the test.
+    await symlink(join(folder, "CLAUDE.md"), join(folder, "CLAUDE.md"));
+    await writeFile(join(folder, "AGENTS.md"), "Write in Italian.");
+    lines.length = 0;
+    expect(names(await folderInstructions(folder, log))).toEqual(["AGENTS.md"]);
+    expect(lines).toContainEqual(
+      expect.objectContaining({ type: "instructions.unreadable", path: join(folder, "CLAUDE.md") }),
+    );
+  });
+
+  it("follows a link to a file inside the folder, and never one that leads out of it", async () => {
+    const outside = await mkdtemp(join(tmpdir(), "tw-folder-md-out-"));
+    await writeFile(join(outside, "private.txt"), "A SECRET FROM ELSEWHERE");
+    folder = await mkdtemp(join(tmpdir(), "tw-folder-md-"));
+    await mkdir(join(folder, "docs"));
+    await writeFile(join(folder, "docs", "rules.md"), "Write in Italian.");
+    await symlink(join(folder, "docs", "rules.md"), join(folder, "AGENTS.md"));
+    await symlink(join(outside, "private.txt"), join(folder, "CLAUDE.md"));
+    lines.length = 0;
+    try {
+      const files = await folderInstructions(folder, log);
+      expect(files).toEqual([{ name: "AGENTS.md", text: "Write in Italian.", cut: false }]);
+      expect(JSON.stringify(files)).not.toContain("SECRET");
+      expect(lines).toContainEqual(
+        expect.objectContaining({ type: "instructions.unreadable", path: join(folder, "CLAUDE.md") }),
+      );
+      // A link that leads nowhere is no file, so it isn't logged as one that couldn't be read.
+      await rm(join(outside, "private.txt"));
+      lines.length = 0;
+      expect(names(await folderInstructions(folder, log))).toEqual(["AGENTS.md"]);
+      expect(lines).not.toContainEqual(expect.objectContaining({ type: "instructions.unreadable" }));
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  // Windows has no named pipes in a folder.
+  it.runIf(process.platform !== "win32")("doesn't wait on a named pipe that sits where a file should be", async () => {
+    folder = await mkdtemp(join(tmpdir(), "tw-folder-md-"));
+    execFileSync("mkfifo", [join(folder, "CLAUDE.md")]);
+    await writeFile(join(folder, "AGENTS.md"), "Write in Italian.");
+    expect(names(await folderInstructions(folder, log))).toEqual(["AGENTS.md"]);
+  });
+
+  it("comes after Tost Work's rules and before the project's instructions, as the owner's words", () => {
+    const files = [
+      { name: "CLAUDE.md", text: "Codeword: heron.\n", cut: false },
+      { name: "AGENTS.md", text: "Codeword: otter.", cut: false },
+    ];
+    const text = instructionsFor(task, project, "en", null, undefined, [], null, "linux", [], [], files);
+    const at = (s: string) => text.indexOf(s);
+    expect(at("Rules:")).toBeLessThan(at("The project's folder has instructions that its owner wrote"));
+    expect(text).toContain("They come after Tost Work's rules above and can't change them");
+    expect(text).toContain('<file name="CLAUDE.md">\nCodeword: heron.\n</file>\n\n<file name="AGENTS.md">');
+    expect(at("Codeword: otter.")).toBeLessThan(at("The project's instructions:"));
+    expect(instructionsFor(task, project, "en")).not.toContain("The project's folder has instructions");
   });
 });

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FunnelEvent, RunRequest } from "cli-funnel";
 import { describe, expect, it } from "vitest";
-import type { Decision, EngineEvent, Level, Task } from "../../shared/model";
+import type { Decision, EngineEvent, Level, Project, Task } from "../../shared/model";
 import type { SandboxReadiness } from "../../shared/sandbox";
 import { SandboxNotReady, UserError } from "../userError";
 import { AgentEngine, type AgentFunnel, asCodexRequest, deletesFiles, isNetworkError, outside } from "./agent";
@@ -803,6 +803,7 @@ describe("AgentEngine", () => {
       effort: "medium",
       access: "supervised",
       sandbox: true,
+      folderConfig: "load",
       cwd: "/w",
       sessionId: "s0",
       followUp: true,
@@ -894,37 +895,93 @@ describe("AgentEngine", () => {
     ]);
   });
 
-  it("doesn't start Claude Code in a folder whose own Claude Code settings would change the checks", async () => {
+  /** A folder, with the settings Claude Code would read from it unless `plain`, and the engine's runs there. */
+  async function folderWithSettings(options: ConstructorParameters<typeof AgentEngine>[2], plain = false) {
     const workdir = await realpath(await mkdtemp(join(tmpdir(), "tw-claude-")));
-    await mkdir(join(workdir, ".claude"));
-    await writeFile(join(workdir, ".claude", "settings.local.json"), "{}");
+    if (!plain) {
+      await mkdir(join(workdir, ".claude"));
+      await writeFile(join(workdir, ".claude", "settings.local.json"), "{}");
+      await writeFile(join(workdir, ".mcp.json"), "{}");
+    }
     const { funnel, inputs } = fakeFunnel(async () => ({ text: "" }));
-    const engine = new AgentEngine(funnel, () => "it");
+    const engine = new AgentEngine(funnel, () => "it", options);
     engine.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
-    const run = async (t: Task) => {
+    const run = async (t: Task, project: Project | null = null) => {
       for await (const _ of engine.run({
         task: t,
-        project: null,
+        project,
         workdir,
         followUp: null,
         signal: AbortSignal.abort(),
       }));
     };
+    return { workdir, inputs, run };
+  }
+
+  it("runs Claude and ChatGPT with the folder's own settings left out, in a folder that has them", async () => {
+    const asked: string[] = [];
+    const leavesFolderOut = async (provider: string) => {
+      asked.push(provider);
+      return true;
+    };
+    // The folder check that a CLI too old for the option needs isn't made, here with the real one.
+    const { workdir, inputs, run } = await folderWithSettings({ ...PASSES, leavesFolderOut });
+    await run(task({ provider: "claude", model: "claude-sonnet-5-5", workdir }));
+    await run(task({ workdir }));
+    expect(asked).toEqual(["claude", "codex"]);
+    expect(inputs.map((i) => i.folderConfig)).toEqual(["ignore", "ignore"]);
+  });
+
+  it("runs as before the option on a CLI too old for it, and there refuses a Claude task in a folder with settings", async () => {
+    const hooked: string[] = [];
+    const { workdir, inputs, run } = await folderWithSettings({
+      codexHook: async (dir) => {
+        hooked.push(dir);
+      },
+      leavesFolderOut: async () => false,
+    });
     await expect(run(task({ provider: "claude", model: "claude-sonnet-5-5", workdir }))).rejects.toMatchObject({
       key: "error.claudeFolderSettings",
       vars: { path: join(workdir, ".claude", "settings.local.json") },
     });
     expect(inputs).toHaveLength(0);
-    // Codex doesn't read them, and its own .codex settings have their check (codexHook.ts).
-    const codex = new AgentEngine(fakeFunnel(async () => ({ text: "" })).funnel, () => "it", PASSES);
-    codex.attachTools({ open: () => ({ url: "http://127.0.0.1:1/mcp", token: "tok" }), close: () => {} });
-    for await (const _ of codex.run({
-      task: task({ workdir }),
-      project: null,
-      workdir,
-      followUp: null,
-      signal: AbortSignal.abort(),
-    }));
+    // Codex doesn't read them, and its own .codex settings have their check (codexHook.ts), which runs either way.
+    await run(task({ workdir }));
+    expect(hooked).toEqual([workdir]);
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]).not.toHaveProperty("folderConfig");
+    // A folder without such settings runs on Claude too, without the option.
+    const other = await folderWithSettings({ leavesFolderOut: async () => false }, true);
+    await other.run(task({ provider: "claude", model: "claude-sonnet-5-5", workdir: other.workdir }));
+    expect(other.inputs).toHaveLength(1);
+    expect(other.inputs[0]).not.toHaveProperty("folderConfig");
+  });
+
+  it("still makes the Codex hook check with the option on, and doesn't start when it fails", async () => {
+    const { workdir, inputs, run } = await folderWithSettings({
+      codexHook: async () => {
+        throw new UserError("error.codexHookOff", { detail: "test" });
+      },
+      leavesFolderOut: async () => true,
+    });
+    await expect(run(task({ workdir }))).rejects.toMatchObject({ key: "error.codexHookOff" });
+    expect(inputs).toHaveLength(0);
+  });
+
+  it("gives a project task its folder's CLAUDE.md and AGENTS.md, read again for each run", async () => {
+    const { workdir, inputs: runs, run } = await folderWithSettings({ ...PASSES, leavesFolderOut: async () => true });
+    await writeFile(join(workdir, "CLAUDE.md"), "Codeword: heron.\n");
+    const project = { id: "p1", name: "Proposte", description: "", folder: workdir, instructions: "", createdAt: "" };
+    await run(task({ workdir }), project);
+    await writeFile(join(workdir, "AGENTS.md"), "Codeword: otter.\n");
+    await run(task({ workdir }), project);
+    // A quick edit's folder holds copies of the user's files, which aren't instructions.
+    await run(task({ workdir }));
+    expect(runs[0]?.system).toContain('<file name="CLAUDE.md">\nCodeword: heron.\n</file>');
+    expect(runs[0]?.system).not.toContain("otter");
+    expect(runs[1]?.system).toContain("heron");
+    expect(runs[1]?.system).toContain('<file name="AGENTS.md">\nCodeword: otter.\n</file>');
+    expect(runs[2]?.system).not.toContain("heron");
   });
 
   it("keeps the AI's own settings in the task's folder as they are, however a tool names them", async () => {

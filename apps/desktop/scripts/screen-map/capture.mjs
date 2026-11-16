@@ -441,7 +441,8 @@ await safe("task errors", async () => {
     );
     return id;
   };
-  // A project folder that carries its own Claude Code settings: a .mcp.json, which Claude Code would start servers from.
+  // A project folder that carries its own Claude Code settings, a .mcp.json, on a Claude Code too old to leave them out
+  // of the task: the only case where Tost Work still refuses such a folder.
   const mcp = join(folder, ".mcp.json");
   writeFileSync(mcp, "{}");
   const claudeFolder = failed(1, "Aggiorna il listino con i prezzi nuovi", folder, {
