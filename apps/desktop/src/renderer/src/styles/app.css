@@ -2970,7 +2970,7 @@ label.opt input {
 }
 /* What a task failed on: a message may list files, one to a line, and a long path wraps instead of widening the page. */
 .agent.failure {
-  white-space: pre-line;
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 /* Tables in a message, now that a "take stock" answer comes in the chat. Wide ones scroll sideways. */
