@@ -24,7 +24,7 @@ import { needsUnconfinedOk } from "../shared/sandbox";
 import { Accounts } from "./accounts";
 import { giveAgentsOwnHomes } from "./agentHomes";
 import { menuTemplate, nextTextSize, textMenuTemplate } from "./appMenu";
-import { leavesFolderOut } from "./claudeFolder";
+import { checkClaudeFolder, leavesFolderOut } from "./claudeFolder";
 import { type CodexHook, codexHookCheck } from "./codexHook";
 import { DebugLogs } from "./debugLog";
 import { documentTools } from "./documents";
@@ -299,6 +299,16 @@ app.whenReady().then(async () => {
       sandboxReady: (provider) => checkSandbox(provider, sandboxSystem),
       codexHook: codexHookCheck(codexHook, () => funnel.providers.codex.detect()),
       leavesFolderOut: (provider) => leavesFolderOut(funnel.providers[provider]),
+      // The version is the one cli-funnel just read for leavesFolderOut, and the message names it.
+      claudeFolder: async (workdir) =>
+        checkClaudeFolder(
+          workdir,
+          undefined,
+          await funnel.providers.claude.detect().then(
+            (found) => found.version,
+            () => undefined,
+          ),
+        ),
       skills: () => skills.list(),
       job: (id) => store.getJob(id),
       verbose: () => debugOn,

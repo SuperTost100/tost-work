@@ -4,7 +4,13 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createFunnel } from "cli-funnel";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
-import { checkClaudeFolder, claudeFolderSettings, compareVersions, leavesFolderOut } from "./claudeFolder";
+import {
+  CLAUDE_FOLDER_MIN_VERSION,
+  checkClaudeFolder,
+  claudeFolderSettings,
+  compareVersions,
+  leavesFolderOut,
+} from "./claudeFolder";
 import { UserError } from "./userError";
 
 let root = "";
@@ -34,43 +40,98 @@ describe("Claude Code settings a task's folder brings", () => {
       "Documents/.claude/settings.json",
       "Documents/.claude/agents/helper.md",
     ]);
-    expect(await claudeFolderSettings(work, home)).toBeNull();
+    expect(await claudeFolderSettings(work, home)).toEqual([]);
     await checkClaudeFolder(work, home);
   });
 
   it("finds the task folder's own settings and MCP servers", async () => {
     for (const file of [".claude/settings.json", ".claude/settings.local.json", ".mcp.json"]) {
       const { home, work } = await layout([`Documents/task/${file}`]);
-      expect(await claudeFolderSettings(work, home), file).toBe(join(work, file));
+      expect(await claudeFolderSettings(work, home), file).toEqual([join(work, file)]);
       await rm(root, { recursive: true, force: true });
     }
   });
 
   it("finds local settings in a folder above, such as a repository's top, and MCP servers anywhere above", async () => {
     let { home, work } = await layout(["Documents/.claude/settings.local.json"]);
-    expect(await claudeFolderSettings(work, home)).toBe(join(home, "Documents", ".claude", "settings.local.json"));
+    expect(await claudeFolderSettings(work, home)).toEqual([join(home, "Documents", ".claude", "settings.local.json")]);
     await rm(root, { recursive: true, force: true });
     ({ home, work } = await layout([".mcp.json"]));
-    expect(await claudeFolderSettings(work, home)).toBe(join(home, ".mcp.json"));
+    expect(await claudeFolderSettings(work, home)).toEqual([join(home, ".mcp.json")]);
   });
 
   it("follows a link to the task's folder, as Claude Code does", async () => {
     const { home } = await layout(["Elsewhere/.mcp.json"]);
     await mkdir(join(home, "Elsewhere", "task"));
     await symlink(join(home, "Elsewhere", "task"), join(root, "link"));
-    expect(await claudeFolderSettings(join(root, "link"), home)).toBe(join(home, "Elsewhere", ".mcp.json"));
+    expect(await claudeFolderSettings(join(root, "link"), home)).toEqual([join(home, "Elsewhere", ".mcp.json")]);
   });
 
-  it("refuses with the file's path, in the user's language", async () => {
-    const { home, work } = await layout(["Documents/task/.claude/settings.local.json"]);
-    const path = join(work, ".claude", "settings.local.json");
-    const err = await checkClaudeFolder(work, home).then(
-      () => null,
-      (e: unknown) => e,
-    );
-    expect(err).toBeInstanceOf(UserError);
-    expect(err).toMatchObject({ key: "error.claudeFolderSettings", vars: { path } });
-    expect((err as UserError).say("it")).toContain(path);
+  it("finds every file at once, in the task's folder and above it, in the order Claude Code's folders go up", async () => {
+    const { home, work } = await layout([
+      "Documents/task/.claude/settings.json",
+      "Documents/task/.claude/settings.local.json",
+      "Documents/task/.mcp.json",
+      "Documents/.claude/settings.local.json",
+      "Documents/.mcp.json",
+      ".mcp.json",
+    ]);
+    expect(await claudeFolderSettings(work, home)).toEqual([
+      join(work, ".claude", "settings.json"),
+      join(work, ".claude", "settings.local.json"),
+      join(work, ".mcp.json"),
+      join(home, "Documents", ".claude", "settings.local.json"),
+      join(home, "Documents", ".mcp.json"),
+      join(home, ".mcp.json"),
+    ]);
+  });
+
+  it("names a file once when the folder is reached through a link and again by its real path", async () => {
+    const { home } = await layout(["Elsewhere/task/.mcp.json", "Elsewhere/.mcp.json"]);
+    await symlink(join(home, "Elsewhere", "task"), join(root, "link"));
+    expect(await claudeFolderSettings(join(root, "link"), home)).toEqual([
+      join(root, "link", ".mcp.json"),
+      join(home, "Elsewhere", ".mcp.json"),
+    ]);
+  });
+
+  it("refuses naming every file, in the user's language, and the version when it's known", async () => {
+    const { home, work } = await layout([
+      "Documents/task/.claude/settings.local.json",
+      "Documents/task/.mcp.json",
+      ".mcp.json",
+    ]);
+    const paths = [join(work, ".claude", "settings.local.json"), join(work, ".mcp.json"), join(home, ".mcp.json")];
+    const refusal = (version?: string) =>
+      checkClaudeFolder(work, home, version).then(
+        () => null,
+        (e: unknown) => e as UserError,
+      );
+    const known = await refusal("2.1.321");
+    expect(known).toBeInstanceOf(UserError);
+    expect(known).toMatchObject({
+      key: "error.claudeFolderSettings",
+      vars: { files: paths.join("\n"), min: CLAUDE_FOLDER_MIN_VERSION, version: "2.1.321" },
+    });
+    for (const lang of ["en", "it"] as const) {
+      const text = known?.say(lang) ?? "";
+      for (const path of paths) expect(text, `${lang} ${path}`).toContain(path);
+      expect(text, lang).toContain("2.1.321");
+      expect(text, lang).toContain(CLAUDE_FOLDER_MIN_VERSION);
+      expect(text, lang).toContain("claude update");
+      expect(text, lang).not.toMatch(/\{\w+\}/);
+    }
+    expect(known?.say("en")).not.toMatch(/by itself|updates itself/);
+    expect(known?.say("it")).not.toMatch(/da solo/);
+    // A version that couldn't be read is left out, and the message says so instead of naming one.
+    const unknown = await refusal();
+    expect(unknown).toMatchObject({ key: "error.claudeFolderSettingsNoVersion" });
+    for (const lang of ["en", "it"] as const) {
+      const text = unknown?.say(lang) ?? "";
+      for (const path of paths) expect(text, `${lang} ${path}`).toContain(path);
+      expect(text, lang).toContain("claude update");
+      expect(text, lang).not.toMatch(/\{\w+\}|undefined/);
+    }
   });
 });
 
@@ -89,6 +150,8 @@ describe("leaving the folder's own settings out of a run", () => {
 
   it("is on from Claude Code 2.1.325 and Codex 0.150.0", async () => {
     expect(funnel.providers.claude.capabilities.folderConfigMinVersion).toBe("2.1.325");
+    // The version the refusal names as the one to have.
+    expect(CLAUDE_FOLDER_MIN_VERSION).toBe("2.1.325");
     expect(funnel.providers.codex.capabilities.folderConfigMinVersion).toBe("0.150.0");
     expect(await on("claude", "2.1.325")).toBe(true);
     expect(await on("claude", "2.1.330 (Claude Code)")).toBe(true);
