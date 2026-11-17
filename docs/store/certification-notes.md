@@ -10,7 +10,7 @@ Microsoft's pages give no length limit for the notes field. If Partner Center re
 ## Notes for certification
 
 ```text
-Notes written on [FILL IN: date, e.g. 2026-11-12]. Package version 1.0.35.0, which is Tost Work 0.0.35-dev, a test build for a private group of testers.
+Notes written on [FILL IN: date, e.g. 2026-11-12]. Package version 1.0.36.0, which is Tost Work 0.0.36-dev, a test build for a private group of testers.
 
 WHAT THE APP IS
 Tost Work is a free, open-source desktop app (MIT licence, github.com/SuperTost100/tost-work) for doing everyday office work with AI on the user's own files. The user picks a project folder and writes a request; the AI makes or changes Word, Excel, PowerPoint and PDF files in that folder, asks when it needs a decision, and shows every file it changed.
@@ -60,6 +60,7 @@ SAFETY OF THE AI'S WORK
 The AI works in the project folder the user chose. What keeps its commands there depends on the AI:
 - ChatGPT (Codex): its commands run in Codex's own sandbox, which lets them write only inside the task's folder and temporary folders. Every step Codex takes first passes a check by the app, and a step that fails the check doesn't run.
 - Claude (Claude Code): it asks the app before it writes or deletes a file. On macOS and Linux its commands run in Claude Code's sandbox. On Windows Claude Code has no sandbox yet, so its commands are not confined to the folder: they could read or write elsewhere on the PC. Its file tools stay in the task's folder. The app says all this before the user connects Claude and before the first Claude task.
+Settings that the project folder carries for Claude Code or Codex themselves (permission rules, hooks, MCP servers) are left out of every task, so they can't lift the app's checks. This needs Claude Code 2.1.325 or Codex 0.150.0, which a fresh install has. With an older Claude Code the app refuses such a folder and says how to update.
 Before a change to a file that was already in the folder, the app shows a card and keeps the earlier version, which "Restore" puts back. This covers the AI's file tools and the commands the app can read. A command or script that works out its file names as it runs, or that changes files from inside a program, can change a file without a card. When the task ends, the app compares the folder with how it was at the start and lists such a file as changed: with its earlier version when the app had kept a copy before the command, and otherwise marked "No earlier version". It can't compare when the task was stopped or the folder holds too many files. A file it had kept a copy of is then still listed with that earlier version, and any other isn't listed. The comparison covers the task's folder only, so on Windows, where Claude's commands can reach other folders, a file changed outside it isn't listed. Commands that delete files are refused, and a deletion goes through the app's own tool: the user is asked, and the file goes to the Recycle Bin. A script that deletes in a way the app can't read isn't caught.
 
 STARTUP TASK
@@ -98,7 +99,7 @@ The data folder stays after an uninstall. The privacy notice tells users which f
 For use only if Partner Center refuses the long notes. It shortens the safety details and leaves out the startup task.
 
 ```text
-Notes written on [FILL IN: date]. Package 1.0.35.0 = Tost Work 0.0.35-dev, a test build for a private group of testers.
+Notes written on [FILL IN: date]. Package 1.0.36.0 = Tost Work 0.0.36-dev, a test build for a private group of testers.
 
 Tost Work is a free, open-source app (github.com/SuperTost100/tost-work) that runs OpenAI's Codex CLI or Anthropic's Claude Code on the user's PC to make and change office files in a folder the user picks. It needs the user's own ChatGPT or Claude account, or an API key.
 
