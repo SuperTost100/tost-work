@@ -11,7 +11,7 @@ Everything needed to send Tost Work's first Microsoft Store submission from Part
 5. [screenshots/](screenshots/): six screenshots per language, 1440 × 900, in `en/` and `it/`.
 6. [certification-notes.md](certification-notes.md): the notes for Microsoft's reviewers and the reasons for the two restricted capabilities, ready to paste.
 
-The build to submit is 0.0.35-dev, Store version `1.0.35.0`. Its package link goes in the table at the top of [submission.md](submission.md#the-build-to-submit).
+The build to submit is 0.0.36-dev, Store version `1.0.36.0`. Its package link is in the table at the top of [submission.md](submission.md#the-build-to-submit).
 
 ## Decisions for Tost
 

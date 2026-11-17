@@ -7,13 +7,13 @@ The steps to send the first Store submission of Tost Work, for a private audienc
 
 ## The build to submit
 
-Fill these in once 0.0.35-dev exists:
+The build is 0.0.36-dev, made from `main` at `cf56bc3`:
 
 | What | Value |
 | --- | --- |
-| Tost Work version | `0.0.35-dev` |
-| Store version in the package | `1.0.35.0` (from `node apps/desktop/scripts/store-version.mjs 0.0.35-dev`, which prints `1.0.35`, and the Store adds the last `.0`) |
-| Package file | **[FILL IN: link to the `.appx` from the Package workflow's "Microsoft Store package" job, in the artifact named `tost-work-store-0.0.35-dev-<commit>`]** |
+| Tost Work version | `0.0.36-dev` |
+| Store version in the package | `1.0.36.0` (from `node apps/desktop/scripts/store-version.mjs 0.0.36-dev`, which prints `1.0.36`, and the Store adds the last `.0`) |
+| Package file | `Tost Work 1.0.36.appx`, in the artifact [`tost-work-store-0.0.36-dev-cf56bc3`](https://github.com/SuperTost100/tost-work/actions/runs/43992667026/artifacts/14288472008) of the Package workflow's "Microsoft Store package" job. GitHub keeps it until 2026-12-01 and asks for a sign-in to download it. After that date, run the Package workflow on the tag `v0.0.36-dev`, which points at `cf56bc3` (`gh workflow run package.yml --ref v0.0.36-dev`): a run on `main` would build a later commit |
 
 The package is the unsigned `.appx` the CI job uploads, not the test-signed copy it installs. Microsoft signs it: "Your MSIX and AppX packages don't have to be signed with a certificate rooted in a trusted certificate authority when submitting to the Microsoft Store" ([package requirements](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/app-package-requirements)).
 
