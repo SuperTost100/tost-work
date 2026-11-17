@@ -47,8 +47,8 @@ changing the app, and the map marks them in the section's note and the frame nam
   `bwrap` and `socat` in, one at a time, and presses Check again.
 - **Tasks that can't start** (section "Tasks that can't start"): the fake engine runs none of the checks that stop a
   real task. The capture saves each failed task into its throwaway database, with the app's own Italian sentence read
-  from `src/shared/i18n.ts`: a project folder with a `.mcp.json` on a Claude Code too old to leave it out of the task
-  (from Claude Code 2.1.325 on, such a folder works), ChatGPT's step check failing because Codex isn't installed, and a
+  from `src/shared/i18n.ts`: a project folder with a `.mcp.json` and a `.claude/settings.local.json` on a Claude Code too old to
+  leave them out of the task (from Claude Code 2.1.325 on, such a folder works), the message naming both files, ChatGPT's step check failing because Codex isn't installed, and a
   Claude task stopped on a missing socat. The window then shows them as it does for a real failure.
 
 The frames for a state the platform doesn't have are named for it (`windows-…`, `linux-…`), and the page title says which

@@ -441,13 +441,20 @@ await safe("task errors", async () => {
     );
     return id;
   };
-  // A project folder that carries its own Claude Code settings, a .mcp.json, on a Claude Code too old to leave them out
-  // of the task: the only case where Tost Work still refuses such a folder.
+  // A project folder that carries its own Claude Code settings, a .mcp.json and a local settings file, on a Claude
+  // Code too old to leave them out of the task: the only case where Tost Work still refuses such a folder.
   const mcp = join(folder, ".mcp.json");
   writeFileSync(mcp, "{}");
+  const local = join(folder, ".claude", "settings.local.json");
+  mkdirSync(dirname(local), { recursive: true });
+  writeFileSync(local, "{}");
   const claudeFolder = failed(1, "Aggiorna il listino con i prezzi nuovi", folder, {
     provider: "claude",
-    error: italian("error.claudeFolderSettings", { path: mcp }),
+    error: italian("error.claudeFolderSettings", {
+      files: [local, mcp].join("\n"),
+      min: "2.1.325",
+      version: "2.1.321",
+    }),
   });
   // What the real check says when Codex isn't there to turn its step check on.
   const chatgpt = failed(2, "Riassumi il contratto in una pagina", folder, {

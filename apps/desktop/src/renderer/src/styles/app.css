@@ -2968,6 +2968,11 @@ label.opt input {
 .agent li + li {
   margin-top: 4px;
 }
+/* What a task failed on: a message may list files, one to a line, and a long path wraps instead of widening the page. */
+.agent.failure {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
 /* Tables in a message, now that a "take stock" answer comes in the chat. Wide ones scroll sideways. */
 .agent table {
   display: block;

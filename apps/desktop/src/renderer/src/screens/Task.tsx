@@ -1309,7 +1309,7 @@ export function Task({
                       onError={onError}
                     />
                   ) : (
-                    <p className="agent">{t("task.failed", { error: task.error ?? "" })}</p>
+                    <p className="agent failure">{t("task.failed", { error: task.error ?? "" })}</p>
                   ))}
                 {checked ? (
                   <>

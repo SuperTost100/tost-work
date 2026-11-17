@@ -941,8 +941,8 @@ describe("AgentEngine", () => {
       leavesFolderOut: async () => false,
     });
     await expect(run(task({ provider: "claude", model: "claude-sonnet-5-5", workdir }))).rejects.toMatchObject({
-      key: "error.claudeFolderSettings",
-      vars: { path: join(workdir, ".claude", "settings.local.json") },
+      key: "error.claudeFolderSettingsNoVersion",
+      vars: { files: [join(workdir, ".claude", "settings.local.json"), join(workdir, ".mcp.json")].join("\n") },
     });
     expect(inputs).toHaveLength(0);
     // Codex doesn't read them, and its own .codex settings have their check (codexHook.ts), which runs either way.
