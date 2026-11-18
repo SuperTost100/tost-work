@@ -12,6 +12,7 @@
 <p align="center">
   <a href="https://github.com/SuperTost100/tost-work/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/SuperTost100/tost-work?include_prereleases&label=release&color=9c8b73"></a>
   <a href="https://github.com/SuperTost100/tost-work/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/SuperTost100/tost-work/ci.yml?branch=main&label=checks"></a>
+  <img alt="CodeRabbit Pull Request Reviews" src="https://img.shields.io/coderabbit/prs/github/SuperTost100/tost-work?link=https%3A%2F%2Fcoderabbit.link%2Ftost">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-9c8b73"></a>
 </p>
 
